@@ -22,6 +22,15 @@ class ConsumedMessage:
     native: Message | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class ConsumerGroupSnapshot:
+    group_id: str
+    topic: str
+    state: str
+    member_count: int | None
+    lag: int
+
+
 class ProducerPort(Protocol):
     def publish(
         self,
@@ -121,6 +130,61 @@ class KafkaConsumer:
 
     def close(self) -> None:
         self._consumer.close()
+
+
+def consumer_group_snapshot(
+    bootstrap_servers: str,
+    *,
+    group_id: str,
+    topic: str,
+    timeout: float = 3.0,
+) -> ConsumerGroupSnapshot:
+    """Read committed offsets and active members without joining the target group."""
+    if topic not in TOPICS:
+        raise ValueError(f"unsupported Kafka topic: {topic}")
+    admin = AdminClient({"bootstrap.servers": bootstrap_servers})
+    metadata = admin.list_topics(topic=topic, timeout=timeout)
+    topic_metadata = metadata.topics.get(topic)
+    if topic_metadata is None or topic_metadata.error is not None:
+        raise RuntimeError(f"Kafka topic is unavailable: {topic}")
+
+    partitions = [TopicPartition(topic, partition_id) for partition_id in sorted(topic_metadata.partitions)]
+    consumer = Consumer(
+        {
+            "bootstrap.servers": bootstrap_servers,
+            "group.id": group_id,
+            "enable.auto.commit": False,
+        }
+    )
+    try:
+        committed = consumer.committed(partitions, timeout=timeout)
+        lag = 0
+        for partition in committed:
+            low, high = consumer.get_watermark_offsets(
+                TopicPartition(topic, partition.partition), timeout=timeout, cached=False
+            )
+            offset = partition.offset if partition.offset >= 0 else low
+            lag += max(0, high - offset)
+    finally:
+        consumer.close()
+
+    state = "UNKNOWN"
+    member_count: int | None = None
+    try:
+        description = admin.describe_consumer_groups([group_id], request_timeout=timeout)[group_id].result(timeout)
+        raw_state = getattr(description, "state", None)
+        state = getattr(raw_state, "name", None) or str(raw_state or "UNKNOWN")
+        member_count = len(getattr(description, "members", ()) or ())
+    except Exception:
+        # Offset lag remains useful when the broker cannot describe group membership.
+        pass
+    return ConsumerGroupSnapshot(
+        group_id=group_id,
+        topic=topic,
+        state=state,
+        member_count=member_count,
+        lag=lag,
+    )
 
 
 def ensure_topics(bootstrap_servers: str) -> None:

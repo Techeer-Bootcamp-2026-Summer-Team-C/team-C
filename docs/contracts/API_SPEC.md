@@ -12,9 +12,9 @@ Agent는 Process, Network, File, DNS, L7 5종 metadata를 전송한다. Npcap/tc
 
 | 구분 | 개수 |
 | --- | ---: |
-| Dashboard Backend REST API | 15 |
+| Dashboard Backend REST API | 20 |
 | Collector REST API | 3 |
-| **제품 REST API 합계** | **18** |
+| **제품 REST API 합계** | **23** |
 
 `/health/live`, `/health/ready`, `/metrics`, Swagger/OpenAPI 경로는 운영 endpoint이므로 제품 API 개수에서 제외한다. Failure 재처리는 공개 REST API가 아니라 관리자용 Python CLI로 수행한다.
 
@@ -205,18 +205,23 @@ FastAPI/Pydantic response model을 최종 응답 계약으로 사용한다.
 | 1 | POST | `/auth/login` | 로그인 | `LoginData` |
 | 2 | GET | `/endpoints` | Endpoint 목록 | `PagedData<EndpointDto>` |
 | 3 | GET | `/endpoints/{endpointId}` | Endpoint 상세 | `EndpointDetailDto` |
-| 4 | GET | `/events` | Event 목록 | `PagedData<EventDto>` |
-| 5 | GET | `/events/{eventId}` | Event 상세 | `EventDetailDto` |
-| 6 | POST | `/archives/restores` | Archive 복원 시작 | `ArchiveRestoreStartDto` |
-| 7 | GET | `/archives/restores` | Archive 복원 상태 | `PagedData<ArchiveBucketDto>` |
-| 8 | GET | `/alerts` | Alert 목록 | `PagedData<AlertDto>` |
-| 9 | GET | `/alerts/{alertId}` | Alert 상세 | `AlertDetailDto` |
-| 10 | PATCH | `/alerts/{alertId}/status` | Alert 상태 변경 | `AlertDto` |
-| 11 | GET | `/incidents` | Incident 목록 | `PagedData<IncidentDto>` |
-| 12 | GET | `/incidents/{incidentId}` | Incident 상세 | `IncidentDetailDto` |
-| 13 | GET | `/dashboard/summary` | 전체 요약 | `DashboardSummaryDto` |
-| 14 | GET | `/dashboard/endpoints/summary` | Endpoint 요약 | `EndpointSummaryDto` |
-| 15 | GET | `/dashboard/ingest/summary` | 수집·저장·failure 요약 | `IngestSummaryDto` |
+| 4 | GET | `/endpoints/{endpointId}/process-tree` | 수집 Event 기반 Process Tree | `ProcessTreeDto` |
+| 5 | GET | `/events` | Event 목록 | `PagedData<EventDto>` |
+| 6 | GET | `/events/{eventId}` | Event 상세 | `EventDetailDto` |
+| 7 | GET | `/failures` | 읽기 전용 Failure/DLQ 목록 | `PagedData<EventFailureDto>` |
+| 8 | POST | `/archives/restores` | Archive 복원 시작 | `ArchiveRestoreStartDto` |
+| 9 | GET | `/archives/restores` | Archive 복원 상태 | `PagedData<ArchiveBucketDto>` |
+| 10 | GET | `/alerts` | Alert 목록 | `PagedData<AlertDto>` |
+| 11 | GET | `/alerts/{alertId}` | Alert 상세 | `AlertDetailDto` |
+| 12 | PATCH | `/alerts/{alertId}/status` | Alert 상태 변경 | `AlertDto` |
+| 13 | GET | `/incidents` | Incident 목록 | `PagedData<IncidentDto>` |
+| 14 | GET | `/incidents/{incidentId}` | Incident 상세 | `IncidentDetailDto` |
+| 15 | GET | `/incidents/{incidentId}/timeline` | Event→Alert→Incident 타임라인 | `AttackTimelineDto` |
+| 16 | GET | `/dashboard/summary` | 전체 요약 | `DashboardSummaryDto` |
+| 17 | GET | `/dashboard/endpoints/summary` | Endpoint 요약 | `EndpointSummaryDto` |
+| 18 | GET | `/dashboard/ingest/summary` | 수집·저장·failure 요약 | `IngestSummaryDto` |
+| 19 | GET | `/dashboard/topology` | Endpoint egress 관계 요약 | `EgressTopologyDto` |
+| 20 | GET | `/operations/health` | 실시간 의존 서비스·Kafka Worker 상태 | `OperationsHealthDto` |
 
 ### 5.2 Collector REST API
 
@@ -465,6 +470,7 @@ GET /api/v1/endpoints?status=ONLINE&osType=WINDOWS&page=1&size=50
 
 | Query | 타입 | 기본 | 설명 |
 | --- | --- | --- | --- |
+| `endpointIds` | repeated integer | - | Endpoint ID exact match, 여러 값은 OR |
 | `status` | EndpointStatus | - | exact match |
 | `osType` | `WINDOWS / MACOS` | - | exact match |
 | `riskLevel` | RiskLevel | - | 현재 Endpoint Risk level exact match |
@@ -549,6 +555,14 @@ GET /api/v1/endpoints/{endpointId}
 
 `certificates`는 `agent_auth_keys` 이력에서 조회하며 값이 없으면 `[]`다. Private key, 개발용 CA private key, 내부 secret은 반환하지 않는다.
 
+### 8.3 Process Tree 조회
+
+```http
+GET /api/v1/endpoints/{endpointId}/process-tree?timePreset=CUSTOM&from=...&to=...&selectedPid=1234
+```
+
+기존 `PROCESS_EXECUTION` Event의 PID/PPID를 묶어 `ProcessTreeDto`를 반환한다. node에는 process metadata, 최초/최종 관측 시각, Event 수, 선택 PID와 parent 수집 여부가 포함된다. 프로세스 실시간 상태나 실행 제어를 만들지 않으며 ERD 변경 없이 ClickHouse Event를 조회한다.
+
 ## 9. Events API
 
 ### 9.1 목록
@@ -611,6 +625,14 @@ Event 목록·상세는 bucket 상태에 따라 다음과 같이 조회한다.
 - archive 검증 후 ClickHouse 삭제 전 7일 safety window처럼 동일 논리 bucket에 HOT과 S3 row가 함께 있으면 HOT이 우선하며, 해당 S3 row의 상태는 조회를 차단하지 않는다.
 - HOT 또는 RESTORED로 충족되지 않은 논리 bucket에 `ARCHIVED`, `RESTORE_REQUESTED`, `RESTORE_FAILED`, `EXPIRED` 상태가 있으면 부분 결과를 반환하지 않고 `409 ARCHIVE_NOT_READY`를 반환한다. 각 `error.details[].context`는 `endpointId`, `bucketStartAt`, `storageStatus` required field를 가진다.
 - Event 조회가 archive 복원을 자동 시작하거나 restored data를 ClickHouse에 재적재하지 않는다.
+
+### 9.3 Failure 목록
+
+```http
+GET /api/v1/failures?timePreset=LATEST_24H&status=FAILED&page=1&size=50
+```
+
+`PagedData<EventFailureDto>`를 반환하는 읽기 전용 DLQ Monitor API다. `status`, `failureStage`, `retryable`, 시간 범위, pagination과 sort를 지원한다. replay·삭제·상태 변경은 제공하지 않고 기존 관리자 CLI 경계를 유지한다.
 
 ## 10. Archive API
 
@@ -809,6 +831,14 @@ GET /api/v1/incidents/{incidentId}
 
 상세 응답 model은 `IncidentDetailDto`다. `IncidentDto` 전체 필드와 `alerts: AlertDto[]`를 반환하며 연결 Alert가 없으면 `[]`다.
 
+### 12.3 Attack Timeline
+
+```http
+GET /api/v1/incidents/{incidentId}/timeline
+```
+
+기존 `incidents`, `incident_alerts`, `alerts`와 Event detail을 결합해 `AttackTimelineDto`를 반환한다. 항목 타입은 `INCIDENT`, `EVENT`, `ALERT`이며 발생 시각 순으로 정렬한다. 별도 timeline table이나 ERD 변경은 없다.
+
 ## 13. Dashboard API
 
 ### 13.1 전체 요약
@@ -892,6 +922,7 @@ Dashboard metric item model은 다음 required field를 사용한다.
 | `events` | `totalCount: integer`, `byEventType: EventTypeCountDto[]`, `topProcesses: TopProcessDto[]`, `topRemoteIps: TopRemoteIpDto[]`, `topDomains: TopDomainDto[]`, `topFileHashes: TopFileHashDto[]`, `topDnsQueries: TopDnsQueryDto[]`, `topL7Protocols: TopL7ProtocolDto[]`, `timeSeries: TimeSeriesPointDto[]` |
 | `eventFailures` | `totalCount: integer`, `byStage: FailureStageCountDto[]`, `byCode: FailureCodeCountDto[]`, `byStatus: FailureStatusCountDto[]` |
 | `storage` | `totalBucketCount: integer`, `byBackend: StorageBackendCountDto[]`, `byClass: StorageClassCountDto[]`, `byStatus: StorageStatusCountDto[]` |
+| `responseGuidance` | `affectedAlertCount`, `ruleCount`, `manualActionStepCount`, `highestSeverity`, `steps: ResponseGuidanceStepDto[]` |
 
 모든 하위 object와 list field는 required다. 집계 결과가 없으면 count는 `0`, list는 `[]`다. `topDomains.domain`은 `COALESCE(remote_domain, http_host)`로 계산하고 DNS query는 `topDnsQueries`에서 별도 집계한다.
 
@@ -932,10 +963,12 @@ GET /api/v1/dashboard/ingest/summary?timePreset=LATEST_24H
     },
     "events": {
       "ingestedCount": 1000000,
+      "ratePerMinute": 694.44,
       "latestIngestedAt": "2026-07-11T00:00:01Z"
     },
     "eventFailures": {
       "failedCount": 12,
+      "ratePerMinute": 0.01,
       "reprocessedCount": 5,
       "reprocessFailedCount": 1,
       "oldestFailedAt": "2026-07-10T22:00:00Z"
@@ -953,11 +986,38 @@ GET /api/v1/dashboard/ingest/summary?timePreset=LATEST_24H
 }
 ```
 
-응답 model `IngestSummaryDto`는 예시와 같은 required object를 사용한다. `latestIngestedAt`, `oldestFailedAt`만 `timestamp | null`이고 나머지 count는 required integer다. Event/failure가 없으면 timestamp는 `null`, count는 `0`이다.
+응답 model `IngestSummaryDto`는 예시와 같은 required object를 사용한다. `latestIngestedAt`, `oldestFailedAt`만 `timestamp | null`이고 count와 `ratePerMinute`는 required다. rate는 선택 범위의 분당 평균이며 Event/failure가 없으면 timestamp는 `null`, count와 rate는 `0`이다.
 
 Failure는 ClickHouse에서 `failure_id`별 최신 `updated_at` row를 선택하고 storage는 PostgreSQL `ingest_metadata`에서 집계한다. `restoredBucketCount`는 `storage_backend=S3`, `storage_class=GLACIER_FLEXIBLE_RETRIEVAL`, `storage_status=RESTORED`인 bucket 수다. API 응답에서만 DB snake_case를 camelCase로 변환한다.
 
-### 13.4 DTO와 ERD Mapping 예외
+### 13.4 Endpoint Egress Topology
+
+```http
+GET /api/v1/dashboard/topology?timePreset=LATEST_24H&endpointIds=1001&endpointIds=1002
+```
+
+기존 network/DNS/L7 Event와 Alert를 Endpoint→target 관계로 집계해 `EgressTopologyDto`를 반환한다. node는 현재 Endpoint 상태·Risk, edge는 protocol·Event 수·Alert 수·마지막 관측 시각을 포함한다. `bytesOut`은 현재 수집 데이터에 없으므로 추정하지 않는다.
+
+### 13.5 실시간 운영 상태
+
+```http
+GET /api/v1/operations/health
+```
+
+이 API는 요청 시점에 Backend API, PostgreSQL, ClickHouse, Kafka, S3를 직접 probe하고 `edr-event-storage-v1`, `edr-detection-v1` Consumer Group의 member 수와 committed-offset lag를 조회한다. 결과를 저장하지 않으므로 ERD 변경과 과거 이력은 없다. 일부 probe가 실패해도 HTTP 200으로 성공한 결과와 실패한 결과를 함께 반환하며, 인증 실패만 401이다.
+
+`OperationsHealthDto`:
+
+| 필드 | 타입/하위 필드 |
+| --- | --- |
+| `checkedAt` | timestamp |
+| `status` | `HEALTHY / DEGRADED / UNAVAILABLE` |
+| `services` | `service`, `status`, `latencyMs`, `detail` |
+| `workers` | `worker`, `groupId`, `topic`, `status`, `memberCount`, `lag`, `detail` |
+
+Worker `status`는 `RUNNING / IDLE / OFFLINE / UNKNOWN`이다. Group member 조회가 실패하면 `memberCount`, `lag`는 각각 확인 가능한 범위만 반환하며 확인할 수 없는 값은 `null`이다. UI는 이 API와 `dashboard/ingest/summary`의 `latestIngestedAt`을 함께 표시하되 과거 availability 그래프를 만들지 않는다.
+
+### 13.6 DTO와 ERD Mapping 예외
 
 기본 규칙은 camelCase field를 같은 단어의 snake_case 컬럼에 대응하는 것이다. 예외는 다음으로 고정한다.
 
@@ -1174,7 +1234,7 @@ CLI는 S3 원문의 보존 만료, 크기, checksum을 검증한 뒤 `replay_fai
 | Report | Report Center/Modal, HTML/Markdown path, 저장·공유 API 사용하지 않음 |
 | DB | PostgreSQL 운영 데이터, ClickHouse event/failure |
 | Failure | 결정적 UUIDv5/S3 key, payload 90일, index 97일, 관리자 CLI 수동 재처리 |
-| 웹 Failure 관리 | DLQ Monitor와 웹 replay API 사용하지 않음 |
+| 웹 Failure 관리 | 읽기 전용 DLQ Monitor 제공, 웹 replay API는 사용하지 않음 |
 | Archive | RestoreObject 7일 Standard tier, 동일 Glacier key/class, PyArrow 직접 조회 |
 | Endpoint 상태 | Heartbeat ONLINE, 30초 Worker sweep, 2분 미수신 OFFLINE, RETIRED 우선 |
 | Incident 상태 | 생성 OPEN, 60초 Detection Worker sweep, window 만료 CLOSED |

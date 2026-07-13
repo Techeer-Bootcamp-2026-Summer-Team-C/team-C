@@ -348,14 +348,16 @@ HOT `storage_path`는 물리 partition명이 아니라 `clickhouse://edr_events/
 
 ## 11. API와 Dashboard
 
-- 제품 REST API는 Dashboard 15개 + Collector 3개 = 18개다.
+- 제품 REST API는 Dashboard 20개 + Collector 3개 = 23개다.
 - Collector API는 Agent 등록, heartbeat, telemetry batch만 제공한다.
 - PCAP artifact upload/download API와 Agent command API는 없다.
 - Endpoint Risk는 기존 Endpoint 목록·상세·summary DTO를 확장하며 새 REST API를 만들지 않는다.
 - 전역 EDR 상태는 `/dashboard/summary`의 Backend 계산 DTO이며 프론트에서 재계산하지 않는다.
+- 실시간 서비스와 Kafka Worker 상태는 `/operations/health`가 요청 시점에 probe하며 별도 이력 table을 만들지 않는다.
 - Response Playbook은 Alert 상세의 읽기 전용 `responseGuidance`이며 Agent response action API를 만들지 않는다.
-- Report Center/Modal, HTML/Markdown report path, report 저장·공유 API는 만들지 않는다. 브라우저 print/CSV는 추후 별도 범위다.
-- DLQ Monitor와 웹 failure replay는 만들지 않고 개별 failure 재처리는 관리자 Python CLI만 사용한다.
+- 브라우저 Print/Save PDF modal은 제공하지만 HTML/Markdown report path와 report 저장·공유 API는 만들지 않는다.
+- 읽기 전용 DLQ Monitor는 제공하고 웹 failure replay는 만들지 않으며 개별 failure 재처리는 관리자 Python CLI만 사용한다.
+- Process Tree, Attack Timeline, Endpoint Egress Topology는 기존 Event/Alert/Incident/Endpoint 데이터를 조회·조합하며 신규 table이나 migration을 만들지 않는다.
 - Dashboard는 React, TypeScript, Vite로 구현하고 REST polling을 사용한다.
 - Frontend route, 화면별 API 조합, query 직렬화, polling 주기, retry와 browser visibility 처리는 `../frontend/FRONTEND_SPEC.md`를 따른다.
 - Frontend color, spacing, panel/chart/list primitive, responsive와 접근성은 `../frontend/FRONTEND_SPEC.md`의 Design System 부분을 따른다.
@@ -434,8 +436,8 @@ tools/
 | `agent_commands`와 PCAP 관련 테이블 | 제외 |
 | Agent 원격 response action | 제외 |
 | Endpoint 격리·프로세스 종료·파일 삭제 API | 제외 |
-| Report Center/Modal과 저장형 HTML/Markdown report | 제외 |
-| 웹 DLQ Monitor와 웹 failure replay API | 제외 |
+| 저장형 HTML/Markdown report와 공유 API | 제외 |
+| 웹 failure replay API | 제외 |
 | Response Playbook 실행·완료 상태 저장 | 제외 |
 | 프론트 Endpoint Risk/EDR 상태 계산 | 제외 |
 | 자동 failure replay state machine | 제외 |
@@ -467,7 +469,7 @@ tools/
 - 목록 query가 `../contracts/API_SPEC.md`의 filter, deterministic sort와 pagination을 지키는지 확인
 - Overview/Operations polling이 `../frontend/FRONTEND_SPEC.md` 주기와 visibility/retry 규칙을 지키는지 확인
 - 375px, 768px, 1280px에서 `../frontend/FRONTEND_SPEC.md`의 navigation, table, focus와 상태 표시 확인
-- Report, 웹 replay, Agent 원격 조치 endpoint가 존재하지 않는지 확인
+- 저장 Report, 웹 replay, Agent 원격 조치 endpoint가 존재하지 않는지 확인
 - Agent SQLite ACK row 물리 삭제 확인
 - failure 1건을 S3에 저장하고 관리자 CLI로 수동 재처리
 - archive checksum과 `ingest_metadata` 상태 확인

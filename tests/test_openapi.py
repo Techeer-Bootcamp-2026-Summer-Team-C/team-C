@@ -6,13 +6,15 @@ from backend.main import create_app
 from tools.export_openapi import render_openapi
 
 ROOT = Path(__file__).parents[1]
-TAGS = {"Auth", "Endpoints", "Events", "Archives", "Alerts", "Incidents", "Dashboard", "Collector"}
+TAGS = {"Auth", "Endpoints", "Events", "Archives", "Alerts", "Incidents", "Dashboard", "Operations", "Collector"}
 EXPECTED_RESPONSES = {
     "authLogin": {"200", "400", "401", "403", "503"},
     "endpointsList": {"200", "400", "401", "503"},
     "endpointsGet": {"200", "400", "401", "404", "503"},
+    "endpointsGetProcessTree": {"200", "400", "401", "503"},
     "eventsList": {"200", "400", "401", "409", "503"},
     "eventsGet": {"200", "400", "401", "404", "409", "503"},
+    "failuresList": {"200", "400", "401", "503"},
     "archiveRestoresStart": {"200", "202", "400", "401", "403", "503"},
     "archiveRestoresList": {"200", "400", "401", "503"},
     "alertsList": {"200", "400", "401", "503"},
@@ -20,9 +22,12 @@ EXPECTED_RESPONSES = {
     "alertsUpdateStatus": {"200", "400", "401", "403", "404", "503"},
     "incidentsList": {"200", "400", "401", "503"},
     "incidentsGet": {"200", "400", "401", "404", "503"},
+    "incidentsGetTimeline": {"200", "400", "401", "404", "503"},
     "dashboardGetSummary": {"200", "400", "401", "503"},
     "dashboardGetEndpointSummary": {"200", "400", "401", "503"},
     "dashboardGetIngestSummary": {"200", "400", "401", "503"},
+    "dashboardGetTopology": {"200", "400", "401", "503"},
+    "operationsGetHealth": {"200", "401"},
     "collectorRegisterAgent": {"200", "201", "400", "401", "403", "409", "503"},
     "collectorHeartbeatAgent": {"200", "400", "401", "403", "503"},
     "collectorIngestTelemetryBatch": {"200", "400", "401", "403", "413", "503"},
@@ -42,9 +47,9 @@ def test_openapi_has_exact_product_operations_tags_and_unique_ids() -> None:
     items = operations(schema)
     expected = {(contract.method.lower(), "/api/v1" + contract.path) for contract in PRODUCT_API_CONTRACTS}
     assert {(method, path) for path, method, _operation in items} == expected
-    assert len(items) == 18
+    assert len(items) == 23
     operation_ids = [operation["operationId"] for _path, _method, operation in items]
-    assert len(operation_ids) == len(set(operation_ids)) == 18
+    assert len(operation_ids) == len(set(operation_ids)) == 23
     assert set(operation_ids) == EXPECTED_RESPONSES.keys()
     assert {tag["name"] for tag in schema["tags"]} == TAGS
     assert all(len(operation["tags"]) == 1 and operation["tags"][0] in TAGS for _, _, operation in items)

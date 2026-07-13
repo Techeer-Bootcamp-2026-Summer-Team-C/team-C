@@ -26,7 +26,11 @@ class EndpointService:
         self.repository = repository
 
     def list(self, query: EndpointListQuery, *, calculated_at: datetime) -> PagedData[EndpointDto]:
-        rows = self.repository.risk_snapshot(status=query.status, os_type=query.os_type)
+        rows = self.repository.risk_snapshot(
+            endpoint_ids=query.endpoint_ids,
+            status=query.status,
+            os_type=query.os_type,
+        )
         items = [endpoint_dto(row, calculated_at=calculated_at) for row in rows]
         if query.risk_level is not None:
             items = [item for item in items if item.risk.level is query.risk_level]

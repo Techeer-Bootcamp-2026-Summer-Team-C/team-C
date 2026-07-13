@@ -341,6 +341,7 @@ class EndpointRepository:
     def risk_snapshot(
         self,
         *,
+        endpoint_ids: Sequence[int] | None = None,
         status: str | None = None,
         os_type: OsType | None = None,
     ) -> list[dict[str, Any]]:
@@ -373,10 +374,18 @@ class EndpointRepository:
                 LEFT JOIN active_alerts a ON a.endpoint_id = e.endpoint_id
                 LEFT JOIN open_incidents i ON i.endpoint_id = e.endpoint_id
                 WHERE e.is_delete = FALSE
+                  AND (%s::bigint[] IS NULL OR e.endpoint_id = ANY(%s::bigint[]))
                   AND (%s::text IS NULL OR e.status = %s::text)
                   AND (%s::text IS NULL OR e.os_type = %s::text)
                 """,
-                (status, status, os_type.value if os_type else None, os_type.value if os_type else None),
+                (
+                    list(endpoint_ids) if endpoint_ids else None,
+                    list(endpoint_ids) if endpoint_ids else None,
+                    status,
+                    status,
+                    os_type.value if os_type else None,
+                    os_type.value if os_type else None,
+                ),
             )
             return [dict(row) for row in cursor.fetchall()]
 

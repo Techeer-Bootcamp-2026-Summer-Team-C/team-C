@@ -16,6 +16,7 @@ export type StorageClass = Schemas["StorageClass"];
 export type UserStatus = Schemas["UserStatus"];
 export type UserRole = Schemas["UserRole"];
 export type SensorHealth = Schemas["SensorHealth"];
+export type WorkerStatus = Schemas["WorkerStatus"];
 export type AgentArchitecture = Schemas["AgentArchitecture"];
 export type RiskLevel = Schemas["RiskLevel"];
 export type EndpointRiskFactorSourceType = Schemas["EndpointRiskFactorSourceType"];
@@ -36,11 +37,14 @@ export type PagedData<Item> = Omit<GeneratedPagedData, "items"> & { items: Item[
 export type EndpointListQuery = QueryOf<"endpointsList">;
 export type EventListQuery = QueryOf<"eventsList">;
 export type EventDetailQuery = QueryOf<"eventsGet">;
+export type ProcessTreeQuery = QueryOf<"endpointsGetProcessTree">;
+export type FailureListQuery = QueryOf<"failuresList">;
 export type ArchiveRestoreListQuery = QueryOf<"archiveRestoresList">;
 export type AlertListQuery = QueryOf<"alertsList">;
 export type IncidentListQuery = QueryOf<"incidentsList">;
 export type DashboardSummaryQuery = QueryOf<"dashboardGetSummary">;
 export type DashboardTimeQuery = QueryOf<"dashboardGetEndpointSummary">;
+export type TopologyQuery = QueryOf<"dashboardGetTopology">;
 export type PaginationQuery = Pick<EndpointListQuery, "page" | "size">;
 export type TimeRangeQuery = Pick<DashboardTimeQuery, "timePreset" | "from" | "to">;
 
@@ -72,6 +76,9 @@ export type EndpointDetailDto = Schemas["EndpointDetailDto"];
 
 export type EventDto = Schemas["EventDto"];
 export type EventDetailDto = Schemas["EventDetailDto"];
+export type ProcessTreeNodeDto = Schemas["ProcessTreeNodeDto"];
+export type ProcessTreeDto = Schemas["ProcessTreeDto"];
+export type EventFailureDto = Schemas["EventFailureDto"];
 
 export type ArchiveRestoreRequest = Schemas["ArchiveRestoreRequest"];
 export type ArchiveBucketDto = Schemas["ArchiveBucketDto"];
@@ -85,6 +92,8 @@ export type AlertStatusUpdateRequest = Schemas["AlertStatusUpdateRequest"];
 
 export type IncidentDto = Schemas["IncidentDto"];
 export type IncidentDetailDto = Schemas["IncidentDetailDto"];
+export type AttackTimelineItemDto = Schemas["AttackTimelineItemDto"];
+export type AttackTimelineDto = Schemas["AttackTimelineDto"];
 
 export type TimeRangeDto = Schemas["TimeRangeDto"];
 export type SeverityCountDto = Schemas["SeverityCountDto"];
@@ -114,5 +123,12 @@ export type EndpointRiskSummaryDto = Schemas["EndpointRiskSummaryDto"];
 export type EdrStateAxisDto = Schemas["EdrStateAxisDto"];
 export type EdrStateDto = Schemas["EdrStateDto"];
 export type DashboardSummaryDto = Schemas["DashboardSummaryDto"];
+export type ResponseGuidanceSummaryDto = Schemas["ResponseGuidanceSummaryDto"];
+export type TopologyNodeDto = Schemas["TopologyNodeDto"];
+export type TopologyEdgeDto = Schemas["TopologyEdgeDto"];
+export type EgressTopologyDto = Schemas["EgressTopologyDto"];
 export type EndpointSummaryDto = Schemas["EndpointSummaryDto"];
 export type IngestSummaryDto = Schemas["IngestSummaryDto"];
+export type ServiceHealthDto = Schemas["ServiceHealthDto"];
+export type PipelineWorkerDto = Schemas["PipelineWorkerDto"];
+export type OperationsHealthDto = Schemas["OperationsHealthDto"];

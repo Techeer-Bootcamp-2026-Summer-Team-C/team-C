@@ -1,5 +1,7 @@
 from typing import Any
 
+from pydantic import Field
+
 from .common import ContractModel, NonNegativeInt, PositiveId, UtcDateTime
 from .enums import EventType, OsType
 
@@ -49,3 +51,24 @@ class EventDetailDto(EventDto):
     raw_payload: dict[str, Any]
     payload_sha256: str
     schema_version: NonNegativeInt
+
+
+class ProcessTreeNodeDto(ContractModel):
+    pid: NonNegativeInt
+    ppid: NonNegativeInt | None
+    process_name: str
+    process_path: str | None
+    command_line: str | None
+    user_name: str | None
+    first_seen_at: UtcDateTime
+    last_seen_at: UtcDateTime
+    event_count: NonNegativeInt
+    selected: bool
+    parent_captured: bool
+
+
+class ProcessTreeDto(ContractModel):
+    endpoint_id: PositiveId
+    from_: UtcDateTime = Field(alias="from")
+    to: UtcDateTime
+    nodes: list[ProcessTreeNodeDto]

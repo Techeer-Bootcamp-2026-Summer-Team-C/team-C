@@ -1,5 +1,8 @@
+from typing import Annotated
+
 from pydantic import Field
 
+from .alerts import ResponseGuidanceStepDto
 from .common import ContractModel, NonNegativeInt, ScoreInt, UtcDateTime
 from .enums import (
     AlertStatus,
@@ -220,6 +223,14 @@ class DashboardStorageDto(ContractModel):
     by_status: list[StorageStatusCountDto]
 
 
+class ResponseGuidanceSummaryDto(ContractModel):
+    affected_alert_count: NonNegativeInt
+    rule_count: NonNegativeInt
+    manual_action_step_count: NonNegativeInt
+    highest_severity: Severity | None
+    steps: list[ResponseGuidanceStepDto]
+
+
 class DashboardSummaryDto(ContractModel):
     time_range: TimeRangeDto
     interval: DashboardInterval
@@ -230,6 +241,7 @@ class DashboardSummaryDto(ContractModel):
     events: DashboardEventsDto
     event_failures: DashboardEventFailuresDto
     storage: DashboardStorageDto
+    response_guidance: ResponseGuidanceSummaryDto
 
 
 class EndpointSummaryAlertsDto(ContractModel):
@@ -260,11 +272,13 @@ class EndpointSummaryDto(ContractModel):
 
 class IngestEventsDto(ContractModel):
     ingested_count: NonNegativeInt
+    rate_per_minute: Annotated[float, Field(ge=0)]
     latest_ingested_at: UtcDateTime | None
 
 
 class IngestEventFailuresDto(ContractModel):
     failed_count: NonNegativeInt
+    rate_per_minute: Annotated[float, Field(ge=0)]
     reprocessed_count: NonNegativeInt
     reprocess_failed_count: NonNegativeInt
     oldest_failed_at: UtcDateTime | None

@@ -1,10 +1,10 @@
 import { Activity, BellRing, Database, HardDrive, Server, ShieldCheck } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/endpoints";
 import { CountBars, IncidentSeriesChart, SeverityDonut, TimeSeriesChart } from "../components/charts";
 import { readTimeFilter, TimeFilterFields } from "../components/filters";
-import { EdrStatePill, ErrorState, GlobalFilterBar, KpiCard, PageHeader, Panel, Skeleton, StaleWarning } from "../components/ui";
+import { EdrStatePill, EmptyState, ErrorState, GlobalFilterBar, KpiCard, PageHeader, Panel, ResponseGuidance, Skeleton, StaleWarning, StatusPill } from "../components/ui";
 import { formatDateTime, humanize } from "../lib/format";
 import { pollingInterval } from "../query/policy";
 
@@ -15,9 +15,12 @@ export function OverviewPage() {
   const dashboard = useQuery({ queryKey: ["dashboard", summaryQuery], queryFn: ({ signal }) => api.dashboard(summaryQuery, signal), enabled: time.valid, staleTime: 30_000, refetchInterval: pollingInterval(30_000) });
   const endpoints = useQuery({ queryKey: ["endpoint-summary", time.query], queryFn: ({ signal }) => api.endpointSummary(time.query, signal), enabled: time.valid, staleTime: 30_000, refetchInterval: pollingInterval(30_000) });
   const ingest = useQuery({ queryKey: ["ingest-summary", time.query], queryFn: ({ signal }) => api.ingestSummary(time.query, signal), enabled: time.valid, staleTime: 30_000, refetchInterval: pollingInterval(30_000) });
-  const initialError = dashboard.error ?? endpoints.error ?? ingest.error;
-  const loading = dashboard.isPending || endpoints.isPending || ingest.isPending;
-  const lastRefreshedAt = Math.max(dashboard.dataUpdatedAt, endpoints.dataUpdatedAt, ingest.dataUpdatedAt);
+  const topEndpoints = useQuery({ queryKey: ["overview-endpoint-risk"], queryFn: ({ signal }) => api.endpoints({ page: 1, size: 5, sortBy: "riskScore", sortOrder: "desc" }, signal), staleTime: 30_000, refetchInterval: pollingInterval(30_000) });
+  const incidentQueue = useQuery({ queryKey: ["overview-incidents", time.query], queryFn: ({ signal }) => api.incidents({ ...time.query, status: "OPEN", page: 1, size: 5, sortOrder: "desc" }, signal), enabled: time.valid, staleTime: 30_000, refetchInterval: pollingInterval(30_000) });
+  const allQueries = [dashboard, endpoints, ingest, topEndpoints, incidentQueue];
+  const initialError = allQueries.map((query) => query.error).find(Boolean) ?? null;
+  const loading = allQueries.some((query) => query.isPending);
+  const lastRefreshedAt = Math.max(...allQueries.map((query) => query.dataUpdatedAt));
 
   return (
     <div className="page-stack">
@@ -25,17 +28,19 @@ export function OverviewPage() {
       <GlobalFilterBar hasFilters={params.size > 0} onClear={() => setParams({})}><TimeFilterFields params={params} setParams={setParams} /></GlobalFilterBar>
       {!time.valid ? <ErrorState error={new Error("A valid custom time range is required.")} /> : null}
       {loading && time.valid ? <OverviewSkeleton /> : null}
-      {initialError && !dashboard.data && !endpoints.data && !ingest.data ? <ErrorState error={initialError} onRetry={() => void Promise.all([dashboard.refetch(), endpoints.refetch(), ingest.refetch()])} /> : null}
-      {(dashboard.isRefetchError || endpoints.isRefetchError || ingest.isRefetchError) && dashboard.data && endpoints.data && ingest.data ? <StaleWarning error={initialError} onRetry={() => void Promise.all([dashboard.refetch(), endpoints.refetch(), ingest.refetch()])} /> : null}
-      {dashboard.data && endpoints.data && ingest.data ? <OverviewContent dashboard={dashboard.data.data} endpoints={endpoints.data.data} ingest={ingest.data.data} /> : null}
+      {initialError && allQueries.every((query) => !query.data) ? <ErrorState error={initialError} onRetry={() => void Promise.all(allQueries.map((query) => query.refetch()))} /> : null}
+      {allQueries.some((query) => query.isRefetchError) && allQueries.every((query) => query.data) ? <StaleWarning error={initialError} onRetry={() => void Promise.all(allQueries.map((query) => query.refetch()))} /> : null}
+      {dashboard.data && endpoints.data && ingest.data && topEndpoints.data && incidentQueue.data ? <OverviewContent dashboard={dashboard.data.data} endpoints={endpoints.data.data} ingest={ingest.data.data} topEndpoints={topEndpoints.data.data.items} incidentQueue={incidentQueue.data.data.items} /> : null}
     </div>
   );
 }
 
-function OverviewContent({ dashboard, endpoints, ingest }: {
+function OverviewContent({ dashboard, endpoints, ingest, topEndpoints, incidentQueue }: {
   dashboard: import("../contracts").DashboardSummaryDto;
   endpoints: import("../contracts").EndpointSummaryDto;
   ingest: import("../contracts").IngestSummaryDto;
+  topEndpoints: import("../contracts").EndpointDto[];
+  incidentQueue: import("../contracts").IncidentDto[];
 }) {
   return (
     <>
@@ -54,6 +59,9 @@ function OverviewContent({ dashboard, endpoints, ingest }: {
         <Panel title="Alert volume" subtitle="Server-provided time buckets"><TimeSeriesChart label="Alert" rows={dashboard.alerts.timeSeries} /></Panel>
         <Panel title="Incident activity" subtitle="Open and closed buckets"><IncidentSeriesChart rows={dashboard.incidents.timeSeries} /></Panel>
         <Panel title="Endpoint risk" subtitle="Current query-time snapshot" meta={<span>Highest {endpoints.risk.highestScore ?? "None"}</span>}><CountBars rows={endpoints.risk.byLevel.map((row) => ({ label: humanize(row.level), count: row.count, tone: row.level.toLowerCase() }))} /></Panel>
+        <Panel title="Highest-risk endpoints" subtitle="Current Backend-calculated risk snapshot">{topEndpoints.length ? <div className="link-list">{topEndpoints.map((endpoint) => <Link key={endpoint.endpointId} to={`/endpoints/${endpoint.endpointId}`}><span><strong>{endpoint.hostname}</strong><small>Endpoint {endpoint.endpointId} · {endpoint.risk.activeAlertCount} active Alert(s)</small></span><span><strong>{endpoint.risk.score}</strong><StatusPill value={endpoint.risk.level} /></span></Link>)}</div> : <EmptyState title="No Endpoints" message="No Endpoint risk snapshot is available." />}</Panel>
+        <Panel title="Incident queue" subtitle="Five most recent open Incidents">{incidentQueue.length ? <div className="link-list">{incidentQueue.map((incident) => <Link key={incident.incidentId} to={`/incidents/${incident.incidentId}`}><span><strong>{incident.title}</strong><small>{formatDateTime(incident.lastDetectedAt)} · {incident.alertCount} Alert(s)</small></span><span><StatusPill value={incident.severity} /><StatusPill value={incident.status} /></span></Link>)}</div> : <EmptyState title="No open Incidents" message="The selected time range has no open Incident rows." />}</Panel>
+        <Panel className="wide" title="Response guidance summary" subtitle={`${dashboard.responseGuidance.affectedAlertCount} active Alerts across ${dashboard.responseGuidance.ruleCount} Rule versions`} meta={<span>{dashboard.responseGuidance.manualActionStepCount} manual steps</span>}><ResponseGuidance steps={dashboard.responseGuidance.steps} /></Panel>
         <Panel title="Endpoint operating systems" subtitle="Current Endpoint snapshot"><CountBars rows={endpoints.byOsType.map((row) => ({ label: row.osType, count: row.count }))} /></Panel>
         <Panel title="Sensor health" subtitle="Current reported sensor snapshots"><CountBars rows={endpoints.sensorHealth.map((row) => ({ label: `${row.sensor} · ${humanize(row.status)}`, count: row.count, tone: row.status.toLowerCase() }))} /></Panel>
         <Panel title="Top rules" subtitle="Alerts in selected range"><CountBars rows={dashboard.alerts.topRules.map((row) => ({ label: `${row.ruleName} · ${row.ruleCode}`, count: row.count }))} /></Panel>

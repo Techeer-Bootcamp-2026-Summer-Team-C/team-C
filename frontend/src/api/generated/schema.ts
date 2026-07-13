@@ -192,6 +192,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboard/topology": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dashboard Topology */
+        get: operations["dashboardGetTopology"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/endpoints": {
         parameters: {
             query?: never;
@@ -218,6 +235,23 @@ export interface paths {
         };
         /** Endpoint Detail */
         get: operations["endpointsGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/endpoints/{endpointId}/process-tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Endpoint Process Tree */
+        get: operations["endpointsGetProcessTree"];
         put?: never;
         post?: never;
         delete?: never;
@@ -260,6 +294,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/failures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Failures */
+        get: operations["failuresList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/incidents": {
         parameters: {
             query?: never;
@@ -286,6 +337,40 @@ export interface paths {
         };
         /** Incident Detail */
         get: operations["incidentsGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/incidents/{incidentId}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Incident Timeline */
+        get: operations["incidentsGetTimeline"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/operations/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Operations Health */
+        get: operations["operationsGetHealth"];
         put?: never;
         post?: never;
         delete?: never;
@@ -535,6 +620,39 @@ export interface components {
             /** To */
             to: string;
         };
+        /** AttackTimelineDto */
+        AttackTimelineDto: {
+            /** Endpointid */
+            endpointId: number;
+            /** Incidentid */
+            incidentId: number;
+            /** Items */
+            items: components["schemas"]["AttackTimelineItemDto"][];
+        };
+        /** AttackTimelineItemDto */
+        AttackTimelineItemDto: {
+            /** Alertid */
+            alertId: number | null;
+            /** Endpointid */
+            endpointId: number;
+            /** Eventid */
+            eventId: string | null;
+            eventType: components["schemas"]["EventType"] | null;
+            /** Incidentid */
+            incidentId: number | null;
+            /**
+             * Itemtype
+             * @enum {string}
+             */
+            itemType: "INCIDENT" | "EVENT" | "ALERT";
+            /** Occurredat */
+            occurredAt: string;
+            severity: components["schemas"]["Severity"] | null;
+            /** Summary */
+            summary: string;
+            /** Title */
+            title: string;
+        };
         /** CertificateDto */
         CertificateDto: {
             /** Certfingerprint */
@@ -652,6 +770,7 @@ export interface components {
             events: components["schemas"]["DashboardEventsDto"];
             incidents: components["schemas"]["DashboardIncidentsDto"];
             interval: components["schemas"]["DashboardInterval"];
+            responseGuidance: components["schemas"]["ResponseGuidanceSummaryDto"];
             storage: components["schemas"]["DashboardStorageDto"];
             timeRange: components["schemas"]["TimeRangeDto"];
         };
@@ -722,6 +841,17 @@ export interface components {
          * @enum {string}
          */
         EdrStateStatus: "GREEN" | "YELLOW" | "RED";
+        /** EgressTopologyDto */
+        EgressTopologyDto: {
+            /** Edges */
+            edges: components["schemas"]["TopologyEdgeDto"][];
+            /** From */
+            from: string;
+            /** Nodes */
+            nodes: components["schemas"]["TopologyNodeDto"][];
+            /** To */
+            to: string;
+        };
         /** EndpointDetailDto */
         EndpointDetailDto: {
             agentArch: components["schemas"]["AgentArchitecture"] | null;
@@ -1067,6 +1197,56 @@ export interface components {
             /** Username */
             userName: string | null;
         };
+        /** EventFailureDto */
+        EventFailureDto: {
+            /** Consumername */
+            consumerName: string;
+            /** Createdat */
+            createdAt: string;
+            /** Endpointid */
+            endpointId: number;
+            /** Errormessage */
+            errorMessage: string;
+            /** Eventid */
+            eventId: string;
+            /** Failedat */
+            failedAt: string;
+            /** Failurecode */
+            failureCode: string | null;
+            /** Failureid */
+            failureId: string;
+            /** Failurestage */
+            failureStage: string;
+            /** Lastreplayedat */
+            lastReplayedAt: string | null;
+            /** Payloadobjectkey */
+            payloadObjectKey: string | null;
+            /** Payloadsha256 */
+            payloadSha256: string | null;
+            /** Payloadsizebytes */
+            payloadSizeBytes: number | null;
+            /** Replaycount */
+            replayCount: number;
+            /** Reprocessoutcome */
+            reprocessOutcome: string | null;
+            /** Resolvedat */
+            resolvedAt: string | null;
+            /** Retentionexpiresat */
+            retentionExpiresAt: string;
+            /** Retrycount */
+            retryCount: number;
+            /** Retryable */
+            retryable: boolean;
+            /** Sourceoffset */
+            sourceOffset: number;
+            /** Sourcepartition */
+            sourcePartition: number;
+            /** Sourcetopic */
+            sourceTopic: string;
+            status: components["schemas"]["EventFailureStatus"];
+            /** Updatedat */
+            updatedAt: string;
+        };
         /**
          * EventFailureStatus
          * @enum {string}
@@ -1229,6 +1409,8 @@ export interface components {
             failedCount: number;
             /** Oldestfailedat */
             oldestFailedAt: string | null;
+            /** Rateperminute */
+            ratePerMinute: number;
             /** Reprocessfailedcount */
             reprocessFailedCount: number;
             /** Reprocessedcount */
@@ -1240,6 +1422,8 @@ export interface components {
             ingestedCount: number;
             /** Latestingestedat */
             latestIngestedAt: string | null;
+            /** Rateperminute */
+            ratePerMinute: number;
         };
         /** IngestStorageDto */
         IngestStorageDto: {
@@ -1373,6 +1557,16 @@ export interface components {
             /** Remoteport */
             remotePort: number;
         };
+        /** OperationsHealthDto */
+        OperationsHealthDto: {
+            /** Checkedat */
+            checkedAt: string;
+            /** Services */
+            services: components["schemas"]["ServiceHealthDto"][];
+            status: components["schemas"]["SensorHealth"];
+            /** Workers */
+            workers: components["schemas"]["PipelineWorkerDto"][];
+        };
         /**
          * OsType
          * @enum {string}
@@ -1428,6 +1622,17 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** PagedData[EventFailureDto] */
+        PagedData_EventFailureDto_: {
+            /** Items */
+            items: components["schemas"]["EventFailureDto"][];
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+            /** Total */
+            total: number;
+        };
         /** PagedData[IncidentDto] */
         PagedData_IncidentDto_: {
             /** Items */
@@ -1438,6 +1643,22 @@ export interface components {
             size: number;
             /** Total */
             total: number;
+        };
+        /** PipelineWorkerDto */
+        PipelineWorkerDto: {
+            /** Detail */
+            detail: string;
+            /** Groupid */
+            groupId: string;
+            /** Lag */
+            lag: number | null;
+            /** Membercount */
+            memberCount: number | null;
+            status: components["schemas"]["WorkerStatus"];
+            /** Topic */
+            topic: string;
+            /** Worker */
+            worker: string;
         };
         /** ProcessExecutionEvent */
         ProcessExecutionEvent: {
@@ -1470,6 +1691,42 @@ export interface components {
             /** Username */
             userName?: string;
         };
+        /** ProcessTreeDto */
+        ProcessTreeDto: {
+            /** Endpointid */
+            endpointId: number;
+            /** From */
+            from: string;
+            /** Nodes */
+            nodes: components["schemas"]["ProcessTreeNodeDto"][];
+            /** To */
+            to: string;
+        };
+        /** ProcessTreeNodeDto */
+        ProcessTreeNodeDto: {
+            /** Commandline */
+            commandLine: string | null;
+            /** Eventcount */
+            eventCount: number;
+            /** Firstseenat */
+            firstSeenAt: string;
+            /** Lastseenat */
+            lastSeenAt: string;
+            /** Parentcaptured */
+            parentCaptured: boolean;
+            /** Pid */
+            pid: number;
+            /** Ppid */
+            ppid: number | null;
+            /** Processname */
+            processName: string;
+            /** Processpath */
+            processPath: string | null;
+            /** Selected */
+            selected: boolean;
+            /** Username */
+            userName: string | null;
+        };
         /** RejectedEventDto */
         RejectedEventDto: {
             /** Code */
@@ -1496,6 +1753,18 @@ export interface components {
             requiresManualAction: boolean;
             /** Title */
             title: string;
+        };
+        /** ResponseGuidanceSummaryDto */
+        ResponseGuidanceSummaryDto: {
+            /** Affectedalertcount */
+            affectedAlertCount: number;
+            highestSeverity: components["schemas"]["Severity"] | null;
+            /** Manualactionstepcount */
+            manualActionStepCount: number;
+            /** Rulecount */
+            ruleCount: number;
+            /** Steps */
+            steps: components["schemas"]["ResponseGuidanceStepDto"][];
         };
         /**
          * RiskLevel
@@ -1543,6 +1812,16 @@ export interface components {
             provider?: string;
             /** Sensor */
             sensor: string;
+            status: components["schemas"]["SensorHealth"];
+        };
+        /** ServiceHealthDto */
+        ServiceHealthDto: {
+            /** Detail */
+            detail: string;
+            /** Latencyms */
+            latencyMs: number;
+            /** Service */
+            service: string;
             status: components["schemas"]["SensorHealth"];
         };
         /**
@@ -1614,9 +1893,19 @@ export interface components {
             data: components["schemas"]["ArchiveRestoreStartDto"];
             meta: components["schemas"]["RequestMeta"];
         };
+        /** SuccessEnvelope[AttackTimelineDto] */
+        SuccessEnvelope_AttackTimelineDto_: {
+            data: components["schemas"]["AttackTimelineDto"];
+            meta: components["schemas"]["RequestMeta"];
+        };
         /** SuccessEnvelope[DashboardSummaryDto] */
         SuccessEnvelope_DashboardSummaryDto_: {
             data: components["schemas"]["DashboardSummaryDto"];
+            meta: components["schemas"]["RequestMeta"];
+        };
+        /** SuccessEnvelope[EgressTopologyDto] */
+        SuccessEnvelope_EgressTopologyDto_: {
+            data: components["schemas"]["EgressTopologyDto"];
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[EndpointDetailDto] */
@@ -1649,6 +1938,11 @@ export interface components {
             data: components["schemas"]["LoginData"];
             meta: components["schemas"]["RequestMeta"];
         };
+        /** SuccessEnvelope[OperationsHealthDto] */
+        SuccessEnvelope_OperationsHealthDto_: {
+            data: components["schemas"]["OperationsHealthDto"];
+            meta: components["schemas"]["RequestMeta"];
+        };
         /** SuccessEnvelope[PagedData[AlertDto]] */
         SuccessEnvelope_PagedData_AlertDto__: {
             data: components["schemas"]["PagedData_AlertDto_"];
@@ -1669,9 +1963,19 @@ export interface components {
             data: components["schemas"]["PagedData_EventDto_"];
             meta: components["schemas"]["RequestMeta"];
         };
+        /** SuccessEnvelope[PagedData[EventFailureDto]] */
+        SuccessEnvelope_PagedData_EventFailureDto__: {
+            data: components["schemas"]["PagedData_EventFailureDto_"];
+            meta: components["schemas"]["RequestMeta"];
+        };
         /** SuccessEnvelope[PagedData[IncidentDto]] */
         SuccessEnvelope_PagedData_IncidentDto__: {
             data: components["schemas"]["PagedData_IncidentDto_"];
+            meta: components["schemas"]["RequestMeta"];
+        };
+        /** SuccessEnvelope[ProcessTreeDto] */
+        SuccessEnvelope_ProcessTreeDto_: {
+            data: components["schemas"]["ProcessTreeDto"];
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[TelemetryBatchData] */
@@ -1777,6 +2081,36 @@ export interface components {
             /** Rulename */
             ruleName: string;
         };
+        /** TopologyEdgeDto */
+        TopologyEdgeDto: {
+            /** Alertcount */
+            alertCount: number;
+            /** Endpointid */
+            endpointId: number;
+            /** Eventcount */
+            eventCount: number;
+            /** Lastseenat */
+            lastSeenAt: string;
+            /** Protocol */
+            protocol: string;
+            /** Sourcelabel */
+            sourceLabel: string;
+            /** Target */
+            target: string;
+        };
+        /** TopologyNodeDto */
+        TopologyNodeDto: {
+            /** Alertcount */
+            alertCount: number;
+            /** Endpointid */
+            endpointId: number;
+            /** Hostname */
+            hostname: string;
+            riskLevel: components["schemas"]["RiskLevel"];
+            /** Riskscore */
+            riskScore: number;
+            status: components["schemas"]["EndpointStatus"];
+        };
         /** UserDto */
         UserDto: {
             /** Email */
@@ -1798,6 +2132,11 @@ export interface components {
          * @enum {string}
          */
         UserStatus: "ACTIVE" | "DISABLED";
+        /**
+         * WorkerStatus
+         * @enum {string}
+         */
+        WorkerStatus: "RUNNING" | "IDLE" | "OFFLINE" | "UNKNOWN";
     };
     responses: never;
     parameters: never;
@@ -2537,11 +2876,64 @@ export interface operations {
             };
         };
     };
+    dashboardGetTopology: {
+        parameters: {
+            query?: {
+                timePreset?: components["schemas"]["TimePreset"];
+                from?: string;
+                to?: string;
+                endpointIds?: number[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_EgressTopologyDto_"];
+                };
+            };
+            /** @description Request validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication failed. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description A required dependency is temporarily unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     endpointsList: {
         parameters: {
             query?: {
                 page?: number;
                 size?: number;
+                endpointIds?: number[];
                 status?: "ONLINE" | "OFFLINE" | "RETIRED";
                 osType?: components["schemas"]["OsType"];
                 riskLevel?: components["schemas"]["RiskLevel"];
@@ -2632,6 +3024,60 @@ export interface operations {
             };
             /** @description The requested resource was not found. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description A required dependency is temporarily unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    endpointsGetProcessTree: {
+        parameters: {
+            query?: {
+                timePreset?: components["schemas"]["TimePreset"];
+                from?: string;
+                to?: string;
+                selectedPid?: number;
+            };
+            header?: never;
+            path: {
+                endpointId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_ProcessTreeDto_"];
+                };
+            };
+            /** @description Request validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication failed. */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2791,6 +3237,63 @@ export interface operations {
             };
         };
     };
+    failuresList: {
+        parameters: {
+            query?: {
+                timePreset?: components["schemas"]["TimePreset"];
+                from?: string;
+                to?: string;
+                page?: number;
+                size?: number;
+                status?: components["schemas"]["EventFailureStatus"];
+                failureStage?: string;
+                retryable?: boolean;
+                sortOrder?: "asc" | "desc";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_PagedData_EventFailureDto__"];
+                };
+            };
+            /** @description Request validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication failed. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description A required dependency is temporarily unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     incidentsList: {
         parameters: {
             query?: {
@@ -2897,6 +3400,93 @@ export interface operations {
             };
             /** @description A required dependency is temporarily unavailable. */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    incidentsGetTimeline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                incidentId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_AttackTimelineDto_"];
+                };
+            };
+            /** @description Request validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication failed. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description The requested resource was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description A required dependency is temporarily unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    operationsGetHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_OperationsHealthDto_"];
+                };
+            };
+            /** @description Authentication failed. */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

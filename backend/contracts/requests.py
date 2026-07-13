@@ -4,8 +4,8 @@ from typing import Literal
 from pydantic import Field, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
-from .common import ContractModel, PositiveId, UtcDateTime, validate_max_31_day_range
-from .enums import AlertStatus, EventType, IncidentStatus, OsType, RiskLevel, Severity, TimePreset
+from .common import ContractModel, NonNegativeInt, PositiveId, UtcDateTime, validate_max_31_day_range
+from .enums import AlertStatus, EventFailureStatus, EventType, IncidentStatus, OsType, RiskLevel, Severity, TimePreset
 
 
 class PaginationQuery(ContractModel):
@@ -31,6 +31,7 @@ class TimeRangeQuery(ContractModel):
 
 
 class EndpointListQuery(PaginationQuery):
+    endpoint_ids: list[PositiveId] | SkipJsonSchema[None] = None
     status: Literal["ONLINE", "OFFLINE", "RETIRED"] | SkipJsonSchema[None] = None
     os_type: OsType | SkipJsonSchema[None] = None
     risk_level: RiskLevel | SkipJsonSchema[None] = None
@@ -53,6 +54,21 @@ class EventListQuery(PaginationQuery, TimeRangeQuery):
 class EventDetailQuery(ContractModel):
     endpoint_id: PositiveId
     occurred_at: UtcDateTime
+
+
+class ProcessTreeQuery(TimeRangeQuery):
+    selected_pid: NonNegativeInt | SkipJsonSchema[None] = None
+
+
+class TopologyQuery(TimeRangeQuery):
+    endpoint_ids: list[PositiveId] | SkipJsonSchema[None] = None
+
+
+class FailureListQuery(PaginationQuery, TimeRangeQuery):
+    status: EventFailureStatus | SkipJsonSchema[None] = None
+    failure_stage: str | SkipJsonSchema[None] = None
+    retryable: bool | SkipJsonSchema[None] = None
+    sort_order: Literal["asc", "desc"] = "desc"
 
 
 class ArchiveRestoreListQuery(PaginationQuery):
