@@ -16,6 +16,7 @@ def _current_windows_sid() -> str:
         check=True,
         capture_output=True,
         text=True,
+        errors="replace",
     )
     row = next(csv.reader([result.stdout.strip()]))
     sid = next((value for value in reversed(row) if value.upper().startswith("S-1-")), "")

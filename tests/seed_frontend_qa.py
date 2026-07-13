@@ -67,8 +67,10 @@ def main() -> None:
         database="edr",
     )
     with psycopg.connect(POSTGRES_DSN) as connection:
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_refresh_sessions.down.sql")
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.down.sql")
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.up.sql")
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_refresh_sessions.up.sql")
     apply_clickhouse_file(clickhouse, ROOT / "migrations/clickhouse/0001_initial.down.sql")
     apply_clickhouse_file(clickhouse, ROOT / "migrations/clickhouse/0001_initial.up.sql")
 

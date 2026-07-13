@@ -25,8 +25,10 @@ def test_postgresql_migration_repository_idempotency_and_rollback() -> None:
     dsn = os.environ["TEST_POSTGRES_DSN"]
     now = datetime(2026, 7, 12, tzinfo=UTC)
     with psycopg.connect(dsn) as connection:
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_refresh_sessions.down.sql")
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.down.sql")
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.up.sql")
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_refresh_sessions.up.sql")
         try:
             endpoint_id = EndpointRepository(connection).insert(
                 EndpointInsert("agent-test-001", "TEST-ENDPOINT", OsType.MACOS, now)
@@ -165,6 +167,7 @@ def test_postgresql_migration_repository_idempotency_and_rollback() -> None:
             assert alerts.active_for_endpoint(endpoint_id) == []
             assert incidents.close_expired(now + timedelta(hours=1)) == 1
         finally:
+            apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_refresh_sessions.down.sql")
             apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.down.sql")
 
 

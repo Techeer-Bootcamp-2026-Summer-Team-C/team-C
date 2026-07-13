@@ -438,6 +438,8 @@ def main() -> int:
     s3_endpoint = os.getenv("TEST_S3_ENDPOINT", "http://127.0.0.1:59000")
     postgres_up = ROOT / "migrations/postgresql/0001_initial.up.sql"
     postgres_down = ROOT / "migrations/postgresql/0001_initial.down.sql"
+    refresh_sessions_up = ROOT / "migrations/postgresql/0002_refresh_sessions.up.sql"
+    refresh_sessions_down = ROOT / "migrations/postgresql/0002_refresh_sessions.down.sql"
     clickhouse_up = ROOT / "migrations/clickhouse/0001_initial.up.sql"
     clickhouse_down = ROOT / "migrations/clickhouse/0001_initial.down.sql"
     clickhouse = clickhouse_connect.get_client(
@@ -449,8 +451,10 @@ def main() -> int:
         autogenerate_session_id=False,
     )
     with psycopg.connect(postgres_dsn) as connection:
+        apply_postgres_file(connection, refresh_sessions_down)
         apply_postgres_file(connection, postgres_down)
         apply_postgres_file(connection, postgres_up)
+        apply_postgres_file(connection, refresh_sessions_up)
         now = datetime.now(UTC)
         connection.execute(
             "INSERT INTO users(email,password_hash,name,role,status,created_at,updated_at) "

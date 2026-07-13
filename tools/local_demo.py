@@ -96,7 +96,10 @@ EDR_AGENT_CA_KEY_PATH=./certs/ca/ca.key
 
 def _agent_id() -> str:
     hostname = socket.gethostname().lower()
-    safe = "".join(character if character.isalnum() or character in ".-_" else "-" for character in hostname)
+    safe = "".join(
+        character if (character.isascii() and character.isalnum()) or character in ".-_" else "-"
+        for character in hostname
+    )
     safe = safe.strip(".-_")[:52] or "local"
     return f"demo-{safe}"
 
@@ -169,6 +172,9 @@ def _initialize() -> None:
         exists = connection.execute("SELECT to_regclass('public.users')").fetchone()[0]
         if exists is None:
             apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.up.sql")
+        refresh_sessions_exists = connection.execute("SELECT to_regclass('public.refresh_sessions')").fetchone()[0]
+        if refresh_sessions_exists is None:
+            apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_refresh_sessions.up.sql")
         credentials = _ensure_credentials()
         existing_admin = connection.execute(
             "SELECT 1 FROM users WHERE LOWER(email)=LOWER(%s) AND is_delete=FALSE", (credentials["email"],)

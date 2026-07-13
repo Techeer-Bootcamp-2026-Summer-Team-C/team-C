@@ -1,0 +1,20 @@
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
+
+WORKDIR /app
+
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
+
+COPY backend ./backend
+COPY tools ./tools
+COPY schemas ./schemas
+COPY rules ./rules
+COPY mappings ./mappings
+COPY migrations ./migrations
+RUN uv sync --frozen --no-dev
+
+ENV PATH="/app/.venv/bin:${PATH}"
+
+EXPOSE 8000
+
+CMD ["python", "-m", "tools.docker_backend_entrypoint"]

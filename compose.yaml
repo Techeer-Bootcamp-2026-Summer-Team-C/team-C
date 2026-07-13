@@ -75,6 +75,50 @@ services:
       timeout: 3s
       retries: 20
 
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    env_file: .env
+    environment:
+      EDR_POSTGRES_DSN: postgresql://${POSTGRES_USER:-edr}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-edr}
+      EDR_CLICKHOUSE_DSN: http://${CLICKHOUSE_USER:-edr}:${CLICKHOUSE_PASSWORD}@clickhouse:8123/${CLICKHOUSE_DB:-edr}
+      EDR_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      EDR_S3_ENDPOINT_URL: http://minio:9000
+      EDR_S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-edr-local}
+      EDR_S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      EDR_S3_BUCKET: edr-failures
+      EDR_AGENT_CA_CERT_PATH: /app/certs/ca/ca.crt
+      EDR_AGENT_CA_KEY_PATH: /app/certs/ca/ca.key
+    ports:
+      - "${BACKEND_HOST_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    environment:
+      EDR_BACKEND_PROXY_TARGET: http://backend:8000
+    ports:
+      - "${FRONTEND_HOST_PORT:-5173}:5173"
+    depends_on:
+      backend:
+        condition: service_healthy
+
 volumes:
   postgres-data:
   clickhouse-data:
