@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from uuid import UUID, uuid4
 
@@ -12,9 +12,10 @@ from .agent_identity import trusted_agent_identity
 from .api_services import AlertService, EndpointService, IncidentService
 from .archive_service import ArchiveService, archive_bucket
 from .auth import (
-    JWT_EXPIRES_SECONDS,
     AuthenticatedUser,
     decode_access_token,
+    generate_refresh_token,
+    hash_refresh_token,
     issue_access_token,
     require_write_role,
     verify_password,
@@ -22,7 +23,7 @@ from .auth import (
 from .collector import CollectorService
 from .contracts.alerts import AlertDetailDto, AlertDto, AlertStatusUpdateRequest
 from .contracts.archives import ArchiveBucketDto, ArchiveRestoreRequest, ArchiveRestoreStartDto
-from .contracts.auth import LoginData, LoginRequest, UserDto
+from .contracts.auth import LoginData, LoginRequest, LogoutData, UserDto
 from .contracts.collector import (
     AgentHeartbeatData,
     AgentHeartbeatRequest,
@@ -50,7 +51,7 @@ from .contracts.requests import (
 from .errors import ApplicationError, RequestValidationError, ServiceUnavailableError
 from .event_service import EventService
 from .runtime import RuntimeServices
-from .settings import get_settings
+from .settings import Settings, get_settings
 from .storage.clickhouse import EventRepository, FailureRepository
 from .storage.models import AgentCertificateIdentity
 from .storage.postgres import (
@@ -58,6 +59,7 @@ from .storage.postgres import (
     EndpointRepository,
     IncidentRepository,
     IngestMetadataRepository,
+    RefreshSessionRepository,
     UserRepository,
 )
 from .summary_service import SummaryService
@@ -99,6 +101,9 @@ def get_collector_service(request: Request) -> CollectorService:
     return CollectorService(_runtime(request))
 
 
+CSRF_HEADER_NAME = "X-CSRF-Protection"
+
+
 def current_user(
     request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(BEARER)],
@@ -106,12 +111,44 @@ def current_user(
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise ApplicationError(401, "INVALID_TOKEN", "A valid Bearer token is required.")
     runtime = _runtime(request)
-    user = decode_access_token(credentials.credentials, secret=runtime.settings.jwt_secret.get_secret_value())
+    settings = runtime.settings
+    user = decode_access_token(
+        credentials.credentials,
+        secret=settings.jwt_secret.get_secret_value(),
+        issuer=settings.jwt_issuer,
+        audience=settings.jwt_audience,
+    )
     with runtime.postgres() as connection:
         identity = UserRepository(connection).active_identity(user.user_id)
-    if identity is None or identity[1] is not UserStatus.ACTIVE or identity[0] is not user.role:
-        raise ApplicationError(401, "INVALID_TOKEN", "The access token identity is no longer active.")
+        if identity is None or identity[1] is not UserStatus.ACTIVE or identity[0] is not user.role:
+            raise ApplicationError(401, "INVALID_TOKEN", "The access token identity is no longer active.")
+        session_active = RefreshSessionRepository(connection).family_has_active_session(
+            user.session_id, datetime.now(UTC)
+        )
+    if not session_active:
+        raise ApplicationError(401, "INVALID_TOKEN", "The session has been revoked.")
     return user
+
+
+def _require_csrf_header(request: Request) -> None:
+    if request.headers.get(CSRF_HEADER_NAME) != "1":
+        raise ApplicationError(403, "FORBIDDEN", "A CSRF protection header is required for this request.")
+
+
+def _set_refresh_cookie(response: Response, settings: Settings, token: str, *, max_age_seconds: int) -> None:
+    response.set_cookie(
+        key=settings.refresh_cookie_name,
+        value=token,
+        max_age=max(max_age_seconds, 0),
+        path="/",
+        secure=settings.refresh_cookie_secure,
+        httponly=True,
+        samesite="lax",
+    )
+
+
+def _clear_refresh_cookie(response: Response, settings: Settings) -> None:
+    response.delete_cookie(key=settings.refresh_cookie_name, path="/")
 
 
 def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
@@ -170,35 +207,151 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         tags=["Auth"],
         responses=_error_responses(400, 401, 403, 503),
     )
-    def login(request: Request, body: LoginRequest) -> SuccessEnvelope[LoginData]:
+    def login(request: Request, body: LoginRequest, response: Response) -> SuccessEnvelope[LoginData]:
         runtime = _runtime(request)
+        settings = runtime.settings
+        now = datetime.now(UTC)
         with runtime.postgres() as connection:
             row = UserRepository(connection).by_email(body.email)
             if row is None or not verify_password(str(row["password_hash"]), body.password):
                 raise ApplicationError(401, "INVALID_CREDENTIALS", "Email or password is incorrect.")
             if row["status"] == UserStatus.DISABLED.value:
                 raise ApplicationError(403, "ACCOUNT_DISABLED", "The account is disabled.")
-            now = datetime.now(UTC)
             role = UserRole(row["role"])
+            user_id = int(row["user_id"])
+            family_id = uuid4()
+            refresh_token = generate_refresh_token()
+            refresh_expires_at = now + timedelta(seconds=settings.refresh_token_ttl_seconds)
+            RefreshSessionRepository(connection).create(
+                refresh_session_id=uuid4(),
+                family_id=family_id,
+                user_id=user_id,
+                token_hash=hash_refresh_token(refresh_token),
+                issued_at=now,
+                expires_at=refresh_expires_at,
+            )
             token = issue_access_token(
-                user_id=int(row["user_id"]),
+                user_id=user_id,
                 role=role,
-                secret=runtime.settings.jwt_secret.get_secret_value(),
+                session_id=str(family_id),
+                secret=settings.jwt_secret.get_secret_value(),
                 now=now,
+                ttl_seconds=settings.access_token_ttl_seconds,
+                issuer=settings.jwt_issuer,
+                audience=settings.jwt_audience,
             )
             connection.execute(
-                "UPDATE users SET last_login_at = %s, updated_at = %s WHERE user_id = %s", (now, now, row["user_id"])
+                "UPDATE users SET last_login_at = %s, updated_at = %s WHERE user_id = %s", (now, now, user_id)
             )
-            connection.commit()
+        _set_refresh_cookie(response, settings, refresh_token, max_age_seconds=settings.refresh_token_ttl_seconds)
+        response.headers["Cache-Control"] = "no-store"
         data = LoginData(
             access_token=token,
             token_type="Bearer",
-            expires_in=JWT_EXPIRES_SECONDS,
+            expires_in=settings.access_token_ttl_seconds,
+            user=UserDto(user_id=user_id, email=row["email"], name=row["name"], role=role, status=UserStatus.ACTIVE),
+        )
+        return _success(request, data)
+
+    @app.post(
+        "/api/v1/auth/refresh",
+        response_model=SuccessEnvelope[LoginData],
+        operation_id="authRefresh",
+        tags=["Auth"],
+        responses=_error_responses(401, 403, 503),
+    )
+    def refresh(request: Request, response: Response) -> SuccessEnvelope[LoginData]:
+        _require_csrf_header(request)
+        runtime = _runtime(request)
+        settings = runtime.settings
+        now = datetime.now(UTC)
+        raw_token = request.cookies.get(settings.refresh_cookie_name)
+        if not raw_token:
+            raise ApplicationError(401, "INVALID_REFRESH_TOKEN", "No refresh session cookie was presented.")
+        token_hash = hash_refresh_token(raw_token)
+        with runtime.postgres() as connection:
+            sessions = RefreshSessionRepository(connection)
+            row = sessions.get_by_token_hash(token_hash)
+            if row is None:
+                _clear_refresh_cookie(response, settings)
+                raise ApplicationError(401, "INVALID_REFRESH_TOKEN", "The refresh session is unknown.")
+            expires_at = row["expires_at"]
+            if row["revoked_at"] is not None:
+                sessions.revoke_family(row["family_id"], now)
+                _clear_refresh_cookie(response, settings)
+                raise ApplicationError(
+                    401, "REFRESH_TOKEN_REUSED", "The refresh token was already used and has been revoked."
+                )
+            if expires_at <= now:
+                _clear_refresh_cookie(response, settings)
+                raise ApplicationError(401, "INVALID_REFRESH_TOKEN", "The refresh session has expired.")
+            user_row = UserRepository(connection).by_id(row["user_id"])
+            if user_row is None or user_row["status"] == UserStatus.DISABLED.value:
+                sessions.revoke_family(row["family_id"], now)
+                _clear_refresh_cookie(response, settings)
+                raise ApplicationError(401, "INVALID_REFRESH_TOKEN", "The account is no longer active.")
+            role = UserRole(user_row["role"])
+            new_refresh_token = generate_refresh_token()
+            sessions.rotate(
+                old_session_id=row["refresh_session_id"],
+                new_session_id=uuid4(),
+                family_id=row["family_id"],
+                user_id=row["user_id"],
+                new_token_hash=hash_refresh_token(new_refresh_token),
+                now=now,
+                expires_at=expires_at,
+            )
+            token = issue_access_token(
+                user_id=row["user_id"],
+                role=role,
+                session_id=str(row["family_id"]),
+                secret=settings.jwt_secret.get_secret_value(),
+                now=now,
+                ttl_seconds=settings.access_token_ttl_seconds,
+                issuer=settings.jwt_issuer,
+                audience=settings.jwt_audience,
+            )
+        _set_refresh_cookie(
+            response, settings, new_refresh_token, max_age_seconds=int((expires_at - now).total_seconds())
+        )
+        response.headers["Cache-Control"] = "no-store"
+        data = LoginData(
+            access_token=token,
+            token_type="Bearer",
+            expires_in=settings.access_token_ttl_seconds,
             user=UserDto(
-                user_id=row["user_id"], email=row["email"], name=row["name"], role=role, status=UserStatus.ACTIVE
+                user_id=user_row["user_id"],
+                email=user_row["email"],
+                name=user_row["name"],
+                role=role,
+                status=UserStatus.ACTIVE,
             ),
         )
         return _success(request, data)
+
+    @app.post(
+        "/api/v1/auth/logout",
+        response_model=SuccessEnvelope[LogoutData],
+        operation_id="authLogout",
+        tags=["Auth"],
+        responses=_error_responses(403, 503),
+    )
+    def logout(request: Request, response: Response) -> SuccessEnvelope[LogoutData]:
+        _require_csrf_header(request)
+        runtime = _runtime(request)
+        settings = runtime.settings
+        raw_token = request.cookies.get(settings.refresh_cookie_name)
+        if raw_token:
+            now = datetime.now(UTC)
+            token_hash = hash_refresh_token(raw_token)
+            with runtime.postgres() as connection:
+                sessions = RefreshSessionRepository(connection)
+                row = sessions.get_by_token_hash(token_hash)
+                if row is not None:
+                    sessions.revoke_family(row["family_id"], now)
+        _clear_refresh_cookie(response, settings)
+        response.headers["Cache-Control"] = "no-store"
+        return _success(request, LogoutData(logged_out=True))
 
     @app.get(
         "/api/v1/endpoints",
@@ -589,6 +742,8 @@ def _openapi_schema(app: FastAPI) -> dict[str, object]:
             if path.startswith("/api/v1/collector/"):
                 operation["security"] = [{"mutualTLS": []}]
     schema["paths"]["/api/v1/auth/login"]["post"].pop("security", None)
+    schema["paths"]["/api/v1/auth/refresh"]["post"].pop("security", None)
+    schema["paths"]["/api/v1/auth/logout"]["post"].pop("security", None)
     _remove_null_defaults(schema)
     app.openapi_schema = schema
     return schema

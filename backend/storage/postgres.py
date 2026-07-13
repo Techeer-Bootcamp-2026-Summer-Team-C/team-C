@@ -2,6 +2,7 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import UUID
 
 from psycopg import Connection
 from psycopg.rows import dict_row
@@ -51,6 +52,22 @@ class UserRepository:
             raise RuntimeError("ADMIN creation failed")
         return int(row[0])
 
+    def reset_admin(self, *, user_id: int, name: str, password_hash: str, now: datetime) -> int:
+        try:
+            self.connection.execute(
+                """
+                UPDATE users
+                SET password_hash = %s, name = %s, role = 'ADMIN', status = 'ACTIVE', is_delete = FALSE, updated_at = %s
+                WHERE user_id = %s
+                """,
+                (password_hash, name, now, user_id),
+            )
+            self.connection.commit()
+        except Exception:
+            self.connection.rollback()
+            raise
+        return user_id
+
     def by_email(self, email: str) -> dict[str, Any] | None:
         with self.connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute(
@@ -63,6 +80,15 @@ class UserRepository:
             row = cursor.fetchone()
         return dict(row) if row is not None else None
 
+    def by_id(self, user_id: int) -> dict[str, Any] | None:
+        with self.connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                "SELECT user_id, email, name, role, status FROM users WHERE user_id = %s AND is_delete = FALSE",
+                (user_id,),
+            )
+            row = cursor.fetchone()
+        return dict(row) if row is not None else None
+
     def active_identity(self, user_id: int) -> tuple[UserRole, UserStatus] | None:
         row = self.connection.execute(
             "SELECT role, status FROM users WHERE user_id = %s AND is_delete = FALSE",
@@ -71,6 +97,94 @@ class UserRepository:
         if row is None:
             return None
         return UserRole(row[0]), UserStatus(row[1])
+
+
+class RefreshSessionRepository:
+    def __init__(self, connection: Connection[Any]) -> None:
+        self.connection = connection
+
+    def create(
+        self,
+        *,
+        refresh_session_id: UUID,
+        family_id: UUID,
+        user_id: int,
+        token_hash: str,
+        issued_at: datetime,
+        expires_at: datetime,
+    ) -> None:
+        self.connection.execute(
+            """
+            INSERT INTO refresh_sessions (
+                refresh_session_id, family_id, user_id, token_hash, issued_at, expires_at, created_at, updated_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (refresh_session_id, family_id, user_id, token_hash, issued_at, expires_at, issued_at, issued_at),
+        )
+
+    def get_by_token_hash(self, token_hash: str) -> dict[str, Any] | None:
+        with self.connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """
+                SELECT refresh_session_id, family_id, user_id, token_hash, issued_at, expires_at,
+                       revoked_at, replaced_by_session_id
+                FROM refresh_sessions
+                WHERE token_hash = %s
+                FOR UPDATE
+                """,
+                (token_hash,),
+            )
+            row = cursor.fetchone()
+        return dict(row) if row is not None else None
+
+    def rotate(
+        self,
+        *,
+        old_session_id: UUID,
+        new_session_id: UUID,
+        family_id: UUID,
+        user_id: int,
+        new_token_hash: str,
+        now: datetime,
+        expires_at: datetime,
+    ) -> None:
+        self.create(
+            refresh_session_id=new_session_id,
+            family_id=family_id,
+            user_id=user_id,
+            token_hash=new_token_hash,
+            issued_at=now,
+            expires_at=expires_at,
+        )
+        self.connection.execute(
+            """
+            UPDATE refresh_sessions
+            SET revoked_at = %s, replaced_by_session_id = %s, updated_at = %s
+            WHERE refresh_session_id = %s
+            """,
+            (now, new_session_id, now, old_session_id),
+        )
+
+    def revoke_family(self, family_id: UUID, now: datetime) -> None:
+        self.connection.execute(
+            """
+            UPDATE refresh_sessions
+            SET revoked_at = %s, updated_at = %s
+            WHERE family_id = %s AND revoked_at IS NULL
+            """,
+            (now, now, family_id),
+        )
+
+    def family_has_active_session(self, family_id: str, now: datetime) -> bool:
+        row = self.connection.execute(
+            """
+            SELECT 1 FROM refresh_sessions
+            WHERE family_id = %s AND revoked_at IS NULL AND expires_at > %s
+            LIMIT 1
+            """,
+            (family_id, now),
+        ).fetchone()
+        return row is not None
 
 
 class EndpointRepository:

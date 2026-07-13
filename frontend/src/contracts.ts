@@ -47,6 +47,7 @@ export type TimeRangeQuery = Pick<DashboardTimeQuery, "timePreset" | "from" | "t
 export type LoginRequest = Schemas["LoginRequest"];
 export type UserDto = Schemas["UserDto"];
 export type LoginData = Schemas["LoginData"];
+export type LogoutData = Schemas["LogoutData"];
 
 export type AgentRegisterRequest = Schemas["AgentRegisterRequest"];
 export type AgentRegisterData = Schemas["AgentRegisterData"];

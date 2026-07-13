@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     env: str = "local"
     log_level: str = "INFO"
     jwt_secret: SecretStr
+    jwt_issuer: str = "edr-c-api"
+    jwt_audience: str = "edr-c-dashboard"
+    access_token_ttl_seconds: int = 900
+    refresh_token_ttl_seconds: int = 7 * 24 * 60 * 60
+    refresh_cookie_name: str = "edr_refresh"
+    refresh_cookie_secure: bool = False
     postgres_dsn: SecretStr
     clickhouse_dsn: SecretStr
     kafka_bootstrap_servers: str

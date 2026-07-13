@@ -23,6 +23,7 @@ import type {
   IngestSummaryDto,
   LoginData,
   LoginRequest,
+  LogoutData,
   PagedData,
   SuccessEnvelope,
 } from "../contracts";
@@ -37,6 +38,12 @@ function queryRecord(query: object): QueryRecord {
 export const api = {
   login(body: LoginRequest, signal?: AbortSignal): Promise<SuccessEnvelope<LoginData>> {
     return apiRequest("/auth/login", { method: "POST", body: JSON.stringify(body) }, signal);
+  },
+  refresh(signal?: AbortSignal): Promise<SuccessEnvelope<LoginData>> {
+    return apiRequest("/auth/refresh", { method: "POST" }, signal);
+  },
+  logout(signal?: AbortSignal): Promise<SuccessEnvelope<LogoutData>> {
+    return apiRequest("/auth/logout", { method: "POST" }, signal);
   },
   endpoints(query: EndpointListQuery, signal?: AbortSignal): Promise<SuccessEnvelope<PagedData<EndpointDto>>> {
     return apiRequest(`/endpoints${buildQuery(queryRecord(query))}`, {}, signal);

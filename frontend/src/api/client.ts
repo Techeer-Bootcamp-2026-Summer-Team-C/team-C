@@ -1,9 +1,12 @@
 import type { ErrorDetail, ErrorEnvelope, SuccessEnvelope } from "../contracts";
 
 const API_ROOT = "/api/v1";
+const NO_RETRY_PATHS = new Set(["/auth/login", "/auth/refresh", "/auth/logout"]);
 
 let accessToken: string | null = null;
 let unauthorizedHandler: (() => void) | null = null;
+let refreshHandler: (() => Promise<boolean>) | null = null;
+let refreshInFlight: Promise<boolean> | null = null;
 
 export class ApiError extends Error {
   readonly status: number;
@@ -38,13 +41,37 @@ export function configureApiAuth(token: string | null, onUnauthorized: (() => vo
   unauthorizedHandler = onUnauthorized;
 }
 
+export function configureApiRefresh(onRefresh: (() => Promise<boolean>) | null): void {
+  refreshHandler = onRefresh;
+}
+
+function requestRefresh(): Promise<boolean> {
+  if (!refreshHandler) return Promise.resolve(false);
+  if (!refreshInFlight) {
+    refreshInFlight = refreshHandler().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
+
 export async function apiRequest<T>(
   path: string,
   init: RequestInit = {},
   signal?: AbortSignal,
 ): Promise<SuccessEnvelope<T>> {
+  return performRequest<T>(path, init, signal, true);
+}
+
+async function performRequest<T>(
+  path: string,
+  init: RequestInit,
+  signal: AbortSignal | undefined,
+  allowRefresh: boolean,
+): Promise<SuccessEnvelope<T>> {
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
+  headers.set("X-CSRF-Protection", "1");
   if (init.body !== undefined && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
 
@@ -53,6 +80,7 @@ export async function apiRequest<T>(
     response = await fetch(`${API_ROOT}${path}`, {
       ...init,
       headers,
+      credentials: "include",
       ...(signal ? { signal } : {}),
     });
   } catch (error) {
@@ -70,6 +98,15 @@ export async function apiRequest<T>(
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     const envelope = isErrorEnvelope(payload) ? payload : null;
+    if (
+      response.status === 401 &&
+      envelope?.error.code === "INVALID_TOKEN" &&
+      allowRefresh &&
+      !NO_RETRY_PATHS.has(path)
+    ) {
+      const refreshed = await requestRefresh();
+      if (refreshed) return performRequest<T>(path, init, signal, false);
+    }
     const retryAfter = response.headers.get("Retry-After");
     const parsedRetryAfter = retryAfter ? Number(retryAfter) : null;
     const error = new ApiError({
@@ -81,7 +118,7 @@ export async function apiRequest<T>(
       requestId: envelope?.meta.requestId ?? response.headers.get("X-Request-ID"),
       retryAfterSeconds: Number.isFinite(parsedRetryAfter) ? parsedRetryAfter : null,
     });
-    if (response.status === 401) unauthorizedHandler?.();
+    if (response.status === 401 && envelope?.error.code === "INVALID_TOKEN") unauthorizedHandler?.();
     throw error;
   }
   if (!isSuccessEnvelope<T>(payload)) {

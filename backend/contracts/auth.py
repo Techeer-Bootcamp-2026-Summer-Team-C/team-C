@@ -29,3 +29,7 @@ class LoginData(ContractModel):
     token_type: Literal["Bearer"]
     expires_in: NonNegativeInt
     user: UserDto
+
+
+class LogoutData(ContractModel):
+    logged_out: bool

@@ -44,11 +44,10 @@ export function LoginPage() {
       <section className="login-panel">
         <form onSubmit={(event) => void submit(event)}>
           <div className="login-heading"><LockKeyhole aria-hidden="true" size={20} /><div><span>AUTHENTICATED ACCESS</span><h2>Sign in</h2></div></div>
-          <label className="field"><span>Email</span><input autoComplete="username" autoFocus onChange={(event) => setEmail(event.target.value)} type="email" value={email} /></label>
+          <label className="field"><span>Email</span><input autoComplete="username" autoFocus onChange={(event) => setEmail(event.target.value)} type="text" value={email} /></label>
           <label className="field"><span>Password</span><input autoComplete="current-password" onChange={(event) => setPassword(event.target.value)} type="password" value={password} /></label>
           {error ? <div className="login-error" role="alert"><strong>{error.code === "ACCOUNT_DISABLED" ? "Account disabled" : "Sign in failed"}</strong><span>{error.message}</span>{error.requestId ? <code>Request {error.requestId}</code> : null}</div> : null}
           <button className="button primary login-submit" disabled={loading} type="submit">{loading ? "Signing in…" : "Sign in"}</button>
-          <p className="login-note">The access token is held in memory only. Refreshing the browser requires a new sign-in.</p>
         </form>
       </section>
     </main>

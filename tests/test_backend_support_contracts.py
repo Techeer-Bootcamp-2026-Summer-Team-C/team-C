@@ -20,12 +20,22 @@ def test_argon2id_and_hs256_claim_contract() -> None:
     assert password_hash.startswith("$argon2id$")
     assert verify_password(password_hash, "correct horse battery staple") is True
     assert verify_password(password_hash, "wrong") is False
-    token = issue_access_token(user_id=7, role=UserRole.ADMIN, secret=JWT_SECRET, now=NOW)
-    claims = jwt.decode(token, JWT_SECRET, algorithms=["HS256"], options={"verify_exp": False})
-    assert set(claims) == {"sub", "role", "iat", "exp"}
+    token = issue_access_token(user_id=7, role=UserRole.ADMIN, secret=JWT_SECRET, now=NOW, session_id="family-7")
+    claims = jwt.decode(
+        token,
+        JWT_SECRET,
+        algorithms=["HS256"],
+        issuer="edr-c-api",
+        audience="edr-c-dashboard",
+        options={"verify_exp": False},
+    )
+    assert set(claims) == {"sub", "role", "sid", "jti", "iss", "aud", "iat", "nbf", "exp"}
     assert claims["sub"] == "7"
     assert claims["role"] == "ADMIN"
-    assert claims["exp"] - claims["iat"] == 3600
+    assert claims["sid"] == "family-7"
+    assert claims["iss"] == "edr-c-api"
+    assert claims["aud"] == "edr-c-dashboard"
+    assert claims["exp"] - claims["iat"] == 900
 
 
 def test_expired_and_tampered_jwt_are_rejected() -> None:

@@ -13,8 +13,45 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+function loginData(email: string) {
+  return {
+    data: {
+      accessToken: "memory-only",
+      tokenType: "Bearer",
+      expiresIn: 900,
+      user: { userId: 1, email, name: "Analyst", role: "ANALYST", status: "ACTIVE" },
+    },
+    meta: { requestId: "req_login" },
+  };
+}
+
+function mockAuthFetch(): ReturnType<typeof vi.fn> {
+  return vi.fn((input: RequestInfo | URL) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/auth/refresh")) {
+      return Promise.resolve(
+        jsonResponse(
+          { error: { code: "INVALID_TOKEN", message: "No session", retryable: false, details: [] }, meta: { requestId: "req_refresh" } },
+          401,
+        ),
+      );
+    }
+    if (url.includes("/auth/logout")) {
+      return Promise.resolve(jsonResponse({ data: { loggedOut: true }, meta: { requestId: "req_logout" } }));
+    }
+    if (url.includes("/auth/login")) {
+      return Promise.resolve(jsonResponse(loginData("analyst@example.com")));
+    }
+    return Promise.resolve(jsonResponse({ data: {}, meta: { requestId: "req_other" } }));
+  });
+}
+
 it("guards a protected route, remembers it in memory, and returns after login", async () => {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { accessToken: "memory-only", tokenType: "Bearer", expiresIn: 3600, user: { userId: 1, email: "analyst@example.com", name: "Analyst", role: "ANALYST", status: "ACTIVE" } }, meta: { requestId: "req_login" } }), { status: 200, headers: { "Content-Type": "application/json" } })));
+  vi.stubGlobal("fetch", mockAuthFetch());
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(<QueryClientProvider client={queryClient}><AuthProvider><MemoryRouter initialEntries={["/alerts?status=OPEN"]}><Routes><Route path="/login" element={<LoginPage />} /><Route path="/alerts" element={<RequireAuth><h1>Alert destination</h1></RequireAuth>} /></Routes></MemoryRouter></AuthProvider></QueryClientProvider>);
   expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
@@ -27,7 +64,22 @@ it("guards a protected route, remembers it in memory, and returns after login", 
 });
 
 it("does not retain the previous route after an explicit logout", async () => {
-  vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: { accessToken: "memory-only", tokenType: "Bearer", expiresIn: 3600, user: { userId: 1, email: "admin@example.com", name: "Administrator", role: "ADMIN", status: "ACTIVE" } }, meta: { requestId: "req_login" } }), { status: 200, headers: { "Content-Type": "application/json" } }))));
+  const fetchMock = vi.fn((input: RequestInfo | URL) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/auth/refresh")) {
+      return Promise.resolve(
+        jsonResponse(
+          { error: { code: "INVALID_TOKEN", message: "No session", retryable: false, details: [] }, meta: { requestId: "req_refresh" } },
+          401,
+        ),
+      );
+    }
+    if (url.includes("/auth/logout")) {
+      return Promise.resolve(jsonResponse({ data: { loggedOut: true }, meta: { requestId: "req_logout" } }));
+    }
+    return Promise.resolve(jsonResponse(loginData("admin@example.com")));
+  });
+  vi.stubGlobal("fetch", fetchMock);
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(<QueryClientProvider client={queryClient}><AuthProvider><MemoryRouter initialEntries={["/alerts"]}><Routes><Route path="/login" element={<LoginPage />} /><Route element={<RequireAuth><AppShell /></RequireAuth>}><Route index element={<h1>Overview destination</h1>} /><Route path="alerts" element={<h1>Alert destination</h1>} /></Route></Routes></MemoryRouter></AuthProvider></QueryClientProvider>);
 
