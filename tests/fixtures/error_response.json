@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "요청 값이 올바르지 않습니다.",
+    "retryable": false,
+    "details": [
+      {"field": "size", "message": "1 이상이어야 합니다.", "context": null}
+    ]
+  },
+  "meta": {"requestId": "req_contract_fixture"}
+}

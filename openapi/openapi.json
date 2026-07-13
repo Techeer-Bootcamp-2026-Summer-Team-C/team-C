@@ -1,0 +1,6826 @@
+{
+  "components": {
+    "schemas": {
+      "AgentArchitecture": {
+        "enum": [
+          "X64",
+          "ARM64"
+        ],
+        "title": "AgentArchitecture",
+        "type": "string"
+      },
+      "AgentHeartbeatData": {
+        "additionalProperties": false,
+        "properties": {
+          "endpointStatus": {
+            "$ref": "#/components/schemas/EndpointStatus"
+          },
+          "nextHeartbeatSeconds": {
+            "minimum": 0.0,
+            "title": "Nextheartbeatseconds",
+            "type": "integer"
+          },
+          "serverTime": {
+            "title": "Servertime",
+            "type": "string"
+          }
+        },
+        "required": [
+          "serverTime",
+          "nextHeartbeatSeconds",
+          "endpointStatus"
+        ],
+        "title": "AgentHeartbeatData",
+        "type": "object"
+      },
+      "AgentHeartbeatRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "agentArch": {
+            "$ref": "#/components/schemas/AgentArchitecture"
+          },
+          "agentBuildId": {
+            "title": "Agentbuildid",
+            "type": "string"
+          },
+          "agentId": {
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+            "title": "Agentid",
+            "type": "string"
+          },
+          "agentVersion": {
+            "title": "Agentversion",
+            "type": "string"
+          },
+          "bufferDepth": {
+            "minimum": 0.0,
+            "title": "Bufferdepth",
+            "type": "integer"
+          },
+          "capabilityCodes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilitycodes",
+            "type": "array"
+          },
+          "sensorHealth": {
+            "items": {
+              "$ref": "#/components/schemas/SensorHealthSnapshot"
+            },
+            "title": "Sensorhealth",
+            "type": "array"
+          },
+          "sentAt": {
+            "format": "date-time",
+            "title": "Sentat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "agentId",
+          "agentVersion",
+          "agentBuildId",
+          "agentArch",
+          "capabilityCodes",
+          "bufferDepth",
+          "sensorHealth",
+          "sentAt"
+        ],
+        "title": "AgentHeartbeatRequest",
+        "type": "object"
+      },
+      "AgentRegisterData": {
+        "additionalProperties": false,
+        "properties": {
+          "agentId": {
+            "title": "Agentid",
+            "type": "string"
+          },
+          "endpointId": {
+            "minimum": 1.0,
+            "title": "Endpointid",
+            "type": "integer"
+          },
+          "heartbeatIntervalSeconds": {
+            "minimum": 0.0,
+            "title": "Heartbeatintervalseconds",
+            "type": "integer"
+          },
+          "registeredAt": {
+            "title": "Registeredat",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EndpointStatus"
+          }
+        },
+        "required": [
+          "endpointId",
+          "agentId",
+          "status",
+          "heartbeatIntervalSeconds",
+          "registeredAt"
+        ],
+        "title": "AgentRegisterData",
+        "type": "object"
+      },
+      "AgentRegisterRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "agentArch": {
+            "$ref": "#/components/schemas/AgentArchitecture"
+          },
+          "agentBuildId": {
+            "title": "Agentbuildid",
+            "type": "string"
+          },
+          "agentId": {
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+            "title": "Agentid",
+            "type": "string"
+          },
+          "agentVersion": {
+            "title": "Agentversion",
+            "type": "string"
+          },
+          "capabilityCodes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilitycodes",
+            "type": "array"
+          },
+          "hostname": {
+            "title": "Hostname",
+            "type": "string"
+          },
+          "osType": {
+            "$ref": "#/components/schemas/OsType"
+          },
+          "osVersion": {
+            "title": "Osversion",
+            "type": "string"
+          }
+        },
+        "required": [
+          "agentId",
+          "hostname",
+          "osType",
+          "osVersion",
+          "agentVersion",
+          "agentBuildId",
+          "agentArch",
+          "capabilityCodes"
+        ],
+        "title": "AgentRegisterRequest",
+        "type": "object"
+      },
+      "AlertDetailDto": {
+        "additionalProperties": false,
+        "properties": {
+          "agentId": {
+            "title": "Agentid",
+            "type": "string"
+          },
+          "alertId": {
+            "minimum": 1.0,
+            "title": "Alertid",
+            "type": "integer"
+          },
+          "batchId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batchid"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "detectedAt": {
+            "title": "Detectedat",
+            "type": "string"
+          },
+          "endpointId": {
+            "minimum": 1.0,
+            "title": "Endpointid",
+            "type": "integer"
+          },
+          "eventId": {
+            "title": "Eventid",
+            "type": "string"
+          },
+          "eventOccurredAt": {
+            "title": "Eventoccurredat",
+            "type": "string"
+          },
+          "incidents": {
+            "items": {
+              "$ref": "#/components/schemas/IncidentReferenceDto"
+            },
+            "title": "Incidents",
+            "type": "array"
+          },
+          "mitreTacticCode": {
+            "title": "Mitretacticcode",
+            "type": "string"
+          },
+          "mitreTacticName": {
+            "title": "Mitretacticname",
+            "type": "string"
+          },
+          "mitreTechniqueCode": {
+            "title": "Mitretechniquecode",
+            "type": "string"
+          },
+          "mitreTechniqueName": {
+            "title": "Mitretechniquename",
+            "type": "string"
+          },
+          "responseGuidance": {
+            "items": {
+              "$ref": "#/components/schemas/ResponseGuidanceStepDto"
+            },
+            "title": "Responseguidance",
+            "type": "array"
+          },
+          "riskScore": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Riskscore",
+            "type": "number"
+          },
+          "ruleCode": {
+            "title": "Rulecode",
+            "type": "string"
+          },
+          "ruleName": {
+            "title": "Rulename",
+            "type": "string"
+          },
+          "ruleVersion": {
+            "title": "Ruleversion",
+            "type": "integer"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "sourceEvent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/AlertStatus"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updatedAt": {
+            "title": "Updatedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "alertId",
+          "endpointId",
+          "eventId",
+          "eventOccurredAt",
+          "batchId",
+          "agentId",
+          "ruleCode",
+          "ruleName",
+          "ruleVersion",
+          "mitreTacticCode",
+          "mitreTacticName",
+          "mitreTechniqueCode",
+          "mitreTechniqueName",
+          "title",
+          "summary",
+          "severity",
+          "riskScore",
+          "status",
+          "detectedAt",
+          "createdAt",
+          "updatedAt",
+          "sourceEvent",
+          "incidents",
+          "responseGuidance"
+        ],
+        "title": "AlertDetailDto",
+        "type": "object"
+      },
+      "AlertDto": {
+        "additionalProperties": false,
+        "properties": {
+          "agentId": {
+            "title": "Agentid",
+            "type": "string"
+          },
+          "alertId": {
+            "minimum": 1.0,
+            "title": "Alertid",
+            "type": "integer"
+          },
+          "batchId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batchid"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "detectedAt": {
+            "title": "Detectedat",
+            "type": "string"
+          },
+          "endpointId": {
+            "minimum": 1.0,
+            "title": "Endpointid",
+            "type": "integer"
+          },
+          "eventId": {
+            "title": "Eventid",
+            "type": "string"
+          },
+          "eventOccurredAt": {
+            "title": "Eventoccurredat",
+            "type": "string"
+          },
+          "mitreTacticCode": {
+            "title": "Mitretacticcode",
+            "type": "string"
+          },
+          "mitreTacticName": {
+            "title": "Mitretacticname",
+            "type": "string"
+          },
+          "mitreTechniqueCode": {
+            "title": "Mitretechniquecode",
+            "type": "string"
+          },
+          "mitreTechniqueName": {
+            "title": "Mitretechniquename",
+            "type": "string"
+          },
+          "riskScore": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Riskscore",
+            "type": "number"
+          },
+          "ruleCode": {
+            "title": "Rulecode",
+            "type": "string"
+          },
+          "ruleName": {
+            "title": "Rulename",
+            "type": "string"
+          },
+          "ruleVersion": {
+            "title": "Ruleversion",
+            "type": "integer"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AlertStatus"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updatedAt": {
+            "title": "Updatedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "alertId",
+          "endpointId",
+          "eventId",
+          "eventOccurredAt",
+          "batchId",
+          "agentId",
+          "ruleCode",
+          "ruleName",
+          "ruleVersion",
+          "mitreTacticCode",
+          "mitreTacticName",
+          "mitreTechniqueCode",
+          "mitreTechniqueName",
+          "title",
+          "summary",
+          "severity",
+          "riskScore",
+          "status",
+          "detectedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "title": "AlertDto",
+        "type": "object"
+      },
+      "AlertStatus": {
+        "enum": [
+          "OPEN",
+          "IN_PROGRESS",
+          "RESOLVED"
+        ],
+        "title": "AlertStatus",
+        "type": "string"
+      },
+      "AlertStatusCountDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AlertStatus"
+          }
+        },
+        "required": [
+          "status",
+          "count"
+        ],
+        "title": "AlertStatusCountDto",
+        "type": "object"
+      },
+      "AlertStatusUpdateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/AlertStatus"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "AlertStatusUpdateRequest",
+        "type": "object"
+      },
+      "ArchiveBucketDto": {
+        "additionalProperties": false,
+        "properties": {
+          "archiveVerifiedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archiveverifiedat"
+          },
+          "archivedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archivedat"
+          },
+          "bucketEndAt": {
+            "title": "Bucketendat",
+            "type": "string"
+          },
+          "bucketStartAt": {
+            "title": "Bucketstartat",
+            "type": "string"
+          },
+          "checksumSha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checksumsha256"
+          },
+          "endpointId": {
+            "minimum": 1.0,
+            "title": "Endpointid",
+            "type": "integer"
+          },
+          "eventCount": {
+            "minimum": 0.0,
+            "title": "Eventcount",
+            "type": "integer"
+          },
+          "lastError": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lasterror"
+          },
+          "restoreExpiresAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restoreexpiresat"
+          },
+          "restoreRequestedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restorerequestedat"
+          },
+          "restoredAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restoredat"
+          },
+          "sizeBytes": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sizebytes"
+          },
+          "storageBackend": {
+            "$ref": "#/components/schemas/StorageBackend"
+          },
+          "storageClass": {
+            "$ref": "#/components/schemas/StorageClass"
+          },
+          "storagePath": {
+            "title": "Storagepath",
+            "type": "string"
+          },
+          "storageStatus": {
+            "$ref": "#/components/schemas/StorageStatus"
+          }
+        },
+        "required": [
+          "endpointId",
+          "bucketStartAt",
+          "bucketEndAt",
+          "storageBackend",
+          "storageClass",
+          "storageStatus",
+          "storagePath",
+          "eventCount",
+          "sizeBytes",
+          "checksumSha256",
+          "archivedAt",
+          "archiveVerifiedAt",
+          "restoreRequestedAt",
+          "restoredAt",
+          "restoreExpiresAt",
+          "lastError"
+        ],
+        "title": "ArchiveBucketDto",
+        "type": "object"
+      },
+      "ArchiveRestoreRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "endpointIds": {
+            "items": {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            "title": "Endpointids",
+            "type": "array"
+          },
+          "from": {
+            "format": "date-time",
+            "title": "From",
+            "type": "string"
+          },
+          "to": {
+            "format": "date-time",
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpointIds",
+          "from",
+          "to"
+        ],
+        "title": "ArchiveRestoreRequest",
+        "type": "object"
+      },
+      "ArchiveRestoreStartDto": {
+        "additionalProperties": false,
+        "properties": {
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/ArchiveBucketDto"
+            },
+            "title": "Buckets",
+            "type": "array"
+          },
+          "endpointIds": {
+            "items": {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            "title": "Endpointids",
+            "type": "array"
+          },
+          "from": {
+            "title": "From",
+            "type": "string"
+          },
+          "restoreDays": {
+            "const": 7,
+            "title": "Restoredays",
+            "type": "integer"
+          },
+          "retrievalTier": {
+            "const": "Standard",
+            "title": "Retrievaltier",
+            "type": "string"
+          },
+          "to": {
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpointIds",
+          "from",
+          "to",
+          "restoreDays",
+          "retrievalTier",
+          "buckets"
+        ],
+        "title": "ArchiveRestoreStartDto",
+        "type": "object"
+      },
+      "CertificateDto": {
+        "additionalProperties": false,
+        "properties": {
+          "certFingerprint": {
+            "title": "Certfingerprint",
+            "type": "string"
+          },
+          "certSanAgentId": {
+            "title": "Certsanagentid",
+            "type": "string"
+          },
+          "certSubject": {
+            "title": "Certsubject",
+            "type": "string"
+          },
+          "expiresAt": {
+            "title": "Expiresat",
+            "type": "string"
+          },
+          "isExpired": {
+            "title": "Isexpired",
+            "type": "boolean"
+          },
+          "isRevoked": {
+            "title": "Isrevoked",
+            "type": "boolean"
+          },
+          "issuedAt": {
+            "title": "Issuedat",
+            "type": "string"
+          },
+          "revokedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revokedat"
+          }
+        },
+        "required": [
+          "certFingerprint",
+          "certSubject",
+          "certSanAgentId",
+          "issuedAt",
+          "expiresAt",
+          "revokedAt",
+          "isExpired",
+          "isRevoked"
+        ],
+        "title": "CertificateDto",
+        "type": "object"
+      },
+      "DashboardAlertsDto": {
+        "additionalProperties": false,
+        "properties": {
+          "bySeverity": {
+            "items": {
+              "$ref": "#/components/schemas/SeverityCountDto"
+            },
+            "title": "Byseverity",
+            "type": "array"
+          },
+          "byStatus": {
+            "items": {
+              "$ref": "#/components/schemas/AlertStatusCountDto"
+            },
+            "title": "Bystatus",
+            "type": "array"
+          },
+          "mitreTactics": {
+            "items": {
+              "$ref": "#/components/schemas/MitreTacticCountDto"
+            },
+            "title": "Mitretactics",
+            "type": "array"
+          },
+          "mitreTechniques": {
+            "items": {
+              "$ref": "#/components/schemas/MitreTechniqueCountDto"
+            },
+            "title": "Mitretechniques",
+            "type": "array"
+          },
+          "timeSeries": {
+            "items": {
+              "$ref": "#/components/schemas/TimeSeriesPointDto"
+            },
+            "title": "Timeseries",
+            "type": "array"
+          },
+          "topRules": {
+            "items": {
+              "$ref": "#/components/schemas/TopRuleDto"
+            },
+            "title": "Toprules",
+            "type": "array"
+          },
+          "totalCount": {
+            "minimum": 0.0,
+            "title": "Totalcount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "totalCount",
+          "bySeverity",
+          "byStatus",
+          "topRules",
+          "mitreTactics",
+          "mitreTechniques",
+          "timeSeries"
+        ],
+        "title": "DashboardAlertsDto",
+        "type": "object"
+      },
+      "DashboardEndpointsDto": {
+        "additionalProperties": false,
+        "properties": {
+          "offlineCount": {
+            "minimum": 0.0,
+            "title": "Offlinecount",
+            "type": "integer"
+          },
+          "onlineCount": {
+            "minimum": 0.0,
+            "title": "Onlinecount",
+            "type": "integer"
+          },
+          "retiredCount": {
+            "minimum": 0.0,
+            "title": "Retiredcount",
+            "type": "integer"
+          },
+          "staleCount": {
+            "minimum": 0.0,
+            "title": "Stalecount",
+            "type": "integer"
+          },
+          "totalCount": {
+            "minimum": 0.0,
+            "title": "Totalcount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "totalCount",
+          "onlineCount",
+          "offlineCount",
+          "retiredCount",
+          "staleCount"
+        ],
+        "title": "DashboardEndpointsDto",
+        "type": "object"
+      },
+      "DashboardEventFailuresDto": {
+        "additionalProperties": false,
+        "properties": {
+          "byCode": {
+            "items": {
+              "$ref": "#/components/schemas/FailureCodeCountDto"
+            },
+            "title": "Bycode",
+            "type": "array"
+          },
+          "byStage": {
+            "items": {
+              "$ref": "#/components/schemas/FailureStageCountDto"
+            },
+            "title": "Bystage",
+            "type": "array"
+          },
+          "byStatus": {
+            "items": {
+              "$ref": "#/components/schemas/FailureStatusCountDto"
+            },
+            "title": "Bystatus",
+            "type": "array"
+          },
+          "totalCount": {
+            "minimum": 0.0,
+            "title": "Totalcount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "totalCount",
+          "byStage",
+          "byCode",
+          "byStatus"
+        ],
+        "title": "DashboardEventFailuresDto",
+        "type": "object"
+      },
+      "DashboardEventsDto": {
+        "additionalProperties": false,
+        "properties": {
+          "byEventType": {
+            "items": {
+              "$ref": "#/components/schemas/EventTypeCountDto"
+            },
+            "title": "Byeventtype",
+            "type": "array"
+          },
+          "timeSeries": {
+            "items": {
+              "$ref": "#/components/schemas/TimeSeriesPointDto"
+            },
+            "title": "Timeseries",
+            "type": "array"
+          },
+          "topDnsQueries": {
+            "items": {
+              "$ref": "#/components/schemas/TopDnsQueryDto"
+            },
+            "title": "Topdnsqueries",
+            "type": "array"
+          },
+          "topDomains": {
+            "items": {
+              "$ref": "#/components/schemas/TopDomainDto"
+            },
+            "title": "Topdomains",
+            "type": "array"
+          },
+          "topFileHashes": {
+            "items": {
+              "$ref": "#/components/schemas/TopFileHashDto"
+            },
+            "title": "Topfilehashes",
+            "type": "array"
+          },
+          "topL7Protocols": {
+            "items": {
+              "$ref": "#/components/schemas/TopL7ProtocolDto"
+            },
+            "title": "Topl7Protocols",
+            "type": "array"
+          },
+          "topProcesses": {
+            "items": {
+              "$ref": "#/components/schemas/TopProcessDto"
+            },
+            "title": "Topprocesses",
+            "type": "array"
+          },
+          "topRemoteIps": {
+            "items": {
+              "$ref": "#/components/schemas/TopRemoteIpDto"
+            },
+            "title": "Topremoteips",
+            "type": "array"
+          },
+          "totalCount": {
+            "minimum": 0.0,
+            "title": "Totalcount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "totalCount",
+          "byEventType",
+          "topProcesses",
+          "topRemoteIps",
+          "topDomains",
+          "topFileHashes",
+          "topDnsQueries",
+          "topL7Protocols",
+          "timeSeries"
+        ],
+        "title": "DashboardEventsDto",
+        "type": "object"
+      },
+      "DashboardIncidentsDto": {
+        "additionalProperties": false,
+        "properties": {
+          "bySeverity": {
+            "items": {
+              "$ref": "#/components/schemas/SeverityCountDto"
+            },
+            "title": "Byseverity",
+            "type": "array"
+          },
+          "closedCount": {
+            "minimum": 0.0,
+            "title": "Closedcount",
+            "type": "integer"
+          },
+          "openCount": {
+            "minimum": 0.0,
+            "title": "Opencount",
+            "type": "integer"
+          },
+          "timeSeries": {
+            "items": {
+              "$ref": "#/components/schemas/IncidentTimeSeriesPointDto"
+            },
+            "title": "Timeseries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "openCount",
+          "closedCount",
+          "bySeverity",
+          "timeSeries"
+        ],
+        "title": "DashboardIncidentsDto",
+        "type": "object"
+      },
+      "DashboardInterval": {
+        "enum": [
+          "1m",
+          "5m",
+          "1h",
+          "1d"
+        ],
+        "title": "DashboardInterval",
+        "type": "string"
+      },
+      "DashboardStorageDto": {
+        "additionalProperties": false,
+        "properties": {
+          "byBackend": {
+            "items": {
+              "$ref": "#/components/schemas/StorageBackendCountDto"
+            },
+            "title": "Bybackend",
+            "type": "array"
+          },
+          "byClass": {
+            "items": {
+              "$ref": "#/components/schemas/StorageClassCountDto"
+            },
+            "title": "Byclass",
+            "type": "array"
+          },
+          "byStatus": {
+            "items": {
+              "$ref": "#/components/schemas/StorageStatusCountDto"
+            },
+            "title": "Bystatus",
+            "type": "array"
+          },
+          "totalBucketCount": {
+            "minimum": 0.0,
+            "title": "Totalbucketcount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "totalBucketCount",
+          "byBackend",
+          "byClass",
+          "byStatus"
+        ],
+        "title": "DashboardStorageDto",
+        "type": "object"
+      },
+      "DashboardSummaryDto": {
+        "additionalProperties": false,
+        "properties": {
+          "alerts": {
+            "$ref": "#/components/schemas/DashboardAlertsDto"
+          },
+          "edrState": {
+            "$ref": "#/components/schemas/EdrStateDto"
+          },
+          "endpoints": {
+            "$ref": "#/components/schemas/DashboardEndpointsDto"
+          },
+          "eventFailures": {
+            "$ref": "#/components/schemas/DashboardEventFailuresDto"
+          },
+          "events": {
+            "$ref": "#/components/schemas/DashboardEventsDto"
+          },
+          "incidents": {
+            "$ref": "#/components/schemas/DashboardIncidentsDto"
+          },
+          "interval": {
+            "$ref": "#/components/schemas/DashboardInterval"
+          },
+          "storage": {
+            "$ref": "#/components/schemas/DashboardStorageDto"
+          },
+          "timeRange": {
+            "$ref": "#/components/schemas/TimeRangeDto"
+          }
+        },
+        "required": [
+          "timeRange",
+          "interval",
+          "edrState",
+          "alerts",
+          "incidents",
+          "endpoints",
+          "events",
+          "eventFailures",
+          "storage"
+        ],
+        "title": "DashboardSummaryDto",
+        "type": "object"
+      },
+      "DnsQueryEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "title": "Eventid",
+            "type": "string"
+          },
+          "eventType": {
+            "const": "DNS_QUERY",
+            "title": "Eventtype",
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "title": "Occurredat",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/DnsQueryPayload"
+          }
+        },
+        "required": [
+          "eventId",
+          "eventType",
+          "occurredAt",
+          "payload"
+        ],
+        "title": "DnsQueryEvent",
+        "type": "object"
+      },
+      "DnsQueryPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "answers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Answers",
+            "type": "array"
+          },
+          "pid": {
+            "minimum": 0,
+            "title": "Pid",
+            "type": "integer"
+          },
+          "processName": {
+            "title": "Processname",
+            "type": "string"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "recordType": {
+            "title": "Recordtype",
+            "type": "string"
+          },
+          "responseCode": {
+            "title": "Responsecode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query",
+          "recordType"
+        ],
+        "title": "DnsQueryPayload",
+        "type": "object"
+      },
+      "EdrStateAxisDto": {
+        "additionalProperties": false,
+        "properties": {
+          "reasonCodes": {
+            "items": {
+              "$ref": "#/components/schemas/EdrStateReasonCode"
+            },
+            "title": "Reasoncodes",
+            "type": "array"
+          },
+          "score": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Score",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EdrStateStatus"
+          }
+        },
+        "required": [
+          "status",
+          "score",
+          "reasonCodes"
+        ],
+        "title": "EdrStateAxisDto",
+        "type": "object"
+      },
+      "EdrStateDto": {
+        "additionalProperties": false,
+        "properties": {
+          "calculatedAt": {
+            "title": "Calculatedat",
+            "type": "string"
+          },
+          "collectionHealth": {
+            "$ref": "#/components/schemas/EdrStateAxisDto"
+          },
+          "criticalRiskEndpointCount": {
+            "minimum": 0.0,
+            "title": "Criticalriskendpointcount",
+            "type": "integer"
+          },
+          "highRiskEndpointCount": {
+            "minimum": 0.0,
+            "title": "Highriskendpointcount",
+            "type": "integer"
+          },
+          "highestEndpointRiskScore": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Highestendpointriskscore"
+          },
+          "reasonCodes": {
+            "items": {
+              "$ref": "#/components/schemas/EdrStateReasonCode"
+            },
+            "title": "Reasoncodes",
+            "type": "array"
+          },
+          "score": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Score",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EdrStateStatus"
+          },
+          "threatLevel": {
+            "$ref": "#/components/schemas/EdrStateAxisDto"
+          }
+        },
+        "required": [
+          "status",
+          "score",
+          "threatLevel",
+          "collectionHealth",
+          "highestEndpointRiskScore",
+          "highRiskEndpointCount",
+          "criticalRiskEndpointCount",
+          "reasonCodes",
+          "calculatedAt"
+        ],
+        "title": "EdrStateDto",
+        "type": "object"
+      },
+      "EdrStateReasonCode": {
+        "enum": [
+          "MEDIUM_ENDPOINT_RISK",
+          "HIGH_ENDPOINT_RISK",
+          "CRITICAL_ENDPOINT_RISK",
+          "OPEN_INCIDENT",
+          "CRITICAL_ALERT",
+          "OFFLINE_ENDPOINT",
+          "STALE_ENDPOINT",
+          "DEGRADED_SENSOR",
+          "UNAVAILABLE_SENSOR",
+          "INGEST_FAILURE",
+          "INGEST_DELAYED",
+          "STORAGE_FAILURE"
+        ],
+        "title": "EdrStateReasonCode",
+        "type": "string"
+      },
+      "EdrStateStatus": {
+        "enum": [
+          "GREEN",
+          "YELLOW",
+          "RED"
+        ],
+        "title": "EdrStateStatus",
+        "type": "string"
+      },
+      "EndpointDetailDto": {
+        "additionalProperties": false,
+        "properties": {
+          "agentArch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentArchitecture"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "agentBuildId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agentbuildid"
+          },
+          "agentId": {
+            "title": "Agentid",
+            "type": "string"
+          },
+          "agentVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agentversion"
+          },
+          "capabilityCodes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilitycodes",
+            "type": "array"
+          },
+          "certificates": {
+            "items": {
+              "$ref": "#/components/schemas/CertificateDto"
+            },
+            "title": "Certificates",
+            "type": "array"
+          },
+          "endpointId": {
+            "minimum": 1.0,
+            "title": "Endpointid",
+            "type": "integer"
+          },
+          "hostname": {
+            "title": "Hostname",
+            "type": "string"
+          },
+          "ipAddress": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ipaddress"
+          },
+          "isStale": {
+            "title": "Isstale",
+            "type": "boolean"
+          },
+          "lastSeenAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastseenat"
+          },
+          "osType": {
+            "$ref": "#/components/schemas/OsType"
+          },
+          "osVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Osversion"
+          },
+          "registeredAt": {
+            "title": "Registeredat",
+            "type": "string"
+          },
+          "risk": {
+            "$ref": "#/components/schemas/EndpointRiskDto"
+          },
+          "sensorHealth": {
+            "items": {
+              "$ref": "#/components/schemas/SensorHealthDto"
+            },
+            "title": "Sensorhealth",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EndpointStatus"
+          }
+        },
+        "required": [
+          "endpointId",
+          "agentId",
+          "hostname",
+          "osType",
+          "osVersion",
+          "ipAddress",
+          "agentVersion",
+          "agentBuildId",
+          "agentArch",
+          "capabilityCodes",
+          "status",
+          "lastSeenAt",
+          "isStale",
+          "sensorHealth",
+          "risk",
+          "registeredAt",
+          "certificates"
+        ],
+        "title": "EndpointDetailDto",
+        "type": "object"
+      },
+      "EndpointDto": {
+        "additionalProperties": false,
+        "properties": {
+          "agentArch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentArchitecture"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "agentBuildId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agentbuildid"
+          },
+          "agentId": {
+            "title": "Agentid",
+            "type": "string"
+          },
+          "agentVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agentversion"
+          },
+          "capabilityCodes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilitycodes",
+            "type": "array"
+          },
+          "endpointId": {
+            "minimum": 1.0,
+            "title": "Endpointid",
+            "type": "integer"
+          },
+          "hostname": {
+            "title": "Hostname",
+            "type": "string"
+          },
+          "ipAddress": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ipaddress"
+          },
+          "isStale": {
+            "title": "Isstale",
+            "type": "boolean"
+          },
+          "lastSeenAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastseenat"
+          },
+          "osType": {
+            "$ref": "#/components/schemas/OsType"
+          },
+          "osVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Osversion"
+          },
+          "registeredAt": {
+            "title": "Registeredat",
+            "type": "string"
+          },
+          "risk": {
+            "$ref": "#/components/schemas/EndpointRiskDto"
+          },
+          "sensorHealth": {
+            "items": {
+              "$ref": "#/components/schemas/SensorHealthDto"
+            },
+            "title": "Sensorhealth",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EndpointStatus"
+          }
+        },
+        "required": [
+          "endpointId",
+          "agentId",
+          "hostname",
+          "osType",
+          "osVersion",
+          "ipAddress",
+          "agentVersion",
+          "agentBuildId",
+          "agentArch",
+          "capabilityCodes",
+          "status",
+          "lastSeenAt",
+          "isStale",
+          "sensorHealth",
+          "risk",
+          "registeredAt"
+        ],
+        "title": "EndpointDto",
+        "type": "object"
+      },
+      "EndpointRiskDto": {
+        "additionalProperties": false,
+        "properties": {
+          "activeAlertCount": {
+            "minimum": 0.0,
+            "title": "Activealertcount",
+            "type": "integer"
+          },
+          "calculatedAt": {
+            "title": "Calculatedat",
+            "type": "string"
+          },
+          "highestAlertRiskScore": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Highestalertriskscore"
+          },
+          "level": {
+            "$ref": "#/components/schemas/RiskLevel"
+          },
+          "openIncidentCount": {
+            "minimum": 0.0,
+            "title": "Openincidentcount",
+            "type": "integer"
+          },
+          "riskFactors": {
+            "items": {
+              "$ref": "#/components/schemas/EndpointRiskFactorDto"
+            },
+            "title": "Riskfactors",
+            "type": "array"
+          },
+          "score": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Score",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "score",
+          "level",
+          "activeAlertCount",
+          "openIncidentCount",
+          "highestAlertRiskScore",
+          "calculatedAt",
+          "riskFactors"
+        ],
+        "title": "EndpointRiskDto",
+        "type": "object"
+      },
+      "EndpointRiskFactorDto": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "contribution": {
+            "minimum": 0.0,
+            "title": "Contribution",
+            "type": "integer"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "sourceId": {
+            "minimum": 1.0,
+            "title": "Sourceid",
+            "type": "integer"
+          },
+          "sourceType": {
+            "$ref": "#/components/schemas/EndpointRiskFactorSourceType"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "title",
+          "description",
+          "contribution",
+          "sourceType",
+          "sourceId"
+        ],
+        "title": "EndpointRiskFactorDto",
+        "type": "object"
+      },
+      "EndpointRiskFactorSourceType": {
+        "enum": [
+          "ALERT",
+          "INCIDENT"
+        ],
+        "title": "EndpointRiskFactorSourceType",
+        "type": "string"
+      },
+      "EndpointRiskSummaryDto": {
+        "additionalProperties": false,
+        "properties": {
+          "byLevel": {
+            "items": {
+              "$ref": "#/components/schemas/RiskLevelCountDto"
+            },
+            "title": "Bylevel",
+            "type": "array"
+          },
+          "calculatedAt": {
+            "title": "Calculatedat",
+            "type": "string"
+          },
+          "criticalRiskEndpointCount": {
+            "minimum": 0.0,
+            "title": "Criticalriskendpointcount",
+            "type": "integer"
+          },
+          "highRiskEndpointCount": {
+            "minimum": 0.0,
+            "title": "Highriskendpointcount",
+            "type": "integer"
+          },
+          "highestScore": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Highestscore"
+          }
+        },
+        "required": [
+          "highestScore",
+          "highRiskEndpointCount",
+          "criticalRiskEndpointCount",
+          "byLevel",
+          "calculatedAt"
+        ],
+        "title": "EndpointRiskSummaryDto",
+        "type": "object"
+      },
+      "EndpointStatus": {
+        "enum": [
+          "ONLINE",
+          "OFFLINE",
+          "RETIRED"
+        ],
+        "title": "EndpointStatus",
+        "type": "string"
+      },
+      "EndpointSummaryAlertsDto": {
+        "additionalProperties": false,
+        "properties": {
+          "bySeverity": {
+            "items": {
+              "$ref": "#/components/schemas/SeverityCountDto"
+            },
+            "title": "Byseverity",
+            "type": "array"
+          },
+          "totalCount": {
+            "minimum": 0.0,
+            "title": "Totalcount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "totalCount",
+          "bySeverity"
+        ],
+        "title": "EndpointSummaryAlertsDto",
+        "type": "object"
+      },
+      "EndpointSummaryDto": {
+        "additionalProperties": false,
+        "properties": {
+          "alerts": {
+            "$ref": "#/components/schemas/EndpointSummaryAlertsDto"
+          },
+          "byOsType": {
+            "items": {
+              "$ref": "#/components/schemas/OsTypeCountDto"
+            },
+            "title": "Byostype",
+            "type": "array"
+          },
+          "incidents": {
+            "$ref": "#/components/schemas/EndpointSummaryIncidentsDto"
+          },
+          "offlineCount": {
+            "minimum": 0.0,
+            "title": "Offlinecount",
+            "type": "integer"
+          },
+          "onlineCount": {
+            "minimum": 0.0,
+            "title": "Onlinecount",
+            "type": "integer"
+          },
+          "retiredCount": {
+            "minimum": 0.0,
+            "title": "Retiredcount",
+            "type": "integer"
+          },
+          "risk": {
+            "$ref": "#/components/schemas/EndpointRiskSummaryDto"
+          },
+          "sensorHealth": {
+            "items": {
+              "$ref": "#/components/schemas/SensorHealthCountDto"
+            },
+            "title": "Sensorhealth",
+            "type": "array"
+          },
+          "staleCount": {
+            "minimum": 0.0,
+            "title": "Stalecount",
+            "type": "integer"
+          },
+          "timeRange": {
+            "$ref": "#/components/schemas/TimeRangeDto"
+          },
+          "totalCount": {
+            "minimum": 0.0,
+            "title": "Totalcount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "timeRange",
+          "totalCount",
+          "onlineCount",
+          "offlineCount",
+          "retiredCount",
+          "staleCount",
+          "byOsType",
+          "sensorHealth",
+          "risk",
+          "alerts",
+          "incidents"
+        ],
+        "title": "EndpointSummaryDto",
+        "type": "object"
+      },
+      "EndpointSummaryIncidentsDto": {
+        "additionalProperties": false,
+        "properties": {
+          "bySeverity": {
+            "items": {
+              "$ref": "#/components/schemas/SeverityCountDto"
+            },
+            "title": "Byseverity",
+            "type": "array"
+          },
+          "closedCount": {
+            "minimum": 0.0,
+            "title": "Closedcount",
+            "type": "integer"
+          },
+          "openCount": {
+            "minimum": 0.0,
+            "title": "Opencount",
+            "type": "integer"
+          },
+          "totalCount": {
+            "minimum": 0.0,
+            "title": "Totalcount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "totalCount",
+          "openCount",
+          "closedCount",
+          "bySeverity"
+        ],
+        "title": "EndpointSummaryIncidentsDto",
+        "type": "object"
+      },
+      "ErrorBody": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "details": {
+            "items": {
+              "$ref": "#/components/schemas/ErrorDetail"
+            },
+            "title": "Details",
+            "type": "array"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "retryable": {
+            "title": "Retryable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "retryable",
+          "details"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "ErrorDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "context": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          },
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "message",
+          "context"
+        ],
+        "title": "ErrorDetail",
+        "type": "object"
+      },
+      "ErrorEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "error",
+          "meta"
+        ],
+        "title": "ErrorEnvelope",
+        "type": "object"
+      },
+      "EventDetailDto": {
+        "additionalProperties": false,
+        "properties": {
+          "agentId": {
+            "title": "Agentid",
+            "type": "string"
+          },
+          "batchId": {
+            "title": "Batchid",
+            "type": "string"
+          },
+          "commandLine": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commandline"
+          },
+          "dnsAnswers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dnsanswers",
+            "type": "array"
+          },
+          "dnsQuery": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dnsquery"
+          },
+          "dnsRecordType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dnsrecordtype"
+          },
+          "dnsResponseCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dnsresponsecode"
+          },
+          "endpointId": {
+            "minimum": 1.0,
+            "title": "Endpointid",
+            "type": "integer"
+          },
+          "eventId": {
+            "title": "Eventid",
+            "type": "string"
+          },
+          "eventType": {
+            "$ref": "#/components/schemas/EventType"
+          },
+          "fileAction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fileaction"
+          },
+          "fileHashSha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filehashsha256"
+          },
+          "filePath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filepath"
+          },
+          "hostname": {
+            "title": "Hostname",
+            "type": "string"
+          },
+          "httpHost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Httphost"
+          },
+          "httpMethod": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Httpmethod"
+          },
+          "httpStatusCode": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Httpstatuscode"
+          },
+          "httpUserAgent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Httpuseragent"
+          },
+          "ingestedAt": {
+            "title": "Ingestedat",
+            "type": "string"
+          },
+          "ipAddress": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ipaddress"
+          },
+          "l7Protocol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "L7Protocol"
+          },
+          "occurredAt": {
+            "title": "Occurredat",
+            "type": "string"
+          },
+          "osType": {
+            "$ref": "#/components/schemas/OsType"
+          },
+          "payloadSha256": {
+            "title": "Payloadsha256",
+            "type": "string"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "ppid": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ppid"
+          },
+          "processName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processname"
+          },
+          "processPath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processpath"
+          },
+          "protocol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protocol"
+          },
+          "rawPayload": {
+            "additionalProperties": true,
+            "title": "Rawpayload",
+            "type": "object"
+          },
+          "remoteDomain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remotedomain"
+          },
+          "remoteIp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remoteip"
+          },
+          "remotePort": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remoteport"
+          },
+          "schemaVersion": {
+            "minimum": 0.0,
+            "title": "Schemaversion",
+            "type": "integer"
+          },
+          "tlsCertificateIssuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tlscertificateissuer"
+          },
+          "tlsCertificateSha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tlscertificatesha256"
+          },
+          "tlsCertificateSubject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tlscertificatesubject"
+          },
+          "tlsSni": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tlssni"
+          },
+          "tlsVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tlsversion"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "userName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "required": [
+          "eventId",
+          "batchId",
+          "endpointId",
+          "agentId",
+          "hostname",
+          "osType",
+          "ipAddress",
+          "eventType",
+          "occurredAt",
+          "ingestedAt",
+          "processName",
+          "processPath",
+          "pid",
+          "ppid",
+          "commandLine",
+          "userName",
+          "filePath",
+          "fileAction",
+          "fileHashSha256",
+          "remoteIp",
+          "remoteDomain",
+          "remotePort",
+          "protocol",
+          "dnsQuery",
+          "dnsRecordType",
+          "dnsResponseCode",
+          "dnsAnswers",
+          "l7Protocol",
+          "httpMethod",
+          "httpHost",
+          "url",
+          "httpStatusCode",
+          "httpUserAgent",
+          "tlsSni",
+          "tlsVersion",
+          "tlsCertificateSubject",
+          "tlsCertificateIssuer",
+          "tlsCertificateSha256",
+          "rawPayload",
+          "payloadSha256",
+          "schemaVersion"
+        ],
+        "title": "EventDetailDto",
+        "type": "object"
+      },
+      "EventDto": {
+        "additionalProperties": false,
+        "properties": {
+          "agentId": {
+            "title": "Agentid",
+            "type": "string"
+          },
+          "batchId": {
+            "title": "Batchid",
+            "type": "string"
+          },
+          "commandLine": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commandline"
+          },
+          "dnsAnswers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dnsanswers",
+            "type": "array"
+          },
+          "dnsQuery": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dnsquery"
+          },
+          "dnsRecordType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dnsrecordtype"
+          },
+          "dnsResponseCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dnsresponsecode"
+          },
+          "endpointId": {
+            "minimum": 1.0,
+            "title": "Endpointid",
+            "type": "integer"
+          },
+          "eventId": {
+            "title": "Eventid",
+            "type": "string"
+          },
+          "eventType": {
+            "$ref": "#/components/schemas/EventType"
+          },
+          "fileAction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fileaction"
+          },
+          "fileHashSha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filehashsha256"
+          },
+          "filePath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filepath"
+          },
+          "hostname": {
+            "title": "Hostname",
+            "type": "string"
+          },
+          "httpHost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Httphost"
+          },
+          "httpMethod": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Httpmethod"
+          },
+          "httpStatusCode": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Httpstatuscode"
+          },
+          "httpUserAgent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Httpuseragent"
+          },
+          "ingestedAt": {
+            "title": "Ingestedat",
+            "type": "string"
+          },
+          "ipAddress": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ipaddress"
+          },
+          "l7Protocol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "L7Protocol"
+          },
+          "occurredAt": {
+            "title": "Occurredat",
+            "type": "string"
+          },
+          "osType": {
+            "$ref": "#/components/schemas/OsType"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "ppid": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ppid"
+          },
+          "processName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processname"
+          },
+          "processPath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processpath"
+          },
+          "protocol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protocol"
+          },
+          "remoteDomain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remotedomain"
+          },
+          "remoteIp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remoteip"
+          },
+          "remotePort": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remoteport"
+          },
+          "tlsCertificateIssuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tlscertificateissuer"
+          },
+          "tlsCertificateSha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tlscertificatesha256"
+          },
+          "tlsCertificateSubject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tlscertificatesubject"
+          },
+          "tlsSni": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tlssni"
+          },
+          "tlsVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tlsversion"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "userName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "required": [
+          "eventId",
+          "batchId",
+          "endpointId",
+          "agentId",
+          "hostname",
+          "osType",
+          "ipAddress",
+          "eventType",
+          "occurredAt",
+          "ingestedAt",
+          "processName",
+          "processPath",
+          "pid",
+          "ppid",
+          "commandLine",
+          "userName",
+          "filePath",
+          "fileAction",
+          "fileHashSha256",
+          "remoteIp",
+          "remoteDomain",
+          "remotePort",
+          "protocol",
+          "dnsQuery",
+          "dnsRecordType",
+          "dnsResponseCode",
+          "dnsAnswers",
+          "l7Protocol",
+          "httpMethod",
+          "httpHost",
+          "url",
+          "httpStatusCode",
+          "httpUserAgent",
+          "tlsSni",
+          "tlsVersion",
+          "tlsCertificateSubject",
+          "tlsCertificateIssuer",
+          "tlsCertificateSha256"
+        ],
+        "title": "EventDto",
+        "type": "object"
+      },
+      "EventFailureStatus": {
+        "enum": [
+          "FAILED",
+          "REPROCESSED",
+          "REPROCESS_FAILED"
+        ],
+        "title": "EventFailureStatus",
+        "type": "string"
+      },
+      "EventType": {
+        "enum": [
+          "PROCESS_EXECUTION",
+          "NETWORK_CONNECTION",
+          "FILE_EVENT",
+          "DNS_QUERY",
+          "L7_EVENT"
+        ],
+        "title": "EventType",
+        "type": "string"
+      },
+      "EventTypeCountDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "eventType": {
+            "$ref": "#/components/schemas/EventType"
+          }
+        },
+        "required": [
+          "eventType",
+          "count"
+        ],
+        "title": "EventTypeCountDto",
+        "type": "object"
+      },
+      "FailureCodeCountDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "failureCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failurecode"
+          }
+        },
+        "required": [
+          "failureCode",
+          "count"
+        ],
+        "title": "FailureCodeCountDto",
+        "type": "object"
+      },
+      "FailureStageCountDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "failureStage": {
+            "title": "Failurestage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "failureStage",
+          "count"
+        ],
+        "title": "FailureStageCountDto",
+        "type": "object"
+      },
+      "FailureStatusCountDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EventFailureStatus"
+          }
+        },
+        "required": [
+          "status",
+          "count"
+        ],
+        "title": "FailureStatusCountDto",
+        "type": "object"
+      },
+      "FileEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "title": "Eventid",
+            "type": "string"
+          },
+          "eventType": {
+            "const": "FILE_EVENT",
+            "title": "Eventtype",
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "title": "Occurredat",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/FileEventPayload"
+          }
+        },
+        "required": [
+          "eventId",
+          "eventType",
+          "occurredAt",
+          "payload"
+        ],
+        "title": "FileEvent",
+        "type": "object"
+      },
+      "FileEventPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "filePath": {
+            "title": "Filepath",
+            "type": "string"
+          },
+          "pid": {
+            "minimum": 0,
+            "title": "Pid",
+            "type": "integer"
+          },
+          "processName": {
+            "title": "Processname",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "filePath",
+          "action"
+        ],
+        "title": "FileEventPayload",
+        "type": "object"
+      },
+      "IncidentDetailDto": {
+        "additionalProperties": false,
+        "properties": {
+          "alertCount": {
+            "minimum": 0.0,
+            "title": "Alertcount",
+            "type": "integer"
+          },
+          "alerts": {
+            "items": {
+              "$ref": "#/components/schemas/AlertDto"
+            },
+            "title": "Alerts",
+            "type": "array"
+          },
+          "closedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closedat"
+          },
+          "correlationKey": {
+            "title": "Correlationkey",
+            "type": "string"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "endpointId": {
+            "minimum": 1.0,
+            "title": "Endpointid",
+            "type": "integer"
+          },
+          "firstDetectedAt": {
+            "title": "Firstdetectedat",
+            "type": "string"
+          },
+          "incidentId": {
+            "minimum": 1.0,
+            "title": "Incidentid",
+            "type": "integer"
+          },
+          "lastDetectedAt": {
+            "title": "Lastdetectedat",
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "status": {
+            "$ref": "#/components/schemas/IncidentStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updatedAt": {
+            "title": "Updatedat",
+            "type": "string"
+          },
+          "windowEndAt": {
+            "title": "Windowendat",
+            "type": "string"
+          },
+          "windowStartAt": {
+            "title": "Windowstartat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "incidentId",
+          "endpointId",
+          "correlationKey",
+          "windowStartAt",
+          "windowEndAt",
+          "title",
+          "description",
+          "severity",
+          "status",
+          "firstDetectedAt",
+          "lastDetectedAt",
+          "closedAt",
+          "createdAt",
+          "updatedAt",
+          "alertCount",
+          "alerts"
+        ],
+        "title": "IncidentDetailDto",
+        "type": "object"
+      },
+      "IncidentDto": {
+        "additionalProperties": false,
+        "properties": {
+          "alertCount": {
+            "minimum": 0.0,
+            "title": "Alertcount",
+            "type": "integer"
+          },
+          "closedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closedat"
+          },
+          "correlationKey": {
+            "title": "Correlationkey",
+            "type": "string"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "endpointId": {
+            "minimum": 1.0,
+            "title": "Endpointid",
+            "type": "integer"
+          },
+          "firstDetectedAt": {
+            "title": "Firstdetectedat",
+            "type": "string"
+          },
+          "incidentId": {
+            "minimum": 1.0,
+            "title": "Incidentid",
+            "type": "integer"
+          },
+          "lastDetectedAt": {
+            "title": "Lastdetectedat",
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "status": {
+            "$ref": "#/components/schemas/IncidentStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updatedAt": {
+            "title": "Updatedat",
+            "type": "string"
+          },
+          "windowEndAt": {
+            "title": "Windowendat",
+            "type": "string"
+          },
+          "windowStartAt": {
+            "title": "Windowstartat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "incidentId",
+          "endpointId",
+          "correlationKey",
+          "windowStartAt",
+          "windowEndAt",
+          "title",
+          "description",
+          "severity",
+          "status",
+          "firstDetectedAt",
+          "lastDetectedAt",
+          "closedAt",
+          "createdAt",
+          "updatedAt",
+          "alertCount"
+        ],
+        "title": "IncidentDto",
+        "type": "object"
+      },
+      "IncidentReferenceDto": {
+        "additionalProperties": false,
+        "properties": {
+          "incidentId": {
+            "minimum": 1.0,
+            "title": "Incidentid",
+            "type": "integer"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "status": {
+            "$ref": "#/components/schemas/IncidentStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "windowEndAt": {
+            "title": "Windowendat",
+            "type": "string"
+          },
+          "windowStartAt": {
+            "title": "Windowstartat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "incidentId",
+          "title",
+          "severity",
+          "status",
+          "windowStartAt",
+          "windowEndAt"
+        ],
+        "title": "IncidentReferenceDto",
+        "type": "object"
+      },
+      "IncidentStatus": {
+        "enum": [
+          "OPEN",
+          "CLOSED"
+        ],
+        "title": "IncidentStatus",
+        "type": "string"
+      },
+      "IncidentTimeSeriesPointDto": {
+        "additionalProperties": false,
+        "properties": {
+          "bucketStartAt": {
+            "title": "Bucketstartat",
+            "type": "string"
+          },
+          "closedCount": {
+            "minimum": 0.0,
+            "title": "Closedcount",
+            "type": "integer"
+          },
+          "openCount": {
+            "minimum": 0.0,
+            "title": "Opencount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "bucketStartAt",
+          "openCount",
+          "closedCount"
+        ],
+        "title": "IncidentTimeSeriesPointDto",
+        "type": "object"
+      },
+      "IngestEventFailuresDto": {
+        "additionalProperties": false,
+        "properties": {
+          "failedCount": {
+            "minimum": 0.0,
+            "title": "Failedcount",
+            "type": "integer"
+          },
+          "oldestFailedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldestfailedat"
+          },
+          "reprocessFailedCount": {
+            "minimum": 0.0,
+            "title": "Reprocessfailedcount",
+            "type": "integer"
+          },
+          "reprocessedCount": {
+            "minimum": 0.0,
+            "title": "Reprocessedcount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "failedCount",
+          "reprocessedCount",
+          "reprocessFailedCount",
+          "oldestFailedAt"
+        ],
+        "title": "IngestEventFailuresDto",
+        "type": "object"
+      },
+      "IngestEventsDto": {
+        "additionalProperties": false,
+        "properties": {
+          "ingestedCount": {
+            "minimum": 0.0,
+            "title": "Ingestedcount",
+            "type": "integer"
+          },
+          "latestIngestedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latestingestedat"
+          }
+        },
+        "required": [
+          "ingestedCount",
+          "latestIngestedAt"
+        ],
+        "title": "IngestEventsDto",
+        "type": "object"
+      },
+      "IngestStorageDto": {
+        "additionalProperties": false,
+        "properties": {
+          "clickhouseHotBucketCount": {
+            "minimum": 0.0,
+            "title": "Clickhousehotbucketcount",
+            "type": "integer"
+          },
+          "expiredBucketCount": {
+            "minimum": 0.0,
+            "title": "Expiredbucketcount",
+            "type": "integer"
+          },
+          "failedBucketCount": {
+            "minimum": 0.0,
+            "title": "Failedbucketcount",
+            "type": "integer"
+          },
+          "glacierArchivedBucketCount": {
+            "minimum": 0.0,
+            "title": "Glacierarchivedbucketcount",
+            "type": "integer"
+          },
+          "restoredBucketCount": {
+            "minimum": 0.0,
+            "title": "Restoredbucketcount",
+            "type": "integer"
+          },
+          "restoringBucketCount": {
+            "minimum": 0.0,
+            "title": "Restoringbucketcount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "clickhouseHotBucketCount",
+          "restoredBucketCount",
+          "glacierArchivedBucketCount",
+          "restoringBucketCount",
+          "failedBucketCount",
+          "expiredBucketCount"
+        ],
+        "title": "IngestStorageDto",
+        "type": "object"
+      },
+      "IngestSummaryDto": {
+        "additionalProperties": false,
+        "properties": {
+          "eventFailures": {
+            "$ref": "#/components/schemas/IngestEventFailuresDto"
+          },
+          "events": {
+            "$ref": "#/components/schemas/IngestEventsDto"
+          },
+          "storage": {
+            "$ref": "#/components/schemas/IngestStorageDto"
+          },
+          "timeRange": {
+            "$ref": "#/components/schemas/TimeRangeDto"
+          }
+        },
+        "required": [
+          "timeRange",
+          "events",
+          "eventFailures",
+          "storage"
+        ],
+        "title": "IngestSummaryDto",
+        "type": "object"
+      },
+      "L7Event": {
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "title": "Eventid",
+            "type": "string"
+          },
+          "eventType": {
+            "const": "L7_EVENT",
+            "title": "Eventtype",
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "title": "Occurredat",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/L7EventPayload"
+          }
+        },
+        "required": [
+          "eventId",
+          "eventType",
+          "occurredAt",
+          "payload"
+        ],
+        "title": "L7Event",
+        "type": "object"
+      },
+      "L7EventPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "httpHost": {
+            "title": "Httphost",
+            "type": "string"
+          },
+          "httpMethod": {
+            "title": "Httpmethod",
+            "type": "string"
+          },
+          "httpStatusCode": {
+            "title": "Httpstatuscode",
+            "type": "integer"
+          },
+          "httpUserAgent": {
+            "title": "Httpuseragent",
+            "type": "string"
+          },
+          "l7Protocol": {
+            "title": "L7Protocol",
+            "type": "string"
+          },
+          "tlsCertificateIssuer": {
+            "title": "Tlscertificateissuer",
+            "type": "string"
+          },
+          "tlsCertificateSha256": {
+            "title": "Tlscertificatesha256",
+            "type": "string"
+          },
+          "tlsCertificateSubject": {
+            "title": "Tlscertificatesubject",
+            "type": "string"
+          },
+          "tlsSni": {
+            "title": "Tlssni",
+            "type": "string"
+          },
+          "tlsVersion": {
+            "title": "Tlsversion",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "l7Protocol"
+        ],
+        "title": "L7EventPayload",
+        "type": "object"
+      },
+      "LoginData": {
+        "additionalProperties": false,
+        "properties": {
+          "accessToken": {
+            "title": "Accesstoken",
+            "type": "string"
+          },
+          "expiresIn": {
+            "minimum": 0.0,
+            "title": "Expiresin",
+            "type": "integer"
+          },
+          "tokenType": {
+            "const": "Bearer",
+            "title": "Tokentype",
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserDto"
+          }
+        },
+        "required": [
+          "accessToken",
+          "tokenType",
+          "expiresIn",
+          "user"
+        ],
+        "title": "LoginData",
+        "type": "object"
+      },
+      "LoginRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "type": "object"
+      },
+      "MitreTacticCountDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "mitreTacticCode": {
+            "title": "Mitretacticcode",
+            "type": "string"
+          },
+          "mitreTacticName": {
+            "title": "Mitretacticname",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mitreTacticCode",
+          "mitreTacticName",
+          "count"
+        ],
+        "title": "MitreTacticCountDto",
+        "type": "object"
+      },
+      "MitreTechniqueCountDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "mitreTechniqueCode": {
+            "title": "Mitretechniquecode",
+            "type": "string"
+          },
+          "mitreTechniqueName": {
+            "title": "Mitretechniquename",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mitreTechniqueCode",
+          "mitreTechniqueName",
+          "count"
+        ],
+        "title": "MitreTechniqueCountDto",
+        "type": "object"
+      },
+      "NetworkConnectionEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "title": "Eventid",
+            "type": "string"
+          },
+          "eventType": {
+            "const": "NETWORK_CONNECTION",
+            "title": "Eventtype",
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "title": "Occurredat",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/NetworkConnectionPayload"
+          }
+        },
+        "required": [
+          "eventId",
+          "eventType",
+          "occurredAt",
+          "payload"
+        ],
+        "title": "NetworkConnectionEvent",
+        "type": "object"
+      },
+      "NetworkConnectionPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "pid": {
+            "minimum": 0,
+            "title": "Pid",
+            "type": "integer"
+          },
+          "processName": {
+            "title": "Processname",
+            "type": "string"
+          },
+          "protocol": {
+            "title": "Protocol",
+            "type": "string"
+          },
+          "remoteDomain": {
+            "title": "Remotedomain",
+            "type": "string"
+          },
+          "remoteIp": {
+            "title": "Remoteip",
+            "type": "string"
+          },
+          "remotePort": {
+            "maximum": 65535,
+            "minimum": 0,
+            "title": "Remoteport",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "protocol",
+          "remoteIp",
+          "remotePort"
+        ],
+        "title": "NetworkConnectionPayload",
+        "type": "object"
+      },
+      "OsType": {
+        "enum": [
+          "WINDOWS",
+          "MACOS"
+        ],
+        "title": "OsType",
+        "type": "string"
+      },
+      "OsTypeCountDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "osType": {
+            "$ref": "#/components/schemas/OsType"
+          }
+        },
+        "required": [
+          "osType",
+          "count"
+        ],
+        "title": "OsTypeCountDto",
+        "type": "object"
+      },
+      "PagedData_AlertDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AlertDto"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "minimum": 1.0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "size": {
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Size",
+            "type": "integer"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "size",
+          "total"
+        ],
+        "title": "PagedData[AlertDto]",
+        "type": "object"
+      },
+      "PagedData_ArchiveBucketDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ArchiveBucketDto"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "minimum": 1.0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "size": {
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Size",
+            "type": "integer"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "size",
+          "total"
+        ],
+        "title": "PagedData[ArchiveBucketDto]",
+        "type": "object"
+      },
+      "PagedData_EndpointDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EndpointDto"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "minimum": 1.0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "size": {
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Size",
+            "type": "integer"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "size",
+          "total"
+        ],
+        "title": "PagedData[EndpointDto]",
+        "type": "object"
+      },
+      "PagedData_EventDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EventDto"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "minimum": 1.0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "size": {
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Size",
+            "type": "integer"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "size",
+          "total"
+        ],
+        "title": "PagedData[EventDto]",
+        "type": "object"
+      },
+      "PagedData_IncidentDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/IncidentDto"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "minimum": 1.0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "size": {
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Size",
+            "type": "integer"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "size",
+          "total"
+        ],
+        "title": "PagedData[IncidentDto]",
+        "type": "object"
+      },
+      "ProcessExecutionEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "title": "Eventid",
+            "type": "string"
+          },
+          "eventType": {
+            "const": "PROCESS_EXECUTION",
+            "title": "Eventtype",
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "title": "Occurredat",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ProcessExecutionPayload"
+          }
+        },
+        "required": [
+          "eventId",
+          "eventType",
+          "occurredAt",
+          "payload"
+        ],
+        "title": "ProcessExecutionEvent",
+        "type": "object"
+      },
+      "ProcessExecutionPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "commandLine": {
+            "title": "Commandline",
+            "type": "string"
+          },
+          "pid": {
+            "minimum": 0,
+            "title": "Pid",
+            "type": "integer"
+          },
+          "ppid": {
+            "minimum": 0,
+            "title": "Ppid",
+            "type": "integer"
+          },
+          "processName": {
+            "title": "Processname",
+            "type": "string"
+          },
+          "processPath": {
+            "title": "Processpath",
+            "type": "string"
+          },
+          "userName": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "processName",
+          "pid"
+        ],
+        "title": "ProcessExecutionPayload",
+        "type": "object"
+      },
+      "RejectedEventDto": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "eventId": {
+            "title": "Eventid",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "retryable": {
+            "title": "Retryable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "eventId",
+          "code",
+          "message",
+          "retryable"
+        ],
+        "title": "RejectedEventDto",
+        "type": "object"
+      },
+      "RequestMeta": {
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestId"
+        ],
+        "title": "RequestMeta",
+        "type": "object"
+      },
+      "ResponseGuidanceStepDto": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "order": {
+            "title": "Order",
+            "type": "integer"
+          },
+          "requiresManualAction": {
+            "title": "Requiresmanualaction",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "order",
+          "title",
+          "description",
+          "requiresManualAction"
+        ],
+        "title": "ResponseGuidanceStepDto",
+        "type": "object"
+      },
+      "RiskLevel": {
+        "enum": [
+          "LOW",
+          "MEDIUM",
+          "HIGH",
+          "CRITICAL"
+        ],
+        "title": "RiskLevel",
+        "type": "string"
+      },
+      "RiskLevelCountDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "level": {
+            "$ref": "#/components/schemas/RiskLevel"
+          }
+        },
+        "required": [
+          "level",
+          "count"
+        ],
+        "title": "RiskLevelCountDto",
+        "type": "object"
+      },
+      "SensorHealth": {
+        "enum": [
+          "HEALTHY",
+          "DEGRADED",
+          "UNAVAILABLE"
+        ],
+        "title": "SensorHealth",
+        "type": "string"
+      },
+      "SensorHealthCountDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "sensor": {
+            "title": "Sensor",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SensorHealth"
+          }
+        },
+        "required": [
+          "sensor",
+          "status",
+          "count"
+        ],
+        "title": "SensorHealthCountDto",
+        "type": "object"
+      },
+      "SensorHealthDto": {
+        "additionalProperties": false,
+        "properties": {
+          "packetDropCount": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Packetdropcount"
+          },
+          "parseErrorCount": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parseerrorcount"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "sensor": {
+            "title": "Sensor",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SensorHealth"
+          }
+        },
+        "required": [
+          "sensor",
+          "status",
+          "provider",
+          "packetDropCount",
+          "parseErrorCount"
+        ],
+        "title": "SensorHealthDto",
+        "type": "object"
+      },
+      "SensorHealthSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "packetDropCount": {
+            "minimum": 0.0,
+            "title": "Packetdropcount",
+            "type": "integer"
+          },
+          "parseErrorCount": {
+            "minimum": 0.0,
+            "title": "Parseerrorcount",
+            "type": "integer"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "sensor": {
+            "title": "Sensor",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SensorHealth"
+          }
+        },
+        "required": [
+          "sensor",
+          "status"
+        ],
+        "title": "SensorHealthSnapshot",
+        "type": "object"
+      },
+      "Severity": {
+        "enum": [
+          "LOW",
+          "MEDIUM",
+          "HIGH",
+          "CRITICAL"
+        ],
+        "title": "Severity",
+        "type": "string"
+      },
+      "SeverityCountDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          }
+        },
+        "required": [
+          "severity",
+          "count"
+        ],
+        "title": "SeverityCountDto",
+        "type": "object"
+      },
+      "StorageBackend": {
+        "enum": [
+          "CLICKHOUSE",
+          "S3"
+        ],
+        "title": "StorageBackend",
+        "type": "string"
+      },
+      "StorageBackendCountDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "storageBackend": {
+            "$ref": "#/components/schemas/StorageBackend"
+          }
+        },
+        "required": [
+          "storageBackend",
+          "count"
+        ],
+        "title": "StorageBackendCountDto",
+        "type": "object"
+      },
+      "StorageClass": {
+        "enum": [
+          "HOT",
+          "GLACIER_FLEXIBLE_RETRIEVAL"
+        ],
+        "title": "StorageClass",
+        "type": "string"
+      },
+      "StorageClassCountDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "storageClass": {
+            "$ref": "#/components/schemas/StorageClass"
+          }
+        },
+        "required": [
+          "storageClass",
+          "count"
+        ],
+        "title": "StorageClassCountDto",
+        "type": "object"
+      },
+      "StorageStatus": {
+        "enum": [
+          "HOT",
+          "ARCHIVED",
+          "RESTORE_REQUESTED",
+          "RESTORED",
+          "RESTORE_FAILED",
+          "EXPIRED"
+        ],
+        "title": "StorageStatus",
+        "type": "string"
+      },
+      "StorageStatusCountDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "storageStatus": {
+            "$ref": "#/components/schemas/StorageStatus"
+          }
+        },
+        "required": [
+          "storageStatus",
+          "count"
+        ],
+        "title": "StorageStatusCountDto",
+        "type": "object"
+      },
+      "SuccessEnvelope_AgentHeartbeatData_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AgentHeartbeatData"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[AgentHeartbeatData]",
+        "type": "object"
+      },
+      "SuccessEnvelope_AgentRegisterData_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AgentRegisterData"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[AgentRegisterData]",
+        "type": "object"
+      },
+      "SuccessEnvelope_AlertDetailDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AlertDetailDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[AlertDetailDto]",
+        "type": "object"
+      },
+      "SuccessEnvelope_AlertDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AlertDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[AlertDto]",
+        "type": "object"
+      },
+      "SuccessEnvelope_ArchiveRestoreStartDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ArchiveRestoreStartDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[ArchiveRestoreStartDto]",
+        "type": "object"
+      },
+      "SuccessEnvelope_DashboardSummaryDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DashboardSummaryDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[DashboardSummaryDto]",
+        "type": "object"
+      },
+      "SuccessEnvelope_EndpointDetailDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/EndpointDetailDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[EndpointDetailDto]",
+        "type": "object"
+      },
+      "SuccessEnvelope_EndpointSummaryDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/EndpointSummaryDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[EndpointSummaryDto]",
+        "type": "object"
+      },
+      "SuccessEnvelope_EventDetailDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/EventDetailDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[EventDetailDto]",
+        "type": "object"
+      },
+      "SuccessEnvelope_IncidentDetailDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/IncidentDetailDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[IncidentDetailDto]",
+        "type": "object"
+      },
+      "SuccessEnvelope_IngestSummaryDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/IngestSummaryDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[IngestSummaryDto]",
+        "type": "object"
+      },
+      "SuccessEnvelope_LoginData_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LoginData"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[LoginData]",
+        "type": "object"
+      },
+      "SuccessEnvelope_PagedData_AlertDto__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PagedData_AlertDto_"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[PagedData[AlertDto]]",
+        "type": "object"
+      },
+      "SuccessEnvelope_PagedData_ArchiveBucketDto__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PagedData_ArchiveBucketDto_"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[PagedData[ArchiveBucketDto]]",
+        "type": "object"
+      },
+      "SuccessEnvelope_PagedData_EndpointDto__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PagedData_EndpointDto_"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[PagedData[EndpointDto]]",
+        "type": "object"
+      },
+      "SuccessEnvelope_PagedData_EventDto__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PagedData_EventDto_"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[PagedData[EventDto]]",
+        "type": "object"
+      },
+      "SuccessEnvelope_PagedData_IncidentDto__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PagedData_IncidentDto_"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[PagedData[IncidentDto]]",
+        "type": "object"
+      },
+      "SuccessEnvelope_TelemetryBatchData_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TelemetryBatchData"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[TelemetryBatchData]",
+        "type": "object"
+      },
+      "TelemetryBatchData": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptedEventIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Acceptedeventids",
+            "type": "array"
+          },
+          "batchId": {
+            "title": "Batchid",
+            "type": "string"
+          },
+          "rejectedEvents": {
+            "items": {
+              "$ref": "#/components/schemas/RejectedEventDto"
+            },
+            "title": "Rejectedevents",
+            "type": "array"
+          }
+        },
+        "required": [
+          "batchId",
+          "acceptedEventIds",
+          "rejectedEvents"
+        ],
+        "title": "TelemetryBatchData",
+        "type": "object"
+      },
+      "TelemetryBatchRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "agentId": {
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+            "title": "Agentid",
+            "type": "string"
+          },
+          "batchId": {
+            "title": "Batchid",
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "DNS_QUERY": "#/components/schemas/DnsQueryEvent",
+                  "FILE_EVENT": "#/components/schemas/FileEvent",
+                  "L7_EVENT": "#/components/schemas/L7Event",
+                  "NETWORK_CONNECTION": "#/components/schemas/NetworkConnectionEvent",
+                  "PROCESS_EXECUTION": "#/components/schemas/ProcessExecutionEvent"
+                },
+                "propertyName": "eventType"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ProcessExecutionEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/NetworkConnectionEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/FileEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/DnsQueryEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/L7Event"
+                }
+              ]
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Events",
+            "type": "array"
+          },
+          "schemaVersion": {
+            "const": 1,
+            "title": "Schemaversion",
+            "type": "integer"
+          },
+          "sentAt": {
+            "format": "date-time",
+            "title": "Sentat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "batchId",
+          "agentId",
+          "sentAt",
+          "events"
+        ],
+        "title": "TelemetryBatchRequest",
+        "type": "object"
+      },
+      "TimePreset": {
+        "enum": [
+          "LATEST_15M",
+          "LATEST_1H",
+          "LATEST_24H",
+          "LATEST_7D",
+          "CUSTOM"
+        ],
+        "title": "TimePreset",
+        "type": "string"
+      },
+      "TimeRangeDto": {
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "title": "From",
+            "type": "string"
+          },
+          "to": {
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "title": "TimeRangeDto",
+        "type": "object"
+      },
+      "TimeSeriesPointDto": {
+        "additionalProperties": false,
+        "properties": {
+          "bucketStartAt": {
+            "title": "Bucketstartat",
+            "type": "string"
+          },
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "bucketStartAt",
+          "count"
+        ],
+        "title": "TimeSeriesPointDto",
+        "type": "object"
+      },
+      "TopDnsQueryDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "dnsQuery": {
+            "title": "Dnsquery",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dnsQuery",
+          "count"
+        ],
+        "title": "TopDnsQueryDto",
+        "type": "object"
+      },
+      "TopDomainDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain",
+          "count"
+        ],
+        "title": "TopDomainDto",
+        "type": "object"
+      },
+      "TopFileHashDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "fileHashSha256": {
+            "title": "Filehashsha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fileHashSha256",
+          "count"
+        ],
+        "title": "TopFileHashDto",
+        "type": "object"
+      },
+      "TopL7ProtocolDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "l7Protocol": {
+            "title": "L7Protocol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "l7Protocol",
+          "count"
+        ],
+        "title": "TopL7ProtocolDto",
+        "type": "object"
+      },
+      "TopProcessDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "processName": {
+            "title": "Processname",
+            "type": "string"
+          }
+        },
+        "required": [
+          "processName",
+          "count"
+        ],
+        "title": "TopProcessDto",
+        "type": "object"
+      },
+      "TopRemoteIpDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "remoteIp": {
+            "title": "Remoteip",
+            "type": "string"
+          }
+        },
+        "required": [
+          "remoteIp",
+          "count"
+        ],
+        "title": "TopRemoteIpDto",
+        "type": "object"
+      },
+      "TopRuleDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "ruleCode": {
+            "title": "Rulecode",
+            "type": "string"
+          },
+          "ruleName": {
+            "title": "Rulename",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ruleCode",
+          "ruleName",
+          "count"
+        ],
+        "title": "TopRuleDto",
+        "type": "object"
+      },
+      "UserDto": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          },
+          "status": {
+            "$ref": "#/components/schemas/UserStatus"
+          },
+          "userId": {
+            "minimum": 1.0,
+            "title": "Userid",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "userId",
+          "email",
+          "name",
+          "role",
+          "status"
+        ],
+        "title": "UserDto",
+        "type": "object"
+      },
+      "UserRole": {
+        "enum": [
+          "ADMIN",
+          "ANALYST",
+          "VIEWER"
+        ],
+        "title": "UserRole",
+        "type": "string"
+      },
+      "UserStatus": {
+        "enum": [
+          "ACTIVE",
+          "DISABLED"
+        ],
+        "title": "UserStatus",
+        "type": "string"
+      }
+    },
+    "securitySchemes": {
+      "BearerJWT": {
+        "description": "JWT access token returned by POST /api/v1/auth/login.",
+        "scheme": "bearer",
+        "type": "http"
+      },
+      "mutualTLS": {
+        "description": "Agent certificate validated by the Collector Nginx mTLS boundary.",
+        "type": "mutualTLS"
+      }
+    }
+  },
+  "info": {
+    "title": "EDR_C",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/alerts": {
+      "get": {
+        "operationId": "alertsList",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "timePreset",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TimePreset",
+              "default": "LATEST_24H"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "endpointId",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "title": "Endpointid",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AlertStatus"
+            }
+          },
+          {
+            "in": "query",
+            "name": "severity",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Severity"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ruleCode",
+            "required": false,
+            "schema": {
+              "title": "Rulecode",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortOrder",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "title": "Sortorder",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_PagedData_AlertDto__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Alerts",
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
+    "/api/v1/alerts/{alertId}": {
+      "get": {
+        "operationId": "alertsGet",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "alertId",
+            "required": true,
+            "schema": {
+              "title": "Alertid",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_AlertDetailDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Alert Detail",
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
+    "/api/v1/alerts/{alertId}/status": {
+      "patch": {
+        "operationId": "alertsUpdateStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "alertId",
+            "required": true,
+            "schema": {
+              "title": "Alertid",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertStatusUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_AlertDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The authenticated identity is not permitted to perform this operation."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Alert Status",
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
+    "/api/v1/archives/restores": {
+      "get": {
+        "operationId": "archiveRestoresList",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "endpointIds",
+            "required": true,
+            "schema": {
+              "items": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "title": "Endpointids",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "To",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_PagedData_ArchiveBucketDto__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Restore List",
+        "tags": [
+          "Archives"
+        ]
+      },
+      "post": {
+        "operationId": "archiveRestoresStart",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArchiveRestoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_ArchiveRestoreStartDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_ArchiveRestoreStartDto_"
+                }
+              }
+            },
+            "description": "Restore accepted."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The authenticated identity is not permitted to perform this operation."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Restore Start",
+        "tags": [
+          "Archives"
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "authLogin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_LoginData_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The authenticated identity is not permitted to perform this operation."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "summary": "Login",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/collector/agents/heartbeat": {
+      "post": {
+        "operationId": "collectorHeartbeatAgent",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentHeartbeatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_AgentHeartbeatData_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The authenticated identity is not permitted to perform this operation."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "mutualTLS": []
+          }
+        ],
+        "summary": "Heartbeat",
+        "tags": [
+          "Collector"
+        ]
+      }
+    },
+    "/api/v1/collector/agents/register": {
+      "post": {
+        "operationId": "collectorRegisterAgent",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentRegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_AgentRegisterData_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_AgentRegisterData_"
+                }
+              }
+            },
+            "description": "Agent created."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The authenticated identity is not permitted to perform this operation."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The request conflicts with the current resource, identity, or Archive state."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "mutualTLS": []
+          }
+        ],
+        "summary": "Register Agent",
+        "tags": [
+          "Collector"
+        ]
+      }
+    },
+    "/api/v1/collector/telemetry/batches": {
+      "post": {
+        "operationId": "collectorIngestTelemetryBatch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelemetryBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_TelemetryBatchData_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The authenticated identity is not permitted to perform this operation."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The request body or event count exceeds the documented limit."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "mutualTLS": []
+          }
+        ],
+        "summary": "Telemetry Batch",
+        "tags": [
+          "Collector"
+        ]
+      }
+    },
+    "/api/v1/dashboard/endpoints/summary": {
+      "get": {
+        "operationId": "dashboardGetEndpointSummary",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "timePreset",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TimePreset",
+              "default": "LATEST_24H"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "To",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_EndpointSummaryDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Endpoint Summary",
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/api/v1/dashboard/ingest/summary": {
+      "get": {
+        "operationId": "dashboardGetIngestSummary",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "timePreset",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TimePreset",
+              "default": "LATEST_24H"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "To",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_IngestSummaryDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Ingest Summary",
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/api/v1/dashboard/summary": {
+      "get": {
+        "operationId": "dashboardGetSummary",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "timePreset",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TimePreset",
+              "default": "LATEST_24H"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "interval",
+            "required": true,
+            "schema": {
+              "enum": [
+                "1m",
+                "5m",
+                "1h",
+                "1d"
+              ],
+              "title": "Interval",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_DashboardSummaryDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Dashboard Summary",
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/api/v1/endpoints": {
+      "get": {
+        "operationId": "endpointsList",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": [
+                "ONLINE",
+                "OFFLINE",
+                "RETIRED"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "osType",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/OsType"
+            }
+          },
+          {
+            "in": "query",
+            "name": "riskLevel",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/RiskLevel"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "required": false,
+            "schema": {
+              "default": "riskScore",
+              "enum": [
+                "riskScore",
+                "lastSeenAt",
+                "registeredAt"
+              ],
+              "title": "Sortby",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortOrder",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "title": "Sortorder",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_PagedData_EndpointDto__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Endpoints",
+        "tags": [
+          "Endpoints"
+        ]
+      }
+    },
+    "/api/v1/endpoints/{endpointId}": {
+      "get": {
+        "operationId": "endpointsGet",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "endpointId",
+            "required": true,
+            "schema": {
+              "title": "Endpointid",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_EndpointDetailDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Endpoint Detail",
+        "tags": [
+          "Endpoints"
+        ]
+      }
+    },
+    "/api/v1/events": {
+      "get": {
+        "operationId": "eventsList",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "timePreset",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TimePreset",
+              "default": "LATEST_24H"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "endpointId",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "title": "Endpointid",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "eventType",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/EventType"
+            }
+          },
+          {
+            "in": "query",
+            "name": "processName",
+            "required": false,
+            "schema": {
+              "title": "Processname",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filePath",
+            "required": false,
+            "schema": {
+              "title": "Filepath",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "domain",
+            "required": false,
+            "schema": {
+              "title": "Domain",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "remoteIp",
+            "required": false,
+            "schema": {
+              "title": "Remoteip",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dnsQuery",
+            "required": false,
+            "schema": {
+              "title": "Dnsquery",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "l7Protocol",
+            "required": false,
+            "schema": {
+              "title": "L7Protocol",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortOrder",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "title": "Sortorder",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_PagedData_EventDto__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The request conflicts with the current resource, identity, or Archive state."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Events",
+        "tags": [
+          "Events"
+        ]
+      }
+    },
+    "/api/v1/events/{eventId}": {
+      "get": {
+        "operationId": "eventsGet",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Eventid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "endpointId",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Endpointid",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "occurredAt",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "Occurredat",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_EventDetailDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The request conflicts with the current resource, identity, or Archive state."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Event Detail",
+        "tags": [
+          "Events"
+        ]
+      }
+    },
+    "/api/v1/incidents": {
+      "get": {
+        "operationId": "incidentsList",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "timePreset",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TimePreset",
+              "default": "LATEST_24H"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "endpointId",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "title": "Endpointid",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/IncidentStatus"
+            }
+          },
+          {
+            "in": "query",
+            "name": "severity",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Severity"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortOrder",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "title": "Sortorder",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_PagedData_IncidentDto__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Incidents",
+        "tags": [
+          "Incidents"
+        ]
+      }
+    },
+    "/api/v1/incidents/{incidentId}": {
+      "get": {
+        "operationId": "incidentsGet",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incidentId",
+            "required": true,
+            "schema": {
+              "title": "Incidentid",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_IncidentDetailDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Incident Detail",
+        "tags": [
+          "Incidents"
+        ]
+      }
+    }
+  },
+  "tags": [
+    {
+      "description": "Dashboard user authentication.",
+      "name": "Auth"
+    },
+    {
+      "description": "Endpoint inventory, health, and Backend-calculated risk.",
+      "name": "Endpoints"
+    },
+    {
+      "description": "HOT ClickHouse and RESTORED Parquet event evidence.",
+      "name": "Events"
+    },
+    {
+      "description": "Archive restore lifecycle operations.",
+      "name": "Archives"
+    },
+    {
+      "description": "RuleV1 detections and Alert workflow state.",
+      "name": "Alerts"
+    },
+    {
+      "description": "Read-only correlated Incident views.",
+      "name": "Incidents"
+    },
+    {
+      "description": "Backend-calculated security and collection summaries.",
+      "name": "Dashboard"
+    },
+    {
+      "description": "mTLS-authenticated Agent registration and telemetry ingest.",
+      "name": "Collector"
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+import { LockKeyhole, Shield } from "lucide-react";
+import { useState, type FormEvent } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { ApiError } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
+
+export function LoginPage() {
+  const auth = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+
+  async function submit(event: FormEvent): Promise<void> {
+    event.preventDefault();
+    if (!email.trim() || !password) {
+      setError(new ApiError({ status: 400, code: "VALIDATION_ERROR", message: "Enter both email and password.", retryable: false, details: [], requestId: null }));
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      await auth.login({ email, password });
+      const state = typeof location.state === "object" && location.state !== null ? location.state as { intended?: unknown } : null;
+      navigate(typeof state?.intended === "string" ? state.intended : "/", { replace: true });
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught : null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="login-layout">
+      <section className="login-context" aria-label="EDR Console">
+        <div className="login-mark"><Shield aria-hidden="true" size={25} /></div>
+        <span>EDR / SINGLE TENANT</span>
+        <h1>Move from signal to evidence.</h1>
+        <p>Review current risk, collection health, Alerts, Incidents, Endpoint state, and event evidence from one operational console.</p>
+        <div className="login-boundary"><strong>Read the state. Follow the source.</strong><span>Risk and EDR State are calculated by the Backend.</span></div>
+      </section>
+      <section className="login-panel">
+        <form onSubmit={(event) => void submit(event)}>
+          <div className="login-heading"><LockKeyhole aria-hidden="true" size={20} /><div><span>AUTHENTICATED ACCESS</span><h2>Sign in</h2></div></div>
+          <label className="field"><span>Email</span><input autoComplete="username" autoFocus onChange={(event) => setEmail(event.target.value)} type="email" value={email} /></label>
+          <label className="field"><span>Password</span><input autoComplete="current-password" onChange={(event) => setPassword(event.target.value)} type="password" value={password} /></label>
+          {error ? <div className="login-error" role="alert"><strong>{error.code === "ACCOUNT_DISABLED" ? "Account disabled" : "Sign in failed"}</strong><span>{error.message}</span>{error.requestId ? <code>Request {error.requestId}</code> : null}</div> : null}
+          <button className="button primary login-submit" disabled={loading} type="submit">{loading ? "Signing in…" : "Sign in"}</button>
+          <p className="login-note">The access token is held in memory only. Refreshing the browser requires a new sign-in.</p>
+        </form>
+      </section>
+    </main>
+  );
+}

@@ -1,0 +1,12 @@
+{
+  "agentId": null,
+  "collectorBaseUrl": "https://127.0.0.1:8443/api/v1",
+  "certificatePfxPath": "C:\\ProgramData\\EDR-C-Agent\\secrets\\agent.p12",
+  "stateDirectory": "C:\\ProgramData\\EDR-C-Agent",
+  "watchDirectory": "C:\\Users\\Public\\EDR-C-Watch",
+  "captureInterface": "\\Device\\NPF_{INTERFACE_GUID}",
+  "queueMaxEvents": 5000,
+  "retryBaseSeconds": 1,
+  "retryMaxSeconds": 60,
+  "logLevel": "INFO"
+}

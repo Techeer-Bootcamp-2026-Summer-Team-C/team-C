@@ -1,0 +1,110 @@
+import type {
+  EndpointDetailDto,
+  ErrorEnvelope,
+  EventDetailDto,
+  SuccessEnvelope,
+  TelemetryBatchRequest,
+} from "../src/contracts";
+
+const timestamp = "2026-07-11T00:00:00Z";
+
+export const endpointFixture = {
+  data: {
+    endpointId: 1001,
+    agentId: "agent-win-001",
+    hostname: "WIN-ENDPOINT-01",
+    osType: "WINDOWS",
+    osVersion: null,
+    ipAddress: null,
+    agentVersion: null,
+    agentBuildId: null,
+    agentArch: null,
+    capabilityCodes: [],
+    status: "OFFLINE",
+    lastSeenAt: null,
+    isStale: false,
+    sensorHealth: [],
+    risk: {
+      score: 0,
+      level: "LOW",
+      activeAlertCount: 0,
+      openIncidentCount: 0,
+      highestAlertRiskScore: null,
+      calculatedAt: timestamp,
+      riskFactors: [],
+    },
+    registeredAt: timestamp,
+    certificates: [],
+  },
+  meta: { requestId: "req_contract_fixture" },
+} satisfies SuccessEnvelope<EndpointDetailDto>;
+
+export const eventFixture = {
+  data: {
+    eventId: "018ff8f4-86de-7b25-9b8a-2d22f6a3e001",
+    batchId: "018ff8f4-86de-7b25-9b8a-2d22f6a3e000",
+    endpointId: 1001,
+    agentId: "agent-win-001",
+    hostname: "WIN-ENDPOINT-01",
+    osType: "WINDOWS",
+    ipAddress: null,
+    eventType: "DNS_QUERY",
+    occurredAt: timestamp,
+    ingestedAt: timestamp,
+    processName: null,
+    processPath: null,
+    pid: null,
+    ppid: null,
+    commandLine: null,
+    userName: null,
+    filePath: null,
+    fileAction: null,
+    fileHashSha256: null,
+    remoteIp: null,
+    remoteDomain: null,
+    remotePort: null,
+    protocol: null,
+    dnsQuery: "example.com",
+    dnsRecordType: "A",
+    dnsResponseCode: null,
+    dnsAnswers: [],
+    l7Protocol: null,
+    httpMethod: null,
+    httpHost: null,
+    url: null,
+    httpStatusCode: null,
+    httpUserAgent: null,
+    tlsSni: null,
+    tlsVersion: null,
+    tlsCertificateSubject: null,
+    tlsCertificateIssuer: null,
+    tlsCertificateSha256: null,
+    rawPayload: { query: "example.com", recordType: "A" },
+    payloadSha256: "0".repeat(64),
+    schemaVersion: 1,
+  },
+  meta: { requestId: "req_contract_fixture" },
+} satisfies SuccessEnvelope<EventDetailDto>;
+
+export const telemetryFixture = {
+  schemaVersion: 1,
+  batchId: "018ff8f4-86de-7b25-9b8a-2d22f6a3e000",
+  agentId: "agent-win-001",
+  sentAt: timestamp,
+  events: [{
+    eventId: "018ff8f4-86de-7b25-9b8a-2d22f6a3e001",
+    eventType: "DNS_QUERY",
+    occurredAt: timestamp,
+    payload: { query: "example.com", recordType: "A", answers: [] },
+  }],
+} satisfies TelemetryBatchRequest;
+
+export const errorFixture = {
+  error: {
+    code: "VALIDATION_ERROR",
+    message: "요청 값이 올바르지 않습니다.",
+    retryable: false,
+    details: [{ field: "size", message: "1 이상이어야 합니다.", context: null }],
+  },
+  meta: { requestId: "req_contract_fixture" },
+} satisfies ErrorEnvelope;

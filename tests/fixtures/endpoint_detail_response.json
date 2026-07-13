@@ -1,0 +1,30 @@
+{
+  "data": {
+    "endpointId": 1001,
+    "agentId": "agent-win-001",
+    "hostname": "WIN-ENDPOINT-01",
+    "osType": "WINDOWS",
+    "osVersion": null,
+    "ipAddress": null,
+    "agentVersion": null,
+    "agentBuildId": null,
+    "agentArch": null,
+    "capabilityCodes": [],
+    "status": "OFFLINE",
+    "lastSeenAt": null,
+    "isStale": false,
+    "sensorHealth": [],
+    "risk": {
+      "score": 0,
+      "level": "LOW",
+      "activeAlertCount": 0,
+      "openIncidentCount": 0,
+      "highestAlertRiskScore": null,
+      "calculatedAt": "2026-07-11T00:00:00Z",
+      "riskFactors": []
+    },
+    "registeredAt": "2026-07-11T00:00:00Z",
+    "certificates": []
+  },
+  "meta": {"requestId": "req_contract_fixture"}
+}

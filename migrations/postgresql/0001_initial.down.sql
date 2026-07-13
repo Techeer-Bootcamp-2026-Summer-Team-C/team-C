@@ -1,0 +1,8 @@
+DROP TABLE IF EXISTS incident_alerts;
+DROP TABLE IF EXISTS incidents;
+DROP TABLE IF EXISTS alerts;
+DROP TABLE IF EXISTS ingest_metadata;
+DROP TABLE IF EXISTS audit_logs;
+DROP TABLE IF EXISTS agent_auth_keys;
+DROP TABLE IF EXISTS endpoints;
+DROP TABLE IF EXISTS users;

@@ -1,0 +1,27 @@
+schema_version: 1
+rule_code: PROC_POWERSHELL_ENCODED
+rule_name: PowerShell Encoded Command
+alert_title: Encoded PowerShell command detected
+alert_summary: PowerShell was executed with an encoded command argument.
+version: 1
+enabled: true
+event_type: PROCESS_EXECUTION
+conditions:
+  all:
+    - field: command_line
+      operator: contains
+      value: "-EncodedCommand"
+severity: HIGH
+risk_score: 85
+mitre:
+  tactic_code: TA0002
+  technique_code: T1059.001
+incident:
+  enabled: true
+  correlation_key: suspicious-powershell
+  window_seconds: 1800
+response_guidance:
+  - order: 1
+    title: Review source event
+    description: 원본 이벤트와 관련 프로세스를 확인합니다.
+    requires_manual_action: false
