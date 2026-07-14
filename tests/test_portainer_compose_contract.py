@@ -108,3 +108,45 @@ def test_nginx_resolves_recreated_backend_containers_through_docker_dns() -> Non
     assert "resolver 127.0.0.11" in nginx
     assert "zone backend_upstream" in nginx
     assert "server backend:8000 resolve;" in nginx
+
+
+def test_observability_stack_runs_pinned_alloy_without_public_ports() -> None:
+    observability = _load("compose.observability.yaml")
+    alloy = observability["services"]["alloy"]
+
+    assert set(observability["services"]) == {"alloy"}
+    assert alloy["image"] == "grafana/alloy:v1.17.0"
+    assert "ports" not in alloy
+    assert alloy["restart"] == "unless-stopped"
+    assert observability["networks"]["data"] == {"external": True, "name": "edr-c-data"}
+
+
+def test_observability_stack_keeps_cloud_credentials_out_of_git() -> None:
+    observability = _load("compose.observability.yaml")
+    environment = observability["services"]["alloy"]["environment"]
+    alloy_config = (PORTAINER / "alloy/config.alloy").read_text(encoding="utf-8")
+
+    expected = {
+        "GRAFANA_CLOUD_METRICS_URL",
+        "GRAFANA_CLOUD_METRICS_USER",
+        "GRAFANA_CLOUD_LOGS_URL",
+        "GRAFANA_CLOUD_LOGS_USER",
+        "GRAFANA_CLOUD_TOKEN",
+    }
+    assert set(environment) == expected
+    assert all("is required" in value for value in environment.values())
+    assert all(f'sys.env("{name}")' in alloy_config for name in expected)
+    assert "grafana.net" not in alloy_config
+
+
+def test_alloy_collects_only_the_intended_production_signals() -> None:
+    alloy = (PORTAINER / "alloy/config.alloy").read_text(encoding="utf-8")
+
+    assert 'prometheus.exporter.unix "host"' in alloy
+    assert 'prometheus.exporter.cadvisor "docker"' in alloy
+    assert 'prometheus.exporter.kafka "kafka"' in alloy
+    assert 'prometheus.exporter.blackbox "backend"' in alloy
+    assert "http://backend:8000/health/ready" in alloy
+    assert 'loki.source.docker "local"' in alloy
+    assert 'regex         = "edr-c-(infra|service|observability)"' in alloy
+    assert "GRAFANA_CLOUD_TOKEN=" not in alloy

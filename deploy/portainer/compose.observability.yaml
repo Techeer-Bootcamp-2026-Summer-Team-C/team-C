@@ -1,0 +1,55 @@
+name: edr-c-observability
+
+services:
+  alloy:
+    image: grafana/alloy:v1.17.0
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - --disable-reporting
+      - /etc/alloy/config.alloy
+    environment:
+      GRAFANA_CLOUD_METRICS_URL: ${GRAFANA_CLOUD_METRICS_URL:?GRAFANA_CLOUD_METRICS_URL is required}
+      GRAFANA_CLOUD_METRICS_USER: ${GRAFANA_CLOUD_METRICS_USER:?GRAFANA_CLOUD_METRICS_USER is required}
+      GRAFANA_CLOUD_LOGS_URL: ${GRAFANA_CLOUD_LOGS_URL:?GRAFANA_CLOUD_LOGS_URL is required}
+      GRAFANA_CLOUD_LOGS_USER: ${GRAFANA_CLOUD_LOGS_USER:?GRAFANA_CLOUD_LOGS_USER is required}
+      GRAFANA_CLOUD_TOKEN: ${GRAFANA_CLOUD_TOKEN:?GRAFANA_CLOUD_TOKEN is required}
+    configs:
+      - source: alloy-config
+        target: /etc/alloy/config.alloy
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        read_only: true
+      - type: bind
+        source: /
+        target: /host/root
+        read_only: true
+        bind:
+          propagation: rslave
+      - type: bind
+        source: /proc
+        target: /host/proc
+        read_only: true
+      - type: bind
+        source: /sys
+        target: /host/sys
+        read_only: true
+      - alloy-data:/var/lib/alloy/data
+    networks:
+      - data
+    restart: unless-stopped
+
+configs:
+  alloy-config:
+    file: ./alloy/config.alloy
+
+networks:
+  data:
+    external: true
+    name: edr-c-data
+
+volumes:
+  alloy-data:

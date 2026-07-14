@@ -144,4 +144,36 @@ Portainer에서 `app-init` 로그에 마이그레이션 오류가 없는지, bac
 - `EDR_NGINX_CERT_DIR` 누락 오류: 환경 변수 대신 `/etc/edr-c/tls` 고정 절대 경로를 사용한다.
 - `undefined volume -` 오류: Nginx 인증서 마운트를 Compose long syntax로 명시하고 모든 named volume을 최상위 `volumes`에 정의한다.
 
-Grafana Cloud 연동은 이 두 스택이 안정화된 뒤 별도 단계로 추가한다. Vercel은 계속 Portainer 관리 범위 밖에 둔다.
+## 8. Grafana Cloud 연동
+
+인프라와 서비스가 안정화된 뒤 세 번째 Git repository 스택을 만든다.
+
+```text
+deploy/portainer/compose.observability.yaml
+```
+
+스택 이름은 `edr-c-observability`로 하고 Grafana Cloud의 Metrics와 Logs 전송 정보를 입력한다.
+
+```text
+GRAFANA_CLOUD_METRICS_URL=<Prometheus remote_write URL>
+GRAFANA_CLOUD_METRICS_USER=<Metrics username 또는 instance ID>
+GRAFANA_CLOUD_LOGS_URL=<Loki push URL>
+GRAFANA_CLOUD_LOGS_USER=<Logs username 또는 instance ID>
+GRAFANA_CLOUD_TOKEN=<metrics:write와 logs:write 권한을 가진 access policy token>
+```
+
+토큰은 Git이나 Compose 파일에 저장하지 않고 Portainer 환경 변수로만 입력한다. Alloy는 외부 포트를 공개하지 않으며 `edr-c-data` 네트워크에서 Kafka와 backend readiness를 확인한다.
+
+수집 범위는 다음과 같다.
+
+- EC2 호스트 CPU, 메모리, 디스크, 네트워크 메트릭
+- Docker 컨테이너 메트릭
+- Kafka 브로커와 consumer group 메트릭
+- backend readiness blackbox 메트릭
+- `edr-c-infra`, `edr-c-service`, `edr-c-observability` 컨테이너 로그
+
+Alloy가 Docker 컨테이너 메트릭과 로그를 읽기 위해 Docker socket을 읽기 전용으로 마운트한다. Docker socket 자체는 강한 권한을 제공하므로 이 스택의 관리 권한은 Portainer 관리자에게만 둔다.
+
+Grafana Cloud에서 메트릭과 로그 유입을 확인하기 전에는 기존 `edr-monitoring` 스택을 제거하지 않는다. Cloud 수집이 검증되면 로컬 Grafana와 Prometheus를 별도 정리 작업으로 중지한다.
+
+Vercel은 계속 Portainer 관리 범위 밖에 둔다.
