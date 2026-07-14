@@ -1,6 +1,6 @@
 CREATE TABLE `users` (
   `user_id` BIGINT NOT NULL,
-  `email` VARCHAR(255) NOT NULL,
+  `login_id` VARCHAR(64) NOT NULL,
   `password_hash` VARCHAR(255) NOT NULL,
   `name` VARCHAR(100) NOT NULL,
   `role` VARCHAR(30) NOT NULL,
@@ -10,7 +10,7 @@ CREATE TABLE `users` (
   `updated_at` DATETIME NOT NULL,
   `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`user_id`),
-  UNIQUE KEY `uq_users_email` (`email`)
+  UNIQUE KEY `uq_users_login_id_active` (`login_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE `endpoints` (

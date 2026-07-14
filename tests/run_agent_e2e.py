@@ -437,6 +437,7 @@ def main() -> int:
     bootstrap = os.getenv("TEST_KAFKA_BOOTSTRAP", "127.0.0.1:59092")
     s3_endpoint = os.getenv("TEST_S3_ENDPOINT", "http://127.0.0.1:59000")
     postgres_up = ROOT / "migrations/postgresql/0001_initial.up.sql"
+    postgres_login_id_up = ROOT / "migrations/postgresql/0002_user_login_id.up.sql"
     postgres_down = ROOT / "migrations/postgresql/0001_initial.down.sql"
     clickhouse_up = ROOT / "migrations/clickhouse/0001_initial.up.sql"
     clickhouse_down = ROOT / "migrations/clickhouse/0001_initial.down.sql"
@@ -451,11 +452,12 @@ def main() -> int:
     with psycopg.connect(postgres_dsn) as connection:
         apply_postgres_file(connection, postgres_down)
         apply_postgres_file(connection, postgres_up)
+        apply_postgres_file(connection, postgres_login_id_up)
         now = datetime.now(UTC)
         connection.execute(
-            "INSERT INTO users(email,password_hash,name,role,status,created_at,updated_at) "
+            "INSERT INTO users(login_id,password_hash,name,role,status,created_at,updated_at) "
             "VALUES(%s,%s,%s,'ADMIN','ACTIVE',%s,%s)",
-            ("e2e-admin@example.com", hash_password("e2e-admin-password"), "E2E Administrator", now, now),
+            ("e2e-admin", hash_password("e2e-admin-password"), "E2E Administrator", now, now),
         )
         connection.commit()
     apply_clickhouse_file(clickhouse, clickhouse_down)
@@ -487,8 +489,6 @@ def main() -> int:
         s3_access_key_id="edr-local",
         s3_secret_access_key=s3_secret,
         s3_bucket="edr-agent-e2e",
-        agent_ca_cert_path="certs/ca.crt",
-        agent_ca_key_path="certs/ca.key",
         _env_file=None,
     )
     runtime = RuntimeServices(settings)
@@ -711,7 +711,7 @@ def main() -> int:
     login_status, login = request_json(
         "http://127.0.0.1:58877/api/v1/auth/login",
         method="POST",
-        body={"email": "e2e-admin@example.com", "password": "e2e-admin-password"},
+        body={"loginId": "e2e-admin", "password": "e2e-admin-password"},
     )
     token = login["data"]["accessToken"]
     endpoint_status, endpoint_api = request_json("http://127.0.0.1:58877/api/v1/endpoints", token=token)

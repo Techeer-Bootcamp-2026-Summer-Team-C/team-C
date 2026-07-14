@@ -25,7 +25,7 @@ def test_argon2id_and_hs256_claim_contract() -> None:
     assert set(claims) == {"sub", "role", "iat", "exp"}
     assert claims["sub"] == "7"
     assert claims["role"] == "ADMIN"
-    assert claims["exp"] - claims["iat"] == 3600
+    assert claims["exp"] - claims["iat"] == 43_200
 
 
 def test_expired_and_tampered_jwt_are_rejected() -> None:
@@ -33,7 +33,7 @@ def test_expired_and_tampered_jwt_are_rejected() -> None:
         user_id=7,
         role=UserRole.VIEWER,
         secret=JWT_SECRET,
-        now=datetime.now(UTC) - timedelta(hours=2),
+        now=datetime.now(UTC) - timedelta(hours=13),
     )
     with pytest.raises(ApplicationError) as expired_error:
         decode_access_token(expired, secret=JWT_SECRET)

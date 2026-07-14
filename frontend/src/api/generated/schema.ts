@@ -1319,8 +1319,8 @@ export interface components {
         };
         /** LoginRequest */
         LoginRequest: {
-            /** Email */
-            email: string;
+            /** Loginid */
+            loginId: string;
             /** Password */
             password: string;
         };
@@ -1779,8 +1779,8 @@ export interface components {
         };
         /** UserDto */
         UserDto: {
-            /** Email */
-            email: string;
+            /** Loginid */
+            loginId: string;
             /** Name */
             name: string;
             role: components["schemas"]["UserRole"];
@@ -2158,6 +2158,15 @@ export interface operations {
             };
             /** @description The authenticated identity is not permitted to perform this operation. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description The request exceeded the configured rate limit. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

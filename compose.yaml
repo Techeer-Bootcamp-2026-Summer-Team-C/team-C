@@ -1,14 +1,36 @@
 name: edr-c-local
 
+x-app-environment: &app-environment
+  EDR_ENV: local
+  EDR_LOG_LEVEL: ${EDR_LOG_LEVEL:-INFO}
+  EDR_JWT_SECRET: ${EDR_JWT_SECRET:-local-dev-only-change-before-deployment}
+  EDR_ACCESS_TOKEN_TTL_SECONDS: ${EDR_ACCESS_TOKEN_TTL_SECONDS:-43200}
+  EDR_POSTGRES_DSN: postgresql://${POSTGRES_USER:-edr}:${POSTGRES_PASSWORD:-edr-local-postgres}@postgres:5432/${POSTGRES_DB:-edr}
+  EDR_CLICKHOUSE_DSN: http://${CLICKHOUSE_USER:-edr}:${CLICKHOUSE_PASSWORD:-edr-local-clickhouse}@clickhouse:8123/${CLICKHOUSE_DB:-edr}
+  EDR_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+  EDR_S3_ENDPOINT_URL: http://minio:9000
+  EDR_S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-edr-local}
+  EDR_S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-edr-local-minio}
+  EDR_S3_BUCKET: ${EDR_S3_BUCKET:-edr-failures}
+
+x-app-service: &app-service
+  build:
+    context: .
+    dockerfile: deploy/docker/backend.Dockerfile
+  environment: *app-environment
+  networks:
+    - data
+  restart: unless-stopped
+
 services:
   postgres:
     image: postgres:16.4
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-edr}
       POSTGRES_USER: ${POSTGRES_USER:-edr}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-edr-local-postgres}
     ports:
-      - "${POSTGRES_HOST_PORT:-5432}:5432"
+      - "${POSTGRES_HOST_PORT:-55432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -16,16 +38,19 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    networks:
+      - data
+    restart: unless-stopped
 
   clickhouse:
     image: clickhouse/clickhouse-server:24.8
     environment:
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-edr}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-edr}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set CLICKHOUSE_PASSWORD in .env}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-edr-local-clickhouse}
     ports:
-      - "${CLICKHOUSE_HTTP_HOST_PORT:-8123}:8123"
-      - "${CLICKHOUSE_NATIVE_HOST_PORT:-9009}:9000"
+      - "${CLICKHOUSE_HTTP_HOST_PORT:-58123}:8123"
+      - "${CLICKHOUSE_NATIVE_HOST_PORT:-59009}:9000"
     volumes:
       - clickhouse-data:/var/lib/clickhouse
     healthcheck:
@@ -33,6 +58,9 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    networks:
+      - data
+    restart: unless-stopped
 
   kafka:
     image: apache/kafka:3.8.0
@@ -40,7 +68,7 @@ services:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://127.0.0.1:${KAFKA_HOST_PORT:-9092}
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://127.0.0.1:${KAFKA_HOST_PORT:-59092}
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
@@ -49,7 +77,7 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
     ports:
-      - "${KAFKA_HOST_PORT:-9092}:9092"
+      - "${KAFKA_HOST_PORT:-59092}:9092"
     volumes:
       - kafka-data:/var/lib/kafka/data
     healthcheck:
@@ -57,16 +85,19 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    networks:
+      - data
+    restart: unless-stopped
 
   minio:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     command: server /data --console-address :9001
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-edr-local}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-edr-local-minio}
     ports:
-      - "${MINIO_API_HOST_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
+      - "${MINIO_API_HOST_PORT:-59000}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT:-59001}:9001"
     volumes:
       - minio-data:/data
     healthcheck:
@@ -74,9 +105,124 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    networks:
+      - data
+    restart: unless-stopped
+
+  cert-init:
+    build:
+      context: .
+      dockerfile: deploy/docker/backend.Dockerfile
+    command:
+      - python
+      - -m
+      - tools.provision_compose_certs
+      - --authority-dir
+      - /authority
+      - --nginx-dir
+      - /nginx-certs
+      - --demo-agent-id
+      - compose-demo-agent
+    volumes:
+      - ./runtime/compose/cert-authority:/authority
+      - nginx-certs:/nginx-certs
+    network_mode: none
+    restart: "no"
+
+  app-init:
+    <<: *app-service
+    command: ["python", "-m", "tools.local_demo", "_initialize"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./runtime/demo:/app/runtime/demo
+    restart: "no"
+
+  backend:
+    <<: *app-service
+    command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    depends_on:
+      app-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=5)"]
+      interval: 5s
+      timeout: 6s
+      retries: 20
+    networks:
+      - edge
+      - data
+
+  event-storage-worker:
+    <<: *app-service
+    command: ["python", "-m", "tools.run_event_storage_worker"]
+    depends_on:
+      app-init:
+        condition: service_completed_successfully
+
+  detection-worker:
+    <<: *app-service
+    command: ["python", "-m", "tools.run_detection_worker"]
+    depends_on:
+      app-init:
+        condition: service_completed_successfully
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    environment:
+      EDR_BACKEND_PROXY_TARGET: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5173').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - edge
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.29.3-alpine
+    depends_on:
+      cert-init:
+        condition: service_completed_successfully
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    ports:
+      - "${NGINX_HTTP_HOST_PORT:-8080}:8080"
+      - "${NGINX_MTLS_HOST_PORT:-8443}:8443"
+    volumes:
+      - ./deploy/nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+      - nginx-certs:/etc/nginx/certs:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/nginx-health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - edge
+    restart: unless-stopped
+
+networks:
+  edge:
+  data:
 
 volumes:
   postgres-data:
   clickhouse-data:
   kafka-data:
   minio-data:
+  nginx-certs:

@@ -12,6 +12,7 @@ dependencies = [
   "boto3>=1.40,<2",
   "clickhouse-connect>=0.8,<1",
   "confluent-kafka>=2.11,<3",
+  "cryptography>=46,<48",
   "fastapi>=0.115,<1",
   "jsonschema>=4.23,<5",
   "pydantic>=2.11,<3",
