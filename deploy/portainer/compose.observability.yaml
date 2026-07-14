@@ -1,23 +1,164 @@
 name: edr-c-observability
 
+x-alloy-config: &alloy-config |
+  logging {
+    level  = "info"
+    format = "logfmt"
+  }
+
+  prometheus.remote_write "grafana_cloud" {
+    external_labels = {
+      cluster     = "team-c",
+      environment = "production",
+      host        = "edr-api-ec2",
+    }
+
+    endpoint {
+      url = sys.env("GRAFANA_CLOUD_METRICS_URL")
+
+      basic_auth {
+        username = sys.env("GRAFANA_CLOUD_METRICS_USER")
+        password = sys.env("GRAFANA_CLOUD_TOKEN")
+      }
+    }
+  }
+
+  prometheus.exporter.unix "host" {
+    rootfs_path = "/host/root"
+    procfs_path = "/host/proc"
+    sysfs_path  = "/host/sys"
+
+    disable_collectors = ["btrfs", "infiniband", "ipvs", "zfs"]
+  }
+
+  prometheus.scrape "host" {
+    targets         = prometheus.exporter.unix.host.targets
+    forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+    job_name        = "integrations/node_exporter"
+    scrape_interval = "30s"
+  }
+
+  prometheus.exporter.cadvisor "docker" {
+    docker_host      = "unix:///var/run/docker.sock"
+    storage_duration = "5m"
+  }
+
+  prometheus.scrape "docker" {
+    targets         = prometheus.exporter.cadvisor.docker.targets
+    forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+    job_name        = "integrations/cadvisor"
+    scrape_interval = "30s"
+  }
+
+  prometheus.exporter.kafka "kafka" {
+    kafka_uris                = ["kafka:29092"]
+    allow_auto_topic_creation = false
+    allow_concurrency         = false
+  }
+
+  prometheus.scrape "kafka" {
+    targets         = prometheus.exporter.kafka.kafka.targets
+    forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+    job_name        = "integrations/kafka_exporter"
+    scrape_interval = "30s"
+  }
+
+  prometheus.exporter.blackbox "backend" {
+    config = "{ modules: { http_2xx: { prober: http, timeout: 5s } } }"
+
+    target {
+      name    = "backend-readiness"
+      address = "http://backend:8000/health/ready"
+      module  = "http_2xx"
+      labels  = {
+        environment = "production",
+      }
+    }
+  }
+
+  prometheus.scrape "backend" {
+    targets         = prometheus.exporter.blackbox.backend.targets
+    forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+    job_name        = "blackbox/backend"
+    scrape_interval = "30s"
+  }
+
+  discovery.docker "local" {
+    host             = "unix:///var/run/docker.sock"
+    refresh_interval = "30s"
+  }
+
+  discovery.relabel "docker_logs" {
+    targets = []
+
+    rule {
+      source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+      regex         = "edr-c-(infra|service|observability)"
+      action        = "keep"
+    }
+
+    rule {
+      source_labels = ["__meta_docker_container_name"]
+      regex         = "/(.*)"
+      target_label  = "container"
+    }
+
+    rule {
+      source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+      target_label  = "compose_project"
+    }
+
+    rule {
+      source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+      target_label  = "compose_service"
+    }
+  }
+
+  loki.source.docker "local" {
+    host          = "unix:///var/run/docker.sock"
+    targets       = discovery.docker.local.targets
+    relabel_rules = discovery.relabel.docker_logs.rules
+    labels        = {
+      cluster     = "team-c",
+      environment = "production",
+      host        = "edr-api-ec2",
+      job         = "docker",
+    }
+    forward_to = [loki.write.grafana_cloud.receiver]
+  }
+
+  loki.write "grafana_cloud" {
+    endpoint {
+      url = sys.env("GRAFANA_CLOUD_LOGS_URL")
+
+      basic_auth {
+        username = sys.env("GRAFANA_CLOUD_LOGS_USER")
+        password = sys.env("GRAFANA_CLOUD_TOKEN")
+      }
+    }
+  }
+
 services:
   alloy:
     image: grafana/alloy:v1.17.0
+    entrypoint:
+      - /bin/sh
+      - -ec
     command:
-      - run
-      - --server.http.listen-addr=0.0.0.0:12345
-      - --storage.path=/var/lib/alloy/data
-      - --disable-reporting
-      - /etc/alloy/config.alloy
+      - |
+        printf '%s' "$$ALLOY_CONFIG" > /tmp/config.alloy
+        exec /bin/alloy run \
+          --server.http.listen-addr=0.0.0.0:12345 \
+          --storage.path=/var/lib/alloy/data \
+          --disable-reporting \
+          /tmp/config.alloy
     environment:
+      ALLOY_CONFIG: *alloy-config
       GRAFANA_CLOUD_METRICS_URL: ${GRAFANA_CLOUD_METRICS_URL:?GRAFANA_CLOUD_METRICS_URL is required}
       GRAFANA_CLOUD_METRICS_USER: ${GRAFANA_CLOUD_METRICS_USER:?GRAFANA_CLOUD_METRICS_USER is required}
       GRAFANA_CLOUD_LOGS_URL: ${GRAFANA_CLOUD_LOGS_URL:?GRAFANA_CLOUD_LOGS_URL is required}
       GRAFANA_CLOUD_LOGS_USER: ${GRAFANA_CLOUD_LOGS_USER:?GRAFANA_CLOUD_LOGS_USER is required}
       GRAFANA_CLOUD_TOKEN: ${GRAFANA_CLOUD_TOKEN:?GRAFANA_CLOUD_TOKEN is required}
-    configs:
-      - source: alloy-config
-        target: /etc/alloy/config.alloy
     volumes:
       - type: bind
         source: /var/run/docker.sock
@@ -27,8 +168,6 @@ services:
         source: /
         target: /host/root
         read_only: true
-        bind:
-          propagation: rslave
       - type: bind
         source: /proc
         target: /host/proc
@@ -41,10 +180,6 @@ services:
     networks:
       - data
     restart: unless-stopped
-
-configs:
-  alloy-config:
-    file: ./alloy/config.alloy
 
 networks:
   data:

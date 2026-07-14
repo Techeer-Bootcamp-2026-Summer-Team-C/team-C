@@ -119,12 +119,23 @@ def test_observability_stack_runs_pinned_alloy_without_public_ports() -> None:
     assert "ports" not in alloy
     assert alloy["restart"] == "unless-stopped"
     assert observability["networks"]["data"] == {"external": True, "name": "edr-c-data"}
+    assert "configs" not in observability
+    assert "configs" not in alloy
+
+    bind_sources = {
+        volume["source"]
+        for volume in alloy["volumes"]
+        if isinstance(volume, dict) and volume["type"] == "bind"
+    }
+    assert bind_sources == {"/", "/proc", "/sys", "/var/run/docker.sock"}
+    assert all("bind" not in volume for volume in alloy["volumes"] if isinstance(volume, dict))
+    assert "$$ALLOY_CONFIG" in alloy["command"][0]
 
 
 def test_observability_stack_keeps_cloud_credentials_out_of_git() -> None:
     observability = _load("compose.observability.yaml")
     environment = observability["services"]["alloy"]["environment"]
-    alloy_config = (PORTAINER / "alloy/config.alloy").read_text(encoding="utf-8")
+    alloy_config = environment["ALLOY_CONFIG"]
 
     expected = {
         "GRAFANA_CLOUD_METRICS_URL",
@@ -133,14 +144,16 @@ def test_observability_stack_keeps_cloud_credentials_out_of_git() -> None:
         "GRAFANA_CLOUD_LOGS_USER",
         "GRAFANA_CLOUD_TOKEN",
     }
-    assert set(environment) == expected
-    assert all("is required" in value for value in environment.values())
+    assert set(environment) == expected | {"ALLOY_CONFIG"}
+    assert all("is required" in environment[name] for name in expected)
     assert all(f'sys.env("{name}")' in alloy_config for name in expected)
     assert "grafana.net" not in alloy_config
+    assert alloy_config == observability["x-alloy-config"]
 
 
 def test_alloy_collects_only_the_intended_production_signals() -> None:
-    alloy = (PORTAINER / "alloy/config.alloy").read_text(encoding="utf-8")
+    observability = _load("compose.observability.yaml")
+    alloy = observability["services"]["alloy"]["environment"]["ALLOY_CONFIG"]
 
     assert 'prometheus.exporter.unix "host"' in alloy
     assert 'prometheus.exporter.cadvisor "docker"' in alloy

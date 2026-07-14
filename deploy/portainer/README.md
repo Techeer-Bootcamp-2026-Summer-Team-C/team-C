@@ -143,6 +143,7 @@ Portainer에서 `app-init` 로그에 마이그레이션 오류가 없는지, bac
 - 원격 BuildKit HTTP/2 오류: Portainer Compose에서 `build`, `context`, `dockerfile`을 사용하지 않고 GHCR 이미지의 커밋 SHA만 사용한다.
 - `EDR_NGINX_CERT_DIR` 누락 오류: 환경 변수 대신 `/etc/edr-c/tls` 고정 절대 경로를 사용한다.
 - `undefined volume -` 오류: Nginx 인증서 마운트를 Compose long syntax로 명시하고 모든 named volume을 최상위 `volumes`에 정의한다.
+- 원격 Agent의 Git 상대 경로 bind 오류: Portainer 서버의 `/data/compose/...` 경로는 EC2에 존재하지 않으므로 repository 파일을 `configs.file`이나 bind mount로 전달하지 않는다. Alloy 설정은 Compose에 포함하고 컨테이너 내부에서 파일로 만든다.
 
 ## 8. Grafana Cloud 연동
 
@@ -163,6 +164,8 @@ GRAFANA_CLOUD_TOKEN=<metrics:write와 logs:write 권한을 가진 access policy 
 ```
 
 토큰은 Git이나 Compose 파일에 저장하지 않고 Portainer 환경 변수로만 입력한다. Alloy는 외부 포트를 공개하지 않으며 `edr-c-data` 네트워크에서 Kafka와 backend readiness를 확인한다.
+
+Portainer 서버와 Agent가 서로 다른 호스트이므로 repository의 상대 경로 파일을 EC2에 직접 mount하지 않는다. `compose.observability.yaml`은 Alloy 설정을 환경 변수로 전달하고 컨테이너 내부의 `/tmp/config.alloy`에 기록한 뒤 Alloy를 시작한다.
 
 수집 범위는 다음과 같다.
 
