@@ -1,0 +1,92 @@
+name: edr-c-service
+
+x-backend-image: &backend-image ghcr.io/techeer-bootcamp-2026-summer-team-c/team-c-backend:${EDR_IMAGE_TAG:?EDR_IMAGE_TAG is required}
+
+x-app-environment: &app-environment
+  EDR_ENV: production
+  EDR_LOG_LEVEL: ${EDR_LOG_LEVEL:-INFO}
+  EDR_JWT_SECRET: ${EDR_JWT_SECRET:?EDR_JWT_SECRET is required}
+  EDR_ACCESS_TOKEN_TTL_SECONDS: ${EDR_ACCESS_TOKEN_TTL_SECONDS:-43200}
+  EDR_POSTGRES_DSN: ${EDR_POSTGRES_DSN:?EDR_POSTGRES_DSN is required}
+  EDR_CLICKHOUSE_DSN: ${EDR_CLICKHOUSE_DSN:?EDR_CLICKHOUSE_DSN is required}
+  EDR_KAFKA_BOOTSTRAP_SERVERS: ${EDR_KAFKA_BOOTSTRAP_SERVERS:-kafka:29092}
+  EDR_KAFKA_RAW_TOPIC: ${EDR_KAFKA_RAW_TOPIC:-telemetry.raw}
+  EDR_KAFKA_VALIDATED_TOPIC: ${EDR_KAFKA_VALIDATED_TOPIC:-telemetry.validated}
+  EDR_KAFKA_PARTITIONS_PER_TOPIC: ${EDR_KAFKA_PARTITIONS_PER_TOPIC:-2}
+  EDR_KAFKA_REPLICATION_FACTOR: ${EDR_KAFKA_REPLICATION_FACTOR:-1}
+  EDR_EVENT_STORAGE_CONSUMER_GROUP: ${EDR_EVENT_STORAGE_CONSUMER_GROUP:-edr-event-storage-v1}
+  EDR_DETECTION_CONSUMER_GROUP: ${EDR_DETECTION_CONSUMER_GROUP:-edr-detection-v1}
+  EDR_AWS_REGION: ${EDR_AWS_REGION:?EDR_AWS_REGION is required}
+  EDR_S3_BUCKET: ${EDR_S3_BUCKET:?EDR_S3_BUCKET is required}
+
+x-app-service: &app-service
+  image: *backend-image
+  environment: *app-environment
+  networks:
+    - data
+  restart: unless-stopped
+
+services:
+  app-init:
+    <<: *app-service
+    command: ["python", "-m", "tools.prod_init"]
+    restart: "no"
+
+  backend:
+    <<: *app-service
+    command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    depends_on:
+      app-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=5)"]
+      interval: 5s
+      timeout: 6s
+      retries: 20
+    networks:
+      - edge
+      - data
+
+  event-storage-worker:
+    <<: *app-service
+    command: ["python", "-m", "tools.run_event_storage_worker"]
+    depends_on:
+      app-init:
+        condition: service_completed_successfully
+
+  detection-worker:
+    <<: *app-service
+    command: ["python", "-m", "tools.run_detection_worker"]
+    depends_on:
+      app-init:
+        condition: service_completed_successfully
+
+  nginx:
+    image: ghcr.io/techeer-bootcamp-2026-summer-team-c/team-c-nginx:${EDR_IMAGE_TAG:?EDR_IMAGE_TAG is required}
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${NGINX_HTTP_HOST_PORT:-8080}:8080"
+      - "${NGINX_MTLS_HOST_PORT:-8443}:8443"
+    volumes:
+      - type: bind
+        source: /etc/edr-c/tls
+        target: /etc/nginx/certs
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/nginx-health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - edge
+    restart: unless-stopped
+
+networks:
+  edge:
+  data:
+    external: true
+    name: edr-c-data

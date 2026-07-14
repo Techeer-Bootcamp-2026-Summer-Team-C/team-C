@@ -1,0 +1,147 @@
+# Portainer 배포 순서
+
+이 디렉터리의 Compose는 EC2의 Portainer Agent 환경에 배포한다. Vercel 프론트엔드와 Mac mini의 Portainer Server는 이 Compose에서 관리하지 않는다. PostgreSQL, ClickHouse, Kafka는 `edr-c-infra`, 백엔드와 워커, Nginx는 `edr-c-service`로 분리한다.
+
+현재 저장소 변경을 GitHub에 올리기 전에는 아래 명령을 실행하지 않는다.
+
+## 1. 기존 데이터 볼륨 확인
+
+기존 EC2를 계속 사용한다면 새 PostgreSQL 볼륨을 먼저 만들면 안 된다. 현재 데이터가 들어 있는 볼륨 이름부터 확인한다.
+
+```bash
+docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
+docker inspect <현재-postgres-컨테이너명> --format '{{range .Mounts}}{{println .Name .Destination}}{{end}}'
+docker inspect <현재-clickhouse-컨테이너명> --format '{{range .Mounts}}{{println .Name .Destination}}{{end}}'
+docker inspect <현재-kafka-컨테이너명> --format '{{range .Mounts}}{{println .Name .Destination}}{{end}}'
+```
+
+출력된 실제 볼륨 이름을 각각 `POSTGRES_VOLUME_NAME`, `CLICKHOUSE_VOLUME_NAME`, `KAFKA_VOLUME_NAME`으로 사용한다. 기존 스택을 삭제하거나 볼륨을 새로 만들기 전에 데이터 백업을 먼저 완료한다.
+
+완전히 새 EC2이고 기존 데이터가 없을 때만 다음처럼 새 볼륨을 만든다.
+
+```bash
+docker volume create edr-c-postgres-data
+docker volume create edr-c-clickhouse-data
+docker volume create edr-c-kafka-data
+```
+
+이 경우 Portainer 환경 변수의 볼륨 이름도 위 세 이름으로 설정한다.
+
+## 2. 공유 네트워크와 TLS 디렉터리 준비
+
+두 스택이 같은 데이터 서비스를 찾도록 외부 네트워크를 한 번만 만든다.
+
+```bash
+docker network inspect edr-c-data >/dev/null 2>&1 || docker network create edr-c-data
+```
+
+Nginx 인증서는 EC2의 고정 절대 경로에 둔다.
+
+```bash
+sudo install -d -m 700 /etc/edr-c/tls
+sudo ls -la /etc/edr-c/tls
+```
+
+배포 전 다음 세 파일이 있어야 한다.
+
+- `/etc/edr-c/tls/server.crt`
+- `/etc/edr-c/tls/server.key`
+- `/etc/edr-c/tls/agent-ca.crt`
+
+Compose는 이 디렉터리가 없으면 자동 생성하지 않고 실패하도록 설정되어 있다. 잘못된 빈 디렉터리로 Nginx가 시작되는 것을 막기 위한 동작이다.
+
+## 3. GitHub 이미지 빌드 확인
+
+`main`에 변경이 반영되면 GitHub Actions의 `Build production images`가 두 이미지를 GHCR에 올린다.
+
+- `ghcr.io/techeer-bootcamp-2026-summer-team-c/team-c-backend:<커밋-SHA>`
+- `ghcr.io/techeer-bootcamp-2026-summer-team-c/team-c-nginx:<커밋-SHA>`
+
+두 matrix job이 모두 성공한 뒤 전체 40자리 커밋 SHA를 복사한다. `latest`나 브랜치 이름은 사용하지 않는다.
+
+이미지가 비공개라면 Portainer의 `Registries`에 `ghcr.io`를 등록한다. GitHub 사용자명과 `read:packages` 권한이 있는 토큰을 사용하고, EC2 환경에서 이 레지스트리를 사용할 수 있게 연결한다. 토큰은 Git이나 Compose 파일에 저장하지 않는다.
+
+## 4. 인프라 스택 배포
+
+Portainer에서 Git repository 방식으로 스택을 만들고 Compose path를 다음으로 지정한다.
+
+```text
+deploy/portainer/compose.infra.yaml
+```
+
+스택 이름은 `edr-c-infra`로 하고 다음 환경 변수를 입력한다.
+
+```text
+POSTGRES_DB=edr
+POSTGRES_USER=<값>
+POSTGRES_PASSWORD=<값>
+CLICKHOUSE_DB=edr
+CLICKHOUSE_USER=<값>
+CLICKHOUSE_PASSWORD=<값>
+POSTGRES_VOLUME_NAME=<1단계에서 확인한 실제 볼륨 이름>
+CLICKHOUSE_VOLUME_NAME=<1단계에서 확인한 실제 볼륨 이름>
+KAFKA_VOLUME_NAME=<1단계에서 확인한 실제 볼륨 이름>
+```
+
+배포 후 PostgreSQL, ClickHouse, Kafka 세 컨테이너가 모두 `healthy`가 될 때까지 기다린다. 이 스택에는 외부 공개 포트가 없다.
+
+## 5. 서비스 스택 배포
+
+두 번째 Git repository 스택의 Compose path는 다음과 같다.
+
+```text
+deploy/portainer/compose.service.yaml
+```
+
+스택 이름은 `edr-c-service`로 하고 다음 환경 변수를 입력한다.
+
+```text
+EDR_IMAGE_TAG=<3단계의 전체 40자리 커밋 SHA>
+EDR_JWT_SECRET=<32자 이상의 임의 문자열>
+EDR_POSTGRES_DSN=postgresql://<사용자>:<URL-인코딩한-비밀번호>@postgres:5432/<DB명>
+EDR_CLICKHOUSE_DSN=http://<사용자>:<URL-인코딩한-비밀번호>@clickhouse:8123/<DB명>
+EDR_AWS_REGION=ap-northeast-2
+EDR_S3_BUCKET=<실제 S3 버킷 이름>
+```
+
+비밀번호에 `@`, `:`, `/`, `?`, `#`, `[`, `]` 같은 문자가 있으면 DSN 안의 비밀번호를 URL 인코딩해야 한다. EC2 인스턴스 역할로 S3에 접근하므로 AWS Access Key와 Secret Key는 입력하지 않는다.
+
+필요할 때만 다음 포트를 기본값에서 바꾼다.
+
+```text
+NGINX_HTTP_HOST_PORT=8080
+NGINX_MTLS_HOST_PORT=8443
+```
+
+`app-init`은 데이터 서비스 연결을 제한된 횟수만 재시도한 뒤 마이그레이션과 Kafka 토픽 준비를 수행한다. 정상 완료되면 `Exited (0)` 상태가 되는 것이 맞다. 그 다음 backend와 worker가 시작되고, backend가 healthy가 된 뒤 Nginx가 시작된다.
+
+## 6. 배포 확인
+
+EC2에서 다음을 확인한다.
+
+```bash
+docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
+curl --fail http://127.0.0.1:8080/nginx-health
+```
+
+Portainer에서 `app-init` 로그에 마이그레이션 오류가 없는지, backend가 `healthy`인지, 두 worker가 재시작을 반복하지 않는지 확인한다.
+
+## 7. 이후 서비스 업데이트
+
+일반 서비스 배포에서는 인프라 스택을 건드리지 않는다.
+
+1. `main`의 이미지 빌드 성공을 확인한다.
+2. 새 커밋 SHA를 복사한다.
+3. `edr-c-service`의 `EDR_IMAGE_TAG`만 새 SHA로 바꾼다.
+4. 서비스 스택만 다시 배포한다.
+5. health check와 로그를 확인한다.
+
+외부 볼륨은 스택 수명주기와 분리되어 있어 스택을 다시 배포해도 자동 삭제되지 않는다. 그래도 기존 스택을 처음 전환하는 날에는 별도 백업 없이 삭제 작업을 진행하지 않는다.
+
+## 이전 오류와 차단 방식
+
+- 원격 BuildKit HTTP/2 오류: Portainer Compose에서 `build`, `context`, `dockerfile`을 사용하지 않고 GHCR 이미지의 커밋 SHA만 사용한다.
+- `EDR_NGINX_CERT_DIR` 누락 오류: 환경 변수 대신 `/etc/edr-c/tls` 고정 절대 경로를 사용한다.
+- `undefined volume -` 오류: Nginx 인증서 마운트를 Compose long syntax로 명시하고 모든 named volume을 최상위 `volumes`에 정의한다.
+
+Grafana Cloud 연동은 이 두 스택이 안정화된 뒤 별도 단계로 추가한다. Vercel은 계속 Portainer 관리 범위 밖에 둔다.
