@@ -10,7 +10,7 @@ from .contracts.enums import UserRole
 from .errors import ApplicationError
 
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRES_SECONDS = 3600
+DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 43_200
 PASSWORD_HASHER = PasswordHasher()
 
 
@@ -31,13 +31,20 @@ def verify_password(password_hash: str, password: str) -> bool:
         return False
 
 
-def issue_access_token(*, user_id: int, role: UserRole, secret: str, now: datetime) -> str:
+def issue_access_token(
+    *,
+    user_id: int,
+    role: UserRole,
+    secret: str,
+    now: datetime,
+    expires_in_seconds: int = DEFAULT_ACCESS_TOKEN_TTL_SECONDS,
+) -> str:
     issued_at = now.astimezone(UTC)
     payload: dict[str, Any] = {
         "sub": str(user_id),
         "role": role.value,
         "iat": issued_at,
-        "exp": issued_at + timedelta(seconds=JWT_EXPIRES_SECONDS),
+        "exp": issued_at + timedelta(seconds=expires_in_seconds),
     }
     return jwt.encode(payload, secret, algorithm=JWT_ALGORITHM)
 

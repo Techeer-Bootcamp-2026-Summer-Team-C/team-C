@@ -43,3 +43,16 @@ def test_windows_acl_uses_current_user_and_system(monkeypatch, tmp_path: Path) -
             "*S-1-5-18:F",
         ]
     ]
+
+
+def test_windows_sid_command_replaces_undecodable_output(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def run(arguments, **kwargs):
+        captured.update(kwargs)
+        return CompletedProcess(arguments, 0, '"DESKTOP\\user","S-1-5-21-1234"\n', "")
+
+    monkeypatch.setattr(secure_files.subprocess, "run", run)
+
+    assert secure_files._current_windows_sid() == "S-1-5-21-1234"
+    assert captured["errors"] == "replace"

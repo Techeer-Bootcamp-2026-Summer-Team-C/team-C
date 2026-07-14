@@ -60,35 +60,53 @@ Dashboard ──> Dashboard API ──────┘
 
 ### 준비 사항
 
-- Python 3.12 또는 3.13
-- uv
 - Docker Desktop
-- Node.js와 npm
-- OpenSSL
 
-### Windows PowerShell
+### 전체 개발환경 실행
 
 ```powershell
-py -3.13 -m tools.local_demo up
+docker compose up -d --build --wait
 ```
 
-### macOS / Linux
+이 명령 하나로 PostgreSQL, ClickHouse, Kafka, MinIO, 초기화 작업, FastAPI, 두 Worker, React 개발 서버와 Nginx를 같은 Compose 프로젝트에서 실행한다. Backend·Worker·Frontend를 호스트 프로세스로 따로 실행하지 않는다.
 
-```bash
-python3 -m tools.local_demo up
-```
+접속 주소:
 
-실행이 완료되면 터미널에 관리자 계정과 비밀번호가 출력됩니다.
+- Dashboard: http://127.0.0.1:8080
+- Swagger: http://127.0.0.1:8080/docs
+- Collector: https://127.0.0.1:8443 (mTLS 전용)
+- MinIO Console: http://127.0.0.1:59001
 
-- Dashboard: http://127.0.0.1:5173
-- Swagger: http://127.0.0.1:8000/docs
+최초 실행 시 관리자 계정은 `runtime/demo/credentials.json`, 로컬 Agent 인증서는 `runtime/compose/cert-authority/agents/compose-demo-agent`에 생성된다. 두 경로는 Git에 포함하지 않는다.
 
 상태 확인과 종료:
 
 ```powershell
+docker compose ps
+docker compose down
+```
+
+`docker compose down`은 데이터 volume을 보존한다. Python 3.12/3.13이 설치된 개발자는 동일 작업을 wrapper로 실행할 수도 있다.
+
+```powershell
+py -3.13 -m tools.local_demo up
 py -3.13 -m tools.local_demo status
 py -3.13 -m tools.local_demo down
 ```
+
+### 실제 배포 서버 경계
+
+로컬 Compose 컨테이너 개수와 실제 배포 서버 개수는 별개다. 실제 배포는 다음 7개 경계로 분리한다.
+
+| 서버 경계 | 배포 컴포넌트 | 로컬 Compose 대응 |
+| --- | --- | --- |
+| Edge/API | Nginx + FastAPI | `nginx`, `backend` |
+| Event Broker | Kafka | `kafka` |
+| Worker | Event Storage Worker + Detection Worker | `event-storage-worker`, `detection-worker` |
+| Relational DB | PostgreSQL | `postgres` |
+| Event DB | ClickHouse | `clickhouse` |
+| Frontend | Vercel | 로컬에서만 `frontend` 컨테이너 |
+| Object Storage | Amazon S3 | 로컬에서는 `minio` |
 
 ## 시연 데이터
 
@@ -102,6 +120,6 @@ uv run --env-file .env python .\tests\seed_frontend_qa.py
 
 ```text
 ADMIN
-frontend-admin@example.com
+frontend-admin
 frontend-admin-password
 ```

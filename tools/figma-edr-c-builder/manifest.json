@@ -1,0 +1,8 @@
+{
+  "name": "EDR_C UX Builder",
+  "id": "1531159824012345678",
+  "api": "1.0.0",
+  "main": "code.js",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page"
+}

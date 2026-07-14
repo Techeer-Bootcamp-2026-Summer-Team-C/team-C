@@ -96,7 +96,7 @@ Collector: https://collector.example.com/api/v1
 | Dashboard | JWT Bearer |
 | Agent | mTLS |
 
-최초 등록은 CA-valid Agent certificate SAN의 `agentId`와 request `agentId`가 일치해야 하며, 이 값으로 Endpoint identity를 생성한다. 등록 API를 제외한 heartbeat·telemetry 요청은 SAN `agentId`, request `agentId`, 등록된 Endpoint identity가 모두 일치하고, 전달된 SHA-256 fingerprint가 해당 Endpoint의 활성 `agent_auth_keys` row와 일치해야 한다. 활성 인증서는 `is_delete=false`, fingerprint 일치, `revoked_at IS NULL`, `issued_at <= now()`, `expires_at > now()`이며 Endpoint가 `RETIRED`가 아닌 row다. Nginx는 외부 certificate forwarding header를 제거하고 TLS 검증 결과로 subject, SAN agent ID, SHA-256 fingerprint, notBefore, notAfter를 덮어쓴다. Backend는 notBefore/notAfter를 UTC timestamp로 변환해 각각 `issued_at`, `expires_at`으로 저장하며 REST request/response DTO에는 인증서 필드를 추가하지 않는다.
+최초 등록은 CA-valid Agent certificate SAN의 `agentId`와 request `agentId`가 일치해야 하며, 이 값으로 Endpoint identity를 생성한다. 등록 API를 제외한 heartbeat·telemetry 요청은 SAN `agentId`, request `agentId`, 등록된 Endpoint identity가 모두 일치하고, 전달된 SHA-256 fingerprint가 해당 Endpoint의 활성 `agent_auth_keys` row와 일치해야 한다. 활성 인증서는 `is_delete=false`, fingerprint 일치, `revoked_at IS NULL`, `issued_at <= now()`, `expires_at > now()`이며 Endpoint가 `RETIRED`가 아닌 row다. Nginx는 외부 certificate forwarding header를 제거하고 TLS 검증을 통과한 escaped PEM certificate만 Backend에 전달한다. Backend는 certificate의 단일 URI SAN, subject, SHA-256 fingerprint, notBefore, notAfter를 직접 읽고 시각을 UTC timestamp로 변환해 각각 `issued_at`, `expires_at`으로 저장한다. REST request/response DTO에는 인증서 필드를 추가하지 않는다.
 
 관리자는 먼저 다음 CLI로 개발용 CA certificate와 Agent certificate/private key를 발급한다.
 
@@ -236,7 +236,7 @@ POST /api/v1/auth/login
 
 ```json
 {
-  "email": "analyst@example.com",
+  "loginId": "analyst",
   "password": "password"
 }
 ```
@@ -246,10 +246,10 @@ POST /api/v1/auth/login
   "data": {
     "accessToken": "jwt",
     "tokenType": "Bearer",
-    "expiresIn": 3600,
+    "expiresIn": 43200,
     "user": {
       "userId": 1,
-      "email": "analyst@example.com",
+      "loginId": "analyst",
       "name": "Analyst",
       "role": "ANALYST",
       "status": "ACTIVE"
@@ -259,15 +259,17 @@ POST /api/v1/auth/login
 }
 ```
 
-`LoginData`는 `accessToken: string`, `tokenType: "Bearer"`, `expiresIn: integer`, `user: UserDto`다. `UserDto`는 `userId: integer`, `email: string`, `name: string`, `role: ADMIN | ANALYST | VIEWER`, `status: ACTIVE | DISABLED` required field를 반환한다.
+`LoginData`는 `accessToken: string`, `tokenType: "Bearer"`, `expiresIn: integer`, `user: UserDto`다. `UserDto`는 `userId: integer`, `loginId: string`, `name: string`, `role: ADMIN | ANALYST | VIEWER`, `status: ACTIVE | DISABLED` required field를 반환한다.
 
-Email은 trim/lowercase로 조회하고 PostgreSQL은 `LOWER(email)` unique index를 사용한다. `is_delete=false AND status=ACTIVE`만 로그인할 수 있고 `DISABLED`는 `403 ACCOUNT_DISABLED`다. JWT access token은 브라우저 메모리에만 보관한다.
+Login ID는 사용자가 지정하며 trim/lowercase 정규화 후 PostgreSQL의 `LOWER(login_id)` partial unique index로 대소문자 구분 없이 중복을 막는다. DB column과 API 길이는 3~64자이고 영문 소문자 또는 숫자로 시작하며 영문, 숫자, `.`, `_`, `@`, `+`, `-`를 허용한다. `@`는 기존 이메일 계정 migration 호환을 위한 허용 문자일 뿐 이메일 형식을 요구하지 않는다. password 요청은 1~1,024자로 제한한다. `is_delete=false AND status=ACTIVE`만 로그인할 수 있고 `DISABLED`는 `403 ACCOUNT_DISABLED`다. Nginx는 로그인 요청을 IP별 분당 10회와 burst 10으로 제한하며 초과 시 `429 RATE_LIMITED`를 반환한다. JWT access token은 현재 브라우저 탭의 `sessionStorage`에 보관해 새로고침 후 복구하며 기본 만료는 12시간이다. `EDR_ACCESS_TOKEN_TTL_SECONDS`로 5분~7일 범위에서 조정한다.
 
 최초 ADMIN은 다음 관리자 CLI로 생성한다.
 
 ```text
-python -m tools.create_admin
+python -m tools.create_admin --login-id <LOGIN_ID> --name <DISPLAY_NAME>
 ```
+
+개발 환경에서 같은 ID의 비밀번호를 다시 지정할 때는 `--reset-existing`을 추가한다. 비밀번호는 기본적으로 숨김 prompt에서 입력하며 `--password-stdin`도 사용할 수 있다.
 
 CLI는 `ACTIVE` ADMIN을 생성한다. 비밀번호나 초기 계정을 migration에 하드코딩하지 않으며 사용자 생성·삭제·상태 변경 REST API는 만들지 않는다.
 

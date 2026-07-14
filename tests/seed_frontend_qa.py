@@ -69,6 +69,7 @@ def main() -> None:
     with psycopg.connect(POSTGRES_DSN) as connection:
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.down.sql")
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.up.sql")
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_user_login_id.up.sql")
     apply_clickhouse_file(clickhouse, ROOT / "migrations/clickhouse/0001_initial.down.sql")
     apply_clickhouse_file(clickhouse, ROOT / "migrations/clickhouse/0001_initial.up.sql")
 
@@ -233,10 +234,10 @@ def main() -> None:
     with psycopg.connect(POSTGRES_DSN) as connection:
         connection.execute(
             """
-            INSERT INTO users (user_id, email, password_hash, name, role, status, created_at, updated_at) VALUES
-            (1, 'frontend-admin@example.com', %s, 'SOC Administrator', 'ADMIN', 'ACTIVE', %s, %s),
-            (2, 'frontend-viewer@example.com', %s, 'Read-only Reviewer', 'VIEWER', 'ACTIVE', %s, %s),
-            (3, 'frontend-disabled@example.com', %s, 'Disabled Analyst', 'ANALYST', 'DISABLED', %s, %s)
+            INSERT INTO users (user_id, login_id, password_hash, name, role, status, created_at, updated_at) VALUES
+            (1, 'frontend-admin', %s, 'SOC Administrator', 'ADMIN', 'ACTIVE', %s, %s),
+            (2, 'frontend-viewer', %s, 'Read-only Reviewer', 'VIEWER', 'ACTIVE', %s, %s),
+            (3, 'frontend-disabled', %s, 'Disabled Analyst', 'ANALYST', 'DISABLED', %s, %s)
             """,
             (admin_hash, now, now, viewer_hash, now, now, disabled_hash, now, now),
         )
@@ -377,8 +378,8 @@ def main() -> None:
         connection.commit()
     clickhouse.close()
     print("Browser QA fixture seeded")
-    print("ADMIN frontend-admin@example.com / frontend-admin-password")
-    print("VIEWER frontend-viewer@example.com / frontend-viewer-password")
+    print("ADMIN frontend-admin / frontend-admin-password")
+    print("VIEWER frontend-viewer / frontend-viewer-password")
     old_day_end = old_day + timedelta(days=1)
     print(f"ARCHIVE_NOT_READY range: endpointId=3 from={old_day.isoformat()} to={old_day_end.isoformat()}")
 

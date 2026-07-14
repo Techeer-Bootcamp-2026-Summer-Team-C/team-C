@@ -123,11 +123,13 @@ def test_actual_http_kafka_storage_detection_failure_and_replay_flow() -> None:
 
     postgres_down = ROOT / "migrations/postgresql/0001_initial.down.sql"
     postgres_up = ROOT / "migrations/postgresql/0001_initial.up.sql"
+    postgres_login_id_up = ROOT / "migrations/postgresql/0002_user_login_id.up.sql"
     clickhouse_down = ROOT / "migrations/clickhouse/0001_initial.down.sql"
     clickhouse_up = ROOT / "migrations/clickhouse/0001_initial.up.sql"
     with psycopg.connect(postgres_dsn) as connection:
         apply_postgres_file(connection, postgres_down)
         apply_postgres_file(connection, postgres_up)
+        apply_postgres_file(connection, postgres_login_id_up)
     apply_clickhouse_file(clickhouse, clickhouse_down)
     apply_clickhouse_file(clickhouse, clickhouse_up)
     admin = AdminClient({"bootstrap.servers": bootstrap})
@@ -147,8 +149,6 @@ def test_actual_http_kafka_storage_detection_failure_and_replay_flow() -> None:
         s3_access_key_id=s3_access_key,
         s3_secret_access_key=s3_secret_key,
         s3_bucket=s3_bucket,
-        agent_ca_cert_path="certs/ca.crt",
-        agent_ca_key_path="certs/ca.key",
         _env_file=None,
     )
     runtime = RuntimeServices(settings)

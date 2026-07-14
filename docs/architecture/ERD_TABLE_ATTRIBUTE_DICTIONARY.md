@@ -104,7 +104,7 @@
 
 ### 3.4 `agent_auth_keys`
 
-목적: mTLS certificate fingerprint, subject, SAN agent ID와 발급·만료·폐기 이력을 관리한다. 속성 수는 11개다. 관리자는 `python -m tools.provision_agent_cert --agent-id <AGENT_ID>`로 개발용 CA certificate와 Agent certificate/private key를 발급한다. Agent certificate의 단일 URI SAN은 `urn:edr:agent:<agentId>`이며 서버는 기존 등록 API에서 request `agentId`와 exact match한 뒤 fingerprint와 SAN agent ID를 저장한다. Nginx가 TLS 검증 결과에서 전달한 notBefore/notAfter를 UTC로 변환해 `issued_at`, `expires_at`에 저장한다. 등록 API를 제외한 heartbeat·telemetry는 해당 Endpoint의 `is_delete=false`, fingerprint 일치, `revoked_at IS NULL`, `issued_at <= now()`, `expires_at > now()`이며 Endpoint가 `RETIRED`가 아닌 활성 인증서만 허용한다. Rotation도 CLI 재발급 후 같은 등록 API를 사용하며 새 row 저장 성공 후 같은 transaction에서 기존 활성 row를 즉시 revoke하고 인증서 중첩 유예기간은 두지 않는다. 인증서 발급 REST API는 만들지 않는다.
+목적: mTLS certificate fingerprint, subject, SAN agent ID와 발급·만료·폐기 이력을 관리한다. 속성 수는 11개다. 관리자는 `python -m tools.provision_agent_cert --agent-id <AGENT_ID>`로 개발용 CA certificate와 Agent certificate/private key를 발급한다. Agent certificate의 단일 URI SAN은 `urn:edr:agent:<agentId>`이며 서버는 기존 등록 API에서 request `agentId`와 exact match한 뒤 fingerprint와 SAN agent ID를 저장한다. Nginx는 TLS 검증을 통과한 escaped PEM certificate를 전달하고 Backend가 여기서 읽은 notBefore/notAfter를 UTC로 변환해 `issued_at`, `expires_at`에 저장한다. 등록 API를 제외한 heartbeat·telemetry는 해당 Endpoint의 `is_delete=false`, fingerprint 일치, `revoked_at IS NULL`, `issued_at <= now()`, `expires_at > now()`이며 Endpoint가 `RETIRED`가 아닌 활성 인증서만 허용한다. Rotation도 CLI 재발급 후 같은 등록 API를 사용하며 새 row 저장 성공 후 같은 transaction에서 기존 활성 row를 즉시 revoke하고 인증서 중첩 유예기간은 두지 않는다. 인증서 발급 REST API는 만들지 않는다.
 
 | 컬럼 | 실제 PostgreSQL 타입 | 설명 |
 | --- | --- | --- |
@@ -189,12 +189,12 @@ HOT `storage_path`는 Endpoint별 ClickHouse 논리 조회 locator이고 S3 `sto
 
 ### 3.8 `users`
 
-목적: Dashboard 로그인과 RBAC 전용이다. 속성 수는 10개다. `status`는 `ACTIVE`, `DISABLED`만 사용하고 `is_delete=false AND status=ACTIVE`만 로그인할 수 있으며 `DISABLED`는 `403 ACCOUNT_DISABLED`다. 최초 ADMIN은 `python -m tools.create_admin`으로 생성하고 migration에 계정이나 비밀번호를 하드코딩하지 않는다. 사용자 생성·삭제·상태 변경 REST API를 만들지 않으며 Alert·Incident와 연결하지 않는다.
+목적: Dashboard 로그인과 RBAC 전용이다. 속성 수는 10개다. 내부 관계와 감사 로그에는 자동 생성 `user_id`를 사용하고 사용자는 별도의 `login_id`와 password로 로그인한다. `status`는 `ACTIVE`, `DISABLED`만 사용하고 `is_delete=false AND status=ACTIVE`만 로그인할 수 있으며 `DISABLED`는 `403 ACCOUNT_DISABLED`다. 최초 ADMIN은 `python -m tools.create_admin --login-id <LOGIN_ID> --name <DISPLAY_NAME>`으로 생성하고 migration에 계정이나 비밀번호를 하드코딩하지 않는다. 사용자 생성·삭제·상태 변경 REST API를 만들지 않으며 Alert·Incident와 연결하지 않는다.
 
 | 컬럼 | 실제 PostgreSQL 타입 | 설명 |
 | --- | --- | --- |
 | `user_id` | `BIGSERIAL` | Dashboard 사용자 PK |
-| `email` | `VARCHAR(255)` | 소문자로 정규화하는 로그인 ID |
+| `login_id` | `VARCHAR(64)` | 3~64자이며 사용자가 지정하고 소문자로 정규화하는 로그인 ID |
 | `password_hash` | `VARCHAR(255)` | Argon2 password hash |
 | `name` | `VARCHAR(100)` | 화면에 표시할 사용자 이름 |
 | `role` | `VARCHAR(30)` | `ADMIN`, `ANALYST`, `VIEWER` 권한 역할 |
@@ -203,6 +203,8 @@ HOT `storage_path`는 Endpoint별 ClickHouse 논리 조회 locator이고 S3 `sto
 | `created_at` | `TIMESTAMPTZ` | 계정 생성 시각 |
 | `updated_at` | `TIMESTAMPTZ` | 로그인 또는 계정 상태 마지막 갱신 시각 |
 | `is_delete` | `BOOLEAN` | 소프트 삭제 표시. 로그인은 `FALSE`만 허용 |
+
+`ck_users_login_id_format`은 허용 문자와 소문자 정규화를 강제한다. `uq_users_login_id_active`는 `LOWER(login_id)`에 `WHERE is_delete=FALSE`를 적용하는 partial unique index다.
 
 ### 3.9 `incident_alerts`
 

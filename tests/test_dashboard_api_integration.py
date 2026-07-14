@@ -44,8 +44,6 @@ def _settings() -> Settings:
         s3_access_key_id=os.getenv("TEST_S3_ACCESS_KEY", "edr-local"),
         s3_secret_access_key=os.environ["TEST_S3_SECRET_KEY"],
         s3_bucket="edr-dashboard-integration",
-        agent_ca_cert_path="certs/ca.crt",
-        agent_ca_key_path="certs/ca.key",
         _env_file=None,
     )
 
@@ -99,11 +97,13 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
     )
     postgres_down = ROOT / "migrations/postgresql/0001_initial.down.sql"
     postgres_up = ROOT / "migrations/postgresql/0001_initial.up.sql"
+    postgres_login_id_up = ROOT / "migrations/postgresql/0002_user_login_id.up.sql"
     clickhouse_down = ROOT / "migrations/clickhouse/0001_initial.down.sql"
     clickhouse_up = ROOT / "migrations/clickhouse/0001_initial.up.sql"
     with psycopg.connect(postgres_dsn) as connection:
         apply_postgres_file(connection, postgres_down)
         apply_postgres_file(connection, postgres_up)
+        apply_postgres_file(connection, postgres_login_id_up)
     apply_clickhouse_file(clickhouse, clickhouse_down)
     apply_clickhouse_file(clickhouse, clickhouse_up)
     try:
@@ -132,10 +132,10 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
         disabled_hash = hash_password("disabled-password")
         connection.execute(
             """
-            INSERT INTO users (email, password_hash, name, role, status, created_at, updated_at) VALUES
-            ('admin@example.com', %s, 'Admin', 'ADMIN', 'ACTIVE', %s, %s),
-            ('viewer@example.com', %s, 'Viewer', 'VIEWER', 'ACTIVE', %s, %s),
-            ('disabled@example.com', %s, 'Disabled', 'ANALYST', 'DISABLED', %s, %s)
+            INSERT INTO users (login_id, password_hash, name, role, status, created_at, updated_at) VALUES
+            ('admin', %s, 'Admin', 'ADMIN', 'ACTIVE', %s, %s),
+            ('viewer', %s, 'Viewer', 'VIEWER', 'ACTIVE', %s, %s),
+            ('disabled', %s, 'Disabled', 'ANALYST', 'DISABLED', %s, %s)
             """,
             (admin_hash, now, now, viewer_hash, now, now, disabled_hash, now, now),
         )
@@ -244,35 +244,36 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
     try:
         login = client.post(
             "/api/v1/auth/login",
-            json={"email": " ADMIN@example.com ", "password": "admin-password"},
+            json={"loginId": " ADMIN ", "password": "admin-password"},
         )
         assert login.status_code == 200
         admin_token = login.json()["data"]["accessToken"]
-        assert login.json()["data"]["expiresIn"] == 3600
+        assert login.json()["data"]["expiresIn"] == 43_200
+        assert login.json()["data"]["user"]["loginId"] == "admin"
         assert (
             client.post(
                 "/api/v1/auth/login",
-                json={"email": "admin@example.com", "password": "wrong"},
+                json={"loginId": "admin", "password": "wrong"},
             ).status_code
             == 401
         )
         assert (
             client.post(
                 "/api/v1/auth/login",
-                json={"email": "disabled@example.com", "password": "disabled-password"},
+                json={"loginId": "disabled", "password": "disabled-password"},
             ).status_code
             == 403
         )
         viewer_token = client.post(
             "/api/v1/auth/login",
-            json={"email": "viewer@example.com", "password": "viewer-password"},
+            json={"loginId": "viewer", "password": "viewer-password"},
         ).json()["data"]["accessToken"]
         tampered = admin_token + "tampered"
         expired = issue_access_token(
             user_id=1,
             role=UserRole.ADMIN,
             secret="dashboard-integration-jwt-secret-32-bytes-minimum",
-            now=datetime.now(UTC) - timedelta(hours=2),
+            now=datetime.now(UTC) - timedelta(hours=13),
         )
         assert client.get("/api/v1/endpoints", headers=_auth(tampered)).status_code == 401
         assert client.get("/api/v1/endpoints", headers=_auth(expired)).status_code == 401

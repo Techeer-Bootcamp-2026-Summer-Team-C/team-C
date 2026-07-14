@@ -1,6 +1,6 @@
 CREATE TABLE `users` (
   `user_id` BIGINT NOT NULL COMMENT 'Dashboard 사용자 식별자',
-  `email` VARCHAR(255) NOT NULL COMMENT '로그인 이메일',
+  `login_id` VARCHAR(64) NOT NULL COMMENT '3~64자 사용자 지정 Dashboard 로그인 ID',
   `password_hash` VARCHAR(255) NOT NULL COMMENT '비밀번호 Hash',
   `name` VARCHAR(100) NOT NULL COMMENT '사용자 이름',
   `role` VARCHAR(30) NOT NULL COMMENT 'ADMIN, ANALYST 또는 VIEWER',
@@ -10,8 +10,8 @@ CREATE TABLE `users` (
   `updated_at` DATETIME NOT NULL COMMENT '수정 시각',
   `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '소프트 삭제 여부',
   PRIMARY KEY (`user_id`),
-  UNIQUE KEY `uq_users_email` (`email`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='[PostgreSQL] 관리자 CLI로 생성하며 삭제되지 않은 ACTIVE만 로그인하는 Dashboard RBAC 사용자';
+  UNIQUE KEY `uq_users_login_id_active` (`login_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='[PostgreSQL] 실제 unique index는 LOWER(login_id), WHERE is_delete=FALSE 조건을 사용하는 Dashboard RBAC 사용자';
 
 CREATE TABLE `endpoints` (
   `endpoint_id` BIGINT NOT NULL COMMENT '엔드포인트 식별자',

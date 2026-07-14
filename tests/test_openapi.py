@@ -8,7 +8,7 @@ from tools.export_openapi import render_openapi
 ROOT = Path(__file__).parents[1]
 TAGS = {"Auth", "Endpoints", "Events", "Archives", "Alerts", "Incidents", "Dashboard", "Collector"}
 EXPECTED_RESPONSES = {
-    "authLogin": {"200", "400", "401", "403", "503"},
+    "authLogin": {"200", "400", "401", "403", "429", "503"},
     "endpointsList": {"200", "400", "401", "503"},
     "endpointsGet": {"200", "400", "401", "404", "503"},
     "eventsList": {"200", "400", "401", "409", "503"},

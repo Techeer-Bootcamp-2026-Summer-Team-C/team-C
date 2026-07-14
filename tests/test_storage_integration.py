@@ -27,6 +27,20 @@ def test_postgresql_migration_repository_idempotency_and_rollback() -> None:
     with psycopg.connect(dsn) as connection:
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.down.sql")
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.up.sql")
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_user_login_id.up.sql")
+        column = connection.execute(
+            """
+            SELECT data_type, character_maximum_length
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'login_id'
+            """
+        ).fetchone()
+        assert column == ("character varying", 64)
+        index_definition = connection.execute(
+            "SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_users_login_id_active'"
+        ).fetchone()[0]
+        assert "lower" in index_definition.lower()
+        assert "is_delete" in index_definition.lower()
         try:
             endpoint_id = EndpointRepository(connection).insert(
                 EndpointInsert("agent-test-001", "TEST-ENDPOINT", OsType.MACOS, now)
@@ -165,6 +179,7 @@ def test_postgresql_migration_repository_idempotency_and_rollback() -> None:
             assert alerts.active_for_endpoint(endpoint_id) == []
             assert incidents.close_expired(now + timedelta(hours=1)) == 1
         finally:
+            apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_user_login_id.down.sql")
             apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.down.sql")
 
 
