@@ -55,6 +55,7 @@ EDR_ENV=local
 EDR_LOG_LEVEL=INFO
 EDR_JWT_SECRET={secrets.token_hex(32)}
 EDR_ACCESS_TOKEN_TTL_SECONDS=43200
+EDR_AWS_REGION=us-east-1
 
 POSTGRES_DB=edr
 POSTGRES_USER=edr
@@ -71,6 +72,12 @@ EDR_CLICKHOUSE_DSN=http://edr:{clickhouse_password}@127.0.0.1:58123/edr
 
 KAFKA_HOST_PORT=59092
 EDR_KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:59092
+EDR_KAFKA_RAW_TOPIC=telemetry.raw
+EDR_KAFKA_VALIDATED_TOPIC=telemetry.validated
+EDR_KAFKA_PARTITIONS_PER_TOPIC=2
+EDR_KAFKA_REPLICATION_FACTOR=1
+EDR_EVENT_STORAGE_CONSUMER_GROUP=edr-event-storage-v1
+EDR_DETECTION_CONSUMER_GROUP=edr-detection-v1
 
 MINIO_ROOT_USER=edr-local
 MINIO_ROOT_PASSWORD={minio_password}
@@ -146,13 +153,13 @@ def start(*, build: bool = False) -> None:
 
 
 def _initialize() -> None:
-    import boto3
     import clickhouse_connect
     import psycopg
     from botocore.exceptions import ClientError
 
     from backend.auth import hash_password
     from backend.kafka import ensure_topics
+    from backend.runtime import create_s3_client
     from backend.settings import get_settings
     from backend.storage.migrations import apply_clickhouse_file, apply_postgres_file
     from backend.storage.postgres import UserRepository
@@ -199,19 +206,18 @@ def _initialize() -> None:
         apply_clickhouse_file(clickhouse, ROOT / "migrations/clickhouse/0001_initial.up.sql")
     finally:
         clickhouse.close()
-    s3 = boto3.client(
-        "s3",
-        endpoint_url=settings.s3_endpoint_url,
-        aws_access_key_id=settings.s3_access_key_id.get_secret_value(),
-        aws_secret_access_key=settings.s3_secret_access_key.get_secret_value(),
-        region_name="us-east-1",
-    )
+    s3 = create_s3_client(settings)
     try:
         s3.create_bucket(Bucket=settings.s3_bucket)
     except ClientError as error:
         if error.response.get("Error", {}).get("Code") not in {"BucketAlreadyExists", "BucketAlreadyOwnedByYou"}:
             raise
-    ensure_topics(settings.kafka_bootstrap_servers)
+    ensure_topics(
+        settings.kafka_bootstrap_servers,
+        topics=settings.kafka_topics,
+        partitions_per_topic=settings.kafka_partitions_per_topic,
+        replication_factor=settings.kafka_replication_factor,
+    )
 
 
 def down() -> None:

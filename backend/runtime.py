@@ -18,23 +18,25 @@ class RuntimeServices:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         bootstrap_servers = settings.kafka_bootstrap_servers
-        ensure_topics(bootstrap_servers)
-        self.producer = KafkaProducer(bootstrap_servers)
+        ensure_topics(
+            bootstrap_servers,
+            topics=settings.kafka_topics,
+            partitions_per_topic=settings.kafka_partitions_per_topic,
+            replication_factor=settings.kafka_replication_factor,
+        )
+        self.raw_topic = settings.kafka_raw_topic
+        self.validated_topic = settings.kafka_validated_topic
+        self.producer = KafkaProducer(bootstrap_servers, allowed_topics=settings.kafka_topics)
         self.clickhouse = clickhouse_connect.get_client(
             dsn=settings.clickhouse_dsn.get_secret_value(),
             autogenerate_session_id=False,
         )
-        self.s3 = boto3.client(
-            "s3",
-            endpoint_url=settings.s3_endpoint_url,
-            aws_access_key_id=settings.s3_access_key_id.get_secret_value(),
-            aws_secret_access_key=settings.s3_secret_access_key.get_secret_value(),
-            region_name="us-east-1",
-        )
+        self.s3 = create_s3_client(settings)
         self.restored_events = RestoredEventReader(
+            region=settings.aws_region,
             endpoint_url=settings.s3_endpoint_url,
-            access_key=settings.s3_access_key_id.get_secret_value(),
-            secret_key=settings.s3_secret_access_key.get_secret_value(),
+            access_key=_secret_value(settings.s3_access_key_id),
+            secret_key=_secret_value(settings.s3_secret_access_key),
             bucket=settings.s3_bucket,
         )
         self.restore_client = BotoRestoreObjectClient(self.s3, bucket=settings.s3_bucket)
@@ -61,3 +63,21 @@ class RuntimeServices:
             mapping_path=root / "mappings" / "mitre_attack.yaml",
         )
         return loader.load_directory(root / "rules")
+
+
+def create_s3_client(settings: Settings) -> Any:
+    options: dict[str, Any] = {}
+    if settings.aws_region is not None:
+        options["region_name"] = settings.aws_region
+    if settings.s3_endpoint_url is not None:
+        options["endpoint_url"] = settings.s3_endpoint_url
+    access_key = _secret_value(settings.s3_access_key_id)
+    secret_key = _secret_value(settings.s3_secret_access_key)
+    if access_key is not None and secret_key is not None:
+        options["aws_access_key_id"] = access_key
+        options["aws_secret_access_key"] = secret_key
+    return boto3.client("s3", **options)
+
+
+def _secret_value(value: Any) -> str | None:
+    return value.get_secret_value() if value is not None else None

@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 from backend.detection import DetectionEngine
 from backend.failure import FailureSink
-from backend.kafka import VALIDATED_TOPIC, KafkaConsumer
+from backend.kafka import KafkaConsumer
 from backend.runtime import RuntimeServices
 from backend.settings import get_settings
 from backend.storage.clickhouse import FailureRepository
@@ -23,8 +23,9 @@ def main(argv: list[str] | None = None) -> int:
     runtime = RuntimeServices(get_settings())
     consumer = KafkaConsumer(
         runtime.settings.kafka_bootstrap_servers,
-        group_id="edr-detection-v1",
-        topic=VALIDATED_TOPIC,
+        group_id=runtime.settings.detection_consumer_group,
+        topic=runtime.settings.kafka_validated_topic,
+        allowed_topics=runtime.settings.kafka_topics,
     )
     try:
         with runtime.postgres() as connection:

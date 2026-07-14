@@ -64,6 +64,7 @@ class EventStorageWorker:
         events: EventRepository,
         metadata: IngestMetadataRepository,
         failure_sink: FailureSink,
+        validated_topic: str = VALIDATED_TOPIC,
         sleep: Callable[[float], None] = time.sleep,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
@@ -72,6 +73,7 @@ class EventStorageWorker:
         self.events = events
         self.metadata = metadata
         self.failure_sink = failure_sink
+        self.validated_topic = validated_topic
         self.sleep = sleep
         self.now = now
 
@@ -139,7 +141,7 @@ class EventStorageWorker:
             "raw": raw,
         }
         if not self.producer.publish(
-            VALIDATED_TOPIC,
+            self.validated_topic,
             key=str(record["endpoint_id"]),
             value=canonical_json(validated),
         ):
