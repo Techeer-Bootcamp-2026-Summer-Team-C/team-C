@@ -146,8 +146,6 @@ def test_actual_http_kafka_storage_detection_failure_and_replay_flow() -> None:
         s3_access_key_id=s3_access_key,
         s3_secret_access_key=s3_secret_key,
         s3_bucket=s3_bucket,
-        agent_ca_cert_path="certs/ca.crt",
-        agent_ca_key_path="certs/ca.key",
         _env_file=None,
     )
     runtime = RuntimeServices(settings)

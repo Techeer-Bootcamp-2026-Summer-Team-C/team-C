@@ -8,21 +8,21 @@ export function LoginPage() {
   const auth = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
 
   async function submit(event: FormEvent): Promise<void> {
     event.preventDefault();
-    if (!email.trim() || !password) {
-      setError(new ApiError({ status: 400, code: "VALIDATION_ERROR", message: "Enter both email and password.", retryable: false, details: [], requestId: null }));
+    if (!loginId.trim() || !password) {
+      setError(new ApiError({ status: 400, code: "VALIDATION_ERROR", message: "Enter both login ID and password.", retryable: false, details: [], requestId: null }));
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      await auth.login({ email, password });
+      await auth.login({ loginId, password });
       const state = typeof location.state === "object" && location.state !== null ? location.state as { intended?: unknown } : null;
       navigate(typeof state?.intended === "string" ? state.intended : "/", { replace: true });
     } catch (caught) {
@@ -44,11 +44,11 @@ export function LoginPage() {
       <section className="login-panel">
         <form onSubmit={(event) => void submit(event)}>
           <div className="login-heading"><LockKeyhole aria-hidden="true" size={20} /><div><span>AUTHENTICATED ACCESS</span><h2>Sign in</h2></div></div>
-          <label className="field"><span>Email</span><input autoComplete="username" autoFocus onChange={(event) => setEmail(event.target.value)} type="email" value={email} /></label>
-          <label className="field"><span>Password</span><input autoComplete="current-password" onChange={(event) => setPassword(event.target.value)} type="password" value={password} /></label>
+          <label className="field"><span>Login ID</span><input autoCapitalize="none" autoComplete="username" autoFocus maxLength={64} minLength={3} onChange={(event) => setLoginId(event.target.value)} spellCheck={false} type="text" value={loginId} /></label>
+          <label className="field"><span>Password</span><input autoComplete="current-password" maxLength={1024} onChange={(event) => setPassword(event.target.value)} type="password" value={password} /></label>
           {error ? <div className="login-error" role="alert"><strong>{error.code === "ACCOUNT_DISABLED" ? "Account disabled" : "Sign in failed"}</strong><span>{error.message}</span>{error.requestId ? <code>Request {error.requestId}</code> : null}</div> : null}
           <button className="button primary login-submit" disabled={loading} type="submit">{loading ? "Signing in…" : "Sign in"}</button>
-          <p className="login-note">The access token is held in memory only. Refreshing the browser requires a new sign-in.</p>
+          <p className="login-note">Your session survives page refreshes in this tab and expires automatically.</p>
         </form>
       </section>
     </main>

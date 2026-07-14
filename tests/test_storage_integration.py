@@ -27,6 +27,19 @@ def test_postgresql_migration_repository_idempotency_and_rollback() -> None:
     with psycopg.connect(dsn) as connection:
         apply_postgres_migrations(connection, ROOT / "migrations/postgresql", direction="down")
         apply_postgres_migrations(connection, ROOT / "migrations/postgresql")
+        column = connection.execute(
+            """
+            SELECT data_type, character_maximum_length
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'login_id'
+            """
+        ).fetchone()
+        assert column == ("character varying", 64)
+        index_definition = connection.execute(
+            "SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_users_login_id_active'"
+        ).fetchone()[0]
+        assert "lower" in index_definition.lower()
+        assert "is_delete" in index_definition.lower()
         try:
             endpoint_id = EndpointRepository(connection).insert(
                 EndpointInsert("agent-test-001", "TEST-ENDPOINT", OsType.MACOS, now)

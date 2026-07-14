@@ -11,14 +11,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from .agent_identity import trusted_agent_identity
 from .api_services import AlertService, EndpointService, IncidentService
 from .archive_service import ArchiveService, archive_bucket
-from .auth import (
-    JWT_EXPIRES_SECONDS,
-    AuthenticatedUser,
-    decode_access_token,
-    issue_access_token,
-    require_write_role,
-    verify_password,
-)
+from .auth import AuthenticatedUser, decode_access_token, issue_access_token, require_write_role, verify_password
 from .collector import CollectorService
 from .contracts.alerts import AlertDetailDto, AlertDto, AlertStatusUpdateRequest
 from .contracts.archives import ArchiveBucketDto, ArchiveRestoreRequest, ArchiveRestoreStartDto
@@ -92,6 +85,7 @@ ERROR_DESCRIPTIONS = {
     404: "The requested resource was not found.",
     409: "The request conflicts with the current resource, identity, or Archive state.",
     413: "The request body or event count exceeds the documented limit.",
+    429: "The request exceeded the configured rate limit.",
     503: "A required dependency is temporarily unavailable.",
 }
 
@@ -179,14 +173,14 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         response_model=SuccessEnvelope[LoginData],
         operation_id="authLogin",
         tags=["Auth"],
-        responses=_error_responses(400, 401, 403, 503),
+        responses=_error_responses(400, 401, 403, 429, 503),
     )
     def login(request: Request, body: LoginRequest) -> SuccessEnvelope[LoginData]:
         runtime = _runtime(request)
         with runtime.postgres() as connection:
-            row = UserRepository(connection).by_email(body.email)
+            row = UserRepository(connection).by_login_id(body.login_id)
             if row is None or not verify_password(str(row["password_hash"]), body.password):
-                raise ApplicationError(401, "INVALID_CREDENTIALS", "Email or password is incorrect.")
+                raise ApplicationError(401, "INVALID_CREDENTIALS", "Login ID or password is incorrect.")
             if row["status"] == UserStatus.DISABLED.value:
                 raise ApplicationError(403, "ACCOUNT_DISABLED", "The account is disabled.")
             now = datetime.now(UTC)
@@ -196,6 +190,7 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
                 role=role,
                 secret=runtime.settings.jwt_secret.get_secret_value(),
                 now=now,
+                expires_in_seconds=runtime.settings.access_token_ttl_seconds,
             )
             connection.execute(
                 "UPDATE users SET last_login_at = %s, updated_at = %s WHERE user_id = %s", (now, now, row["user_id"])
@@ -204,9 +199,13 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         data = LoginData(
             access_token=token,
             token_type="Bearer",
-            expires_in=JWT_EXPIRES_SECONDS,
+            expires_in=runtime.settings.access_token_ttl_seconds,
             user=UserDto(
-                user_id=row["user_id"], email=row["email"], name=row["name"], role=role, status=UserStatus.ACTIVE
+                user_id=row["user_id"],
+                login_id=row["login_id"],
+                name=row["name"],
+                role=role,
+                status=UserStatus.ACTIVE,
             ),
         )
         return _success(request, data)

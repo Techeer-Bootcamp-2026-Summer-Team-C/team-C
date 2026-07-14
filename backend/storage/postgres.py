@@ -7,6 +7,7 @@ from psycopg import Connection
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from backend.contracts.auth import normalize_login_id
 from backend.contracts.collector import AgentHeartbeatRequest, AgentRegisterRequest
 from backend.contracts.enums import AlertStatus, EndpointStatus, IncidentStatus, OsType, UserRole, UserStatus
 from backend.errors import (
@@ -33,15 +34,15 @@ class UserRepository:
     def __init__(self, connection: Connection[Any]) -> None:
         self.connection = connection
 
-    def create_admin(self, *, email: str, name: str, password_hash: str, now: datetime) -> int:
+    def create_admin(self, *, login_id: str, name: str, password_hash: str, now: datetime) -> int:
         try:
             row = self.connection.execute(
                 """
-                INSERT INTO users (email, password_hash, name, role, status, created_at, updated_at)
+                INSERT INTO users (login_id, password_hash, name, role, status, created_at, updated_at)
                 VALUES (%s, %s, %s, 'ADMIN', 'ACTIVE', %s, %s)
                 RETURNING user_id
                 """,
-                (email.strip().lower(), password_hash, name, now, now),
+                (normalize_login_id(login_id), password_hash, name, now, now),
             ).fetchone()
             self.connection.commit()
         except Exception:
@@ -51,14 +52,31 @@ class UserRepository:
             raise RuntimeError("ADMIN creation failed")
         return int(row[0])
 
-    def by_email(self, email: str) -> dict[str, Any] | None:
+    def reset_admin_credentials(self, *, login_id: str, name: str, password_hash: str, now: datetime) -> int | None:
+        try:
+            row = self.connection.execute(
+                """
+                UPDATE users
+                SET password_hash = %s, name = %s, role = 'ADMIN', status = 'ACTIVE', updated_at = %s
+                WHERE LOWER(login_id) = %s AND is_delete = FALSE
+                RETURNING user_id
+                """,
+                (password_hash, name, now, normalize_login_id(login_id)),
+            ).fetchone()
+            self.connection.commit()
+        except Exception:
+            self.connection.rollback()
+            raise
+        return int(row[0]) if row is not None else None
+
+    def by_login_id(self, login_id: str) -> dict[str, Any] | None:
         with self.connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute(
                 """
-                SELECT user_id, email, password_hash, name, role, status
-                FROM users WHERE LOWER(email) = %s AND is_delete = FALSE
+                SELECT user_id, login_id, password_hash, name, role, status
+                FROM users WHERE LOWER(login_id) = %s AND is_delete = FALSE
                 """,
-                (email.strip().lower(),),
+                (normalize_login_id(login_id),),
             )
             row = cursor.fetchone()
         return dict(row) if row is not None else None

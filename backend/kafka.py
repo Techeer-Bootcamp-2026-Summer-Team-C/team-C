@@ -7,8 +7,10 @@ from confluent_kafka.admin import AdminClient, NewPartitions, NewTopic
 RAW_TOPIC = "telemetry.raw"
 VALIDATED_TOPIC = "telemetry.validated"
 TOPICS = (RAW_TOPIC, VALIDATED_TOPIC)
-PARTITIONS_PER_TOPIC = 3
+PARTITIONS_PER_TOPIC = 2
 REPLICATION_FACTOR = 1
+EVENT_STORAGE_CONSUMER_GROUP = "edr-event-storage-v1"
+DETECTION_CONSUMER_GROUP = "edr-detection-v1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,7 +55,8 @@ class ConsumerPort(Protocol):
 
 
 class KafkaProducer:
-    def __init__(self, bootstrap_servers: str) -> None:
+    def __init__(self, bootstrap_servers: str, *, allowed_topics: tuple[str, ...] = TOPICS) -> None:
+        self._allowed_topics = allowed_topics
         self._producer = Producer({"bootstrap.servers": bootstrap_servers, "enable.idempotence": True})
 
     def publish(
@@ -64,7 +67,7 @@ class KafkaProducer:
         value: bytes,
         headers: list[tuple[str, bytes]] | None = None,
     ) -> bool:
-        if topic not in TOPICS:
+        if topic not in self._allowed_topics:
             raise ValueError(f"unsupported Kafka topic: {topic}")
         delivery_error: list[object] = []
         delivered: list[bool] = []
@@ -84,8 +87,15 @@ class KafkaProducer:
 
 
 class KafkaConsumer:
-    def __init__(self, bootstrap_servers: str, *, group_id: str, topic: str) -> None:
-        if topic not in TOPICS:
+    def __init__(
+        self,
+        bootstrap_servers: str,
+        *,
+        group_id: str,
+        topic: str,
+        allowed_topics: tuple[str, ...] = TOPICS,
+    ) -> None:
+        if topic not in allowed_topics:
             raise ValueError(f"unsupported Kafka topic: {topic}")
         self._consumer = Consumer(
             {
@@ -187,17 +197,23 @@ def consumer_group_snapshot(
     )
 
 
-def ensure_topics(bootstrap_servers: str) -> None:
+def ensure_topics(
+    bootstrap_servers: str,
+    *,
+    topics: tuple[str, ...] = TOPICS,
+    partitions_per_topic: int = PARTITIONS_PER_TOPIC,
+    replication_factor: int = REPLICATION_FACTOR,
+) -> None:
     admin = AdminClient({"bootstrap.servers": bootstrap_servers})
     metadata = admin.list_topics(timeout=10)
-    missing = [topic for topic in TOPICS if topic not in metadata.topics]
+    missing = [topic for topic in topics if topic not in metadata.topics]
     if missing:
         futures = admin.create_topics(
             [
                 NewTopic(
                     topic,
-                    num_partitions=PARTITIONS_PER_TOPIC,
-                    replication_factor=REPLICATION_FACTOR,
+                    num_partitions=partitions_per_topic,
+                    replication_factor=replication_factor,
                 )
                 for topic in missing
             ]
@@ -207,12 +223,12 @@ def ensure_topics(bootstrap_servers: str) -> None:
 
     under_partitioned = [
         topic
-        for topic in TOPICS
-        if topic in metadata.topics and len(metadata.topics[topic].partitions) < PARTITIONS_PER_TOPIC
+        for topic in topics
+        if topic in metadata.topics and len(metadata.topics[topic].partitions) < partitions_per_topic
     ]
     if under_partitioned:
         futures = admin.create_partitions(
-            [NewPartitions(topic, new_total_count=PARTITIONS_PER_TOPIC) for topic in under_partitioned]
+            [NewPartitions(topic, new_total_count=partitions_per_topic) for topic in under_partitioned]
         )
         for future in futures.values():
             future.result(10)

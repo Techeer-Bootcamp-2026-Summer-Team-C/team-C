@@ -21,15 +21,27 @@ class RestoredReaderPort(Protocol):
 
 
 class RestoredEventReader:
-    def __init__(self, *, endpoint_url: str, access_key: str, secret_key: str, bucket: str) -> None:
-        parsed = urlparse(endpoint_url)
+    def __init__(
+        self,
+        *,
+        region: str | None,
+        endpoint_url: str | None,
+        access_key: str | None,
+        secret_key: str | None,
+        bucket: str,
+    ) -> None:
         self.bucket = bucket
-        self.filesystem = pafs.S3FileSystem(
-            access_key=access_key,
-            secret_key=secret_key,
-            endpoint_override=parsed.netloc,
-            scheme=parsed.scheme,
-        )
+        options: dict[str, str] = {}
+        if region is not None:
+            options["region"] = region
+        if endpoint_url is not None:
+            parsed = urlparse(endpoint_url)
+            options["endpoint_override"] = parsed.netloc
+            options["scheme"] = parsed.scheme
+        if access_key is not None and secret_key is not None:
+            options["access_key"] = access_key
+            options["secret_key"] = secret_key
+        self.filesystem = pafs.S3FileSystem(**options)
 
     def read_rows(self, object_key: str) -> list[dict[str, Any]]:
         table = pq.read_table(f"{self.bucket}/{object_key}", filesystem=self.filesystem)

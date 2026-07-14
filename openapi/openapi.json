@@ -3957,17 +3957,22 @@
       "LoginRequest": {
         "additionalProperties": false,
         "properties": {
-          "email": {
-            "title": "Email",
+          "loginId": {
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[a-z0-9][a-z0-9._@+-]{2,63}$",
+            "title": "Loginid",
             "type": "string"
           },
           "password": {
+            "maxLength": 1024,
+            "minLength": 1,
             "title": "Password",
             "type": "string"
           }
         },
         "required": [
-          "email",
+          "loginId",
           "password"
         ],
         "title": "LoginRequest",
@@ -5826,8 +5831,11 @@
       "UserDto": {
         "additionalProperties": false,
         "properties": {
-          "email": {
-            "title": "Email",
+          "loginId": {
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[a-z0-9][a-z0-9._@+-]{2,63}$",
+            "title": "Loginid",
             "type": "string"
           },
           "name": {
@@ -5848,7 +5856,7 @@
         },
         "required": [
           "userId",
-          "email",
+          "loginId",
           "name",
           "role",
           "status"
@@ -6486,6 +6494,16 @@
               }
             },
             "description": "The authenticated identity is not permitted to perform this operation."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The request exceeded the configured rate limit."
           },
           "503": {
             "content": {

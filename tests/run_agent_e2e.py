@@ -452,9 +452,9 @@ def main() -> int:
         apply_postgres_migrations(connection, postgres_migrations)
         now = datetime.now(UTC)
         connection.execute(
-            "INSERT INTO users(email,password_hash,name,role,status,created_at,updated_at) "
+            "INSERT INTO users(login_id,password_hash,name,role,status,created_at,updated_at) "
             "VALUES(%s,%s,%s,'ADMIN','ACTIVE',%s,%s)",
-            ("e2e-admin@example.com", hash_password("e2e-admin-password"), "E2E Administrator", now, now),
+            ("e2e-admin", hash_password("e2e-admin-password"), "E2E Administrator", now, now),
         )
         connection.commit()
     apply_clickhouse_file(clickhouse, clickhouse_down)
@@ -486,8 +486,6 @@ def main() -> int:
         s3_access_key_id="edr-local",
         s3_secret_access_key=s3_secret,
         s3_bucket="edr-agent-e2e",
-        agent_ca_cert_path="certs/ca.crt",
-        agent_ca_key_path="certs/ca.key",
         _env_file=None,
     )
     runtime = RuntimeServices(settings)
@@ -710,7 +708,7 @@ def main() -> int:
     login_status, login = request_json(
         "http://127.0.0.1:58877/api/v1/auth/login",
         method="POST",
-        body={"email": "e2e-admin@example.com", "password": "e2e-admin-password"},
+        body={"loginId": "e2e-admin", "password": "e2e-admin-password"},
     )
     token = login["data"]["accessToken"]
     endpoint_status, endpoint_api = request_json("http://127.0.0.1:58877/api/v1/endpoints", token=token)

@@ -1,7 +1,7 @@
 import argparse
 
 from backend.failure import FailureSink
-from backend.kafka import RAW_TOPIC, KafkaConsumer
+from backend.kafka import KafkaConsumer
 from backend.runtime import RuntimeServices
 from backend.settings import get_settings
 from backend.storage.clickhouse import EventRepository, FailureRepository
@@ -20,8 +20,9 @@ def main(argv: list[str] | None = None) -> int:
     runtime = RuntimeServices(get_settings())
     consumer = KafkaConsumer(
         runtime.settings.kafka_bootstrap_servers,
-        group_id="edr-event-storage-v1",
-        topic=RAW_TOPIC,
+        group_id=runtime.settings.event_storage_consumer_group,
+        topic=runtime.settings.kafka_raw_topic,
+        allowed_topics=runtime.settings.kafka_topics,
     )
     try:
         with runtime.postgres() as connection:
@@ -35,6 +36,7 @@ def main(argv: list[str] | None = None) -> int:
                     bucket=runtime.settings.s3_bucket,
                     repository=FailureRepository(runtime.clickhouse),
                 ),
+                validated_topic=runtime.settings.kafka_validated_topic,
             )
             if args.once:
                 return 0 if worker.run_once(10) else 1

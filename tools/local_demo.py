@@ -1,30 +1,22 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import secrets
 import shutil
-import signal
-import socket
 import subprocess
 import sys
-import time
-import urllib.error
-import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 
-from tools.provision_agent_cert import provision
 from tools.secure_files import protect_private_path
 
 ROOT = Path(__file__).parents[1]
 ENV_FILE = ROOT / ".env"
 RUNTIME_DIR = ROOT / "runtime" / "demo"
 CREDENTIALS_FILE = RUNTIME_DIR / "credentials.json"
-PROCESS_FILE = RUNTIME_DIR / "processes.json"
-ADMIN_EMAIL = "admin@edr.local"
+ADMIN_LOGIN_ID = "admin"
 
 
 def _tool(name: str) -> str:
@@ -34,13 +26,15 @@ def _tool(name: str) -> str:
     return executable
 
 
-def _run(arguments: list[str], *, env: dict[str, str] | None = None, input_text: str | None = None) -> None:
+def _run(arguments: list[str], *, env: dict[str, str] | None = None) -> None:
     print(f"+ {' '.join(arguments)}")
-    subprocess.run(arguments, cwd=ROOT, check=True, env=env, input=input_text, text=True)
+    subprocess.run(arguments, cwd=ROOT, check=True, env=env, text=True)
 
 
 def _read_env() -> dict[str, str]:
     values = os.environ.copy()
+    if not ENV_FILE.exists():
+        return values
     for raw_line in ENV_FILE.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
@@ -60,6 +54,8 @@ def _write_local_env() -> bool:
 EDR_ENV=local
 EDR_LOG_LEVEL=INFO
 EDR_JWT_SECRET={secrets.token_hex(32)}
+EDR_ACCESS_TOKEN_TTL_SECONDS=43200
+EDR_AWS_REGION=us-east-1
 
 POSTGRES_DB=edr
 POSTGRES_USER=edr
@@ -76,6 +72,12 @@ EDR_CLICKHOUSE_DSN=http://edr:{clickhouse_password}@127.0.0.1:58123/edr
 
 KAFKA_HOST_PORT=59092
 EDR_KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:59092
+EDR_KAFKA_RAW_TOPIC=telemetry.raw
+EDR_KAFKA_VALIDATED_TOPIC=telemetry.validated
+EDR_KAFKA_PARTITIONS_PER_TOPIC=2
+EDR_KAFKA_REPLICATION_FACTOR=1
+EDR_EVENT_STORAGE_CONSUMER_GROUP=edr-event-storage-v1
+EDR_DETECTION_CONSUMER_GROUP=edr-detection-v1
 
 MINIO_ROOT_USER=edr-local
 MINIO_ROOT_PASSWORD={minio_password}
@@ -86,80 +88,78 @@ EDR_S3_ACCESS_KEY_ID=edr-local
 EDR_S3_SECRET_ACCESS_KEY={minio_password}
 EDR_S3_BUCKET=edr-failures
 
-EDR_AGENT_CA_CERT_PATH=./certs/ca/ca.crt
-EDR_AGENT_CA_KEY_PATH=./certs/ca/ca.key
+NGINX_HTTP_HOST_PORT=8080
+NGINX_MTLS_HOST_PORT=8443
 """
     ENV_FILE.write_text(content, encoding="utf-8")
     protect_private_path(ENV_FILE)
     return True
 
 
-def _agent_id() -> str:
-    hostname = socket.gethostname().lower()
-    safe = "".join(character if character.isalnum() or character in ".-_" else "-" for character in hostname)
-    safe = safe.strip(".-_")[:52] or "local"
-    return f"demo-{safe}"
-
-
-def _ensure_local_certificate() -> None:
-    agent_id = _agent_id()
-    certificate = ROOT / "certs" / "agents" / agent_id / "agent.crt"
-    if certificate.exists():
-        return
-    provision(agent_id, ROOT / "certs")
-
-
 def _ensure_credentials() -> dict[str, str]:
     RUNTIME_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
     protect_private_path(RUNTIME_DIR, directory=True)
     if CREDENTIALS_FILE.exists():
-        return json.loads(CREDENTIALS_FILE.read_text(encoding="utf-8"))
-    credentials = {"email": ADMIN_EMAIL, "password": secrets.token_urlsafe(18)}
+        credentials = json.loads(CREDENTIALS_FILE.read_text(encoding="utf-8"))
+        if "loginId" not in credentials and "email" in credentials:
+            credentials = {"loginId": credentials["email"], "password": credentials["password"]}
+            CREDENTIALS_FILE.write_text(json.dumps(credentials, indent=2) + "\n", encoding="utf-8")
+            protect_private_path(CREDENTIALS_FILE)
+        return credentials
+    credentials = {"loginId": ADMIN_LOGIN_ID, "password": secrets.token_urlsafe(18)}
     CREDENTIALS_FILE.write_text(json.dumps(credentials, indent=2) + "\n", encoding="utf-8")
     protect_private_path(CREDENTIALS_FILE)
     return credentials
 
 
-def _compose(*arguments: str, env: dict[str, str]) -> list[str]:
-    clone_id = hashlib.sha256(str(ROOT.resolve()).encode()).hexdigest()[:10]
-    return [
-        _tool("docker"),
-        "compose",
-        "--project-name",
-        f"edr-c-demo-{clone_id}",
-        "--env-file",
-        str(ENV_FILE),
-        *arguments,
-    ]
+def _compose(*arguments: str) -> list[str]:
+    command = [_tool("docker"), "compose"]
+    if ENV_FILE.exists():
+        command.extend(("--env-file", str(ENV_FILE)))
+    return [*command, *arguments]
 
 
-def setup() -> None:
-    if not ((3, 12) <= sys.version_info[:2] < (3, 14)):
-        raise RuntimeError("Python 3.12 or 3.13 is required")
-    for command in ("uv", "npm", "docker", "openssl"):
-        _tool(command)
+def _check_docker() -> None:
     _run([_tool("docker"), "info"])
-    created = _write_local_env()
-    _ensure_local_certificate()
-    credentials = _ensure_credentials()
-    env = _read_env()
-    _run([_tool("uv"), "sync", "--all-groups", "--frozen"], env=env)
-    _run([_tool("npm"), "--prefix", "frontend", "ci"], env=env)
-    _run(_compose("up", "-d", "--wait", env=env), env=env)
-    _run([_tool("uv"), "run", "python", "-m", "tools.local_demo", "_initialize"], env=env)
-    print("\nLocal demo setup complete" + (" (new local secrets generated)" if created else ""))
-    print(f"Dashboard login: {credentials['email']} / {credentials['password']}")
+
+
+def _print_access() -> None:
+    values = _read_env()
+    http_port = values.get("NGINX_HTTP_HOST_PORT", "8080")
+    mtls_port = values.get("NGINX_MTLS_HOST_PORT", "8443")
+    print("\nEDR_C full Docker Compose environment is running")
+    print(f"Dashboard: http://127.0.0.1:{http_port}")
+    print(f"Swagger:   http://127.0.0.1:{http_port}/docs")
+    print(f"Collector: https://127.0.0.1:{mtls_port} (mTLS only)")
     print(f"Credentials file: {CREDENTIALS_FILE}")
 
 
+def setup() -> None:
+    _check_docker()
+    created = _write_local_env()
+    _run(_compose("build"), env=_read_env())
+    print("\nLocal Compose images are ready" + (" (new local secrets generated)" if created else ""))
+
+
+def start(*, build: bool = False) -> None:
+    _check_docker()
+    _write_local_env()
+    arguments = ["up", "-d"]
+    if build:
+        arguments.append("--build")
+    arguments.append("--wait")
+    _run(_compose(*arguments), env=_read_env())
+    _print_access()
+
+
 def _initialize() -> None:
-    import boto3
     import clickhouse_connect
     import psycopg
     from botocore.exceptions import ClientError
 
     from backend.auth import hash_password
     from backend.kafka import ensure_topics
+    from backend.runtime import create_s3_client
     from backend.settings import get_settings
     from backend.storage.migrations import apply_clickhouse_file, apply_postgres_file, apply_postgres_migrations
     from backend.storage.postgres import UserRepository
@@ -169,15 +169,35 @@ def _initialize() -> None:
         exists = connection.execute("SELECT to_regclass('public.users')").fetchone()[0]
         if exists is None:
             apply_postgres_migrations(connection, ROOT / "migrations/postgresql")
-        elif connection.execute("SELECT to_regclass('public.user_dashboard_layouts')").fetchone()[0] is None:
-            apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_user_dashboard_layouts.up.sql")
+        else:
+            login_id_exists = connection.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'login_id'
+                )
+                """
+            ).fetchone()[0]
+            if not login_id_exists:
+                apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_user_login_id.up.sql")
+            if connection.execute("SELECT to_regclass('public.user_dashboard_layouts')").fetchone()[0] is None:
+                apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_user_dashboard_layouts.up.sql")
+        login_id_length = connection.execute(
+            """
+            SELECT character_maximum_length
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'login_id'
+            """
+        ).fetchone()[0]
+        if login_id_length != 64:
+            connection.execute("ALTER TABLE users ALTER COLUMN login_id TYPE VARCHAR(64)")
         credentials = _ensure_credentials()
         existing_admin = connection.execute(
-            "SELECT 1 FROM users WHERE LOWER(email)=LOWER(%s) AND is_delete=FALSE", (credentials["email"],)
+            "SELECT 1 FROM users WHERE LOWER(login_id)=LOWER(%s) AND is_delete=FALSE", (credentials["loginId"],)
         ).fetchone()
         if existing_admin is None:
             UserRepository(connection).create_admin(
-                email=credentials["email"],
+                login_id=credentials["loginId"],
                 name="Local Demo Admin",
                 password_hash=hash_password(credentials["password"]),
                 now=datetime.now(UTC),
@@ -189,133 +209,33 @@ def _initialize() -> None:
         apply_clickhouse_file(clickhouse, ROOT / "migrations/clickhouse/0001_initial.up.sql")
     finally:
         clickhouse.close()
-    s3 = boto3.client(
-        "s3",
-        endpoint_url=settings.s3_endpoint_url,
-        aws_access_key_id=settings.s3_access_key_id.get_secret_value(),
-        aws_secret_access_key=settings.s3_secret_access_key.get_secret_value(),
-        region_name="us-east-1",
-    )
+    s3 = create_s3_client(settings)
     try:
         s3.create_bucket(Bucket=settings.s3_bucket)
     except ClientError as error:
         if error.response.get("Error", {}).get("Code") not in {"BucketAlreadyExists", "BucketAlreadyOwnedByYou"}:
             raise
-    ensure_topics(settings.kafka_bootstrap_servers)
-
-
-def _pid_running(pid: int) -> bool:
-    if os.name == "nt":
-        result = subprocess.run(
-            ["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True, check=False
-        )
-        return str(pid) in result.stdout
-    try:
-        os.kill(pid, 0)
-    except OSError:
-        return False
-    return True
-
-
-def _start_process(name: str, arguments: list[str], env: dict[str, str]) -> int:
-    log_path = RUNTIME_DIR / f"{name}.log"
-    log = log_path.open("ab")
-    options: dict[str, object] = {}
-    if os.name == "nt":
-        options["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
-    else:
-        options["start_new_session"] = True
-    try:
-        process = subprocess.Popen(arguments, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, **options)
-    finally:
-        log.close()
-    return process.pid
-
-
-def _wait_for(url: str, *, timeout: float = 60) -> None:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        try:
-            with urllib.request.urlopen(url, timeout=2) as response:
-                if response.status < 500:
-                    return
-        except (OSError, urllib.error.URLError):
-            time.sleep(0.5)
-    raise RuntimeError(f"service did not become ready: {url}")
-
-
-def start() -> None:
-    if PROCESS_FILE.exists():
-        existing = json.loads(PROCESS_FILE.read_text(encoding="utf-8"))
-        if any(_pid_running(int(pid)) for pid in existing.values()):
-            print("Local demo processes are already running.")
-            status()
-            return
-    env = _read_env()
-    env["EDR_BACKEND_PROXY_TARGET"] = "http://127.0.0.1:8000"
-    commands = {
-        "backend": [_tool("uv"), "run", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "8000"],
-        "event-storage-worker": [_tool("uv"), "run", "python", "-m", "tools.run_event_storage_worker"],
-        "detection-worker": [_tool("uv"), "run", "python", "-m", "tools.run_detection_worker"],
-        "frontend": [_tool("npm"), "--prefix", "frontend", "run", "dev", "--", "--port", "5173"],
-    }
-    pids = {name: _start_process(name, command, env) for name, command in commands.items()}
-    PROCESS_FILE.write_text(json.dumps(pids, indent=2) + "\n", encoding="utf-8")
-    try:
-        _wait_for("http://127.0.0.1:8000/health/ready")
-        _wait_for("http://127.0.0.1:5173/")
-    except Exception:
-        stop_processes()
-        raise
-    credentials = _ensure_credentials()
-    print("\nEDR_C local demo is running")
-    print("Dashboard: http://127.0.0.1:5173")
-    print("Swagger:   http://127.0.0.1:8000/docs")
-    print(f"Login:     {credentials['email']} / {credentials['password']}")
-
-
-def stop_processes() -> None:
-    if not PROCESS_FILE.exists():
-        return
-    processes = json.loads(PROCESS_FILE.read_text(encoding="utf-8"))
-    for pid_value in processes.values():
-        pid = int(pid_value)
-        if not _pid_running(pid):
-            continue
-        if os.name == "nt":
-            subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], check=False, capture_output=True)
-        else:
-            try:
-                os.killpg(pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
-    PROCESS_FILE.unlink(missing_ok=True)
+    ensure_topics(
+        settings.kafka_bootstrap_servers,
+        topics=settings.kafka_topics,
+        partitions_per_topic=settings.kafka_partitions_per_topic,
+        replication_factor=settings.kafka_replication_factor,
+    )
 
 
 def down() -> None:
-    stop_processes()
-    if ENV_FILE.exists() and shutil.which("docker"):
-        env = _read_env()
-        _run(_compose("down", env=env), env=env)
-    print("EDR_C local demo stopped. Local database volumes were preserved.")
+    if shutil.which("docker") is not None:
+        _run(_compose("down"), env=_read_env())
+    print("EDR_C local Compose environment stopped. Data volumes were preserved.")
 
 
 def status() -> int:
-    processes: dict[str, int] = {}
-    if PROCESS_FILE.exists():
-        processes = json.loads(PROCESS_FILE.read_text(encoding="utf-8"))
-    all_running = bool(processes)
-    for name, pid_value in processes.items():
-        running = _pid_running(int(pid_value))
-        all_running = all_running and running
-        print(f"{name}: {'running' if running else 'stopped'} (pid {pid_value})")
-    if not processes:
-        print("Local demo application processes are stopped.")
-    return 0 if all_running else 1
+    result = subprocess.run(_compose("ps"), cwd=ROOT, env=_read_env(), text=True, check=False)
+    return result.returncode
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Set up and run the isolated EDR_C local demo.")
+    parser = argparse.ArgumentParser(description="Manage the EDR_C full Docker Compose development environment.")
     parser.add_argument("command", choices=["up", "setup", "start", "status", "down", "_initialize"])
     return parser.parse_args(argv)
 
@@ -324,8 +244,7 @@ def main(argv: list[str] | None = None) -> int:
     arguments = parse_args(argv)
     try:
         if arguments.command == "up":
-            setup()
-            start()
+            start(build=True)
         elif arguments.command == "setup":
             setup()
         elif arguments.command == "start":
@@ -337,7 +256,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             _initialize()
     except (RuntimeError, subprocess.CalledProcessError, OSError, ValueError) as error:
-        print(f"local demo failed: {error}", file=sys.stderr)
+        print(f"local Compose environment failed: {error}", file=sys.stderr)
         return 2
     return 0
 
