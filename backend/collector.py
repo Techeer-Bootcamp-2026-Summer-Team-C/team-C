@@ -50,8 +50,15 @@ class TelemetryEnvelope(ContractModel):
 
 
 class CollectorService:
-    def __init__(self, runtime: CollectorRuntimePort, *, now=lambda: datetime.now(UTC)) -> None:
+    def __init__(
+        self,
+        runtime: CollectorRuntimePort,
+        *,
+        raw_topic: str | None = None,
+        now=lambda: datetime.now(UTC),
+    ) -> None:
         self.runtime = runtime
+        self.raw_topic = raw_topic or getattr(runtime, "raw_topic", RAW_TOPIC)
         self.now = now
 
     def register(
@@ -151,7 +158,7 @@ class CollectorService:
             publish_candidates += 1
             message = self._raw_message(envelope, endpoint, event)
             if self.runtime.producer.publish(
-                RAW_TOPIC,
+                self.raw_topic,
                 key=str(endpoint.endpoint_id),
                 value=canonical_json(message),
             ):

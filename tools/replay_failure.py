@@ -4,7 +4,6 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from backend.failure import FailureSink
-from backend.kafka import RAW_TOPIC
 from backend.runtime import RuntimeServices
 from backend.settings import get_settings
 from backend.storage.clickhouse import FailureRepository
@@ -28,9 +27,13 @@ def replay_failure(failure_id: UUID, runtime: RuntimeServices, *, now: datetime)
     try:
         envelope = sink.load_verified(failure, now=now)
         source_message = envelope["message"]
-        raw_message = source_message["raw"] if envelope["sourceTopic"] == "telemetry.validated" else source_message
+        raw_message = (
+            source_message["raw"]
+            if envelope["sourceTopic"] == runtime.settings.kafka_validated_topic
+            else source_message
+        )
         acknowledged = runtime.producer.publish(
-            RAW_TOPIC,
+            runtime.settings.kafka_raw_topic,
             key=str(raw_message["endpointId"]),
             value=canonical_json(raw_message),
             headers=[("replay_failure_id", str(failure_id).encode())],
