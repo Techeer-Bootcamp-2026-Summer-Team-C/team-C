@@ -24,6 +24,9 @@ EXPECTED_RESPONSES = {
     "incidentsGet": {"200", "400", "401", "404", "503"},
     "incidentsGetTimeline": {"200", "400", "401", "404", "503"},
     "dashboardGetSummary": {"200", "400", "401", "503"},
+    "dashboardLayoutsGet": {"200", "401", "404", "503"},
+    "dashboardLayoutsPut": {"200", "400", "401", "404", "409", "503"},
+    "dashboardLayoutsDelete": {"200", "401", "404", "503"},
     "dashboardGetEndpointSummary": {"200", "400", "401", "503"},
     "dashboardGetIngestSummary": {"200", "400", "401", "503"},
     "dashboardGetTopology": {"200", "400", "401", "503"},
@@ -47,9 +50,9 @@ def test_openapi_has_exact_product_operations_tags_and_unique_ids() -> None:
     items = operations(schema)
     expected = {(contract.method.lower(), "/api/v1" + contract.path) for contract in PRODUCT_API_CONTRACTS}
     assert {(method, path) for path, method, _operation in items} == expected
-    assert len(items) == 23
+    assert len(items) == 26
     operation_ids = [operation["operationId"] for _path, _method, operation in items]
-    assert len(operation_ids) == len(set(operation_ids)) == 23
+    assert len(operation_ids) == len(set(operation_ids)) == 26
     assert set(operation_ids) == EXPECTED_RESPONSES.keys()
     assert {tag["name"] for tag in schema["tags"]} == TAGS
     assert all(len(operation["tags"]) == 1 and operation["tags"][0] in TAGS for _, _, operation in items)

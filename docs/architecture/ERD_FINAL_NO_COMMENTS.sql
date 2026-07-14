@@ -13,6 +13,21 @@ CREATE TABLE `users` (
   UNIQUE KEY `uq_users_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE `user_dashboard_layouts` (
+  `layout_id` BIGINT NOT NULL,
+  `user_id` BIGINT NOT NULL,
+  `dashboard_key` VARCHAR(64) NOT NULL,
+  `layout_version` INT NOT NULL,
+  `revision` BIGINT NOT NULL,
+  `layout_json` LONGTEXT NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`layout_id`),
+  UNIQUE KEY `uq_user_dashboard_layouts_user_dashboard` (`user_id`, `dashboard_key`),
+  KEY `idx_user_dashboard_layouts_user_id` (`user_id`),
+  CONSTRAINT `fk_user_dashboard_layouts_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE `endpoints` (
   `endpoint_id` BIGINT NOT NULL,
   `agent_id` VARCHAR(64) NOT NULL,

@@ -1165,6 +1165,74 @@
         "title": "DashboardInterval",
         "type": "string"
       },
+      "DashboardLayoutDto": {
+        "additionalProperties": false,
+        "properties": {
+          "dashboardKey": {
+            "title": "Dashboardkey",
+            "type": "string"
+          },
+          "isDefault": {
+            "title": "Isdefault",
+            "type": "boolean"
+          },
+          "layoutVersion": {
+            "minimum": 1.0,
+            "title": "Layoutversion",
+            "type": "integer"
+          },
+          "revision": {
+            "minimum": 0.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "widgets": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardWidgetLayoutDto"
+            },
+            "title": "Widgets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "dashboardKey",
+          "layoutVersion",
+          "revision",
+          "isDefault",
+          "widgets"
+        ],
+        "title": "DashboardLayoutDto",
+        "type": "object"
+      },
+      "DashboardLayoutPutRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "layoutVersion": {
+            "minimum": 1.0,
+            "title": "Layoutversion",
+            "type": "integer"
+          },
+          "revision": {
+            "minimum": 0.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "widgets": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardWidgetLayoutDto"
+            },
+            "title": "Widgets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "layoutVersion",
+          "revision",
+          "widgets"
+        ],
+        "title": "DashboardLayoutPutRequest",
+        "type": "object"
+      },
       "DashboardStorageDto": {
         "additionalProperties": false,
         "properties": {
@@ -1251,6 +1319,51 @@
           "responseGuidance"
         ],
         "title": "DashboardSummaryDto",
+        "type": "object"
+      },
+      "DashboardWidgetLayoutDto": {
+        "additionalProperties": false,
+        "properties": {
+          "h": {
+            "maximum": 24.0,
+            "minimum": 1.0,
+            "title": "H",
+            "type": "integer"
+          },
+          "hidden": {
+            "title": "Hidden",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "w": {
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "W",
+            "type": "integer"
+          },
+          "x": {
+            "minimum": 0.0,
+            "title": "X",
+            "type": "integer"
+          },
+          "y": {
+            "minimum": 0.0,
+            "title": "Y",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "x",
+          "y",
+          "w",
+          "h",
+          "hidden"
+        ],
+        "title": "DashboardWidgetLayoutDto",
         "type": "object"
       },
       "DnsQueryEvent": {
@@ -5023,6 +5136,23 @@
         "title": "SuccessEnvelope[AttackTimelineDto]",
         "type": "object"
       },
+      "SuccessEnvelope_DashboardLayoutDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DashboardLayoutDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[DashboardLayoutDto]",
+        "type": "object"
+      },
       "SuccessEnvelope_DashboardSummaryDto_": {
         "additionalProperties": false,
         "properties": {
@@ -6801,6 +6931,233 @@
           }
         ],
         "summary": "Ingest Summary",
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/api/v1/dashboard/layouts/{dashboardKey}": {
+      "delete": {
+        "operationId": "dashboardLayoutsDelete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboardKey",
+            "required": true,
+            "schema": {
+              "title": "Dashboardkey",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_DashboardLayoutDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Dashboard Layout Delete",
+        "tags": [
+          "Dashboard"
+        ]
+      },
+      "get": {
+        "operationId": "dashboardLayoutsGet",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboardKey",
+            "required": true,
+            "schema": {
+              "title": "Dashboardkey",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_DashboardLayoutDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Dashboard Layout Get",
+        "tags": [
+          "Dashboard"
+        ]
+      },
+      "put": {
+        "operationId": "dashboardLayoutsPut",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboardKey",
+            "required": true,
+            "schema": {
+              "title": "Dashboardkey",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DashboardLayoutPutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_DashboardLayoutDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The request conflicts with the current resource, identity, or Archive state."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Dashboard Layout Put",
         "tags": [
           "Dashboard"
         ]

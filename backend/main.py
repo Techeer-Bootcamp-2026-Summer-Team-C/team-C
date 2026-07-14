@@ -33,6 +33,7 @@ from .contracts.collector import (
 )
 from .contracts.common import ErrorBody, ErrorDetail, ErrorEnvelope, PagedData, RequestMeta, SuccessEnvelope
 from .contracts.dashboard import DashboardSummaryDto, EndpointSummaryDto, IngestSummaryDto
+from .contracts.dashboard_layouts import DashboardLayoutDto, DashboardLayoutPutRequest
 from .contracts.endpoints import EndpointDetailDto, EndpointDto
 from .contracts.enums import DashboardInterval, UserRole, UserStatus
 from .contracts.events import EventDetailDto, EventDto, ProcessTreeDto
@@ -52,6 +53,7 @@ from .contracts.requests import (
     ProcessTreeQuery,
     TopologyQuery,
 )
+from .dashboard_layouts import DashboardLayoutService
 from .errors import ApplicationError, RequestValidationError, ServiceUnavailableError
 from .event_service import EventService
 from .investigation_service import FailureService, InvestigationService
@@ -62,6 +64,7 @@ from .storage.clickhouse import EventRepository, FailureRepository
 from .storage.models import AgentCertificateIdentity
 from .storage.postgres import (
     AlertRepository,
+    DashboardLayoutRepository,
     EndpointRepository,
     IncidentRepository,
     IngestMetadataRepository,
@@ -549,6 +552,67 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         from_, to = resolve_time_range(query, now=datetime.now(UTC))
         with runtime.postgres() as connection:
             data = _summary_service(runtime, connection).ingest_summary(from_=from_, to=to)
+        return _success(request, data)
+
+    @app.get(
+        "/api/v1/dashboard/layouts/{dashboardKey}",
+        response_model=SuccessEnvelope[DashboardLayoutDto],
+        operation_id="dashboardLayoutsGet",
+        tags=["Dashboard"],
+        responses=_error_responses(401, 404, 503),
+    )
+    def dashboard_layout_get(
+        request: Request,
+        dashboardKey: str,
+        user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[DashboardLayoutDto]:
+        runtime = _runtime(request)
+        with runtime.postgres() as connection:
+            data = DashboardLayoutService(DashboardLayoutRepository(connection)).get(
+                user_id=user.user_id, dashboard_key=dashboardKey
+            )
+        return _success(request, data)
+
+    @app.put(
+        "/api/v1/dashboard/layouts/{dashboardKey}",
+        response_model=SuccessEnvelope[DashboardLayoutDto],
+        operation_id="dashboardLayoutsPut",
+        tags=["Dashboard"],
+        responses=_error_responses(400, 401, 404, 409, 503),
+    )
+    def dashboard_layout_put(
+        request: Request,
+        dashboardKey: str,
+        body: DashboardLayoutPutRequest,
+        user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[DashboardLayoutDto]:
+        runtime = _runtime(request)
+        with runtime.postgres() as connection:
+            data = DashboardLayoutService(DashboardLayoutRepository(connection)).put(
+                user_id=user.user_id,
+                dashboard_key=dashboardKey,
+                body=body,
+                now=datetime.now(UTC),
+            )
+        return _success(request, data)
+
+    @app.delete(
+        "/api/v1/dashboard/layouts/{dashboardKey}",
+        response_model=SuccessEnvelope[DashboardLayoutDto],
+        operation_id="dashboardLayoutsDelete",
+        tags=["Dashboard"],
+        responses=_error_responses(401, 404, 503),
+    )
+    def dashboard_layout_delete(
+        request: Request,
+        dashboardKey: str,
+        user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[DashboardLayoutDto]:
+        runtime = _runtime(request)
+        with runtime.postgres() as connection:
+            data = DashboardLayoutService(DashboardLayoutRepository(connection)).delete(
+                user_id=user.user_id, dashboard_key=dashboardKey
+            )
         return _success(request, data)
 
     @app.get(

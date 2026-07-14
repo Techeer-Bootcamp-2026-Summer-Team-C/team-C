@@ -13,6 +13,21 @@ CREATE TABLE `users` (
   UNIQUE KEY `uq_users_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='[PostgreSQL] 관리자 CLI로 생성하며 삭제되지 않은 ACTIVE만 로그인하는 Dashboard RBAC 사용자';
 
+CREATE TABLE `user_dashboard_layouts` (
+  `layout_id` BIGINT NOT NULL COMMENT '사용자 Dashboard layout 식별자',
+  `user_id` BIGINT NOT NULL COMMENT 'layout을 소유한 Dashboard 사용자 식별자',
+  `dashboard_key` VARCHAR(64) NOT NULL COMMENT 'overview 등 Dashboard 화면 안정 식별자',
+  `layout_version` INT NOT NULL COMMENT '위젯 Registry와 layout JSON schema 버전',
+  `revision` BIGINT NOT NULL COMMENT '낙관적 동시성 제어 revision',
+  `layout_json` LONGTEXT NOT NULL COMMENT '위젯 id, x, y, w, h, hidden 배열 JSON',
+  `created_at` DATETIME NOT NULL COMMENT '최초 저장 시각',
+  `updated_at` DATETIME NOT NULL COMMENT '마지막 저장 시각',
+  PRIMARY KEY (`layout_id`),
+  UNIQUE KEY `uq_user_dashboard_layouts_user_dashboard` (`user_id`, `dashboard_key`),
+  KEY `idx_user_dashboard_layouts_user_id` (`user_id`),
+  CONSTRAINT `fk_user_dashboard_layouts_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='[PostgreSQL] JWT 사용자별 Dashboard 위젯 배치, 크기와 숨김 상태';
+
 CREATE TABLE `endpoints` (
   `endpoint_id` BIGINT NOT NULL COMMENT '엔드포인트 식별자',
   `agent_id` VARCHAR(64) NOT NULL COMMENT 'Agent 불변 식별자',

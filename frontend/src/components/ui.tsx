@@ -64,12 +64,14 @@ export function EdrStatePill({ state, score, reasons, calculatedAt }: {
   reasons: readonly string[];
   calculatedAt: string;
 }) {
+  const reasonSummary = reasons.length ? reasons.map(humanize).join(" · ") : "No active risk reasons";
   return (
-    <section className={`edr-state tone-${state.toLowerCase()}`} aria-label={`EDR state ${state}, score ${score}`}>
+    <section className={`edr-state tone-${state.toLowerCase()}`}
+      aria-label={`EDR state ${state}, score ${score}. ${reasonSummary}`} title={reasonSummary}>
       <div><span>Current EDR state</span><strong>{state}</strong></div>
       <div className="edr-score"><strong>{score}</strong><span>/ 100</span></div>
       <div className="edr-reasons">
-        <span>{reasons.length ? reasons.map(humanize).join(" · ") : "No active risk reasons"}</span>
+        <span>{reasonSummary}</span>
         <small>Calculated {formatDateTime(calculatedAt)}</small>
       </div>
     </section>

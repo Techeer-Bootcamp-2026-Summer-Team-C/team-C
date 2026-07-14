@@ -175,6 +175,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboard/layouts/{dashboardKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dashboard Layout Get */
+        get: operations["dashboardLayoutsGet"];
+        /** Dashboard Layout Put */
+        put: operations["dashboardLayoutsPut"];
+        post?: never;
+        /** Dashboard Layout Delete */
+        delete: operations["dashboardLayoutsDelete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dashboard/summary": {
         parameters: {
             query?: never;
@@ -750,6 +769,28 @@ export interface components {
          * @enum {string}
          */
         DashboardInterval: "1m" | "5m" | "1h" | "1d";
+        /** DashboardLayoutDto */
+        DashboardLayoutDto: {
+            /** Dashboardkey */
+            dashboardKey: string;
+            /** Isdefault */
+            isDefault: boolean;
+            /** Layoutversion */
+            layoutVersion: number;
+            /** Revision */
+            revision: number;
+            /** Widgets */
+            widgets: components["schemas"]["DashboardWidgetLayoutDto"][];
+        };
+        /** DashboardLayoutPutRequest */
+        DashboardLayoutPutRequest: {
+            /** Layoutversion */
+            layoutVersion: number;
+            /** Revision */
+            revision: number;
+            /** Widgets */
+            widgets: components["schemas"]["DashboardWidgetLayoutDto"][];
+        };
         /** DashboardStorageDto */
         DashboardStorageDto: {
             /** Bybackend */
@@ -773,6 +814,21 @@ export interface components {
             responseGuidance: components["schemas"]["ResponseGuidanceSummaryDto"];
             storage: components["schemas"]["DashboardStorageDto"];
             timeRange: components["schemas"]["TimeRangeDto"];
+        };
+        /** DashboardWidgetLayoutDto */
+        DashboardWidgetLayoutDto: {
+            /** H */
+            h: number;
+            /** Hidden */
+            hidden: boolean;
+            /** Id */
+            id: string;
+            /** W */
+            w: number;
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
         };
         /** DnsQueryEvent */
         DnsQueryEvent: {
@@ -1898,6 +1954,11 @@ export interface components {
             data: components["schemas"]["AttackTimelineDto"];
             meta: components["schemas"]["RequestMeta"];
         };
+        /** SuccessEnvelope[DashboardLayoutDto] */
+        SuccessEnvelope_DashboardLayoutDto_: {
+            data: components["schemas"]["DashboardLayoutDto"];
+            meta: components["schemas"]["RequestMeta"];
+        };
         /** SuccessEnvelope[DashboardSummaryDto] */
         SuccessEnvelope_DashboardSummaryDto_: {
             data: components["schemas"]["DashboardSummaryDto"];
@@ -2806,6 +2867,175 @@ export interface operations {
             };
             /** @description Authentication failed. */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description A required dependency is temporarily unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardLayoutsGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboardKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_DashboardLayoutDto_"];
+                };
+            };
+            /** @description Authentication failed. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description The requested resource was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description A required dependency is temporarily unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardLayoutsPut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboardKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardLayoutPutRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_DashboardLayoutDto_"];
+                };
+            };
+            /** @description Request validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication failed. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description The requested resource was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description The request conflicts with the current resource, identity, or Archive state. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description A required dependency is temporarily unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardLayoutsDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboardKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_DashboardLayoutDto_"];
+                };
+            };
+            /** @description Authentication failed. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description The requested resource was not found. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

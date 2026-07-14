@@ -18,7 +18,7 @@ from backend.main import create_app
 from backend.runtime import RuntimeServices
 from backend.settings import Settings
 from backend.storage.clickhouse import EventRepository
-from backend.storage.migrations import apply_clickhouse_file, apply_postgres_file
+from backend.storage.migrations import apply_clickhouse_file, apply_postgres_migrations
 from backend.workers import normalize_event
 
 ROOT = Path(__file__).parents[1]
@@ -97,13 +97,12 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
         aws_secret_access_key=settings.s3_secret_access_key.get_secret_value(),
         region_name="us-east-1",
     )
-    postgres_down = ROOT / "migrations/postgresql/0001_initial.down.sql"
-    postgres_up = ROOT / "migrations/postgresql/0001_initial.up.sql"
+    postgres_migrations = ROOT / "migrations/postgresql"
     clickhouse_down = ROOT / "migrations/clickhouse/0001_initial.down.sql"
     clickhouse_up = ROOT / "migrations/clickhouse/0001_initial.up.sql"
     with psycopg.connect(postgres_dsn) as connection:
-        apply_postgres_file(connection, postgres_down)
-        apply_postgres_file(connection, postgres_up)
+        apply_postgres_migrations(connection, postgres_migrations, direction="down")
+        apply_postgres_migrations(connection, postgres_migrations)
     apply_clickhouse_file(clickhouse, clickhouse_down)
     apply_clickhouse_file(clickhouse, clickhouse_up)
     try:
@@ -381,6 +380,74 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
             response = client.get(path, headers=_auth(admin_token))
             assert response.status_code == 200, response.text
 
+        default_layout = client.get("/api/v1/dashboard/layouts/overview", headers=_auth(admin_token))
+        assert default_layout.status_code == 200
+        assert default_layout.json()["data"]["isDefault"] is True
+        assert default_layout.json()["data"]["revision"] == 0
+        assert len(default_layout.json()["data"]["widgets"]) == 23
+        admin_widgets = default_layout.json()["data"]["widgets"]
+        admin_widgets[0]["hidden"] = True
+        saved_layout = client.put(
+            "/api/v1/dashboard/layouts/overview",
+            headers=_auth(admin_token),
+            json={"layoutVersion": 1, "revision": 0, "widgets": admin_widgets},
+        )
+        assert saved_layout.status_code == 200
+        assert saved_layout.json()["data"]["revision"] == 1
+        assert saved_layout.json()["data"]["widgets"][0]["hidden"] is True
+        admin_widgets = saved_layout.json()["data"]["widgets"]
+        admin_widgets[1]["hidden"] = True
+        updated_layout = client.put(
+            "/api/v1/dashboard/layouts/overview",
+            headers=_auth(admin_token),
+            json={"layoutVersion": 1, "revision": 1, "widgets": admin_widgets},
+        )
+        assert updated_layout.status_code == 200
+        assert updated_layout.json()["data"]["revision"] == 2
+        assert updated_layout.json()["data"]["widgets"][1]["hidden"] is True
+        admin_widgets = updated_layout.json()["data"]["widgets"]
+        viewer_layout = client.get("/api/v1/dashboard/layouts/overview", headers=_auth(viewer_token))
+        assert viewer_layout.status_code == 200
+        assert viewer_layout.json()["data"]["isDefault"] is True
+        assert viewer_layout.json()["data"]["widgets"][0]["hidden"] is False
+
+        duplicate_widgets = list(admin_widgets) + [dict(admin_widgets[0])]
+        invalid_cases = (
+            [dict(widget, id="unknown-widget") if index == 0 else widget for index, widget in enumerate(admin_widgets)],
+            duplicate_widgets,
+            [dict(widget, w=5) if widget["id"] == "event-volume" else widget for widget in admin_widgets],
+            [dict(widget, x=12) if widget["id"] == "kpi-events" else widget for widget in admin_widgets],
+        )
+        for widgets in invalid_cases:
+            invalid = client.put(
+                "/api/v1/dashboard/layouts/overview",
+                headers=_auth(admin_token),
+                json={"layoutVersion": 1, "revision": 2, "widgets": widgets},
+            )
+            assert invalid.status_code == 400, invalid.text
+            assert invalid.json()["error"]["code"] == "INVALID_DASHBOARD_LAYOUT"
+
+        conflict = client.put(
+            "/api/v1/dashboard/layouts/overview",
+            headers=_auth(admin_token),
+            json={"layoutVersion": 1, "revision": 0, "widgets": admin_widgets},
+        )
+        assert conflict.status_code == 409
+        assert conflict.json()["error"]["code"] == "DASHBOARD_LAYOUT_REVISION_CONFLICT"
+        with psycopg.connect(postgres_dsn) as connection:
+            connection.execute(
+                "UPDATE user_dashboard_layouts SET layout_json = '[{\"broken\":true}]'::jsonb WHERE user_id = 1"
+            )
+            connection.commit()
+        recovered = client.get("/api/v1/dashboard/layouts/overview", headers=_auth(admin_token))
+        assert recovered.status_code == 200
+        assert recovered.json()["data"]["isDefault"] is True
+        assert len(recovered.json()["data"]["widgets"]) == 23
+        reset_layout = client.delete("/api/v1/dashboard/layouts/overview", headers=_auth(admin_token))
+        assert reset_layout.status_code == 200
+        assert reset_layout.json()["data"]["isDefault"] is True
+        assert client.delete("/api/v1/dashboard/layouts/overview", headers=_auth(admin_token)).status_code == 200
+
         restored_restore = client.post(
             "/api/v1/archives/restores",
             headers=_auth(admin_token),
@@ -455,10 +522,14 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
         assert empty_dashboard["events"]["totalCount"] == 0
         assert empty_dashboard["alerts"]["bySeverity"] == []
         assert empty_endpoints["risk"]["highestScore"] is None
-        assert empty_ingest["events"] == {"ingestedCount": 0, "latestIngestedAt": None}
+        assert empty_ingest["events"] == {
+            "ingestedCount": 0,
+            "latestIngestedAt": None,
+            "ratePerMinute": 0.0,
+        }
     finally:
         with psycopg.connect(postgres_dsn) as connection:
-            apply_postgres_file(connection, postgres_down)
+            apply_postgres_migrations(connection, postgres_migrations, direction="down")
         apply_clickhouse_file(clickhouse, clickhouse_down)
         for item in s3.list_objects_v2(Bucket=settings.s3_bucket).get("Contents", []):
             s3.delete_object(Bucket=settings.s3_bucket, Key=item["Key"])

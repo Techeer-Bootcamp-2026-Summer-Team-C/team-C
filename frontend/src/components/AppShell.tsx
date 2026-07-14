@@ -34,7 +34,7 @@ export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const [compact, setCompact] = useState(() => localStorage.getItem(COMPACT_KEY) !== "false");
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [compactNavOpen, setCompactNavOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
   const pageTitle = NAVIGATION.find((item) =>
@@ -66,7 +66,7 @@ export function AppShell() {
   return (
     <div className={compact ? "app-shell compact" : "app-shell"}>
       <a className="skip-link" href="#main-content">Skip to content</a>
-      <aside className={mobileOpen ? "nav-rail mobile-open" : "nav-rail"}>
+      <aside className={compactNavOpen ? "nav-rail compact-nav-open" : "nav-rail"}>
         <div className="brand-mark" aria-label="EDR Console">EC</div>
         <nav aria-label="Primary navigation">
           {NAVIGATION.map(({ to, label, icon: Icon, end }) => (
@@ -75,7 +75,7 @@ export function AppShell() {
               className={({ isActive }) => (isActive ? "nav-item active" : "nav-item")}
               end={end}
               key={to}
-              onClick={() => setMobileOpen(false)}
+              onClick={() => setCompactNavOpen(false)}
               title={label}
               to={to}
             >
@@ -92,10 +92,10 @@ export function AppShell() {
       <section className="console-shell">
         <header className="top-bar">
           <button
-            aria-expanded={mobileOpen}
+            aria-expanded={compactNavOpen}
             aria-label="Toggle navigation"
-            className="mobile-menu"
-            onClick={() => setMobileOpen((current) => !current)}
+            className="compact-nav-menu"
+            onClick={() => setCompactNavOpen((current) => !current)}
             type="button"
           >
             <Menu aria-hidden="true" size={20} />

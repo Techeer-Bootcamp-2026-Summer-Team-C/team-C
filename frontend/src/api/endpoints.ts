@@ -35,6 +35,7 @@ import type {
   TopologyQuery,
 } from "../contracts";
 import { apiRequest, buildQuery } from "./client";
+import type { DashboardLayoutPutRequest, DashboardLayoutResponse } from "../features/dashboardLayout";
 
 type QueryRecord = Record<string, string | number | readonly number[] | undefined | null>;
 
@@ -88,6 +89,25 @@ export const api = {
   },
   dashboard(query: DashboardSummaryQuery, signal?: AbortSignal): Promise<SuccessEnvelope<DashboardSummaryDto>> {
     return apiRequest(`/dashboard/summary${buildQuery(queryRecord(query))}`, {}, signal);
+  },
+  dashboardLayout(dashboardKey: string, signal?: AbortSignal): Promise<SuccessEnvelope<DashboardLayoutResponse>> {
+    return apiRequest(`/dashboard/layouts/${encodeURIComponent(dashboardKey)}`, {}, signal);
+  },
+  saveDashboardLayout(
+    dashboardKey: string,
+    body: DashboardLayoutPutRequest,
+    signal?: AbortSignal,
+  ): Promise<SuccessEnvelope<DashboardLayoutResponse>> {
+    return apiRequest(`/dashboard/layouts/${encodeURIComponent(dashboardKey)}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }, signal);
+  },
+  resetDashboardLayout(
+    dashboardKey: string,
+    signal?: AbortSignal,
+  ): Promise<SuccessEnvelope<DashboardLayoutResponse>> {
+    return apiRequest(`/dashboard/layouts/${encodeURIComponent(dashboardKey)}`, { method: "DELETE" }, signal);
   },
   endpointSummary(query: DashboardTimeQuery, signal?: AbortSignal): Promise<SuccessEnvelope<EndpointSummaryDto>> {
     return apiRequest(`/dashboard/endpoints/summary${buildQuery(queryRecord(query))}`, {}, signal);

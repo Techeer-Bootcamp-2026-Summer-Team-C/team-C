@@ -161,14 +161,16 @@ def _initialize() -> None:
     from backend.auth import hash_password
     from backend.kafka import ensure_topics
     from backend.settings import get_settings
-    from backend.storage.migrations import apply_clickhouse_file, apply_postgres_file
+    from backend.storage.migrations import apply_clickhouse_file, apply_postgres_file, apply_postgres_migrations
     from backend.storage.postgres import UserRepository
 
     settings = get_settings()
     with psycopg.connect(settings.postgres_dsn.get_secret_value()) as connection:
         exists = connection.execute("SELECT to_regclass('public.users')").fetchone()[0]
         if exists is None:
-            apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.up.sql")
+            apply_postgres_migrations(connection, ROOT / "migrations/postgresql")
+        elif connection.execute("SELECT to_regclass('public.user_dashboard_layouts')").fetchone()[0] is None:
+            apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_user_dashboard_layouts.up.sql")
         credentials = _ensure_credentials()
         existing_admin = connection.execute(
             "SELECT 1 FROM users WHERE LOWER(email)=LOWER(%s) AND is_delete=FALSE", (credentials["email"],)

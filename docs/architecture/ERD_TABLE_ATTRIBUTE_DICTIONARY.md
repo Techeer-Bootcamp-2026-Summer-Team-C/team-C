@@ -2,7 +2,7 @@
 
 ## 1. 문서 목적
 
-이 문서는 ERDCloud 업로드 파일 `ERD_FINAL.sql`과 `ERD_FINAL_NO_COMMENTS.sql`의 11개 테이블·192개 속성을 설명하는 데이터 사전이다. ERDCloud DDL은 importer 호환을 위해 MySQL 계열 타입으로 표현하지만, 아래 속성 표의 타입은 실제 실행 저장소인 SQLite, PostgreSQL, ClickHouse 타입을 기준으로 한다.
+이 문서는 ERDCloud 업로드 파일 `ERD_FINAL.sql`과 `ERD_FINAL_NO_COMMENTS.sql`의 12개 테이블·200개 속성을 설명하는 데이터 사전이다. ERDCloud DDL은 importer 호환을 위해 MySQL 계열 타입으로 표현하지만, 아래 속성 표의 타입은 실제 실행 저장소인 SQLite, PostgreSQL, ClickHouse 타입을 기준으로 한다.
 
 ## 2. 전체 테이블 구성
 
@@ -19,9 +19,10 @@
 | PostgreSQL | `incidents` | 15 | 시간 구간 기반 Alert correlation |
 | PostgreSQL | `incident_alerts` | 7 | Incident와 Alert의 N:M 연결 |
 | PostgreSQL | `users` | 10 | Dashboard 로그인과 RBAC |
-| **합계** | **11개** | **192** | |
+| PostgreSQL | `user_dashboard_layouts` | 8 | JWT 사용자별 Dashboard 위젯 layout |
+| **합계** | **12개** | **200** | |
 
-관계의 중심은 `endpoints → alerts → incident_alerts ← incidents`다. `agent_auth_keys`와 `ingest_metadata`는 `endpoints`를 참조한다. SQLite와 ClickHouse 테이블은 PostgreSQL과 저장소가 다르므로 물리 FK를 만들지 않고 ID로 논리 연결한다.
+관계의 중심은 `endpoints → alerts → incident_alerts ← incidents`다. `agent_auth_keys`와 `ingest_metadata`는 `endpoints`를, `user_dashboard_layouts`는 `users`를 참조한다. SQLite와 ClickHouse 테이블은 PostgreSQL과 저장소가 다르므로 물리 FK를 만들지 않고 ID로 논리 연결한다.
 
 ## 3. 테이블·속성 상세
 
@@ -204,7 +205,22 @@ HOT `storage_path`는 Endpoint별 ClickHouse 논리 조회 locator이고 S3 `sto
 | `updated_at` | `TIMESTAMPTZ` | 로그인 또는 계정 상태 마지막 갱신 시각 |
 | `is_delete` | `BOOLEAN` | 소프트 삭제 표시. 로그인은 `FALSE`만 허용 |
 
-### 3.9 `incident_alerts`
+### 3.9 `user_dashboard_layouts`
+
+목적: Overview 위젯의 데스크톱 12열 배치, 크기와 숨김 상태를 JWT 사용자별로 저장한다. `(user_id, dashboard_key)`는 unique이며 사용자는 request body나 query가 아니라 JWT `sub`로만 결정한다. `revision`은 오래된 화면의 PUT을 `409 DASHBOARD_LAYOUT_REVISION_CONFLICT`로 거부하는 낙관적 동시성 제어 값이다.
+
+| 컬럼 | 실제 PostgreSQL 타입 | 설명 |
+| --- | --- | --- |
+| `layout_id` | `BIGSERIAL` | Dashboard layout PK |
+| `user_id` | `BIGINT` | layout 소유자 `users.user_id` FK. 사용자 삭제 시 cascade |
+| `dashboard_key` | `VARCHAR(64)` | 현재 `overview`를 사용하는 Dashboard 화면 key |
+| `layout_version` | `INTEGER` | 위젯 registry와 layout JSON schema 버전 |
+| `revision` | `BIGINT` | 저장할 때마다 증가하는 낙관적 동시성 revision |
+| `layout_json` | `JSONB` | `{id,x,y,w,h,hidden}` 위젯 객체 배열 |
+| `created_at` | `TIMESTAMPTZ` | 최초 저장 시각 |
+| `updated_at` | `TIMESTAMPTZ` | 마지막 정상 저장 시각 |
+
+### 3.10 `incident_alerts`
 
 목적: Incident와 Alert의 N:M 관계를 저장한다. `(incident_id, alert_id)`는 unique이며 속성 수는 7개다.
 
@@ -218,7 +234,7 @@ HOT `storage_path`는 Endpoint별 ClickHouse 논리 조회 locator이고 S3 `sto
 | `updated_at` | `TIMESTAMPTZ` | 연결 행 마지막 갱신 시각 |
 | `is_delete` | `BOOLEAN` | 연결 소프트 삭제 표시 |
 
-### 3.10 `edr_events`
+### 3.11 `edr_events`
 
 목적: Process, Network, File, DNS, L7 metadata를 검색·집계한다. 속성 수는 44개다.
 
@@ -273,7 +289,7 @@ HOT `storage_path`는 Endpoint별 ClickHouse 논리 조회 locator이고 S3 `sto
 
 Event 조회, latest-row 선택과 `uniqExact(event_id)` 집계는 `is_delete=false` row만 사용한다. 요청 `[from, to)`와 겹치는 UTC DAY bucket은 `bucket_start_at < to AND bucket_end_at > from`으로 선택하고 실제 event는 원래 `[from, to)`로 다시 필터링한다.
 
-### 3.11 `alerts`
+### 3.12 `alerts`
 
 목적: Detection Worker가 생성한 탐지 결과와 MITRE ATT&CK mapping을 저장한다. 속성 수는 22개다. Alert의 `rule_name`, `title`, `summary`는 탐지 당시 RuleV1의 `rule_name`, `alert_title`, `alert_summary` 문자열을 그대로 snapshot한다. 모든 `enabled=true` RuleV1은 tactic/technique code가 필수이고 누락되거나 `mappings/mitre_attack.yaml`에 없으면 readiness를 실패시킨다. YAML에는 code만 저장하고 Backend가 고정 mapping에서 name을 변환하므로 MITRE code/name 4개 컬럼은 모두 NOT NULL이다. `(event_id, rule_code, rule_version)`은 unique이며 담당자 컬럼은 없다.
 
