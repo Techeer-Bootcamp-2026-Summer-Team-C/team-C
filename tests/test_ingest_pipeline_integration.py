@@ -17,7 +17,7 @@ from backend.main import create_app
 from backend.runtime import RuntimeServices
 from backend.settings import Settings
 from backend.storage.clickhouse import EventRepository, FailureRepository
-from backend.storage.migrations import apply_clickhouse_file, apply_postgres_file
+from backend.storage.migrations import apply_clickhouse_file, apply_postgres_migrations
 from backend.storage.postgres import AlertRepository, EndpointRepository, IncidentRepository, IngestMetadataRepository
 from backend.workers import DetectionWorker, EventStorageWorker, LifecycleTasks
 from tools.replay_failure import FailureNotFoundError, replay_failure
@@ -121,17 +121,12 @@ def test_actual_http_kafka_storage_detection_failure_and_replay_flow() -> None:
     except s3.exceptions.BucketAlreadyOwnedByYou:
         pass
 
-    postgres_down = ROOT / "migrations/postgresql/0001_initial.down.sql"
-    postgres_up = ROOT / "migrations/postgresql/0001_initial.up.sql"
-    postgres_login_id_up = ROOT / "migrations/postgresql/0002_user_login_id.up.sql"
-    postgres_user_locale_up = ROOT / "migrations/postgresql/0003_user_locale.up.sql"
+    postgres_migrations = ROOT / "migrations/postgresql"
     clickhouse_down = ROOT / "migrations/clickhouse/0001_initial.down.sql"
     clickhouse_up = ROOT / "migrations/clickhouse/0001_initial.up.sql"
     with psycopg.connect(postgres_dsn) as connection:
-        apply_postgres_file(connection, postgres_down)
-        apply_postgres_file(connection, postgres_up)
-        apply_postgres_file(connection, postgres_login_id_up)
-        apply_postgres_file(connection, postgres_user_locale_up)
+        apply_postgres_migrations(connection, postgres_migrations, direction="down")
+        apply_postgres_migrations(connection, postgres_migrations)
     apply_clickhouse_file(clickhouse, clickhouse_down)
     apply_clickhouse_file(clickhouse, clickhouse_up)
     admin = AdminClient({"bootstrap.servers": bootstrap})
@@ -410,7 +405,7 @@ def test_actual_http_kafka_storage_detection_failure_and_replay_flow() -> None:
         raw_consumer.close()
         detection_consumer.close()
         with psycopg.connect(postgres_dsn) as connection:
-            apply_postgres_file(connection, postgres_down)
+            apply_postgres_migrations(connection, postgres_migrations, direction="down")
         apply_clickhouse_file(clickhouse, clickhouse_down)
         response = s3.list_objects_v2(Bucket=s3_bucket)
         for item in response.get("Contents", []):

@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from math import ceil
 
 from .api_services import endpoint_dto
+from .contracts.alerts import ResponseGuidanceStepDto
 from .contracts.dashboard import (
     AlertStatusCountDto,
     DashboardAlertsDto,
@@ -30,6 +31,7 @@ from .contracts.dashboard import (
     MitreTacticCountDto,
     MitreTechniqueCountDto,
     OsTypeCountDto,
+    ResponseGuidanceSummaryDto,
     RiskLevelCountDto,
     SensorHealthCountDto,
     SeverityCountDto,
@@ -52,6 +54,7 @@ from .errors import ApplicationError
 from .event_service import EventService
 from .policy.edr_state import CollectionHealthInput, ThreatLevelInput, calculate_edr_state
 from .policy.risk import summarize_endpoint_risks
+from .rule_loader import LoadedRule
 from .storage.clickhouse import EventRepository, FailureRepository
 from .storage.postgres import AlertRepository, EndpointRepository, IncidentRepository, IngestMetadataRepository
 
@@ -67,6 +70,7 @@ class SummaryService:
         events: EventRepository,
         failures: FailureRepository,
         event_service: EventService,
+        rules: list[LoadedRule] | None = None,
     ) -> None:
         self.endpoints = endpoints
         self.alerts = alerts
@@ -75,6 +79,7 @@ class SummaryService:
         self.events = events
         self.failures = failures
         self.event_service = event_service
+        self.rules = {(item.rule.rule_code, item.rule.version): item for item in (rules or [])}
 
     def dashboard(
         self,
@@ -198,6 +203,7 @@ class SummaryService:
                 by_class=_string_counts(storage_rows, "storage_class", StorageClassCountDto, "storage_class"),
                 by_status=_string_counts(storage_rows, "storage_status", StorageStatusCountDto, "storage_status"),
             ),
+            response_guidance=self._response_guidance(alert_rows),
         )
 
     def endpoint_summary(self, *, from_: datetime, to: datetime, calculated_at: datetime) -> EndpointSummaryDto:
@@ -247,11 +253,17 @@ class SummaryService:
         event_count, latest_ingested_at = self.events.ingest_summary(from_=from_, to=to)
         failures = self.failures.current_rows(from_=from_, to=to)
         storage = self.metadata.all_current()
+        duration_minutes = max((to - from_).total_seconds() / 60, 1 / 60)
         return IngestSummaryDto(
             time_range=TimeRangeDto(from_=from_, to=to),
-            events=IngestEventsDto(ingested_count=event_count, latest_ingested_at=_aware(latest_ingested_at)),
+            events=IngestEventsDto(
+                ingested_count=event_count,
+                rate_per_minute=event_count / duration_minutes,
+                latest_ingested_at=_aware(latest_ingested_at),
+            ),
             event_failures=IngestEventFailuresDto(
                 failed_count=sum(row["status"] == "FAILED" for row in failures),
+                rate_per_minute=len(failures) / duration_minutes,
                 reprocessed_count=sum(row["status"] == "REPROCESSED" for row in failures),
                 reprocess_failed_count=sum(row["status"] == "REPROCESS_FAILED" for row in failures),
                 oldest_failed_at=min(
@@ -267,6 +279,39 @@ class SummaryService:
                 failed_bucket_count=_storage_count(storage, "S3", "RESTORE_FAILED"),
                 expired_bucket_count=_storage_count(storage, "S3", "EXPIRED"),
             ),
+        )
+
+    def _response_guidance(self, alert_rows) -> ResponseGuidanceSummaryDto:
+        active = [row for row in alert_rows if str(row["status"]) in {"OPEN", "IN_PROGRESS"}]
+        identities = {(str(row["rule_code"]), int(row["rule_version"])) for row in active}
+        candidates: list[tuple[int, int, object]] = []
+        severity_rank = {Severity.LOW: 0, Severity.MEDIUM: 1, Severity.HIGH: 2, Severity.CRITICAL: 3}
+        for identity in identities:
+            loaded = self.rules.get(identity)
+            if loaded is None:
+                continue
+            rank = severity_rank[loaded.rule.severity]
+            for step in loaded.rule.response_guidance:
+                candidates.append((rank, step.order, step))
+        candidates.sort(key=lambda item: (-item[0], item[1], item[2].title))
+        seen: set[tuple[str, str, bool]] = set()
+        steps: list[ResponseGuidanceStepDto] = []
+        manual_action_count = 0
+        for _rank, _order, step in candidates:
+            key = (step.title, step.description, step.requires_manual_action)
+            if key in seen:
+                continue
+            seen.add(key)
+            manual_action_count += int(step.requires_manual_action)
+            if len(steps) < 8:
+                steps.append(ResponseGuidanceStepDto.model_validate(step.model_dump()))
+        highest = max((Severity(str(row["severity"])) for row in active), key=severity_rank.get, default=None)
+        return ResponseGuidanceSummaryDto(
+            affected_alert_count=len(active),
+            rule_count=len(identities),
+            manual_action_step_count=manual_action_count,
+            highest_severity=highest,
+            steps=steps,
         )
 
     def _endpoint_items(self, calculated_at: datetime):

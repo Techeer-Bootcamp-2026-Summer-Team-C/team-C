@@ -26,10 +26,13 @@ from .contracts.collector import (
 )
 from .contracts.common import ErrorBody, ErrorDetail, ErrorEnvelope, PagedData, RequestMeta, SuccessEnvelope
 from .contracts.dashboard import DashboardSummaryDto, EndpointSummaryDto, IngestSummaryDto
+from .contracts.dashboard_layouts import DashboardLayoutDto, DashboardLayoutPutRequest
 from .contracts.endpoints import EndpointDetailDto, EndpointDto
 from .contracts.enums import DashboardInterval, UserLocale, UserRole, UserStatus
-from .contracts.events import EventDetailDto, EventDto
+from .contracts.events import EventDetailDto, EventDto, ProcessTreeDto
 from .contracts.incidents import IncidentDetailDto, IncidentDto
+from .contracts.investigations import AttackTimelineDto, EgressTopologyDto, EventFailureDto
+from .contracts.operations import OperationsHealthDto
 from .contracts.requests import (
     AlertListQuery,
     ArchiveRestoreListQuery,
@@ -38,16 +41,23 @@ from .contracts.requests import (
     EndpointListQuery,
     EventDetailQuery,
     EventListQuery,
+    FailureListQuery,
     IncidentListQuery,
+    ProcessTreeQuery,
+    TopologyQuery,
 )
+from .dashboard_layouts import DashboardLayoutService
 from .errors import ApplicationError, RequestValidationError, ServiceUnavailableError
 from .event_service import EventService
+from .investigation_service import FailureService, InvestigationService
+from .operations_service import OperationsHealthService
 from .runtime import RuntimeServices
 from .settings import get_settings
 from .storage.clickhouse import EventRepository, FailureRepository
 from .storage.models import AgentCertificateIdentity
 from .storage.postgres import (
     AlertRepository,
+    DashboardLayoutRepository,
     EndpointRepository,
     IncidentRepository,
     IngestMetadataRepository,
@@ -65,6 +75,7 @@ OPENAPI_TAGS = [
     {"name": "Alerts", "description": "RuleV1 detections and Alert workflow state."},
     {"name": "Incidents", "description": "Read-only correlated Incident views."},
     {"name": "Dashboard", "description": "Backend-calculated security and collection summaries."},
+    {"name": "Operations", "description": "Live dependency and pipeline worker health."},
     {"name": "Collector", "description": "mTLS-authenticated Agent registration and telemetry ingest."},
 ]
 
@@ -279,6 +290,30 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         return _success(request, data)
 
     @app.get(
+        "/api/v1/endpoints/{endpointId}/process-tree",
+        response_model=SuccessEnvelope[ProcessTreeDto],
+        operation_id="endpointsGetProcessTree",
+        tags=["Endpoints"],
+        responses=_error_responses(400, 401, 503),
+    )
+    def endpoint_process_tree(
+        endpointId: int,
+        request: Request,
+        query: Annotated[ProcessTreeQuery, Query()],
+        _user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[ProcessTreeDto]:
+        runtime = _runtime(request)
+        from_, to = resolve_time_range(query, now=datetime.now(UTC))
+        with runtime.postgres() as connection:
+            data = _investigation_service(runtime, connection).process_tree(
+                endpointId,
+                from_=from_,
+                to=to,
+                selected_pid=query.selected_pid,
+            )
+        return _success(request, data)
+
+    @app.get(
         "/api/v1/events",
         response_model=SuccessEnvelope[PagedData[EventDto]],
         operation_id="eventsList",
@@ -316,6 +351,23 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
             )
         if data is None:
             raise ApplicationError(404, "NOT_FOUND", "Event was not found.")
+        return _success(request, data)
+
+    @app.get(
+        "/api/v1/failures",
+        response_model=SuccessEnvelope[PagedData[EventFailureDto]],
+        operation_id="failuresList",
+        tags=["Operations"],
+        responses=_error_responses(400, 401, 503),
+    )
+    def failures(
+        request: Request,
+        query: Annotated[FailureListQuery, Query()],
+        _user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[PagedData[EventFailureDto]]:
+        runtime = _runtime(request)
+        from_, to = resolve_time_range(query, now=datetime.now(UTC))
+        data = FailureService(FailureRepository(runtime.clickhouse)).list(query, from_=from_, to=to)
         return _success(request, data)
 
     @app.post(
@@ -469,6 +521,23 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         return _success(request, data)
 
     @app.get(
+        "/api/v1/incidents/{incidentId}/timeline",
+        response_model=SuccessEnvelope[AttackTimelineDto],
+        operation_id="incidentsGetTimeline",
+        tags=["Incidents"],
+        responses=_error_responses(400, 401, 404, 503),
+    )
+    def incident_timeline(
+        incidentId: int,
+        request: Request,
+        _user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[AttackTimelineDto]:
+        runtime = _runtime(request)
+        with runtime.postgres() as connection:
+            data = _investigation_service(runtime, connection).timeline(incidentId)
+        return _success(request, data)
+
+    @app.get(
         "/api/v1/dashboard/summary",
         response_model=SuccessEnvelope[DashboardSummaryDto],
         operation_id="dashboardGetSummary",
@@ -526,6 +595,105 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         from_, to = resolve_time_range(query, now=datetime.now(UTC))
         with runtime.postgres() as connection:
             data = _summary_service(runtime, connection).ingest_summary(from_=from_, to=to)
+        return _success(request, data)
+
+    @app.get(
+        "/api/v1/dashboard/layouts/{dashboardKey}",
+        response_model=SuccessEnvelope[DashboardLayoutDto],
+        operation_id="dashboardLayoutsGet",
+        tags=["Dashboard"],
+        responses=_error_responses(401, 404, 503),
+    )
+    def dashboard_layout_get(
+        request: Request,
+        dashboardKey: str,
+        user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[DashboardLayoutDto]:
+        runtime = _runtime(request)
+        with runtime.postgres() as connection:
+            data = DashboardLayoutService(DashboardLayoutRepository(connection)).get(
+                user_id=user.user_id, dashboard_key=dashboardKey
+            )
+        return _success(request, data)
+
+    @app.put(
+        "/api/v1/dashboard/layouts/{dashboardKey}",
+        response_model=SuccessEnvelope[DashboardLayoutDto],
+        operation_id="dashboardLayoutsPut",
+        tags=["Dashboard"],
+        responses=_error_responses(400, 401, 404, 409, 503),
+    )
+    def dashboard_layout_put(
+        request: Request,
+        dashboardKey: str,
+        body: DashboardLayoutPutRequest,
+        user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[DashboardLayoutDto]:
+        runtime = _runtime(request)
+        with runtime.postgres() as connection:
+            data = DashboardLayoutService(DashboardLayoutRepository(connection)).put(
+                user_id=user.user_id,
+                dashboard_key=dashboardKey,
+                body=body,
+                now=datetime.now(UTC),
+            )
+        return _success(request, data)
+
+    @app.delete(
+        "/api/v1/dashboard/layouts/{dashboardKey}",
+        response_model=SuccessEnvelope[DashboardLayoutDto],
+        operation_id="dashboardLayoutsDelete",
+        tags=["Dashboard"],
+        responses=_error_responses(401, 404, 503),
+    )
+    def dashboard_layout_delete(
+        request: Request,
+        dashboardKey: str,
+        user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[DashboardLayoutDto]:
+        runtime = _runtime(request)
+        with runtime.postgres() as connection:
+            data = DashboardLayoutService(DashboardLayoutRepository(connection)).delete(
+                user_id=user.user_id, dashboard_key=dashboardKey
+            )
+        return _success(request, data)
+
+    @app.get(
+        "/api/v1/dashboard/topology",
+        response_model=SuccessEnvelope[EgressTopologyDto],
+        operation_id="dashboardGetTopology",
+        tags=["Dashboard"],
+        responses=_error_responses(400, 401, 503),
+    )
+    def dashboard_topology(
+        request: Request,
+        query: Annotated[TopologyQuery, Query()],
+        _user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[EgressTopologyDto]:
+        runtime = _runtime(request)
+        calculated_at = datetime.now(UTC)
+        from_, to = resolve_time_range(query, now=calculated_at)
+        with runtime.postgres() as connection:
+            data = _investigation_service(runtime, connection).topology(
+                from_=from_,
+                to=to,
+                endpoint_ids=query.endpoint_ids,
+                calculated_at=calculated_at,
+            )
+        return _success(request, data)
+
+    @app.get(
+        "/api/v1/operations/health",
+        response_model=SuccessEnvelope[OperationsHealthDto],
+        operation_id="operationsGetHealth",
+        tags=["Operations"],
+        responses=_error_responses(401),
+    )
+    def operations_health(
+        request: Request,
+        _user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[OperationsHealthDto]:
+        data = OperationsHealthService(_runtime(request)).snapshot(checked_at=datetime.now(UTC))
         return _success(request, data)
 
     @app.post(
@@ -695,6 +863,16 @@ def _summary_service(runtime: RuntimeServices, connection) -> SummaryService:
         events=EventRepository(runtime.clickhouse),
         failures=FailureRepository(runtime.clickhouse),
         event_service=_event_service(runtime, connection),
+        rules=runtime.rules,
+    )
+
+
+def _investigation_service(runtime: RuntimeServices, connection) -> InvestigationService:
+    return InvestigationService(
+        endpoints=EndpointRepository(connection),
+        alerts=AlertRepository(connection),
+        incidents=IncidentRepository(connection),
+        events=_event_service(runtime, connection),
     )
 
 

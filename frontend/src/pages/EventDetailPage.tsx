@@ -1,11 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { api } from "../api/endpoints";
+import { ProcessTree } from "../components/ProcessTree";
 import { DefinitionGrid, EmptyState, ErrorState, PageHeader, Panel, Skeleton, StatusPill } from "../components/ui";
 import { displayNullable, formatDateTime } from "../lib/format";
 import { useI18n } from "../i18n/LocaleContext";
+import { processTreeWindow } from "../features/processTree";
 import { validEventDetailQuery } from "../lib/url";
 
 export function EventDetailPage() {
@@ -16,17 +19,33 @@ export function EventDetailPage() {
   const endpointId = Number(params.get("endpointId"));
   const occurredAt = params.get("occurredAt") ?? "";
   const result = useQuery({ queryKey: ["event", eventId, endpointId, occurredAt], queryFn: ({ signal }) => api.event(eventId, { endpointId, occurredAt }, signal), enabled: valid });
+  const event = result.data?.data;
+  const treeWindow = event ? processTreeWindow(event.occurredAt) : null;
+  const treeResult = useQuery({
+    queryKey: ["process-tree", event?.endpointId, treeWindow?.from, treeWindow?.to],
+    queryFn: ({ signal }) => api.processTree(event!.endpointId, {
+      timePreset: "CUSTOM",
+      from: treeWindow!.from,
+      to: treeWindow!.to,
+      ...(event!.pid !== null ? { selectedPid: event!.pid } : {}),
+    }, signal),
+    enabled: Boolean(event && treeWindow),
+  });
   const archiveNotReady = result.error instanceof ApiError && result.error.code === "ARCHIVE_NOT_READY";
   if (!valid) return <div className="page-stack"><Link className="back-link" to="/events"><ArrowLeft aria-hidden="true" size={15} />{t("events.stream")}</Link><EmptyState title={t("event.routingMissing")} message={t("event.routingDescription")} /><Link className="button" to="/events">{t("event.return")}</Link></div>;
   return <div className="page-stack">
     <Link className="back-link" to="/events"><ArrowLeft aria-hidden="true" size={15} />{t("events.stream")}</Link>
     {result.isPending ? <Skeleton rows={12} /> : null}
     {result.error ? <ErrorState archiveAction={archiveNotReady} error={result.error} {...(!archiveNotReady ? { onRetry: () => void result.refetch() } : {})} /> : null}
-    {result.data ? <EventDetail event={result.data.data} /> : null}
+    {result.data ? <EventDetail event={result.data.data} processTree={
+      treeResult.isPending ? <Skeleton rows={5} />
+        : treeResult.error ? <ErrorState error={treeResult.error} onRetry={() => void treeResult.refetch()} />
+          : treeResult.data ? <ProcessTree nodes={treeResult.data.data.nodes} /> : null
+    } /> : null}
   </div>;
 }
 
-function EventDetail({ event }: { event: import("../contracts").EventDetailDto }) {
+function EventDetail({ event, processTree }: { event: import("../contracts").EventDetailDto; processTree: ReactNode }) {
   const { locale, t } = useI18n();
   const fields = [
     ["Event ID", <code>{event.eventId}</code>], [t("event.batchId"), <code>{event.batchId}</code>],
@@ -46,6 +65,7 @@ function EventDetail({ event }: { event: import("../contracts").EventDetailDto }
     <section className="detail-grid">
       <Panel className="wide" title={t("event.normalized")} subtitle={t("event.normalizedSubtitle")}><DefinitionGrid items={fields.map(([label, value]) => ({ label, value }))} /></Panel>
       <Panel title={t("event.payloadIdentity")} subtitle={t("event.payloadSubtitle")}><DefinitionGrid items={[{ label: t("event.payloadSha"), value: <code>{event.payloadSha256}</code> }, { label: t("event.schemaVersion"), value: event.schemaVersion }]} /></Panel>
+      <Panel className="wide" title={t("event.processTree")} subtitle={t("event.processTreeSubtitle")} meta={<StatusPill value="READ ONLY" />}>{processTree}</Panel>
       <Panel className="wide" title={t("event.rawPayload")} subtitle={t("event.rawPayloadSubtitle")}><pre className="json-view">{JSON.stringify(event.rawPayload, null, 2)}</pre></Panel>
     </section>
   </>;

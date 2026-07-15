@@ -10,6 +10,7 @@ import { EventDetailPage } from "./pages/EventDetailPage";
 import { EventsPage } from "./pages/EventsPage";
 import { IncidentDetailPage } from "./pages/IncidentDetailPage";
 import { IncidentsPage } from "./pages/IncidentsPage";
+import { IntelligencePage } from "./pages/IntelligencePage";
 import { LoginPage } from "./pages/LoginPage";
 import { OperationsPage } from "./pages/OperationsPage";
 import { OverviewPage } from "./pages/OverviewPage";
@@ -27,6 +28,7 @@ export function App() {
       <Route path="endpoints/:endpointId" element={<EndpointDetailPage />} />
       <Route path="events" element={<EventsPage />} />
       <Route path="events/:eventId" element={<EventDetailPage />} />
+      <Route path="intelligence" element={<IntelligencePage />} />
       <Route path="operations" element={<OperationsPage />} />
       <Route path="operations/archives" element={<ArchivesPage />} />
     </Route>

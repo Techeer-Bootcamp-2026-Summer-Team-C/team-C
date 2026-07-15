@@ -10,7 +10,7 @@ import pytest
 
 from backend.contracts.enums import AlertStatus, OsType, Severity, StorageBackend, StorageClass, StorageStatus
 from backend.storage.clickhouse import EventRepository, FailureRepository
-from backend.storage.migrations import apply_clickhouse_file, apply_postgres_file
+from backend.storage.migrations import apply_clickhouse_file, apply_postgres_file, apply_postgres_migrations
 from backend.storage.models import AlertInsert, EndpointInsert, IncidentInsert, IngestBucket
 from backend.storage.postgres import AlertRepository, EndpointRepository, IncidentRepository, IngestMetadataRepository
 
@@ -25,7 +25,7 @@ def test_postgresql_migration_repository_idempotency_and_rollback() -> None:
     dsn = os.environ["TEST_POSTGRES_DSN"]
     now = datetime(2026, 7, 12, tzinfo=UTC)
     with psycopg.connect(dsn) as connection:
-        apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.down.sql")
+        apply_postgres_migrations(connection, ROOT / "migrations/postgresql", direction="down")
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.up.sql")
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_user_login_id.up.sql")
         connection.execute(
@@ -41,6 +41,7 @@ def test_postgresql_migration_repository_idempotency_and_rollback() -> None:
         with pytest.raises(psycopg.errors.CheckViolation):
             with connection.transaction():
                 connection.execute("UPDATE users SET locale = 'JA' WHERE login_id = 'migration-user'")
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0004_user_dashboard_layouts.up.sql")
         column = connection.execute(
             """
             SELECT data_type, character_maximum_length
@@ -192,9 +193,7 @@ def test_postgresql_migration_repository_idempotency_and_rollback() -> None:
             assert alerts.active_for_endpoint(endpoint_id) == []
             assert incidents.close_expired(now + timedelta(hours=1)) == 1
         finally:
-            apply_postgres_file(connection, ROOT / "migrations/postgresql/0003_user_locale.down.sql")
-            apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_user_login_id.down.sql")
-            apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.down.sql")
+            apply_postgres_migrations(connection, ROOT / "migrations/postgresql", direction="down")
 
 
 def test_clickhouse_migration_event_repository_and_rollback() -> None:

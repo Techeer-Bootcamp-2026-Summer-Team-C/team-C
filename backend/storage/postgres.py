@@ -170,6 +170,103 @@ class UserRepository:
         return UserRole(row[0]), UserStatus(row[1])
 
 
+class DashboardLayoutRepository:
+    def __init__(self, connection: Connection[Any]) -> None:
+        self.connection = connection
+
+    def get(self, user_id: int, dashboard_key: str) -> dict[str, Any] | None:
+        with self.connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """
+                SELECT layout_id, user_id, dashboard_key, layout_version, revision, layout_json,
+                       created_at, updated_at
+                FROM user_dashboard_layouts
+                WHERE user_id = %s AND dashboard_key = %s
+                """,
+                (user_id, dashboard_key),
+            )
+            row = cursor.fetchone()
+        return dict(row) if row is not None else None
+
+    def upsert(
+        self,
+        *,
+        user_id: int,
+        dashboard_key: str,
+        layout_version: int,
+        expected_revision: int,
+        widgets: list[dict[str, object]],
+        now: datetime,
+    ) -> int | None:
+        try:
+            row = self.connection.execute(
+                """
+                WITH input (
+                    user_id, dashboard_key, layout_version, expected_revision, layout_json, changed_at
+                ) AS (
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                ), updated AS (
+                    UPDATE user_dashboard_layouts AS stored
+                    SET layout_version = input.layout_version,
+                        revision = stored.revision + 1,
+                        layout_json = input.layout_json,
+                        updated_at = input.changed_at
+                    FROM input
+                    WHERE stored.user_id = input.user_id
+                      AND stored.dashboard_key = input.dashboard_key
+                      AND stored.revision = input.expected_revision
+                    RETURNING stored.revision
+                ), inserted AS (
+                    INSERT INTO user_dashboard_layouts (
+                        user_id, dashboard_key, layout_version, revision, layout_json, created_at, updated_at
+                    )
+                    SELECT input.user_id, input.dashboard_key, input.layout_version, 1,
+                           input.layout_json, input.changed_at, input.changed_at
+                    FROM input
+                    WHERE input.expected_revision = 0
+                      AND NOT EXISTS (
+                          SELECT 1 FROM user_dashboard_layouts AS stored
+                          WHERE stored.user_id = input.user_id
+                            AND stored.dashboard_key = input.dashboard_key
+                      )
+                    ON CONFLICT (user_id, dashboard_key) DO NOTHING
+                    RETURNING revision
+                )
+                SELECT revision FROM updated
+                UNION ALL
+                SELECT revision FROM inserted
+                LIMIT 1
+                """,
+                (
+                    user_id,
+                    dashboard_key,
+                    layout_version,
+                    expected_revision,
+                    Jsonb(widgets),
+                    now,
+                ),
+            ).fetchone()
+            if row is None:
+                self.connection.rollback()
+                return None
+            self.connection.commit()
+            return int(row[0])
+        except Exception:
+            self.connection.rollback()
+            raise
+
+    def delete(self, user_id: int, dashboard_key: str) -> None:
+        try:
+            self.connection.execute(
+                "DELETE FROM user_dashboard_layouts WHERE user_id = %s AND dashboard_key = %s",
+                (user_id, dashboard_key),
+            )
+            self.connection.commit()
+        except Exception:
+            self.connection.rollback()
+            raise
+
+
 class EndpointRepository:
     def __init__(self, connection: Connection[Any]) -> None:
         self.connection = connection
@@ -438,6 +535,7 @@ class EndpointRepository:
     def risk_snapshot(
         self,
         *,
+        endpoint_ids: Sequence[int] | None = None,
         status: str | None = None,
         os_type: OsType | None = None,
     ) -> list[dict[str, Any]]:
@@ -470,10 +568,18 @@ class EndpointRepository:
                 LEFT JOIN active_alerts a ON a.endpoint_id = e.endpoint_id
                 LEFT JOIN open_incidents i ON i.endpoint_id = e.endpoint_id
                 WHERE e.is_delete = FALSE
+                  AND (%s::bigint[] IS NULL OR e.endpoint_id = ANY(%s::bigint[]))
                   AND (%s::text IS NULL OR e.status = %s::text)
                   AND (%s::text IS NULL OR e.os_type = %s::text)
                 """,
-                (status, status, os_type.value if os_type else None, os_type.value if os_type else None),
+                (
+                    list(endpoint_ids) if endpoint_ids else None,
+                    list(endpoint_ids) if endpoint_ids else None,
+                    status,
+                    status,
+                    os_type.value if os_type else None,
+                    os_type.value if os_type else None,
+                ),
             )
             return [dict(row) for row in cursor.fetchall()]
 

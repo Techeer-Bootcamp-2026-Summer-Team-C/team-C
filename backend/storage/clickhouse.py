@@ -298,7 +298,16 @@ class FailureRepository:
         updated["updated_at"] = replayed_at
         self.insert([updated])
 
-    def current_rows(self, *, from_: datetime | None = None, to: datetime | None = None) -> list[JsonObject]:
+    def current_rows(
+        self,
+        *,
+        from_: datetime | None = None,
+        to: datetime | None = None,
+        status: str | None = None,
+        failure_stage: str | None = None,
+        retryable: bool | None = None,
+        sort_order: Literal["asc", "desc"] = "desc",
+    ) -> list[JsonObject]:
         conditions: list[str] = []
         parameters: dict[str, Any] = {}
         if from_ is not None:
@@ -307,9 +316,19 @@ class FailureRepository:
         if to is not None:
             conditions.append("failed_at < {to:DateTime64(3)}")
             parameters["to"] = to
+        if status is not None:
+            conditions.append("status = {status:String}")
+            parameters["status"] = status
+        if failure_stage is not None:
+            conditions.append("failure_stage = {failure_stage:String}")
+            parameters["failure_stage"] = failure_stage
+        if retryable is not None:
+            conditions.append("retryable = {retryable:Bool}")
+            parameters["retryable"] = retryable
         where = " WHERE " + " AND ".join(conditions) if conditions else ""
         result = self.client.query(
-            f"SELECT {', '.join(FAILURE_COLUMNS)} FROM event_failures FINAL{where}",
+            f"SELECT {', '.join(FAILURE_COLUMNS)} FROM event_failures FINAL{where} "
+            f"ORDER BY failed_at {sort_order.upper()}, failure_id {sort_order.upper()}",
             parameters=parameters,
         )
         return [dict(zip(FAILURE_COLUMNS, row, strict=True)) for row in result.result_rows]

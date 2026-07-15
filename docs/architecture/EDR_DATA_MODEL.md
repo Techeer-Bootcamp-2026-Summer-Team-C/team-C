@@ -46,7 +46,7 @@ Windows C++ / macOS Swift Agent
 | --- | --- | --- |
 | Agent SQLite | `local_event_buffer` | Collector ACK 전 metadata event 임시 저장 |
 | ClickHouse | `edr_events`, `event_failures` | 정상 telemetry와 대량 failure 검색 index |
-| PostgreSQL | `endpoints`, `agent_auth_keys`, `audit_logs`, `ingest_metadata`, `users`, `alerts`, `incidents`, `incident_alerts` | 운영 상태, 인증, 감사, 저장 카탈로그, 탐지 결과 |
+| PostgreSQL | `endpoints`, `agent_auth_keys`, `audit_logs`, `ingest_metadata`, `users`, `user_dashboard_layouts`, `alerts`, `incidents`, `incident_alerts` | 운영 상태, 인증, 감사, 저장 카탈로그, 사용자 Dashboard 설정, 탐지 결과 |
 | S3 Standard | 최초 실패부터 7일까지 failure 원문 | Failure 단기 object |
 | S3 Glacier Instant Retrieval | 7일 이후 failure 원문 | 최초 실패 기준 총 90일 보존 |
 | S3 Glacier Flexible Retrieval | raw event archive | Parquet/ZSTD 장기 보관과 7일 임시 RestoreObject |
@@ -55,7 +55,7 @@ PostgreSQL에는 event failure row와 원문을 저장하지 않는다. ClickHou
 
 ## 5. 테이블 구성
 
-최종 논리 ERD는 11개 테이블이다.
+최종 논리 ERD는 12개 테이블이다.
 
 | 저장소 | 테이블 | 속성 수 | 역할 |
 | --- | --- | ---: | --- |
@@ -68,9 +68,10 @@ PostgreSQL에는 event failure row와 원문을 저장하지 않는다. ClickHou
 | PostgreSQL | `ingest_metadata` | 19 | Endpoint/UTC DAY bucket 저장 위치 |
 | PostgreSQL | `incidents` | 15 | 자동 correlation projection |
 | PostgreSQL | `users` | 11 | Dashboard 로그인/RBAC/UI 언어 설정 |
+| PostgreSQL | `user_dashboard_layouts` | 8 | JWT 사용자별 Dashboard 위젯 layout |
 | PostgreSQL | `incident_alerts` | 7 | Incident-Alert N:M 연결 |
 | PostgreSQL | `alerts` | 22 | Rule/MITRE 탐지 결과 |
-| **합계** | **11개** | **193** |  |
+| **합계** | **12개** | **201** |  |
 
 ## 6. 관계 요약
 
@@ -80,9 +81,10 @@ endpoints -> ingest_metadata
 endpoints -> alerts
 endpoints -> incidents
 incidents -> incident_alerts <- alerts
+users -> user_dashboard_layouts
 ```
 
-- `users`는 Dashboard 로그인과 RBAC 전용이다.
+- `users`는 Dashboard 로그인/RBAC와 사용자별 Dashboard layout 소유권에만 연결된다.
 - 담당자 지정 기능이 없으므로 `users`와 Alert/Incident 사이 FK가 없다.
 - `edr_events.event_id`와 `event_failures.event_id`는 PostgreSQL FK가 아닌 논리 참조다.
 - `audit_logs`의 actor/resource ID는 삭제 이후에도 이력을 보존하는 문자열 snapshot이다.
@@ -332,7 +334,22 @@ HOT `storage_path`는 Endpoint별 ClickHouse 논리 조회 locator이고 S3 `sto
 
 `ck_users_login_id_format`은 허용 문자와 소문자 정규화를 강제한다. `ck_users_locale`은 `locale IN ('EN', 'KO')`를 강제한다. `uq_users_login_id_active`는 `LOWER(login_id)`에 `WHERE is_delete=FALSE`를 적용하는 partial unique index다.
 
-### 8.9 `incident_alerts`
+### 8.9 `user_dashboard_layouts`
+
+목적: Overview의 데스크톱 12열 위젯 layout을 JWT 사용자별로 저장한다. `(user_id, dashboard_key)`는 unique이며 API는 body/query 사용자 ID를 받지 않는다. `revision`은 오래된 PUT을 거부하는 낙관적 동시성 값이다.
+
+| 컬럼 | 실제 PostgreSQL 타입 | 설명 |
+| --- | --- | --- |
+| `layout_id` | `BIGSERIAL` | Dashboard layout PK |
+| `user_id` | `BIGINT` | `users.user_id` FK, 사용자 삭제 시 cascade |
+| `dashboard_key` | `VARCHAR(64)` | 현재 `overview` |
+| `layout_version` | `INTEGER` | 위젯 registry/layout schema 버전 |
+| `revision` | `BIGINT` | 저장마다 증가하는 revision |
+| `layout_json` | `JSONB` | `{id,x,y,w,h,hidden}` 배열 |
+| `created_at` | `TIMESTAMPTZ` | 최초 저장 시각 |
+| `updated_at` | `TIMESTAMPTZ` | 마지막 저장 시각 |
+
+### 8.10 `incident_alerts`
 
 목적: Incident와 Alert의 N:M 관계를 저장한다. `(incident_id, alert_id)`는 unique이며 속성 수는 7개다.
 
@@ -346,7 +363,7 @@ HOT `storage_path`는 Endpoint별 ClickHouse 논리 조회 locator이고 S3 `sto
 | `updated_at` | `TIMESTAMPTZ` | 연결 행 마지막 갱신 시각 |
 | `is_delete` | `BOOLEAN` | 연결 소프트 삭제 표시 |
 
-### 8.10 `edr_events`
+### 8.11 `edr_events`
 
 목적: Process, Network, File, DNS, L7 metadata를 검색·집계한다. 속성 수는 44개다.
 
@@ -401,7 +418,7 @@ HOT `storage_path`는 Endpoint별 ClickHouse 논리 조회 locator이고 S3 `sto
 
 Event 조회, latest-row 선택과 `uniqExact(event_id)` 집계는 `is_delete=false` row만 사용한다. 요청 `[from, to)`와 겹치는 UTC DAY bucket은 `bucket_start_at < to AND bucket_end_at > from`으로 선택하고 실제 event는 원래 `[from, to)`로 다시 필터링한다.
 
-### 8.11 `alerts`
+### 8.12 `alerts`
 
 목적: Detection Worker가 생성한 탐지 결과와 MITRE ATT&CK mapping을 저장한다. 속성 수는 22개다. Alert의 `rule_name`, `title`, `summary`는 탐지 당시 RuleV1의 `rule_name`, `alert_title`, `alert_summary` 문자열을 그대로 snapshot한다. 모든 `enabled=true` RuleV1은 tactic/technique code가 필수이고 누락되거나 `mappings/mitre_attack.yaml`에 없으면 readiness를 실패시킨다. YAML에는 code만 저장하고 Backend가 고정 mapping에서 name을 변환하므로 MITRE code/name 4개 컬럼은 모두 NOT NULL이다. `(event_id, rule_code, rule_version)`은 unique이며 담당자 컬럼은 없다.
 

@@ -67,12 +67,13 @@ export function EdrStatePill({ state, score, reasons, calculatedAt }: {
   calculatedAt: string;
 }) {
   const { t } = useI18n();
+  const reasonSummary = reasons.length ? reasons.map(humanize).join(" · ") : t("edrState.noReasons");
   return (
-    <section className={`edr-state tone-${state.toLowerCase()}`} aria-label={t("edrState.aria", { state, score })}>
+    <section className={`edr-state tone-${state.toLowerCase()}`} aria-label={t("edrState.aria", { state, score })} title={reasonSummary}>
       <div><span>{t("edrState.current")}</span><strong>{state}</strong></div>
       <div className="edr-score"><strong>{score}</strong><span>/ 100</span></div>
       <div className="edr-reasons">
-        <span>{reasons.length ? reasons.map(humanize).join(" · ") : t("edrState.noReasons")}</span>
+        <span>{reasonSummary}</span>
         <small>{t("edrState.calculated", { time: formatDateTime(calculatedAt) })}</small>
       </div>
     </section>

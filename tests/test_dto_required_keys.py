@@ -2,10 +2,32 @@ import inspect
 
 from pydantic import BaseModel
 
-from backend.contracts import alerts, archives, auth, collector, dashboard, endpoints, events, incidents
+from backend.contracts import (
+    alerts,
+    archives,
+    auth,
+    collector,
+    dashboard,
+    endpoints,
+    events,
+    incidents,
+    investigations,
+    operations,
+)
 from backend.contracts.common import ErrorBody, ErrorDetail, ErrorEnvelope, RequestMeta
 
-RESPONSE_MODULES = (auth, collector, endpoints, events, archives, alerts, incidents, dashboard)
+RESPONSE_MODULES = (
+    auth,
+    collector,
+    endpoints,
+    events,
+    archives,
+    alerts,
+    incidents,
+    dashboard,
+    investigations,
+    operations,
+)
 COMMON_RESPONSE_MODELS = (RequestMeta, ErrorDetail, ErrorBody, ErrorEnvelope)
 
 

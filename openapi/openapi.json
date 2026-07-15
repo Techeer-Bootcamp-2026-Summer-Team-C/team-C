@@ -713,6 +713,135 @@
         "title": "ArchiveRestoreStartDto",
         "type": "object"
       },
+      "AttackTimelineDto": {
+        "additionalProperties": false,
+        "properties": {
+          "endpointId": {
+            "minimum": 1.0,
+            "title": "Endpointid",
+            "type": "integer"
+          },
+          "incidentId": {
+            "minimum": 1.0,
+            "title": "Incidentid",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AttackTimelineItemDto"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "incidentId",
+          "endpointId",
+          "items"
+        ],
+        "title": "AttackTimelineDto",
+        "type": "object"
+      },
+      "AttackTimelineItemDto": {
+        "additionalProperties": false,
+        "properties": {
+          "alertId": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alertid"
+          },
+          "endpointId": {
+            "minimum": 1.0,
+            "title": "Endpointid",
+            "type": "integer"
+          },
+          "eventId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eventid"
+          },
+          "eventType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "incidentId": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incidentid"
+          },
+          "itemType": {
+            "enum": [
+              "INCIDENT",
+              "EVENT",
+              "ALERT"
+            ],
+            "title": "Itemtype",
+            "type": "string"
+          },
+          "occurredAt": {
+            "title": "Occurredat",
+            "type": "string"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Severity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemType",
+          "occurredAt",
+          "endpointId",
+          "title",
+          "summary",
+          "severity",
+          "eventType",
+          "eventId",
+          "alertId",
+          "incidentId"
+        ],
+        "title": "AttackTimelineItemDto",
+        "type": "object"
+      },
       "CertificateDto": {
         "additionalProperties": false,
         "properties": {
@@ -1036,6 +1165,74 @@
         "title": "DashboardInterval",
         "type": "string"
       },
+      "DashboardLayoutDto": {
+        "additionalProperties": false,
+        "properties": {
+          "dashboardKey": {
+            "title": "Dashboardkey",
+            "type": "string"
+          },
+          "isDefault": {
+            "title": "Isdefault",
+            "type": "boolean"
+          },
+          "layoutVersion": {
+            "minimum": 1.0,
+            "title": "Layoutversion",
+            "type": "integer"
+          },
+          "revision": {
+            "minimum": 0.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "widgets": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardWidgetLayoutDto"
+            },
+            "title": "Widgets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "dashboardKey",
+          "layoutVersion",
+          "revision",
+          "isDefault",
+          "widgets"
+        ],
+        "title": "DashboardLayoutDto",
+        "type": "object"
+      },
+      "DashboardLayoutPutRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "layoutVersion": {
+            "minimum": 1.0,
+            "title": "Layoutversion",
+            "type": "integer"
+          },
+          "revision": {
+            "minimum": 0.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "widgets": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardWidgetLayoutDto"
+            },
+            "title": "Widgets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "layoutVersion",
+          "revision",
+          "widgets"
+        ],
+        "title": "DashboardLayoutPutRequest",
+        "type": "object"
+      },
       "DashboardStorageDto": {
         "additionalProperties": false,
         "properties": {
@@ -1099,6 +1296,9 @@
           "interval": {
             "$ref": "#/components/schemas/DashboardInterval"
           },
+          "responseGuidance": {
+            "$ref": "#/components/schemas/ResponseGuidanceSummaryDto"
+          },
           "storage": {
             "$ref": "#/components/schemas/DashboardStorageDto"
           },
@@ -1115,9 +1315,55 @@
           "endpoints",
           "events",
           "eventFailures",
-          "storage"
+          "storage",
+          "responseGuidance"
         ],
         "title": "DashboardSummaryDto",
+        "type": "object"
+      },
+      "DashboardWidgetLayoutDto": {
+        "additionalProperties": false,
+        "properties": {
+          "h": {
+            "maximum": 24.0,
+            "minimum": 1.0,
+            "title": "H",
+            "type": "integer"
+          },
+          "hidden": {
+            "title": "Hidden",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "w": {
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "W",
+            "type": "integer"
+          },
+          "x": {
+            "minimum": 0.0,
+            "title": "X",
+            "type": "integer"
+          },
+          "y": {
+            "minimum": 0.0,
+            "title": "Y",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "x",
+          "y",
+          "w",
+          "h",
+          "hidden"
+        ],
+        "title": "DashboardWidgetLayoutDto",
         "type": "object"
       },
       "DnsQueryEvent": {
@@ -1310,6 +1556,41 @@
         ],
         "title": "EdrStateStatus",
         "type": "string"
+      },
+      "EgressTopologyDto": {
+        "additionalProperties": false,
+        "properties": {
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/TopologyEdgeDto"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "from": {
+            "title": "From",
+            "type": "string"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/TopologyNodeDto"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "to": {
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "nodes",
+          "edges"
+        ],
+        "title": "EgressTopologyDto",
+        "type": "object"
       },
       "EndpointDetailDto": {
         "additionalProperties": false,
@@ -2783,6 +3064,189 @@
         "title": "EventDto",
         "type": "object"
       },
+      "EventFailureDto": {
+        "additionalProperties": false,
+        "properties": {
+          "consumerName": {
+            "title": "Consumername",
+            "type": "string"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "endpointId": {
+            "minimum": 1.0,
+            "title": "Endpointid",
+            "type": "integer"
+          },
+          "errorMessage": {
+            "title": "Errormessage",
+            "type": "string"
+          },
+          "eventId": {
+            "title": "Eventid",
+            "type": "string"
+          },
+          "failedAt": {
+            "title": "Failedat",
+            "type": "string"
+          },
+          "failureCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failurecode"
+          },
+          "failureId": {
+            "title": "Failureid",
+            "type": "string"
+          },
+          "failureStage": {
+            "title": "Failurestage",
+            "type": "string"
+          },
+          "lastReplayedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastreplayedat"
+          },
+          "payloadObjectKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payloadobjectkey"
+          },
+          "payloadSha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payloadsha256"
+          },
+          "payloadSizeBytes": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payloadsizebytes"
+          },
+          "replayCount": {
+            "minimum": 0.0,
+            "title": "Replaycount",
+            "type": "integer"
+          },
+          "reprocessOutcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reprocessoutcome"
+          },
+          "resolvedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolvedat"
+          },
+          "retentionExpiresAt": {
+            "title": "Retentionexpiresat",
+            "type": "string"
+          },
+          "retryCount": {
+            "minimum": 0.0,
+            "title": "Retrycount",
+            "type": "integer"
+          },
+          "retryable": {
+            "title": "Retryable",
+            "type": "boolean"
+          },
+          "sourceOffset": {
+            "minimum": 0.0,
+            "title": "Sourceoffset",
+            "type": "integer"
+          },
+          "sourcePartition": {
+            "minimum": 0.0,
+            "title": "Sourcepartition",
+            "type": "integer"
+          },
+          "sourceTopic": {
+            "title": "Sourcetopic",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EventFailureStatus"
+          },
+          "updatedAt": {
+            "title": "Updatedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "failureId",
+          "eventId",
+          "endpointId",
+          "sourceTopic",
+          "sourcePartition",
+          "sourceOffset",
+          "consumerName",
+          "failureStage",
+          "failureCode",
+          "errorMessage",
+          "retryable",
+          "retryCount",
+          "payloadObjectKey",
+          "payloadSha256",
+          "payloadSizeBytes",
+          "status",
+          "failedAt",
+          "replayCount",
+          "lastReplayedAt",
+          "reprocessOutcome",
+          "resolvedAt",
+          "retentionExpiresAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "title": "EventFailureDto",
+        "type": "object"
+      },
       "EventFailureStatus": {
         "enum": [
           "FAILED",
@@ -3247,6 +3711,11 @@
             ],
             "title": "Oldestfailedat"
           },
+          "ratePerMinute": {
+            "minimum": 0.0,
+            "title": "Rateperminute",
+            "type": "number"
+          },
           "reprocessFailedCount": {
             "minimum": 0.0,
             "title": "Reprocessfailedcount",
@@ -3260,6 +3729,7 @@
         },
         "required": [
           "failedCount",
+          "ratePerMinute",
           "reprocessedCount",
           "reprocessFailedCount",
           "oldestFailedAt"
@@ -3285,10 +3755,16 @@
               }
             ],
             "title": "Latestingestedat"
+          },
+          "ratePerMinute": {
+            "minimum": 0.0,
+            "title": "Rateperminute",
+            "type": "number"
           }
         },
         "required": [
           "ingestedCount",
+          "ratePerMinute",
           "latestIngestedAt"
         ],
         "title": "IngestEventsDto",
@@ -3621,6 +4097,40 @@
         "title": "NetworkConnectionPayload",
         "type": "object"
       },
+      "OperationsHealthDto": {
+        "additionalProperties": false,
+        "properties": {
+          "checkedAt": {
+            "title": "Checkedat",
+            "type": "string"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceHealthDto"
+            },
+            "title": "Services",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SensorHealth"
+          },
+          "workers": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineWorkerDto"
+            },
+            "title": "Workers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "checkedAt",
+          "status",
+          "services",
+          "workers"
+        ],
+        "title": "OperationsHealthDto",
+        "type": "object"
+      },
       "OsType": {
         "enum": [
           "WINDOWS",
@@ -3792,6 +4302,42 @@
         "title": "PagedData[EventDto]",
         "type": "object"
       },
+      "PagedData_EventFailureDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EventFailureDto"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "minimum": 1.0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "size": {
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Size",
+            "type": "integer"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "size",
+          "total"
+        ],
+        "title": "PagedData[EventFailureDto]",
+        "type": "object"
+      },
       "PagedData_IncidentDto_": {
         "additionalProperties": false,
         "properties": {
@@ -3826,6 +4372,65 @@
           "total"
         ],
         "title": "PagedData[IncidentDto]",
+        "type": "object"
+      },
+      "PipelineWorkerDto": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "groupId": {
+            "title": "Groupid",
+            "type": "string"
+          },
+          "lag": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lag"
+          },
+          "memberCount": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Membercount"
+          },
+          "status": {
+            "$ref": "#/components/schemas/WorkerStatus"
+          },
+          "topic": {
+            "title": "Topic",
+            "type": "string"
+          },
+          "worker": {
+            "title": "Worker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "worker",
+          "groupId",
+          "topic",
+          "status",
+          "memberCount",
+          "lag",
+          "detail"
+        ],
+        "title": "PipelineWorkerDto",
         "type": "object"
       },
       "ProcessExecutionEvent": {
@@ -3893,6 +4498,134 @@
           "pid"
         ],
         "title": "ProcessExecutionPayload",
+        "type": "object"
+      },
+      "ProcessTreeDto": {
+        "additionalProperties": false,
+        "properties": {
+          "endpointId": {
+            "minimum": 1.0,
+            "title": "Endpointid",
+            "type": "integer"
+          },
+          "from": {
+            "title": "From",
+            "type": "string"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/ProcessTreeNodeDto"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "to": {
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpointId",
+          "from",
+          "to",
+          "nodes"
+        ],
+        "title": "ProcessTreeDto",
+        "type": "object"
+      },
+      "ProcessTreeNodeDto": {
+        "additionalProperties": false,
+        "properties": {
+          "commandLine": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commandline"
+          },
+          "eventCount": {
+            "minimum": 0.0,
+            "title": "Eventcount",
+            "type": "integer"
+          },
+          "firstSeenAt": {
+            "title": "Firstseenat",
+            "type": "string"
+          },
+          "lastSeenAt": {
+            "title": "Lastseenat",
+            "type": "string"
+          },
+          "parentCaptured": {
+            "title": "Parentcaptured",
+            "type": "boolean"
+          },
+          "pid": {
+            "minimum": 0.0,
+            "title": "Pid",
+            "type": "integer"
+          },
+          "ppid": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ppid"
+          },
+          "processName": {
+            "title": "Processname",
+            "type": "string"
+          },
+          "processPath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processpath"
+          },
+          "selected": {
+            "title": "Selected",
+            "type": "boolean"
+          },
+          "userName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "required": [
+          "pid",
+          "ppid",
+          "processName",
+          "processPath",
+          "commandLine",
+          "userName",
+          "firstSeenAt",
+          "lastSeenAt",
+          "eventCount",
+          "selected",
+          "parentCaptured"
+        ],
+        "title": "ProcessTreeNodeDto",
         "type": "object"
       },
       "RejectedEventDto": {
@@ -3965,6 +4698,52 @@
           "requiresManualAction"
         ],
         "title": "ResponseGuidanceStepDto",
+        "type": "object"
+      },
+      "ResponseGuidanceSummaryDto": {
+        "additionalProperties": false,
+        "properties": {
+          "affectedAlertCount": {
+            "minimum": 0.0,
+            "title": "Affectedalertcount",
+            "type": "integer"
+          },
+          "highestSeverity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Severity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "manualActionStepCount": {
+            "minimum": 0.0,
+            "title": "Manualactionstepcount",
+            "type": "integer"
+          },
+          "ruleCount": {
+            "minimum": 0.0,
+            "title": "Rulecount",
+            "type": "integer"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/ResponseGuidanceStepDto"
+            },
+            "title": "Steps",
+            "type": "array"
+          }
+        },
+        "required": [
+          "affectedAlertCount",
+          "ruleCount",
+          "manualActionStepCount",
+          "highestSeverity",
+          "steps"
+        ],
+        "title": "ResponseGuidanceSummaryDto",
         "type": "object"
       },
       "RiskLevel": {
@@ -4115,6 +4894,35 @@
           "status"
         ],
         "title": "SensorHealthSnapshot",
+        "type": "object"
+      },
+      "ServiceHealthDto": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "latencyMs": {
+            "minimum": 0.0,
+            "title": "Latencyms",
+            "type": "integer"
+          },
+          "service": {
+            "title": "Service",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SensorHealth"
+          }
+        },
+        "required": [
+          "service",
+          "status",
+          "latencyMs",
+          "detail"
+        ],
+        "title": "ServiceHealthDto",
         "type": "object"
       },
       "Severity": {
@@ -4316,6 +5124,40 @@
         "title": "SuccessEnvelope[ArchiveRestoreStartDto]",
         "type": "object"
       },
+      "SuccessEnvelope_AttackTimelineDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AttackTimelineDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[AttackTimelineDto]",
+        "type": "object"
+      },
+      "SuccessEnvelope_DashboardLayoutDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DashboardLayoutDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[DashboardLayoutDto]",
+        "type": "object"
+      },
       "SuccessEnvelope_DashboardSummaryDto_": {
         "additionalProperties": false,
         "properties": {
@@ -4331,6 +5173,23 @@
           "meta"
         ],
         "title": "SuccessEnvelope[DashboardSummaryDto]",
+        "type": "object"
+      },
+      "SuccessEnvelope_EgressTopologyDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/EgressTopologyDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[EgressTopologyDto]",
         "type": "object"
       },
       "SuccessEnvelope_EndpointDetailDto_": {
@@ -4435,6 +5294,23 @@
         "title": "SuccessEnvelope[LoginData]",
         "type": "object"
       },
+      "SuccessEnvelope_OperationsHealthDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OperationsHealthDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[OperationsHealthDto]",
+        "type": "object"
+      },
       "SuccessEnvelope_PagedData_AlertDto__": {
         "additionalProperties": false,
         "properties": {
@@ -4503,6 +5379,23 @@
         "title": "SuccessEnvelope[PagedData[EventDto]]",
         "type": "object"
       },
+      "SuccessEnvelope_PagedData_EventFailureDto__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PagedData_EventFailureDto_"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[PagedData[EventFailureDto]]",
+        "type": "object"
+      },
       "SuccessEnvelope_PagedData_IncidentDto__": {
         "additionalProperties": false,
         "properties": {
@@ -4518,6 +5411,23 @@
           "meta"
         ],
         "title": "SuccessEnvelope[PagedData[IncidentDto]]",
+        "type": "object"
+      },
+      "SuccessEnvelope_ProcessTreeDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ProcessTreeDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[ProcessTreeDto]",
         "type": "object"
       },
       "SuccessEnvelope_TelemetryBatchData_": {
@@ -4847,6 +5757,94 @@
         "title": "TopRuleDto",
         "type": "object"
       },
+      "TopologyEdgeDto": {
+        "additionalProperties": false,
+        "properties": {
+          "alertCount": {
+            "minimum": 0.0,
+            "title": "Alertcount",
+            "type": "integer"
+          },
+          "endpointId": {
+            "minimum": 1.0,
+            "title": "Endpointid",
+            "type": "integer"
+          },
+          "eventCount": {
+            "minimum": 0.0,
+            "title": "Eventcount",
+            "type": "integer"
+          },
+          "lastSeenAt": {
+            "title": "Lastseenat",
+            "type": "string"
+          },
+          "protocol": {
+            "title": "Protocol",
+            "type": "string"
+          },
+          "sourceLabel": {
+            "title": "Sourcelabel",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpointId",
+          "sourceLabel",
+          "target",
+          "protocol",
+          "eventCount",
+          "alertCount",
+          "lastSeenAt"
+        ],
+        "title": "TopologyEdgeDto",
+        "type": "object"
+      },
+      "TopologyNodeDto": {
+        "additionalProperties": false,
+        "properties": {
+          "alertCount": {
+            "minimum": 0.0,
+            "title": "Alertcount",
+            "type": "integer"
+          },
+          "endpointId": {
+            "minimum": 1.0,
+            "title": "Endpointid",
+            "type": "integer"
+          },
+          "hostname": {
+            "title": "Hostname",
+            "type": "string"
+          },
+          "riskLevel": {
+            "$ref": "#/components/schemas/RiskLevel"
+          },
+          "riskScore": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Riskscore",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EndpointStatus"
+          }
+        },
+        "required": [
+          "endpointId",
+          "hostname",
+          "status",
+          "riskScore",
+          "riskLevel",
+          "alertCount"
+        ],
+        "title": "TopologyNodeDto",
+        "type": "object"
+      },
       "UserDto": {
         "additionalProperties": false,
         "properties": {
@@ -4923,6 +5921,16 @@
           "DISABLED"
         ],
         "title": "UserStatus",
+        "type": "string"
+      },
+      "WorkerStatus": {
+        "enum": [
+          "RUNNING",
+          "IDLE",
+          "OFFLINE",
+          "UNKNOWN"
+        ],
+        "title": "WorkerStatus",
         "type": "string"
       }
     },
@@ -5988,6 +6996,233 @@
         ]
       }
     },
+    "/api/v1/dashboard/layouts/{dashboardKey}": {
+      "delete": {
+        "operationId": "dashboardLayoutsDelete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboardKey",
+            "required": true,
+            "schema": {
+              "title": "Dashboardkey",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_DashboardLayoutDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Dashboard Layout Delete",
+        "tags": [
+          "Dashboard"
+        ]
+      },
+      "get": {
+        "operationId": "dashboardLayoutsGet",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboardKey",
+            "required": true,
+            "schema": {
+              "title": "Dashboardkey",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_DashboardLayoutDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Dashboard Layout Get",
+        "tags": [
+          "Dashboard"
+        ]
+      },
+      "put": {
+        "operationId": "dashboardLayoutsPut",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboardKey",
+            "required": true,
+            "schema": {
+              "title": "Dashboardkey",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DashboardLayoutPutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_DashboardLayoutDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The request conflicts with the current resource, identity, or Archive state."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Dashboard Layout Put",
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
     "/api/v1/dashboard/summary": {
       "get": {
         "operationId": "dashboardGetSummary",
@@ -6090,6 +7325,106 @@
         ]
       }
     },
+    "/api/v1/dashboard/topology": {
+      "get": {
+        "operationId": "dashboardGetTopology",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "timePreset",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TimePreset",
+              "default": "LATEST_24H"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "endpointIds",
+            "required": false,
+            "schema": {
+              "items": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "title": "Endpointids",
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_EgressTopologyDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Dashboard Topology",
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
     "/api/v1/endpoints": {
       "get": {
         "operationId": "endpointsList",
@@ -6115,6 +7450,19 @@
               "minimum": 1,
               "title": "Size",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "endpointIds",
+            "required": false,
+            "schema": {
+              "items": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "title": "Endpointids",
+              "type": "array"
             }
           },
           {
@@ -6302,6 +7650,112 @@
           }
         ],
         "summary": "Endpoint Detail",
+        "tags": [
+          "Endpoints"
+        ]
+      }
+    },
+    "/api/v1/endpoints/{endpointId}/process-tree": {
+      "get": {
+        "operationId": "endpointsGetProcessTree",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "endpointId",
+            "required": true,
+            "schema": {
+              "title": "Endpointid",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "timePreset",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TimePreset",
+              "default": "LATEST_24H"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "selectedPid",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "title": "Selectedpid",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_ProcessTreeDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Endpoint Process Tree",
         "tags": [
           "Endpoints"
         ]
@@ -6621,6 +8075,156 @@
         ]
       }
     },
+    "/api/v1/failures": {
+      "get": {
+        "operationId": "failuresList",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "timePreset",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TimePreset",
+              "default": "LATEST_24H"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/EventFailureStatus"
+            }
+          },
+          {
+            "in": "query",
+            "name": "failureStage",
+            "required": false,
+            "schema": {
+              "title": "Failurestage",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "retryable",
+            "required": false,
+            "schema": {
+              "title": "Retryable",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortOrder",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "title": "Sortorder",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_PagedData_EventFailureDto__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Failures",
+        "tags": [
+          "Operations"
+        ]
+      }
+    },
     "/api/v1/incidents": {
       "get": {
         "operationId": "incidentsList",
@@ -6848,6 +8452,119 @@
         ]
       }
     },
+    "/api/v1/incidents/{incidentId}/timeline": {
+      "get": {
+        "operationId": "incidentsGetTimeline",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incidentId",
+            "required": true,
+            "schema": {
+              "title": "Incidentid",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_AttackTimelineDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Incident Timeline",
+        "tags": [
+          "Incidents"
+        ]
+      }
+    },
+    "/api/v1/operations/health": {
+      "get": {
+        "operationId": "operationsGetHealth",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_OperationsHealthDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Operations Health",
+        "tags": [
+          "Operations"
+        ]
+      }
+    },
     "/api/v1/users/me": {
       "get": {
         "operationId": "usersMeGet",
@@ -6993,6 +8710,10 @@
     {
       "description": "Backend-calculated security and collection summaries.",
       "name": "Dashboard"
+    },
+    {
+      "description": "Live dependency and pipeline worker health.",
+      "name": "Operations"
     },
     {
       "description": "mTLS-authenticated Agent registration and telemetry ingest.",

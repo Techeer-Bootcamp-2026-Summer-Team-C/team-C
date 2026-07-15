@@ -14,7 +14,7 @@ import pyarrow.parquet as pq
 from backend.auth import hash_password
 from backend.event_service import RestoredEventReader
 from backend.storage.clickhouse import EventRepository, FailureRepository
-from backend.storage.migrations import apply_clickhouse_file, apply_postgres_file
+from backend.storage.migrations import apply_clickhouse_file, apply_postgres_migrations
 from backend.workers import normalize_event
 
 ROOT = Path(__file__).parents[1]
@@ -68,10 +68,8 @@ def main() -> None:
         database="edr",
     )
     with psycopg.connect(POSTGRES_DSN) as connection:
-        apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.down.sql")
-        apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.up.sql")
-        apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_user_login_id.up.sql")
-        apply_postgres_file(connection, ROOT / "migrations/postgresql/0003_user_locale.up.sql")
+        apply_postgres_migrations(connection, ROOT / "migrations/postgresql", direction="down")
+        apply_postgres_migrations(connection, ROOT / "migrations/postgresql")
     apply_clickhouse_file(clickhouse, ROOT / "migrations/clickhouse/0001_initial.down.sql")
     apply_clickhouse_file(clickhouse, ROOT / "migrations/clickhouse/0001_initial.up.sql")
 

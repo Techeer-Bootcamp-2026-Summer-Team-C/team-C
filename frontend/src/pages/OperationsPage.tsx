@@ -1,34 +1,101 @@
 import { useQuery } from "@tanstack/react-query";
-import { Archive, Database, HardDrive, RefreshCcw } from "lucide-react";
+import { Activity, Archive, Cloud, Database, HardDrive, Radio, RefreshCcw, Server } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/endpoints";
 import { readTimeFilter, TimeFilterFields } from "../components/filters";
-import { ErrorState, GlobalFilterBar, KpiCard, PageHeader, Panel, Skeleton, StaleWarning } from "../components/ui";
+import { DataTable, EmptyState, ErrorState, Field, GlobalFilterBar, KpiCard, PageHeader, Pagination, Panel, Skeleton, StaleWarning, StatusPill } from "../components/ui";
+import type { FailureListQuery, IngestSummaryDto, OperationsHealthDto, ServiceHealthDto } from "../contracts";
 import { useI18n } from "../i18n/LocaleContext";
-import { formatDateTime } from "../lib/format";
+import { formatDateTime, humanize } from "../lib/format";
+import { allowedValue } from "../lib/params";
+import { numberParam, updateParams } from "../lib/url";
 import { pollingInterval } from "../query/policy";
 
 export function OperationsPage() {
   const { t } = useI18n();
   const [params, setParams] = useSearchParams();
   const time = readTimeFilter(params);
-  const result = useQuery({ queryKey: ["ingest-summary", time.query], queryFn: ({ signal }) => api.ingestSummary(time.query, signal), enabled: time.valid, staleTime: 15_000, refetchInterval: pollingInterval(15_000) });
+  const ingest = useQuery({ queryKey: ["ingest-summary", time.query], queryFn: ({ signal }) => api.ingestSummary(time.query, signal), enabled: time.valid, staleTime: 15_000, refetchInterval: pollingInterval(15_000) });
+  const health = useQuery({ queryKey: ["operations-health"], queryFn: ({ signal }) => api.operationsHealth(signal), staleTime: 15_000, refetchInterval: pollingInterval(30_000) });
+  const failureStatus = allowedValue(params.get("failureStatus"), ["FAILED", "REPROCESSED", "REPROCESS_FAILED"] as const);
+  const retryable = allowedValue(params.get("retryable"), ["true", "false"] as const);
+  const failureQuery: FailureListQuery = { ...time.query, page: numberParam(params, "page", 1), size: 50, sortOrder: "desc" };
+  if (failureStatus) failureQuery.status = failureStatus;
+  const failureStage = params.get("failureStage");
+  if (failureStage) failureQuery.failureStage = failureStage;
+  if (retryable) failureQuery.retryable = retryable === "true";
+  const failures = useQuery({ queryKey: ["event-failures", failureQuery], queryFn: ({ signal }) => api.failures(failureQuery, signal), enabled: time.valid, staleTime: 15_000, refetchInterval: pollingInterval(30_000) });
+  const refreshing = ingest.isFetching || health.isFetching || failures.isFetching;
+  const refresh = () => void Promise.all([ingest.refetch(), health.refetch(), failures.refetch()]);
   return <div className="page-stack">
-    <PageHeader eyebrow={t("operations.eyebrow")} title={t("operations.title")} description={t("operations.description")} actions={<Link className="button" to="/operations/archives"><Archive aria-hidden="true" size={16} />{t("operations.archiveAction")}</Link>} />
-    <GlobalFilterBar hasFilters={params.size > 0} onClear={() => setParams({})}><TimeFilterFields params={params} setParams={setParams} /></GlobalFilterBar>
-    {result.isPending ? <Skeleton rows={8} /> : null}
-    {result.error && !result.data ? <ErrorState error={result.error} onRetry={() => void result.refetch()} /> : null}
-    {result.isRefetchError && result.data ? <StaleWarning error={result.error} onRetry={() => void result.refetch()} /> : null}
-    {result.data ? <OperationsContent data={result.data.data} /> : null}
+    <PageHeader eyebrow={t("operations.eyebrow")} title={t("operations.title")} description={t("operations.description")} actions={<>
+      <button className="button ghost" disabled={refreshing} onClick={refresh} type="button"><RefreshCcw aria-hidden="true" size={16} />{refreshing ? t("operations.refreshing") : t("operations.refreshLive")}</button>
+      <Link className="button" to="/operations/archives"><Archive aria-hidden="true" size={16} />{t("operations.archiveAction")}</Link>
+    </>} />
+    <GlobalFilterBar hasFilters={params.size > 0} onClear={() => setParams({})}><TimeFilterFields params={params} setParams={setParams} />
+      <Field label={t("operations.failureStatus")}><select onChange={(event) => setParams(updateParams(params, { failureStatus: event.target.value, page: null }))} value={failureStatus ?? ""}><option value="">{t("filter.allStatuses")}</option><option>FAILED</option><option>REPROCESSED</option><option>REPROCESS_FAILED</option></select></Field>
+      <Field label={t("operations.stage")}><input onChange={(event) => setParams(updateParams(params, { failureStage: event.target.value, page: null }))} placeholder="detection" value={params.get("failureStage") ?? ""} /></Field>
+      <Field label={t("operations.retryable")}><select onChange={(event) => setParams(updateParams(params, { retryable: event.target.value, page: null }))} value={retryable ?? ""}><option value="">{t("operations.all")}</option><option value="true">{t("operations.retryable")}</option><option value="false">{t("operations.notRetryable")}</option></select></Field>
+    </GlobalFilterBar>
+
+    {health.isPending ? <Skeleton rows={5} /> : null}
+    {health.error && !health.data ? <ErrorState error={health.error} onRetry={() => void health.refetch()} /> : null}
+    {health.isRefetchError && health.data ? <StaleWarning error={health.error} onRetry={() => void health.refetch()} /> : null}
+    {health.data ? <LiveHealth data={health.data.data} /> : null}
+
+    {ingest.isPending ? <Skeleton rows={8} /> : null}
+    {ingest.error && !ingest.data ? <ErrorState error={ingest.error} onRetry={() => void ingest.refetch()} /> : null}
+    {ingest.isRefetchError && ingest.data ? <StaleWarning error={ingest.error} onRetry={() => void ingest.refetch()} /> : null}
+    {ingest.data ? <IngestContent data={ingest.data.data} /> : null}
+    {failures.isPending ? <Skeleton rows={8} /> : null}
+    {failures.error && !failures.data ? <ErrorState error={failures.error} onRetry={() => void failures.refetch()} /> : null}
+    {failures.data ? <Panel title={t("operations.failureQueue")} subtitle={t("operations.failureQueueSubtitle")} meta={<StatusPill value="READ ONLY" />}>
+      {failures.data.data.items.length ? <><DataTable label={t("operations.eventFailureQueue")}><thead><tr><th scope="col">{t("operations.failure")}</th><th scope="col">{t("operations.stage")}</th><th scope="col">{t("filter.status")}</th><th scope="col">{t("operations.retry")}</th><th scope="col">{t("operations.error")}</th><th scope="col">{t("operations.failedAt")}</th></tr></thead><tbody>{failures.data.data.items.map((failure) => <tr key={failure.failureId}><td><code className="table-code">{failure.failureId}</code><small>Endpoint {failure.endpointId} · offset {failure.sourcePartition}:{failure.sourceOffset}</small></td><td>{humanize(failure.failureStage)}<small>{failure.consumerName}</small></td><td><StatusPill value={failure.status} /></td><td>{failure.retryable ? t("operations.retryable") : t("operations.no")}<small>{t("operations.attempts", { count: failure.retryCount })}</small></td><td><strong>{failure.failureCode ?? t("operations.uncoded")}</strong><small>{failure.errorMessage}</small></td><td>{formatDateTime(failure.failedAt)}</td></tr>)}</tbody></DataTable><Pagination page={failures.data.data} /></> : <EmptyState title={t("operations.noFailureRows")} message={t("operations.noFailureRowsDescription")} />}
+    </Panel> : null}
   </div>;
 }
 
-function OperationsContent({ data }: { data: import("../contracts").IngestSummaryDto }) {
+function LiveHealth({ data }: { data: OperationsHealthDto }) {
   const { t } = useI18n();
   return <>
+    <section className={`health-summary tone-${data.status.toLowerCase()}`} aria-live="polite">
+      <div><Radio aria-hidden="true" size={18} /><span>{t("operations.liveControlPlane")}</span><StatusPill value={data.status} /></div>
+      <small>{t("operations.checked", { time: formatDateTime(data.checkedAt) })}</small>
+    </section>
+    <Panel title={t("operations.serviceHealth")} subtitle={t("operations.serviceHealthSubtitle")}>
+      <section className="service-health-grid">
+        {data.services.map((service) => <ServiceCard key={service.service} service={service} />)}
+      </section>
+    </Panel>
+    <Panel title={t("operations.pipelineWorkers")} subtitle={t("operations.pipelineWorkersSubtitle")}>
+      <DataTable label={t("operations.pipelineWorkerHealth")}><thead><tr><th scope="col">Worker</th><th scope="col">Topic</th><th scope="col">{t("filter.status")}</th><th scope="col">{t("operations.members")}</th><th scope="col">Lag</th><th scope="col">{t("operations.brokerState")}</th></tr></thead><tbody>
+        {data.workers.map((worker) => <tr key={worker.groupId}><td><strong>{worker.worker}</strong><code className="table-code">{worker.groupId}</code></td><td><code>{worker.topic}</code></td><td><StatusPill value={worker.status} /></td><td>{worker.memberCount ?? t("operations.unknown")}</td><td>{worker.lag ?? t("operations.unknown")}</td><td>{worker.detail}</td></tr>)}
+      </tbody></DataTable>
+    </Panel>
+  </>;
+}
+
+function ServiceCard({ service }: { service: ServiceHealthDto }) {
+  const icons: Record<string, ReactNode> = {
+    "Backend API": <Server size={18} />, PostgreSQL: <Database size={18} />, ClickHouse: <Activity size={18} />,
+    Kafka: <Radio size={18} />, S3: <Cloud size={18} />,
+  };
+  return <article className={`service-card tone-${service.status.toLowerCase()}`}>
+    <div><span className="service-icon">{icons[service.service] ?? <Server size={18} />}</span><StatusPill value={service.status} /></div>
+    <strong>{service.service}</strong>
+    <span>{service.latencyMs} ms</span>
+    <small>{service.detail}</small>
+  </article>;
+}
+
+function IngestContent({ data }: { data: IngestSummaryDto }) {
+  const { t } = useI18n();
+  const latest = freshness(data.events.latestIngestedAt);
+  return <>
     <section className="kpi-grid operations-kpis">
-      <KpiCard detail={t("common.latest", { time: formatDateTime(data.events.latestIngestedAt) })} icon={<Database size={18} />} label={t("operations.ingestedEvents")} value={data.events.ingestedCount} />
-      <KpiCard detail={t("common.oldest", { time: formatDateTime(data.eventFailures.oldestFailedAt) })} icon={<RefreshCcw size={18} />} label={t("operations.failed")} tone={data.eventFailures.failedCount ? "critical" : "neutral"} value={data.eventFailures.failedCount} />
+      <KpiCard detail={latest ? t("operations.ingestFreshness", { rate: data.events.ratePerMinute.toFixed(2), time: latest.time, minutes: latest.minutes }) : t("operations.noIngestedInRange")} icon={<Database size={18} />} label={t("operations.ingestedEvents")} value={data.events.ingestedCount} />
+      <KpiCard detail={t("operations.failureRate", { rate: data.eventFailures.ratePerMinute.toFixed(2), time: formatDateTime(data.eventFailures.oldestFailedAt) })} icon={<RefreshCcw size={18} />} label={t("operations.failed")} tone={data.eventFailures.failedCount ? "critical" : "neutral"} value={data.eventFailures.failedCount} />
       <KpiCard detail={t("operations.reprocessedDetail")} icon={<RefreshCcw size={18} />} label={t("operations.reprocessed")} value={data.eventFailures.reprocessedCount} />
       <KpiCard detail={t("operations.reprocessFailedDetail")} icon={<RefreshCcw size={18} />} label={t("operations.reprocessFailed")} tone={data.eventFailures.reprocessFailedCount ? "warning" : "neutral"} value={data.eventFailures.reprocessFailedCount} />
     </section>
@@ -42,6 +109,12 @@ function OperationsContent({ data }: { data: import("../contracts").IngestSummar
     </section></Panel>
     <Panel title={t("operations.boundary")} subtitle={t("operations.boundarySubtitle")}><div className="boundary-note"><HardDrive aria-hidden="true" size={22} /><div><strong>{t("operations.noWebReplay")}</strong><p>{t("operations.boundaryDescription")}</p></div></div></Panel>
   </>;
+}
+
+function freshness(timestamp: string | null): { time: string; minutes: number } | null {
+  if (!timestamp) return null;
+  const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(timestamp)) / 60_000));
+  return { time: formatDateTime(timestamp), minutes };
 }
 
 function StorageCount({ label, value }: { label: string; value: number }) {

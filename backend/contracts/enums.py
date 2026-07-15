@@ -85,6 +85,13 @@ class SensorHealth(StrEnum):
     UNAVAILABLE = "UNAVAILABLE"
 
 
+class WorkerStatus(StrEnum):
+    RUNNING = "RUNNING"
+    IDLE = "IDLE"
+    OFFLINE = "OFFLINE"
+    UNKNOWN = "UNKNOWN"
+
+
 class AgentArchitecture(StrEnum):
     X64 = "X64"
     ARM64 = "ARM64"

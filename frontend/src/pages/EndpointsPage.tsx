@@ -5,6 +5,7 @@ import { DataTable, EmptyState, ErrorState, Field, GlobalFilterBar, PageHeader, 
 import type { EndpointListQuery } from "../contracts";
 import { useI18n } from "../i18n/LocaleContext";
 import { formatDateTime } from "../lib/format";
+import { parseEndpointIds } from "../lib/endpointIds";
 import { allowedValue } from "../lib/params";
 import { numberParam, updateParams } from "../lib/url";
 
@@ -16,15 +17,18 @@ export function EndpointsPage() {
   const riskLevel = allowedValue(params.get("riskLevel"), ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const);
   const sortBy = allowedValue(params.get("sortBy"), ["riskScore", "lastSeenAt", "registeredAt"] as const) ?? "riskScore";
   const sortOrder = allowedValue(params.get("sortOrder"), ["asc", "desc"] as const) ?? "desc";
+  const endpointIds = parseEndpointIds(params.get("endpointIds"));
   const query: EndpointListQuery = { page: numberParam(params, "page", 1), size: numberParam(params, "size", 50), sortBy, sortOrder };
   if (status) query.status = status;
   if (osType) query.osType = osType;
   if (riskLevel) query.riskLevel = riskLevel;
+  if (endpointIds.length) query.endpointIds = endpointIds;
   const result = useQuery({ queryKey: ["endpoints", query], queryFn: ({ signal }) => api.endpoints(query, signal) });
 
   return <div className="page-stack">
     <PageHeader eyebrow={t("endpoints.eyebrow")} title={t("endpoints.title")} description={t("endpoints.description")} />
     <GlobalFilterBar hasFilters={params.size > 0} onClear={() => setParams({})}>
+      <Field label={t("filter.endpointIds")}><input onChange={(event) => setParams(updateParams(params, { endpointIds: event.target.value }))} placeholder="1, 2, 7" value={params.get("endpointIds") ?? ""} /></Field>
       <Field label={t("filter.status")}><select onChange={(event) => setParams(updateParams(params, { status: event.target.value }))} value={status ?? ""}><option value="">{t("filter.allStatuses")}</option><option>ONLINE</option><option>OFFLINE</option><option>RETIRED</option></select></Field>
       <Field label={t("endpoints.operatingSystem")}><select onChange={(event) => setParams(updateParams(params, { osType: event.target.value }))} value={osType ?? ""}><option value="">{t("endpoints.allSystems")}</option><option>WINDOWS</option><option>MACOS</option></select></Field>
       <Field label={t("endpoints.riskLevel")}><select onChange={(event) => setParams(updateParams(params, { riskLevel: event.target.value }))} value={riskLevel ?? ""}><option value="">{t("endpoints.allLevels")}</option><option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>CRITICAL</option></select></Field>

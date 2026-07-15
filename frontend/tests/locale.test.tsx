@@ -154,6 +154,10 @@ it("preserves the English regression copy and uses the agreed mixed Korean termi
   expect(translate("KO", "edrState.noReasons")).toBe("활성 Risk 요인 없음");
   expect(translate("KO", "alert.responseGuidance")).toBe("Response 가이던스");
   expect(translate("KO", "event.rawPayload")).toBe("원본 Payload");
+  expect(translate("KO", "event.processTree")).toBe("Process Tree");
+  expect(translate("KO", "operations.failureQueue")).toBe("Failure Queue");
+  expect(translate("KO", "dashboardLayout.edit")).toBe("Dashboard 편집");
+  expect(translate("KO", "intelligence.mitreTactics")).toBe("MITRE Tactic");
 });
 
 it("preserves Event capitalization in Korean time-series copy", async () => {
