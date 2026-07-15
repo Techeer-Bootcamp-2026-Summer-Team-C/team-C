@@ -1,6 +1,6 @@
 # 운영 배포 현황
 
-이 문서는 2026-07-15 KST 점검에서 확인한 스냅샷과 운영 절차를 기록한다. 실제 현재 상태는 Portainer의 컨테이너 이미지 태그와 라이브 health check를 다시 확인해야 한다.
+이 문서는 2026-07-15~16 KST 점검에서 확인한 스냅샷과 운영 절차를 기록한다. 실제 현재 상태는 Portainer의 컨테이너 이미지 태그와 라이브 health check를 다시 확인해야 한다.
 
 ## 결론
 
@@ -47,8 +47,12 @@
 - volume archive: 미사용 volume 14개를 `archives/docker-volumes/20260715T151036/unused-docker-volumes.tar.gz`(`289.5 MiB`)로 보관하고 체크섬 검증 후 삭제
 - S3 수명 주기: 기존 `archives/` 0일 Glacier Flexible Retrieval 전환과 `failures/` 90일 만료 규칙 확인, 중복 규칙은 만들지 않음
 - SSM Session Manager: EC2 역할에 `AmazonSSMManagedInstanceCore` 연결, Snap Agent `3.3.4793.0` 활성화, 인스턴스 `i-04b0a5ebb3c054f9a` 온라인 확인
-- Grafana Cloud 실측: 수집 대상 4개 모두 `up=1`, readiness `probe_success=1`, 루트 디스크 사용률 약 `38.23%`; 현재 consumer lag 시계열은 없음
-- Grafana Cloud 알림: 규칙 조건은 검증했으나 알림 수신처가 없어 저장 전 상태이며, 실제 수신 이메일 등록 후 3개 규칙을 고정할 예정
+- Grafana Cloud 실측: 수집 대상 4개 모두 `up=1`, readiness `probe_success=1`, 루트 디스크 사용률 약 `36.64%`; 현재 consumer lag 값은 `0`
+- Grafana Cloud 알림: Slack contact point `Grafana`에 아래 3개 규칙을 연결하고 `Team C Production` 폴더의 `team-c-production-1m` 평가 그룹에 저장
+  - `Backend readiness failed`: `probe_success < 1`, 1분 지속
+  - `Root disk usage high`: 루트 파일시스템 사용률 `> 85%`, 5분 지속
+  - `Kafka consumer lag high`: `sum(kafka_consumergroup_lag) or vector(0) > 100`, 5분 지속
+- Grafana Cloud 알림 검증: readiness와 디스크 규칙은 실제 평가 `Normal`, Kafka lag는 현재 값 `0`과 미리보기 `Normal`, 세 규칙 모두 저장 성공 확인
 
 삭제한 범위는 중단된 `edr-c-demo-*`, 생성만 되고 실행되지 않던 `edr-c-local-*`, Alloy/Grafana Cloud로 대체된 `edr-monitoring-*` 컨테이너와 그 뒤 미사용 상태가 된 이미지다. 운영 데이터 볼륨과 현재 이미지, Portainer Agent는 보존했다.
 
@@ -74,7 +78,6 @@ powershell -File tools/verify_production_deployment.ps1 `
 
 ### 우선순위 높음
 
-- Grafana Cloud에 실제 수신 이메일을 등록하고 readiness 실패·consumer lag·디스크 부족 규칙 3개를 저장한다.
 - PostgreSQL·ClickHouse 백업은 중요한 데이터 변경 또는 배포 전후에 갱신하고, 정기 자동화는 데이터 규모와 운영 빈도가 커질 때 적용한다.
 
 ### 다음 정리
