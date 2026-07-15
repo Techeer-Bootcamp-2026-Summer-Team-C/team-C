@@ -116,6 +116,8 @@ EDR_S3_BUCKET=<실제 S3 버킷 이름>
 
 비밀번호에 `@`, `:`, `/`, `?`, `#`, `[`, `]` 같은 문자가 있으면 DSN 안의 비밀번호를 URL 인코딩해야 한다. EC2 인스턴스 역할로 S3에 접근하므로 AWS Access Key와 Secret Key는 입력하지 않는다.
 
+> 운영 `edr-c-service`는 현재 `refs/heads/production` 브랜치 + polling으로 자동 배포된다(7절 참조). production 브랜치의 compose는 이미지 SHA가 고정돼 있어 `EDR_IMAGE_TAG`는 CI가 자동으로 채운다. 이 스택을 재구성할 때는 repository reference를 `refs/heads/production`으로 두고 `EDR_IMAGE_TAG` 없이 나머지 비밀 변수만 입력한다.
+
 필요할 때만 다음 포트를 기본값에서 바꾼다.
 
 ```text

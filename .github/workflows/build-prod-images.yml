@@ -10,7 +10,8 @@ on:
       - "backend/**"
       - "deploy/docker/**"
       - "deploy/nginx/**"
-      - "deploy/portainer/**"
+      - "deploy/portainer/compose.service.yaml"
+      - "deploy/portainer/pin-images.py"
       - "mappings/**"
       - "migrations/**"
       - "rules/**"
@@ -25,7 +26,7 @@ permissions:
   packages: write
 
 concurrency:
-  group: production-deploy
+  group: production-images-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -73,6 +74,9 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:

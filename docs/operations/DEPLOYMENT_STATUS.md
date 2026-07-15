@@ -69,11 +69,12 @@
 
 ## 표준 업데이트 절차
 
-1. `main`의 GitHub Actions 이미지 빌드가 성공했는지 확인한다.
-2. 전체 40자리 커밋 SHA를 `edr-c-service`의 `EDR_IMAGE_TAG`에 입력한다.
-3. `Pull latest image`를 켜고 서비스 스택만 재배포한다.
-4. `app-init=Exited (0)`, backend/Nginx=`healthy`, worker 2개=`running`을 확인한다.
-5. 저장소 checkout이 있는 관리 PC에서 Mac mini를 경유해 공개 경로와 API 계약을 확인한다.
+`edr-c-service`는 자동 배포된다(위 "2026-07-16 자동 배포 전환" 참조): `main`에 push하면 이미지 빌드 → `production` 브랜치 SHA 고정 → Portainer polling(5분)으로 자동 재배포된다. 수동 조작이 필요 없다. 인프라·관측 스택은 여전히 `refs/heads/main` 기준 수동 절차를 따른다.
+
+배포 후 확인:
+
+1. `app-init=Exited (0)`, backend/Nginx=`healthy`, worker 2개=`running`을 확인한다.
+2. 저장소 checkout이 있는 관리 PC에서 Mac mini를 경유해 공개 경로와 API 계약을 확인한다.
 
 ```powershell
 powershell -File tools/verify_production_deployment.ps1 `
@@ -81,7 +82,11 @@ powershell -File tools/verify_production_deployment.ps1 `
   -SshHost macmini
 ```
 
-6. 새 배포가 안정적인 것을 확인한 뒤에만 이전 SHA 이미지 중 Portainer가 `Unused`로 표시하는 항목을 제거한다.
+3. 새 배포가 안정적인 것을 확인한 뒤에만 이전 SHA 이미지 중 Portainer가 `Unused`로 표시하는 항목을 제거한다.
+
+### 수동 재배포·롤백 (예외 시에만)
+
+자동 배포가 막혔거나 이전 버전으로 되돌려야 할 때만 수동 개입한다. 이전 이미지 SHA는 GHCR에 남아 있으므로, 되돌릴 커밋을 `main`에 반영해 재빌드하거나(권장) admin이 Portainer에서 해당 SHA 이미지로 임시 재배포한다. `production` 브랜치의 compose는 이미지 SHA가 고정돼 있어 `EDR_IMAGE_TAG` 수동 변경은 더 이상 사용하지 않는다.
 
 ## 남은 운영 과제
 
@@ -92,6 +97,6 @@ powershell -File tools/verify_production_deployment.ps1 `
 ### 다음 정리
 
 - archive된 volume이 실제로 필요할 때만 개별 복원 훈련을 한다. 현재 운영 volume 6개는 유지한다.
-- 수동 SHA 승격이 운영 부담이 될 때만 Portainer webhook과 GitHub Environment 승인 기반 자동 배포를 검토한다.
+- 배포 게이트(테스트·린트 CI, Portainer webhook, GitHub Environment 승인)는 추후 도입을 검토한다. 현재는 polling 기반 자동 배포만 적용돼 있다.
 - Grafana Cloud 체험/과금 상태가 끝나기 전에 계속 사용할지 또는 대체할지 결정한다.
 - Vercel은 실제 소유 계정에서 프로젝트·도메인·환경 변수·배포 이력을 별도로 점검한다. 현재 Portainer 운영과 섞어 관리하지 않는다.
