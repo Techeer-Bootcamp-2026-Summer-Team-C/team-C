@@ -34,7 +34,7 @@
 - 이미지: 25개에서 실행 중인 7개 이미지로 정리하고 이전 `f13e554...` backend/Nginx 이미지 삭제
 - 스택: 7개에서 운영 3개와 Portainer Agent 스택만 남겨 4개로 정리
 - 네트워크: 연결이 없던 demo/local 네트워크 3개를 제거해 Docker 기본 3개와 운영 네트워크 3개만 유지
-- 데이터 볼륨: 20개(사용 중 6개, 미사용 표시 14개), 백업 전에는 삭제하지 않음
+- 데이터 볼륨: 미사용 14개를 S3에 archive한 뒤 삭제하고, 사용 중인 6개만 유지
 - Portainer Server: `2.39.3-alpine`에서 `2.39.5-alpine`으로 업그레이드하고 DB migration 성공 확인
 - Portainer HTTPS: 9443 활성화 후 Tailscale Serve의 tailnet 전용 HTTPS 주소에서 200 응답 확인
 - Portainer 백업: 업그레이드 전 `portainer_data` 압축, SHA-256 검증, 별도 volume 실제 복원 훈련 성공
@@ -43,6 +43,12 @@
 - 데이터 복구 훈련: 임시 DB에서 PostgreSQL public table 8개와 ClickHouse table 2개를 확인하고 임시 DB 삭제 완료
 - 이미지 후속 정리: 새 Agent 검증 후 미사용 `portainer/agent:2.39.3-alpine` 제거, 실행 이미지 7개만 유지
 - 관측 재검증: Alloy 최신 100줄에서 `level=error` 0건, Kafka exporter 메타데이터 갱신 지속 확인
+- 외부 백업: PostgreSQL·ClickHouse·Kafka 메타데이터 백업 5개 객체(`42.4 KiB`)를 `archives/ec2-backups/20260715T142555/`에 업로드하고 SHA-256 검증 완료
+- volume archive: 미사용 volume 14개를 `archives/docker-volumes/20260715T151036/unused-docker-volumes.tar.gz`(`289.5 MiB`)로 보관하고 체크섬 검증 후 삭제
+- S3 수명 주기: 기존 `archives/` 0일 Glacier Flexible Retrieval 전환과 `failures/` 90일 만료 규칙 확인, 중복 규칙은 만들지 않음
+- SSM Session Manager: EC2 역할에 `AmazonSSMManagedInstanceCore` 연결, Snap Agent `3.3.4793.0` 활성화, 인스턴스 `i-04b0a5ebb3c054f9a` 온라인 확인
+- Grafana Cloud 실측: 수집 대상 4개 모두 `up=1`, readiness `probe_success=1`, 루트 디스크 사용률 약 `38.23%`; 현재 consumer lag 시계열은 없음
+- Grafana Cloud 알림: 규칙 조건은 검증했으나 알림 수신처가 없어 저장 전 상태이며, 실제 수신 이메일 등록 후 3개 규칙을 고정할 예정
 
 삭제한 범위는 중단된 `edr-c-demo-*`, 생성만 되고 실행되지 않던 `edr-c-local-*`, Alloy/Grafana Cloud로 대체된 `edr-monitoring-*` 컨테이너와 그 뒤 미사용 상태가 된 이미지다. 운영 데이터 볼륨과 현재 이미지, Portainer Agent는 보존했다.
 
@@ -68,13 +74,12 @@ powershell -File tools/verify_production_deployment.ps1 `
 
 ### 우선순위 높음
 
-- PostgreSQL·ClickHouse·Kafka 정기 백업과 실제 복구 훈련을 자동화한다.
-- Grafana Cloud에서 컨테이너 단위 cAdvisor 지표가 충분히 수집되는지 다시 확인하고, readiness 실패·consumer lag·디스크 부족 알림을 코드나 런북으로 고정한다.
+- Grafana Cloud에 실제 수신 이메일을 등록하고 readiness 실패·consumer lag·디스크 부족 규칙 3개를 저장한다.
+- PostgreSQL·ClickHouse 백업은 중요한 데이터 변경 또는 배포 전후에 갱신하고, 정기 자동화는 데이터 규모와 운영 빈도가 커질 때 적용한다.
 
 ### 다음 정리
 
-- 현재 볼륨을 스택별로 매핑하고, 백업이 확인된 익명·고아 볼륨만 별도 승인 후 제거한다.
-- PostgreSQL·ClickHouse 논리 백업을 외부 저장소에 복제하고 실제 복구 훈련을 남긴다.
-- 수동 SHA 승격 절차가 안정화되면 Portainer webhook과 GitHub Environment 승인 기반 자동 배포를 검토한다.
+- archive된 volume이 실제로 필요할 때만 개별 복원 훈련을 한다. 현재 운영 volume 6개는 유지한다.
+- 수동 SHA 승격이 운영 부담이 될 때만 Portainer webhook과 GitHub Environment 승인 기반 자동 배포를 검토한다.
 - Grafana Cloud 체험/과금 상태가 끝나기 전에 계속 사용할지 또는 대체할지 결정한다.
 - Vercel은 실제 소유 계정에서 프로젝트·도메인·환경 변수·배포 이력을 별도로 점검한다. 현재 Portainer 운영과 섞어 관리하지 않는다.
