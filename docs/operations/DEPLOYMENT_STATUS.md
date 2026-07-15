@@ -25,7 +25,7 @@
 - 운영 Compose 마지막 변경: `d08a0b538b8d1e466bd62b450e8a03335e32e895`
 - GitHub Actions `Build production images`: `273fa115f5dacfa2efaf6bcf34cdb5ca64e37ec5`의 backend와 Nginx 이미지 빌드 성공
 - 서비스 스택의 `EDR_IMAGE_TAG`: 위 이미지 빌드 SHA로 갱신 후 pull/redeploy 성공
-- 세 Git 기반 스택의 repository reference: 모두 `refs/heads/main`
+- 세 Git 기반 스택의 repository reference: 모두 `refs/heads/main` (2026-07-16 `edr-c-service`만 `refs/heads/production` + polling으로 전환, 아래 절 참조)
 - 관측 스택: Docker 로그 필터 결과를 실제 Loki source에 연결하고 `/run/udev/data`를 읽기 전용으로 마운트한 최신 Compose로 재배포
 - Alloy: `running`, remote-write WAL 재생과 Kafka exporter 갱신 확인, `/run/udev/data` 오류 없음
 - HTTP 검증: `/nginx-health` 200 `ok`, `/health/ready` 200 `ready`
@@ -57,6 +57,15 @@
 삭제한 범위는 중단된 `edr-c-demo-*`, 생성만 되고 실행되지 않던 `edr-c-local-*`, Alloy/Grafana Cloud로 대체된 `edr-monitoring-*` 컨테이너와 그 뒤 미사용 상태가 된 이미지다. 운영 데이터 볼륨과 현재 이미지, Portainer Agent는 보존했다.
 
 볼륨 이름만으로 사용 여부를 판단하면 안 된다. 현재 인프라는 이전 스택에서 생성된 `edr-c-demo-*` 또는 `edr-c-local_*` 이름의 일부 외부 볼륨을 실제 운영 데이터 볼륨으로 재사용한다. Portainer에서 `Unused` 표시가 없거나 현재 컨테이너에 연결된 볼륨은 이름이 오래돼 보여도 삭제하지 않는다.
+
+## 2026-07-16 자동 배포 전환
+
+- `edr-c-service` 스택을 `refs/heads/production` + GitOps polling(5분, re-pull)으로 전환. 이 스택은 더 이상 `EDR_IMAGE_TAG`를 수동으로 바꾸지 않는다.
+- `main` push → GitHub Actions가 backend·Nginx 이미지를 커밋 SHA로 빌드 → `promote` job이 `compose.service.yaml`의 이미지 태그를 그 SHA로 고정해 `production` 브랜치에 기록 → Portainer polling이 감지해 자동 재배포. (실측 검증 완료)
+- `promote`는 `main` push에서만 실행된다(`workflow_dispatch`로 임의 브랜치를 승격할 수 없음).
+- 나머지 스택(`edr-c-infra`, `edr-c-observability`)은 계속 `refs/heads/main` 기준이며 수동 절차를 따른다.
+- 비밀값(JWT·DSN 등)은 여전히 Portainer 스택 환경 변수에만 저장하고, `production` 브랜치에는 이미지 SHA만 기록한다.
+- 전제: EC2 endpoint의 `allowBindMountsForRegularUsers`를 활성화해야 Nginx TLS bind mount 배포가 막히지 않는다.
 
 ## 표준 업데이트 절차
 
