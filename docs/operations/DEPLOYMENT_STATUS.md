@@ -6,7 +6,7 @@
 
 운영 배포의 기준은 Vercel이 아니라 EC2의 Portainer Agent 환경이다. Mac mini의 Portainer Server가 EC2 Agent를 관리하고, 애플리케이션은 GHCR에 빌드된 커밋 SHA 고정 이미지를 사용한다. Vercel은 다른 계정에서 관리되고 있어 이번 점검과 변경 범위에서 제외했다.
 
-최종 점검 시점 운영 서비스는 이미지 빌드 커밋 `273fa115f5dacfa2efaf6bcf34cdb5ca64e37ec5`의 backend와 Nginx를 사용한다. 운영 Compose와 문서의 최신 `main`은 `d08a0b538b8d1e466bd62b450e8a03335e32e895`이며, 이 커밋은 이미지 빌드 대상 경로를 바꾸지 않아 별도 서비스 이미지를 만들지 않았다. backend와 Nginx는 `healthy`, PostgreSQL·ClickHouse·Kafka는 `healthy`, 두 worker와 Alloy, Portainer Agent는 `running`, 일회성 `app-init`은 정상 종료 상태인 `Exited (0)`이다. 워킹트리의 미커밋 변경은 운영 이미지에 포함되지 않는다.
+최종 점검 시점 운영 서비스는 이미지 빌드 커밋 `273fa115f5dacfa2efaf6bcf34cdb5ca64e37ec5`의 backend와 Nginx를 사용한다. 운영 Compose의 마지막 변경은 `d08a0b538b8d1e466bd62b450e8a03335e32e895`이며, 이 커밋은 이미지 빌드 대상 경로를 바꾸지 않아 별도 서비스 이미지를 만들지 않았다. 이 문서만 바꾸는 후속 커밋도 런타임 재배포 대상이 아니다. backend와 Nginx는 `healthy`, PostgreSQL·ClickHouse·Kafka는 `healthy`, 두 worker와 Alloy, Portainer Agent는 `running`, 일회성 `app-init`은 정상 종료 상태인 `Exited (0)`이다. 워킹트리의 미커밋 변경은 운영 이미지에 포함되지 않는다.
 
 ## 배포 소스 오브 트루스
 
@@ -21,7 +21,7 @@
 
 ## 2026-07-15 적용 결과
 
-- 최종 Git `main`과 `origin/main`: `d08a0b538b8d1e466bd62b450e8a03335e32e895`
+- 운영 Compose 마지막 변경: `d08a0b538b8d1e466bd62b450e8a03335e32e895`
 - GitHub Actions `Build production images`: `273fa115f5dacfa2efaf6bcf34cdb5ca64e37ec5`의 backend와 Nginx 이미지 빌드 성공
 - 서비스 스택의 `EDR_IMAGE_TAG`: 위 이미지 빌드 SHA로 갱신 후 pull/redeploy 성공
 - 세 Git 기반 스택의 repository reference: 모두 `refs/heads/main`
