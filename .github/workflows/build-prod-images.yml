@@ -67,26 +67,3 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.image }}:${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
-
-  promote:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Pin service images to the built commit SHA
-        run: python3 deploy/portainer/pin-images.py "${{ github.sha }}"
-
-      - name: Publish production deploy manifest
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -B production
-          git add deploy/portainer/compose.service.yaml
-          git commit -m "deploy: pin service images to ${GITHUB_SHA}"
-          git push --force origin production
