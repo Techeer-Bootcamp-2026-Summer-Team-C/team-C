@@ -127,8 +127,16 @@ def test_observability_stack_runs_pinned_alloy_without_public_ports() -> None:
         for volume in alloy["volumes"]
         if isinstance(volume, dict) and volume["type"] == "bind"
     }
-    assert bind_sources == {"/", "/proc", "/sys", "/var/run/docker.sock"}
-    assert all("bind" not in volume for volume in alloy["volumes"] if isinstance(volume, dict))
+    assert bind_sources == {"/", "/proc", "/run/udev/data", "/sys", "/var/run/docker.sock"}
+
+    udev_mount = next(
+        volume
+        for volume in alloy["volumes"]
+        if isinstance(volume, dict) and volume["source"] == "/run/udev/data"
+    )
+    assert udev_mount["target"] == "/run/udev/data"
+    assert udev_mount["read_only"] is True
+    assert udev_mount["bind"] == {"create_host_path": False}
     assert "$$ALLOY_CONFIG" in alloy["command"][0]
 
 

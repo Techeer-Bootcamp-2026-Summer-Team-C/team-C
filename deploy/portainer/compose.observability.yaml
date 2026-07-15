@@ -175,6 +175,12 @@ services:
         source: /sys
         target: /host/sys
         read_only: true
+      - type: bind
+        source: /run/udev/data
+        target: /run/udev/data
+        read_only: true
+        bind:
+          create_host_path: false
       - alloy-data:/var/lib/alloy/data
     networks:
       - data

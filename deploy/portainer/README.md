@@ -162,6 +162,7 @@ EC2에 저장소 checkout과 PowerShell이 실제로 설치된 경우에만 `-Ss
 - `EDR_NGINX_CERT_DIR` 누락 오류: 환경 변수 대신 `/etc/edr-c/tls` 고정 절대 경로를 사용한다.
 - `undefined volume -` 오류: Nginx 인증서 마운트를 Compose long syntax로 명시하고 모든 named volume을 최상위 `volumes`에 정의한다.
 - 원격 Agent의 Git 상대 경로 bind 오류: Portainer 서버의 `/data/compose/...` 경로는 EC2에 존재하지 않으므로 repository 파일을 `configs.file`이나 bind mount로 전달하지 않는다. Alloy 설정은 Compose에 포함하고 컨테이너 내부에서 파일로 만든다.
+- Alloy node exporter의 `/run/udev/data` 오류: 호스트의 udev 데이터 디렉터리를 같은 경로에 읽기 전용으로 mount하고 `create_host_path: false`로 잘못된 빈 디렉터리 생성을 막는다.
 
 ## 8. Grafana Cloud 연동
 
