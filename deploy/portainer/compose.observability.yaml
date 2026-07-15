@@ -89,7 +89,7 @@ x-alloy-config: &alloy-config |
   }
 
   discovery.relabel "docker_logs" {
-    targets = []
+    targets = discovery.docker.local.targets
 
     rule {
       source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
@@ -115,9 +115,8 @@ x-alloy-config: &alloy-config |
   }
 
   loki.source.docker "local" {
-    host          = "unix:///var/run/docker.sock"
-    targets       = discovery.docker.local.targets
-    relabel_rules = discovery.relabel.docker_logs.rules
+    host    = "unix:///var/run/docker.sock"
+    targets = discovery.relabel.docker_logs.output
     labels        = {
       cluster     = "team-c",
       environment = "production",

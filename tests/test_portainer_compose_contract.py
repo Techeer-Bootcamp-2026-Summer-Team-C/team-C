@@ -162,4 +162,61 @@ def test_alloy_collects_only_the_intended_production_signals() -> None:
     assert "http://backend:8000/health/ready" in alloy
     assert 'loki.source.docker "local"' in alloy
     assert 'regex         = "edr-c-(infra|service|observability)"' in alloy
+    assert "targets = discovery.docker.local.targets" in alloy
+    assert "targets = discovery.relabel.docker_logs.output" in alloy
+    assert "relabel_rules" not in alloy
     assert "GRAFANA_CLOUD_TOKEN=" not in alloy
+
+
+def test_portainer_environment_examples_cover_required_variables_without_secrets() -> None:
+    expected = {
+        "env.infra.example": {
+            "POSTGRES_USER",
+            "POSTGRES_PASSWORD",
+            "CLICKHOUSE_USER",
+            "CLICKHOUSE_PASSWORD",
+            "POSTGRES_VOLUME_NAME",
+            "CLICKHOUSE_VOLUME_NAME",
+            "KAFKA_VOLUME_NAME",
+        },
+        "env.service.example": {
+            "EDR_IMAGE_TAG",
+            "EDR_JWT_SECRET",
+            "EDR_POSTGRES_DSN",
+            "EDR_CLICKHOUSE_DSN",
+            "EDR_AWS_REGION",
+            "EDR_S3_BUCKET",
+        },
+        "env.observability.example": {
+            "GRAFANA_CLOUD_METRICS_URL",
+            "GRAFANA_CLOUD_METRICS_USER",
+            "GRAFANA_CLOUD_LOGS_URL",
+            "GRAFANA_CLOUD_LOGS_USER",
+            "GRAFANA_CLOUD_TOKEN",
+        },
+    }
+
+    for filename, required_names in expected.items():
+        lines = (PORTAINER / filename).read_text(encoding="utf-8").splitlines()
+        values = dict(line.split("=", 1) for line in lines if line and not line.startswith("#"))
+
+        assert required_names <= values.keys()
+        assert all(value for value in values.values())
+        assert all(
+            "<" in value and ">" in value
+            for name, value in values.items()
+            if name.endswith(("PASSWORD", "SECRET", "TOKEN"))
+        )
+
+
+def test_production_verifier_checks_health_and_current_api_contracts() -> None:
+    verifier = (ROOT / "tools/verify_production_deployment.ps1").read_text(encoding="utf-8")
+
+    assert '"/nginx-health"' in verifier
+    assert '"/health/ready"' in verifier
+    assert '"/openapi.json"' in verifier
+    assert '"/api/v1/users/me/locale"' in verifier
+    assert '"/api/v1/dashboard/layouts/{dashboardKey}"' in verifier
+    assert '"/api/v1/endpoints/{endpointId}/process-tree"' in verifier
+    assert "[string]$SshHost" in verifier
+    assert "ssh $SshHost curl" in verifier
