@@ -1,12 +1,14 @@
 # Portainer 배포 순서
 
-이 디렉터리의 Compose는 EC2의 Portainer Agent 환경에 배포한다. Vercel 프론트엔드와 Mac mini의 Portainer Server는 이 Compose에서 관리하지 않는다. PostgreSQL, ClickHouse, Kafka는 `edr-c-infra`, 백엔드와 워커, Nginx는 `edr-c-service`로 분리한다.
+이 디렉터리의 인프라·서비스·관측 Compose는 EC2의 Portainer Agent 환경에 배포한다. Mac mini의 Portainer Server는 `compose.portainer-server.yaml`을 `/Users/geonha/portainer/docker-compose.yml`로 동기화해 별도로 실행한다. Vercel 프론트엔드는 이 범위에서 관리하지 않는다. PostgreSQL, ClickHouse, Kafka는 `edr-c-infra`, 백엔드와 워커, Nginx는 `edr-c-service`로 분리한다.
 
-운영 배포의 소스 오브 트루스는 다음 세 파일이다.
+운영 배포의 소스 오브 트루스는 다음 다섯 파일이다.
 
 - `compose.infra.yaml`
 - `compose.service.yaml`
 - `compose.observability.yaml`
+- `compose.portainer-agent.yaml`
+- `compose.portainer-server.yaml`
 
 Portainer에 입력할 변수 이름은 `env.infra.example`, `env.service.example`, `env.observability.example`을 참고한다. 예시 파일에는 비밀값을 넣지 않으며 실제 값은 Portainer 환경 변수로만 관리한다. 현재 운영 스냅샷과 남은 과제는 `docs/operations/DEPLOYMENT_STATUS.md`에 기록한다.
 
@@ -203,3 +205,31 @@ Grafana Cloud에서 메트릭과 로그 유입을 확인하기 전에는 기존 
 이미지 정리는 새 SHA 배포 검증 이후에만 수행한다. Portainer가 `Unused`로 표시한 이미지에 한해 삭제하고, 실행 중인 컨테이너의 이미지와 데이터 볼륨은 함께 삭제하지 않는다. 볼륨 정리는 백업과 스택별 매핑을 확인한 별도 작업으로 처리한다.
 
 Vercel은 계속 Portainer 관리 범위 밖에 둔다.
+
+## 9. Mac mini Portainer Server
+
+Portainer Server는 `2.39.5-alpine`으로 고정하고 영속 volume `portainer_data`를 재사용한다. 컨테이너의 9443은 Mac mini loopback에만 바인딩하고 Tailscale Serve가 이를 tailnet 전용 HTTPS로 전달한다. 외부에 9000 HTTP를 계속 공개하지 않는다.
+
+```bash
+cp deploy/portainer/compose.portainer-server.yaml /Users/geonha/portainer/docker-compose.yml
+cd /Users/geonha/portainer
+docker compose up -d
+tailscale serve --bg --yes https+insecure://localhost:9443
+tailscale serve status
+```
+
+서버와 EC2의 표준 Agent는 같은 패치 버전을 사용한다. Server 또는 Agent를 올리기 전에는 `docs/operations/PORTAINER_BACKUP_RECOVERY.md`의 백업과 비파괴 복구 훈련을 먼저 수행한다.
+
+## 10. EC2 Portainer Agent
+
+Agent를 Portainer의 컨테이너 Duplicate/Edit 화면에서 직접 교체하지 않는다. 저장소의 `compose.portainer-agent.yaml`을 EC2의 `/home/ubuntu/portainer/docker-compose.yml`에 동기화한 뒤 SSH에서 Compose로 갱신한다. 새 이미지를 먼저 pull한 뒤 Compose를 갱신하면 pull 또는 검증 실패가 기존 Agent를 먼저 제거하지 않는다.
+
+```bash
+cd /home/ubuntu/portainer
+docker compose pull portainer-agent
+docker compose up -d --no-deps portainer-agent
+docker compose ps
+docker compose logs --tail 100 portainer-agent
+```
+
+Agent의 9001 포트는 EC2 보안 그룹에서 인터넷에 공개하지 않고 Mac mini와 EC2가 속한 tailnet 경로로만 접근한다. Server의 environment 주소도 EC2 Tailscale IP의 9001을 사용한다.

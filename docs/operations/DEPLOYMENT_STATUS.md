@@ -15,7 +15,8 @@
 | 데이터 인프라 | `edr-c-infra` | `deploy/portainer/compose.infra.yaml` |
 | API·worker·Nginx | `edr-c-service` | `deploy/portainer/compose.service.yaml` |
 | Grafana Cloud 수집 | `edr-c-observability` | `deploy/portainer/compose.observability.yaml` |
-| 원격 관리 Agent | `portainer` | EC2에서 별도 관리 |
+| 원격 관리 Agent | EC2 `portainer-agent` | `deploy/portainer/compose.portainer-agent.yaml` |
+| 관리 서버 | Mac mini `portainer` | `deploy/portainer/compose.portainer-server.yaml` |
 
 단일 호스트 개발·데모 Compose나 Vercel 설정은 운영 Portainer 배포의 기준이 아니다. 환경 변수 이름은 `deploy/portainer/env.*.example`을 참고하고, 실제 비밀값은 Portainer에만 저장한다.
 
@@ -34,6 +35,14 @@
 - 스택: 7개에서 운영 3개와 Portainer Agent 스택만 남겨 4개로 정리
 - 네트워크: 연결이 없던 demo/local 네트워크 3개를 제거해 Docker 기본 3개와 운영 네트워크 3개만 유지
 - 데이터 볼륨: 20개(사용 중 6개, 미사용 표시 14개), 백업 전에는 삭제하지 않음
+- Portainer Server: `2.39.3-alpine`에서 `2.39.5-alpine`으로 업그레이드하고 DB migration 성공 확인
+- Portainer HTTPS: 9443 활성화 후 Tailscale Serve의 tailnet 전용 HTTPS 주소에서 200 응답 확인
+- Portainer 백업: 업그레이드 전 `portainer_data` 압축, SHA-256 검증, 별도 volume 실제 복원 훈련 성공
+- Portainer Agent: UI 직접 교체 실패 후 기존 Compose로 복구하고, 이미지를 먼저 pull하는 절차로 `2.39.5-alpine` 전환 및 endpoint `Up` 확인
+- 운영 데이터 백업: `/home/ubuntu/backups/20260715T142555`에 PostgreSQL dump, ClickHouse native backup, Kafka 토픽·consumer 스냅샷과 SHA-256 생성
+- 데이터 복구 훈련: 임시 DB에서 PostgreSQL public table 8개와 ClickHouse table 2개를 확인하고 임시 DB 삭제 완료
+- 이미지 후속 정리: 새 Agent 검증 후 미사용 `portainer/agent:2.39.3-alpine` 제거, 실행 이미지 7개만 유지
+- 관측 재검증: Alloy 최신 100줄에서 `level=error` 0건, Kafka exporter 메타데이터 갱신 지속 확인
 
 삭제한 범위는 중단된 `edr-c-demo-*`, 생성만 되고 실행되지 않던 `edr-c-local-*`, Alloy/Grafana Cloud로 대체된 `edr-monitoring-*` 컨테이너와 그 뒤 미사용 상태가 된 이미지다. 운영 데이터 볼륨과 현재 이미지, Portainer Agent는 보존했다.
 
@@ -60,13 +69,12 @@ powershell -File tools/verify_production_deployment.ps1 `
 ### 우선순위 높음
 
 - PostgreSQL·ClickHouse·Kafka 정기 백업과 실제 복구 훈련을 자동화한다.
-- Portainer Server의 HTTP 9000 접근을 9443 HTTPS 또는 Tailscale HTTPS로 전환한다.
-- Portainer 2.39.3 LTS를 현재 제공되는 패치 버전으로 올리기 전에 설정과 데이터 백업을 만든다.
 - Grafana Cloud에서 컨테이너 단위 cAdvisor 지표가 충분히 수집되는지 다시 확인하고, readiness 실패·consumer lag·디스크 부족 알림을 코드나 런북으로 고정한다.
 
 ### 다음 정리
 
 - 현재 볼륨을 스택별로 매핑하고, 백업이 확인된 익명·고아 볼륨만 별도 승인 후 제거한다.
+- PostgreSQL·ClickHouse 논리 백업을 외부 저장소에 복제하고 실제 복구 훈련을 남긴다.
 - 수동 SHA 승격 절차가 안정화되면 Portainer webhook과 GitHub Environment 승인 기반 자동 배포를 검토한다.
 - Grafana Cloud 체험/과금 상태가 끝나기 전에 계속 사용할지 또는 대체할지 결정한다.
 - Vercel은 실제 소유 계정에서 프로젝트·도메인·환경 변수·배포 이력을 별도로 점검한다. 현재 Portainer 운영과 섞어 관리하지 않는다.

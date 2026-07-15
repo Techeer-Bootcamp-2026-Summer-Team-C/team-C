@@ -34,6 +34,46 @@ def test_portainer_stacks_split_infrastructure_from_services() -> None:
     assert "minio" not in infra["services"] | service["services"]
 
 
+def test_portainer_server_is_pinned_and_exposes_only_loopback_https() -> None:
+    server = _load("compose.portainer-server.yaml")
+    portainer = server["services"]["portainer"]
+
+    assert set(server["services"]) == {"portainer"}
+    assert portainer["image"] == "portainer/portainer-ce:2.39.5-alpine"
+    assert portainer["ports"] == ["127.0.0.1:9443:9443"]
+    assert portainer["restart"] == "unless-stopped"
+    assert portainer["volumes"] == [
+        "/var/run/docker.sock:/var/run/docker.sock",
+        "portainer-data:/data",
+    ]
+    assert server["volumes"]["portainer-data"] == {
+        "external": True,
+        "name": "portainer_data",
+    }
+    assert server["networks"]["portainer-network"] == {"name": "portainer-network"}
+
+
+def test_portainer_agent_is_pinned_and_preserves_required_host_mounts() -> None:
+    agent_compose = _load("compose.portainer-agent.yaml")
+    agent = agent_compose["services"]["portainer-agent"]
+
+    assert agent_compose["name"] == "portainer"
+    assert set(agent_compose["services"]) == {"portainer-agent"}
+    assert agent["image"] == "portainer/agent:2.39.5-alpine"
+    assert agent["container_name"] == "portainer-agent"
+    assert agent["ports"] == ["9001:9001"]
+    assert agent["restart"] == "unless-stopped"
+    assert agent["volumes"] == [
+        "/var/run/docker.sock:/var/run/docker.sock",
+        "/var/lib/docker/volumes:/var/lib/docker/volumes",
+        "/:/host",
+    ]
+    assert agent_compose["networks"]["portainer-network"] == {
+        "external": True,
+        "name": "portainer-network",
+    }
+
+
 def test_portainer_stacks_never_build_on_the_remote_environment() -> None:
     infra = _load("compose.infra.yaml")
     service = _load("compose.service.yaml")
