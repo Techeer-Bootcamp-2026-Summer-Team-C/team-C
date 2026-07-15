@@ -6,7 +6,7 @@
 
 운영 배포의 기준은 Vercel이 아니라 EC2의 Portainer Agent 환경이다. Mac mini의 Portainer Server가 EC2 Agent를 관리하고, 애플리케이션은 GHCR에 빌드된 커밋 SHA 고정 이미지를 사용한다. Vercel은 다른 계정에서 관리되고 있어 이번 점검과 변경 범위에서 제외했다.
 
-점검 시점 운영 서비스는 Git 커밋 `f13e554c1a806bb6ab4889ef4c3ebcc69a7c8dda`의 backend와 Nginx 이미지였다. backend와 Nginx는 `healthy`, PostgreSQL·ClickHouse·Kafka는 `healthy`, 두 worker와 Alloy, Portainer Agent는 `running`, 일회성 `app-init`은 정상 종료 상태인 `Exited (0)`이었다. 워킹트리의 미커밋 변경은 운영 이미지에 포함되지 않는다.
+최종 점검 시점 운영 서비스는 이미지 빌드 커밋 `273fa115f5dacfa2efaf6bcf34cdb5ca64e37ec5`의 backend와 Nginx를 사용한다. 운영 Compose와 문서의 최신 `main`은 `d08a0b538b8d1e466bd62b450e8a03335e32e895`이며, 이 커밋은 이미지 빌드 대상 경로를 바꾸지 않아 별도 서비스 이미지를 만들지 않았다. backend와 Nginx는 `healthy`, PostgreSQL·ClickHouse·Kafka는 `healthy`, 두 worker와 Alloy, Portainer Agent는 `running`, 일회성 `app-init`은 정상 종료 상태인 `Exited (0)`이다. 워킹트리의 미커밋 변경은 운영 이미지에 포함되지 않는다.
 
 ## 배포 소스 오브 트루스
 
@@ -21,16 +21,19 @@
 
 ## 2026-07-15 적용 결과
 
-- 점검 당시 Git `main`과 `origin/main`: `f13e554c1a806bb6ab4889ef4c3ebcc69a7c8dda`
-- GitHub Actions `Build production images`: backend와 Nginx 이미지 빌드 성공
-- 서비스 스택의 `EDR_IMAGE_TAG`: 위 40자리 SHA로 갱신 후 pull/redeploy 성공
+- 최종 Git `main`과 `origin/main`: `d08a0b538b8d1e466bd62b450e8a03335e32e895`
+- GitHub Actions `Build production images`: `273fa115f5dacfa2efaf6bcf34cdb5ca64e37ec5`의 backend와 Nginx 이미지 빌드 성공
+- 서비스 스택의 `EDR_IMAGE_TAG`: 위 이미지 빌드 SHA로 갱신 후 pull/redeploy 성공
+- 세 Git 기반 스택의 repository reference: 모두 `refs/heads/main`
+- 관측 스택: Docker 로그 필터 결과를 실제 Loki source에 연결하고 `/run/udev/data`를 읽기 전용으로 마운트한 최신 Compose로 재배포
+- Alloy: `running`, remote-write WAL 재생과 Kafka exporter 갱신 확인, `/run/udev/data` 오류 없음
 - HTTP 검증: `/nginx-health` 200 `ok`, `/health/ready` 200 `ready`
 - OpenAPI 검증: 25개 path, locale·dashboard layout·process tree 계약 포함
 - 컨테이너: 30개에서 운영에 필요한 10개로 정리
-- 이미지: 25개에서 실행 중인 7개 이미지로 정리
+- 이미지: 25개에서 실행 중인 7개 이미지로 정리하고 이전 `f13e554...` backend/Nginx 이미지 삭제
 - 스택: 7개에서 운영 3개와 Portainer Agent 스택만 남겨 4개로 정리
 - 네트워크: 연결이 없던 demo/local 네트워크 3개를 제거해 Docker 기본 3개와 운영 네트워크 3개만 유지
-- 데이터 볼륨: 삭제하지 않음
+- 데이터 볼륨: 20개(사용 중 6개, 미사용 표시 14개), 백업 전에는 삭제하지 않음
 
 삭제한 범위는 중단된 `edr-c-demo-*`, 생성만 되고 실행되지 않던 `edr-c-local-*`, Alloy/Grafana Cloud로 대체된 `edr-monitoring-*` 컨테이너와 그 뒤 미사용 상태가 된 이미지다. 운영 데이터 볼륨과 현재 이미지, Portainer Agent는 보존했다.
 
