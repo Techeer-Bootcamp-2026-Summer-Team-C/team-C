@@ -98,12 +98,14 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
     postgres_down = ROOT / "migrations/postgresql/0001_initial.down.sql"
     postgres_up = ROOT / "migrations/postgresql/0001_initial.up.sql"
     postgres_login_id_up = ROOT / "migrations/postgresql/0002_user_login_id.up.sql"
+    postgres_user_locale_up = ROOT / "migrations/postgresql/0003_user_locale.up.sql"
     clickhouse_down = ROOT / "migrations/clickhouse/0001_initial.down.sql"
     clickhouse_up = ROOT / "migrations/clickhouse/0001_initial.up.sql"
     with psycopg.connect(postgres_dsn) as connection:
         apply_postgres_file(connection, postgres_down)
         apply_postgres_file(connection, postgres_up)
         apply_postgres_file(connection, postgres_login_id_up)
+        apply_postgres_file(connection, postgres_user_locale_up)
     apply_clickhouse_file(clickhouse, clickhouse_down)
     apply_clickhouse_file(clickhouse, clickhouse_up)
     try:
@@ -129,16 +131,19 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
     with psycopg.connect(postgres_dsn) as connection:
         admin_hash = hash_password("admin-password")
         viewer_hash = hash_password("viewer-password")
+        analyst_hash = hash_password("analyst-password")
         disabled_hash = hash_password("disabled-password")
         connection.execute(
             """
             INSERT INTO users (login_id, password_hash, name, role, status, created_at, updated_at) VALUES
             ('admin', %s, 'Admin', 'ADMIN', 'ACTIVE', %s, %s),
             ('viewer', %s, 'Viewer', 'VIEWER', 'ACTIVE', %s, %s),
+            ('analyst', %s, 'Analyst', 'ANALYST', 'ACTIVE', %s, %s),
             ('disabled', %s, 'Disabled', 'ANALYST', 'DISABLED', %s, %s)
             """,
-            (admin_hash, now, now, viewer_hash, now, now, disabled_hash, now, now),
+            (admin_hash, now, now, viewer_hash, now, now, analyst_hash, now, now, disabled_hash, now, now),
         )
+        connection.execute("UPDATE users SET locale = 'KO' WHERE login_id = 'viewer'")
         connection.execute(
             """
             INSERT INTO endpoints (
@@ -250,6 +255,7 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
         admin_token = login.json()["data"]["accessToken"]
         assert login.json()["data"]["expiresIn"] == 43_200
         assert login.json()["data"]["user"]["loginId"] == "admin"
+        assert login.json()["data"]["user"]["locale"] == "EN"
         assert (
             client.post(
                 "/api/v1/auth/login",
@@ -264,10 +270,68 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
             ).status_code
             == 403
         )
-        viewer_token = client.post(
+        viewer_login = client.post(
             "/api/v1/auth/login",
             json={"loginId": "viewer", "password": "viewer-password"},
+        ).json()["data"]
+        viewer_token = viewer_login["accessToken"]
+        assert viewer_login["user"]["locale"] == "KO"
+        analyst_token = client.post(
+            "/api/v1/auth/login",
+            json={"loginId": "analyst", "password": "analyst-password"},
         ).json()["data"]["accessToken"]
+
+        assert client.get("/api/v1/users/me").status_code == 401
+        me = client.get("/api/v1/users/me", headers=_auth(admin_token))
+        assert me.status_code == 200
+        assert me.json()["data"]["locale"] == "EN"
+        assert (
+            client.patch(
+                "/api/v1/users/me/locale", headers=_auth(admin_token), json={"locale": "JA"}
+            ).status_code
+            == 400
+        )
+        changed_locale = client.patch(
+            "/api/v1/users/me/locale", headers=_auth(admin_token), json={"locale": "KO"}
+        )
+        same_locale = client.patch(
+            "/api/v1/users/me/locale", headers=_auth(admin_token), json={"locale": "KO"}
+        )
+        assert changed_locale.status_code == same_locale.status_code == 200
+        assert changed_locale.json()["data"]["locale"] == same_locale.json()["data"]["locale"] == "KO"
+        assert (
+            client.patch(
+                "/api/v1/users/me/locale", headers=_auth(viewer_token), json={"locale": "EN"}
+            ).json()["data"]["locale"]
+            == "EN"
+        )
+        assert (
+            client.patch(
+                "/api/v1/users/me/locale", headers=_auth(analyst_token), json={"locale": "KO"}
+            ).json()["data"]["locale"]
+            == "KO"
+        )
+        assert (
+            client.patch(
+                "/api/v1/users/2/locale", headers=_auth(admin_token), json={"locale": "EN"}
+            ).status_code
+            == 404
+        )
+        assert (
+            client.post(
+                "/api/v1/auth/login", json={"loginId": "admin", "password": "admin-password"}
+            ).json()["data"]["user"]["locale"]
+            == "KO"
+        )
+        with psycopg.connect(postgres_dsn) as connection:
+            locale_audits = connection.execute(
+                """
+                SELECT actor_type, actor_identifier, resource_type, resource_id, before_json, after_json
+                FROM audit_logs WHERE action = 'USER_LOCALE_CHANGED' ORDER BY audit_log_id
+                """
+            ).fetchall()
+        assert len(locale_audits) == 3
+        assert locale_audits[0] == ("USER", "1", "USER", "1", {"locale": "EN"}, {"locale": "KO"})
         tampered = admin_token + "tampered"
         expired = issue_access_token(
             user_id=1,

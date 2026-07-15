@@ -6,9 +6,11 @@ from backend.main import create_app
 from tools.export_openapi import render_openapi
 
 ROOT = Path(__file__).parents[1]
-TAGS = {"Auth", "Endpoints", "Events", "Archives", "Alerts", "Incidents", "Dashboard", "Collector"}
+TAGS = {"Auth", "Users", "Endpoints", "Events", "Archives", "Alerts", "Incidents", "Dashboard", "Collector"}
 EXPECTED_RESPONSES = {
     "authLogin": {"200", "400", "401", "403", "429", "503"},
+    "usersMeGet": {"200", "401", "503"},
+    "usersLocaleUpdate": {"200", "400", "401", "503"},
     "endpointsList": {"200", "400", "401", "503"},
     "endpointsGet": {"200", "400", "401", "404", "503"},
     "eventsList": {"200", "400", "401", "409", "503"},
@@ -42,9 +44,9 @@ def test_openapi_has_exact_product_operations_tags_and_unique_ids() -> None:
     items = operations(schema)
     expected = {(contract.method.lower(), "/api/v1" + contract.path) for contract in PRODUCT_API_CONTRACTS}
     assert {(method, path) for path, method, _operation in items} == expected
-    assert len(items) == 18
+    assert len(items) == 20
     operation_ids = [operation["operationId"] for _path, _method, operation in items]
-    assert len(operation_ids) == len(set(operation_ids)) == 18
+    assert len(operation_ids) == len(set(operation_ids)) == 20
     assert set(operation_ids) == EXPECTED_RESPONSES.keys()
     assert {tag["name"] for tag in schema["tags"]} == TAGS
     assert all(len(operation["tags"]) == 1 and operation["tags"][0] in TAGS for _, _, operation in items)
@@ -82,6 +84,8 @@ def test_openapi_request_and_envelope_components_are_codegen_ready() -> None:
     }
     assert "HTTPValidationError" not in schemas
     assert "ValidationError" not in schemas
+    assert schemas["UserDto"]["required"] == ["userId", "loginId", "name", "role", "status", "locale"]
+    assert schemas["UserLocale"]["enum"] == ["EN", "KO"]
     assert schemas["DnsQueryPayload"]["required"] == ["query", "recordType"]
     assert "default" not in schemas["DnsQueryPayload"]["properties"]["responseCode"]
 

@@ -25,6 +25,8 @@ import type {
   LoginRequest,
   PagedData,
   SuccessEnvelope,
+  UserDto,
+  UserLocaleUpdateRequest,
 } from "../contracts";
 import { apiRequest, buildQuery } from "./client";
 
@@ -37,6 +39,12 @@ function queryRecord(query: object): QueryRecord {
 export const api = {
   login(body: LoginRequest, signal?: AbortSignal): Promise<SuccessEnvelope<LoginData>> {
     return apiRequest("/auth/login", { method: "POST", body: JSON.stringify(body) }, signal);
+  },
+  currentUser(signal?: AbortSignal): Promise<SuccessEnvelope<UserDto>> {
+    return apiRequest("/users/me", {}, signal);
+  },
+  updateLocale(body: UserLocaleUpdateRequest, signal?: AbortSignal): Promise<SuccessEnvelope<UserDto>> {
+    return apiRequest("/users/me/locale", { method: "PATCH", body: JSON.stringify(body) }, signal);
   },
   endpoints(query: EndpointListQuery, signal?: AbortSignal): Promise<SuccessEnvelope<PagedData<EndpointDto>>> {
     return apiRequest(`/endpoints${buildQuery(queryRecord(query))}`, {}, signal);

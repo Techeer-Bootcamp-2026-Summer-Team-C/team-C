@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from pydantic import Field, field_validator
 
 from .common import ContractModel, NonNegativeInt, PositiveId
-from .enums import UserRole, UserStatus
+from .enums import UserLocale, UserRole, UserStatus
 
 LOGIN_ID_PATTERN = r"^[a-z0-9][a-z0-9._@+-]{2,63}$"
 MAX_PASSWORD_LENGTH = 1024
@@ -37,6 +37,11 @@ class UserDto(ContractModel):
     name: str
     role: UserRole
     status: UserStatus
+    locale: UserLocale
+
+
+class UserLocaleUpdateRequest(ContractModel):
+    locale: UserLocale
 
 
 class LoginData(ContractModel):

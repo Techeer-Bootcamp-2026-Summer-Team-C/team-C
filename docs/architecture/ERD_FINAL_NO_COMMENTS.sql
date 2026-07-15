@@ -5,11 +5,13 @@ CREATE TABLE `users` (
   `name` VARCHAR(100) NOT NULL,
   `role` VARCHAR(30) NOT NULL,
   `status` VARCHAR(30) NOT NULL,
+  `locale` VARCHAR(2) NOT NULL DEFAULT 'EN',
   `last_login_at` DATETIME NULL,
   `created_at` DATETIME NOT NULL,
   `updated_at` DATETIME NOT NULL,
   `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`user_id`),
+  CONSTRAINT `ck_users_locale` CHECK (`locale` IN ('EN', 'KO')),
   UNIQUE KEY `uq_users_login_id_active` (`login_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

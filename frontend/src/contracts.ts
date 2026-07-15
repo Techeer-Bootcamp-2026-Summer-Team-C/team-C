@@ -15,6 +15,7 @@ export type StorageBackend = Schemas["StorageBackend"];
 export type StorageClass = Schemas["StorageClass"];
 export type UserStatus = Schemas["UserStatus"];
 export type UserRole = Schemas["UserRole"];
+export type UserLocale = Schemas["UserLocale"];
 export type SensorHealth = Schemas["SensorHealth"];
 export type AgentArchitecture = Schemas["AgentArchitecture"];
 export type RiskLevel = Schemas["RiskLevel"];
@@ -46,6 +47,7 @@ export type TimeRangeQuery = Pick<DashboardTimeQuery, "timePreset" | "from" | "t
 
 export type LoginRequest = Schemas["LoginRequest"];
 export type UserDto = Schemas["UserDto"];
+export type UserLocaleUpdateRequest = Schemas["UserLocaleUpdateRequest"];
 export type LoginData = Schemas["LoginData"];
 
 export type AgentRegisterRequest = Schemas["AgentRegisterRequest"];

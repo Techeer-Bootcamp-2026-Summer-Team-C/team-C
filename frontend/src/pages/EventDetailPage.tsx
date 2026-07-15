@@ -5,9 +5,11 @@ import { ApiError } from "../api/client";
 import { api } from "../api/endpoints";
 import { DefinitionGrid, EmptyState, ErrorState, PageHeader, Panel, Skeleton, StatusPill } from "../components/ui";
 import { displayNullable, formatDateTime } from "../lib/format";
+import { useI18n } from "../i18n/LocaleContext";
 import { validEventDetailQuery } from "../lib/url";
 
 export function EventDetailPage() {
+  const { t } = useI18n();
   const eventId = useParams().eventId ?? "";
   const [params] = useSearchParams();
   const valid = Boolean(eventId) && validEventDetailQuery(params);
@@ -15,9 +17,9 @@ export function EventDetailPage() {
   const occurredAt = params.get("occurredAt") ?? "";
   const result = useQuery({ queryKey: ["event", eventId, endpointId, occurredAt], queryFn: ({ signal }) => api.event(eventId, { endpointId, occurredAt }, signal), enabled: valid });
   const archiveNotReady = result.error instanceof ApiError && result.error.code === "ARCHIVE_NOT_READY";
-  if (!valid) return <div className="page-stack"><Link className="back-link" to="/events"><ArrowLeft aria-hidden="true" size={15} />Event stream</Link><EmptyState title="Event routing information is missing" message="Open this Event from the Event list so endpointId and occurredAt remain in the URL query." /><Link className="button" to="/events">Return to Events</Link></div>;
+  if (!valid) return <div className="page-stack"><Link className="back-link" to="/events"><ArrowLeft aria-hidden="true" size={15} />{t("events.stream")}</Link><EmptyState title={t("event.routingMissing")} message={t("event.routingDescription")} /><Link className="button" to="/events">{t("event.return")}</Link></div>;
   return <div className="page-stack">
-    <Link className="back-link" to="/events"><ArrowLeft aria-hidden="true" size={15} />Event stream</Link>
+    <Link className="back-link" to="/events"><ArrowLeft aria-hidden="true" size={15} />{t("events.stream")}</Link>
     {result.isPending ? <Skeleton rows={12} /> : null}
     {result.error ? <ErrorState archiveAction={archiveNotReady} error={result.error} {...(!archiveNotReady ? { onRetry: () => void result.refetch() } : {})} /> : null}
     {result.data ? <EventDetail event={result.data.data} /> : null}
@@ -25,25 +27,26 @@ export function EventDetailPage() {
 }
 
 function EventDetail({ event }: { event: import("../contracts").EventDetailDto }) {
+  const { locale, t } = useI18n();
   const fields = [
-    ["Event ID", <code>{event.eventId}</code>], ["Batch ID", <code>{event.batchId}</code>],
+    ["Event ID", <code>{event.eventId}</code>], [t("event.batchId"), <code>{event.batchId}</code>],
     ["Endpoint", <Link to={`/endpoints/${event.endpointId}`}>{event.hostname} · {event.endpointId}</Link>],
-    ["Agent ID", <code>{event.agentId}</code>], ["Operating system", event.osType], ["IP address", displayNullable(event.ipAddress)],
-    ["Occurred", formatDateTime(event.occurredAt)], ["Ingested", formatDateTime(event.ingestedAt)],
-    ["Process name", displayNullable(event.processName)], ["Process path", displayNullable(event.processPath)], ["PID", event.pid ?? "Not available"], ["PPID", event.ppid ?? "Not available"],
-    ["Command line", displayNullable(event.commandLine)], ["User", displayNullable(event.userName)],
-    ["File path", displayNullable(event.filePath)], ["File action", displayNullable(event.fileAction)], ["File SHA-256", displayNullable(event.fileHashSha256)],
-    ["Remote IP", displayNullable(event.remoteIp)], ["Remote domain", displayNullable(event.remoteDomain)], ["Remote port", event.remotePort ?? "Not available"], ["Protocol", displayNullable(event.protocol)],
-    ["DNS query", displayNullable(event.dnsQuery)], ["DNS record type", displayNullable(event.dnsRecordType)], ["DNS response", displayNullable(event.dnsResponseCode)], ["DNS answers", event.dnsAnswers.length ? event.dnsAnswers.join(", ") : "None"],
-    ["L7 protocol", displayNullable(event.l7Protocol)], ["HTTP method", displayNullable(event.httpMethod)], ["HTTP host", displayNullable(event.httpHost)], ["URL", displayNullable(event.url)], ["HTTP status", event.httpStatusCode ?? "Not available"], ["HTTP user agent", displayNullable(event.httpUserAgent)],
+    ["Agent ID", <code>{event.agentId}</code>], [t("endpoints.operatingSystem"), event.osType], [t("endpoint.ipAddress"), displayNullable(event.ipAddress)],
+    [t("event.occurred"), formatDateTime(event.occurredAt)], [t("event.ingested"), formatDateTime(event.ingestedAt)],
+    [t("event.processName"), displayNullable(event.processName)], [t("event.processPath"), displayNullable(event.processPath)], ["PID", event.pid ?? t("common.notAvailable")], ["PPID", event.ppid ?? t("common.notAvailable")],
+    [t("event.commandLine"), displayNullable(event.commandLine)], [t("event.user"), displayNullable(event.userName)],
+    [t("event.filePath"), displayNullable(event.filePath)], [t("event.fileAction"), displayNullable(event.fileAction)], ["File SHA-256", displayNullable(event.fileHashSha256)],
+    ["Remote IP", displayNullable(event.remoteIp)], [locale === "KO" ? "Remote Domain" : "Remote domain", displayNullable(event.remoteDomain)], [locale === "KO" ? "Remote Port" : "Remote port", event.remotePort ?? t("common.notAvailable")], ["Protocol", displayNullable(event.protocol)],
+    ["DNS query", displayNullable(event.dnsQuery)], ["DNS record type", displayNullable(event.dnsRecordType)], ["DNS response", displayNullable(event.dnsResponseCode)], [t("event.dnsAnswers"), event.dnsAnswers.length ? event.dnsAnswers.join(", ") : t("common.none")],
+    ["L7 protocol", displayNullable(event.l7Protocol)], ["HTTP method", displayNullable(event.httpMethod)], ["HTTP host", displayNullable(event.httpHost)], ["URL", displayNullable(event.url)], ["HTTP status", event.httpStatusCode ?? t("common.notAvailable")], ["HTTP user agent", displayNullable(event.httpUserAgent)],
     ["TLS SNI", displayNullable(event.tlsSni)], ["TLS version", displayNullable(event.tlsVersion)], ["TLS subject", displayNullable(event.tlsCertificateSubject)], ["TLS issuer", displayNullable(event.tlsCertificateIssuer)], ["TLS SHA-256", displayNullable(event.tlsCertificateSha256)],
   ] as const;
   return <>
     <PageHeader eyebrow={`EVENT · SCHEMA V${event.schemaVersion}`} title={event.processName ?? event.remoteDomain ?? event.filePath ?? event.eventType} description={event.eventId} actions={<StatusPill value={event.eventType} />} />
     <section className="detail-grid">
-      <Panel className="wide" title="Normalized event" subtitle="Required and nullable Event DTO fields"><DefinitionGrid items={fields.map(([label, value]) => ({ label, value }))} /></Panel>
-      <Panel title="Payload identity" subtitle="No packet or PCAP bytes"><DefinitionGrid items={[{ label: "Payload SHA-256", value: <code>{event.payloadSha256}</code> }, { label: "Schema version", value: event.schemaVersion }]} /></Panel>
-      <Panel className="wide" title="Raw payload" subtitle="Normalized metadata event JSON"><pre className="json-view">{JSON.stringify(event.rawPayload, null, 2)}</pre></Panel>
+      <Panel className="wide" title={t("event.normalized")} subtitle={t("event.normalizedSubtitle")}><DefinitionGrid items={fields.map(([label, value]) => ({ label, value }))} /></Panel>
+      <Panel title={t("event.payloadIdentity")} subtitle={t("event.payloadSubtitle")}><DefinitionGrid items={[{ label: t("event.payloadSha"), value: <code>{event.payloadSha256}</code> }, { label: t("event.schemaVersion"), value: event.schemaVersion }]} /></Panel>
+      <Panel className="wide" title={t("event.rawPayload")} subtitle={t("event.rawPayloadSubtitle")}><pre className="json-view">{JSON.stringify(event.rawPayload, null, 2)}</pre></Panel>
     </section>
   </>;
 }

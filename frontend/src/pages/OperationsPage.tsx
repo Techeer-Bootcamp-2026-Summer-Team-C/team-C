@@ -4,15 +4,17 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/endpoints";
 import { readTimeFilter, TimeFilterFields } from "../components/filters";
 import { ErrorState, GlobalFilterBar, KpiCard, PageHeader, Panel, Skeleton, StaleWarning } from "../components/ui";
+import { useI18n } from "../i18n/LocaleContext";
 import { formatDateTime } from "../lib/format";
 import { pollingInterval } from "../query/policy";
 
 export function OperationsPage() {
+  const { t } = useI18n();
   const [params, setParams] = useSearchParams();
   const time = readTimeFilter(params);
   const result = useQuery({ queryKey: ["ingest-summary", time.query], queryFn: ({ signal }) => api.ingestSummary(time.query, signal), enabled: time.valid, staleTime: 15_000, refetchInterval: pollingInterval(15_000) });
   return <div className="page-stack">
-    <PageHeader eyebrow="COLLECTION HEALTH" title="Operations" description="Ingest, failure, and storage lifecycle health from existing Backend projections." actions={<Link className="button" to="/operations/archives"><Archive aria-hidden="true" size={16} />Archive operations</Link>} />
+    <PageHeader eyebrow={t("operations.eyebrow")} title={t("operations.title")} description={t("operations.description")} actions={<Link className="button" to="/operations/archives"><Archive aria-hidden="true" size={16} />{t("operations.archiveAction")}</Link>} />
     <GlobalFilterBar hasFilters={params.size > 0} onClear={() => setParams({})}><TimeFilterFields params={params} setParams={setParams} /></GlobalFilterBar>
     {result.isPending ? <Skeleton rows={8} /> : null}
     {result.error && !result.data ? <ErrorState error={result.error} onRetry={() => void result.refetch()} /> : null}
@@ -22,14 +24,15 @@ export function OperationsPage() {
 }
 
 function OperationsContent({ data }: { data: import("../contracts").IngestSummaryDto }) {
+  const { t } = useI18n();
   return <>
     <section className="kpi-grid operations-kpis">
-      <KpiCard detail={`Latest ${formatDateTime(data.events.latestIngestedAt)}`} icon={<Database size={18} />} label="Ingested events" value={data.events.ingestedCount} />
-      <KpiCard detail={`Oldest ${formatDateTime(data.eventFailures.oldestFailedAt)}`} icon={<RefreshCcw size={18} />} label="Failed" tone={data.eventFailures.failedCount ? "critical" : "neutral"} value={data.eventFailures.failedCount} />
-      <KpiCard detail="Successfully replayed by CLI" icon={<RefreshCcw size={18} />} label="Reprocessed" value={data.eventFailures.reprocessedCount} />
-      <KpiCard detail="CLI reprocess failures" icon={<RefreshCcw size={18} />} label="Reprocess failed" tone={data.eventFailures.reprocessFailedCount ? "warning" : "neutral"} value={data.eventFailures.reprocessFailedCount} />
+      <KpiCard detail={t("common.latest", { time: formatDateTime(data.events.latestIngestedAt) })} icon={<Database size={18} />} label={t("operations.ingestedEvents")} value={data.events.ingestedCount} />
+      <KpiCard detail={t("common.oldest", { time: formatDateTime(data.eventFailures.oldestFailedAt) })} icon={<RefreshCcw size={18} />} label={t("operations.failed")} tone={data.eventFailures.failedCount ? "critical" : "neutral"} value={data.eventFailures.failedCount} />
+      <KpiCard detail={t("operations.reprocessedDetail")} icon={<RefreshCcw size={18} />} label={t("operations.reprocessed")} value={data.eventFailures.reprocessedCount} />
+      <KpiCard detail={t("operations.reprocessFailedDetail")} icon={<RefreshCcw size={18} />} label={t("operations.reprocessFailed")} tone={data.eventFailures.reprocessFailedCount ? "warning" : "neutral"} value={data.eventFailures.reprocessFailedCount} />
     </section>
-    <Panel title="Storage lifecycle" subtitle="Current ingest_metadata counts"><section className="storage-grid">
+    <Panel title={t("operations.storageLifecycle")} subtitle={t("operations.storageSubtitle")}><section className="storage-grid">
       <StorageCount label="ClickHouse HOT" value={data.storage.clickhouseHotBucketCount} />
       <StorageCount label="RESTORED" value={data.storage.restoredBucketCount} />
       <StorageCount label="ARCHIVED" value={data.storage.glacierArchivedBucketCount} />
@@ -37,7 +40,7 @@ function OperationsContent({ data }: { data: import("../contracts").IngestSummar
       <StorageCount label="RESTORE FAILED" value={data.storage.failedBucketCount} />
       <StorageCount label="EXPIRED" value={data.storage.expiredBucketCount} />
     </section></Panel>
-    <Panel title="Operational boundary" subtitle="Failure replay remains CLI-only"><div className="boundary-note"><HardDrive aria-hidden="true" size={22} /><div><strong>No DLQ Monitor or web replay controls</strong><p>This screen intentionally exposes only contracted summary counts and Archive lifecycle actions.</p></div></div></Panel>
+    <Panel title={t("operations.boundary")} subtitle={t("operations.boundarySubtitle")}><div className="boundary-note"><HardDrive aria-hidden="true" size={22} /><div><strong>{t("operations.noWebReplay")}</strong><p>{t("operations.boundaryDescription")}</p></div></div></Panel>
   </>;
 }
 

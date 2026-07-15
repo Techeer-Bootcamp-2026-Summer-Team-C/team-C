@@ -438,6 +438,7 @@ def main() -> int:
     s3_endpoint = os.getenv("TEST_S3_ENDPOINT", "http://127.0.0.1:59000")
     postgres_up = ROOT / "migrations/postgresql/0001_initial.up.sql"
     postgres_login_id_up = ROOT / "migrations/postgresql/0002_user_login_id.up.sql"
+    postgres_user_locale_up = ROOT / "migrations/postgresql/0003_user_locale.up.sql"
     postgres_down = ROOT / "migrations/postgresql/0001_initial.down.sql"
     clickhouse_up = ROOT / "migrations/clickhouse/0001_initial.up.sql"
     clickhouse_down = ROOT / "migrations/clickhouse/0001_initial.down.sql"
@@ -453,6 +454,7 @@ def main() -> int:
         apply_postgres_file(connection, postgres_down)
         apply_postgres_file(connection, postgres_up)
         apply_postgres_file(connection, postgres_login_id_up)
+        apply_postgres_file(connection, postgres_user_locale_up)
         now = datetime.now(UTC)
         connection.execute(
             "INSERT INTO users(login_id,password_hash,name,role,status,created_at,updated_at) "

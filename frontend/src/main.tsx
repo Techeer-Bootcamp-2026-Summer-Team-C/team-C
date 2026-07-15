@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { App } from "./App";
 import { AuthProvider } from "./auth/AuthContext";
+import { LocaleProvider } from "./i18n/LocaleContext";
 import { retryDelay, shouldRetry } from "./query/policy";
 import "./styles.css";
 
@@ -26,9 +27,11 @@ createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
+        <LocaleProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </LocaleProvider>
       </AuthProvider>
     </QueryClientProvider>
   </StrictMode>,

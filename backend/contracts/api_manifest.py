@@ -12,6 +12,8 @@ class ApiContract:
 
 PRODUCT_API_CONTRACTS: tuple[ApiContract, ...] = (
     ApiContract("POST", "/auth/login", "LoginRequest", "LoginData", "PUBLIC"),
+    ApiContract("GET", "/users/me", "none", "UserDto", "JWT_READ"),
+    ApiContract("PATCH", "/users/me/locale", "UserLocaleUpdateRequest", "UserDto", "JWT_READ"),
     ApiContract("GET", "/endpoints", "EndpointListQuery", "PagedData<EndpointDto>", "JWT_READ"),
     ApiContract("GET", "/endpoints/{endpointId}", "path", "EndpointDetailDto", "JWT_READ"),
     ApiContract("GET", "/events", "EventListQuery", "PagedData<EventDto>", "JWT_READ"),

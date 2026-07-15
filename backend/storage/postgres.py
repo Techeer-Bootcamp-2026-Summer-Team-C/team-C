@@ -9,7 +9,15 @@ from psycopg.types.json import Jsonb
 
 from backend.contracts.auth import normalize_login_id
 from backend.contracts.collector import AgentHeartbeatRequest, AgentRegisterRequest
-from backend.contracts.enums import AlertStatus, EndpointStatus, IncidentStatus, OsType, UserRole, UserStatus
+from backend.contracts.enums import (
+    AlertStatus,
+    EndpointStatus,
+    IncidentStatus,
+    OsType,
+    UserLocale,
+    UserRole,
+    UserStatus,
+)
 from backend.errors import (
     AgentIdentityConflictError,
     ArchivedDayImmutableError,
@@ -73,13 +81,84 @@ class UserRepository:
         with self.connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute(
                 """
-                SELECT user_id, login_id, password_hash, name, role, status
+                SELECT user_id, login_id, password_hash, name, role, status, locale
                 FROM users WHERE LOWER(login_id) = %s AND is_delete = FALSE
                 """,
                 (normalize_login_id(login_id),),
             )
             row = cursor.fetchone()
         return dict(row) if row is not None else None
+
+    def by_user_id(self, user_id: int) -> dict[str, Any] | None:
+        with self.connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """
+                SELECT user_id, login_id, name, role, status, locale
+                FROM users
+                WHERE user_id = %s AND status = 'ACTIVE' AND is_delete = FALSE
+                """,
+                (user_id,),
+            )
+            row = cursor.fetchone()
+        return dict(row) if row is not None else None
+
+    def update_locale(
+        self,
+        *,
+        user_id: int,
+        locale: UserLocale,
+        request_id: str,
+        changed_at: datetime,
+    ) -> dict[str, Any] | None:
+        with self.connection.transaction():
+            with self.connection.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """
+                    SELECT user_id, login_id, name, role, status, locale
+                    FROM users
+                    WHERE user_id = %s AND status = 'ACTIVE' AND is_delete = FALSE
+                    FOR UPDATE
+                    """,
+                    (user_id,),
+                )
+                current = cursor.fetchone()
+                if current is None:
+                    return None
+                if current["locale"] == locale.value:
+                    return dict(current)
+                cursor.execute(
+                    """
+                    UPDATE users
+                    SET locale = %s, updated_at = %s
+                    WHERE user_id = %s AND status = 'ACTIVE' AND is_delete = FALSE
+                    RETURNING user_id, login_id, name, role, status, locale
+                    """,
+                    (locale.value, changed_at, user_id),
+                )
+                updated = cursor.fetchone()
+                if updated is None:
+                    return None
+                cursor.execute(
+                    """
+                    INSERT INTO audit_logs (
+                        actor_type, actor_identifier, action, resource_type, resource_id,
+                        before_json, after_json, request_id, created_at
+                    ) VALUES (
+                        'USER', %s, 'USER_LOCALE_CHANGED', 'USER', %s,
+                        jsonb_build_object('locale', %s::text),
+                        jsonb_build_object('locale', %s::text), %s, %s
+                    )
+                    """,
+                    (
+                        str(user_id),
+                        str(user_id),
+                        current["locale"],
+                        locale.value,
+                        request_id,
+                        changed_at,
+                    ),
+                )
+        return dict(updated)
 
     def active_identity(self, user_id: int) -> tuple[UserRole, UserStatus] | None:
         row = self.connection.execute(

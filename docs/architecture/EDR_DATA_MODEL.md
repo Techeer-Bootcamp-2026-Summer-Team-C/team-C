@@ -67,10 +67,10 @@ PostgreSQL에는 event failure row와 원문을 저장하지 않는다. ClickHou
 | PostgreSQL | `audit_logs` | 10 | append-only control-plane audit |
 | PostgreSQL | `ingest_metadata` | 19 | Endpoint/UTC DAY bucket 저장 위치 |
 | PostgreSQL | `incidents` | 15 | 자동 correlation projection |
-| PostgreSQL | `users` | 10 | Dashboard 로그인/RBAC |
+| PostgreSQL | `users` | 11 | Dashboard 로그인/RBAC/UI 언어 설정 |
 | PostgreSQL | `incident_alerts` | 7 | Incident-Alert N:M 연결 |
 | PostgreSQL | `alerts` | 22 | Rule/MITRE 탐지 결과 |
-| **합계** | **11개** | **192** |  |
+| **합계** | **11개** | **193** |  |
 
 ## 6. 관계 요약
 
@@ -314,7 +314,7 @@ HOT `storage_path`는 Endpoint별 ClickHouse 논리 조회 locator이고 S3 `sto
 
 ### 8.8 `users`
 
-목적: Dashboard 로그인과 RBAC 전용이다. 속성 수는 10개다. 내부 관계와 감사 로그에는 자동 생성 `user_id`를 사용하고 사용자는 별도의 `login_id`와 password로 로그인한다. `status`는 `ACTIVE`, `DISABLED`만 사용하고 `is_delete=false AND status=ACTIVE`만 로그인할 수 있으며 `DISABLED`는 `403 ACCOUNT_DISABLED`다. 최초 ADMIN은 `python -m tools.create_admin --login-id <LOGIN_ID> --name <DISPLAY_NAME>`으로 생성하고 migration에 계정이나 비밀번호를 하드코딩하지 않는다. 사용자 생성·삭제·상태 변경 REST API를 만들지 않으며 Alert·Incident와 연결하지 않는다.
+목적: Dashboard 로그인, RBAC와 계정별 UI 언어 설정을 관리한다. 속성 수는 11개다. 내부 관계와 감사 로그에는 자동 생성 `user_id`를 사용하고 사용자는 별도의 `login_id`와 password로 로그인한다. `status`는 `ACTIVE`, `DISABLED`만 사용하고 `is_delete=false AND status=ACTIVE`만 로그인할 수 있으며 `DISABLED`는 `403 ACCOUNT_DISABLED`다. `locale`은 `EN`, `KO`만 허용하고 기본값은 `EN`이며 인증된 사용자의 Frontend 언어 source of truth다. 최초 ADMIN은 `python -m tools.create_admin --login-id <LOGIN_ID> --name <DISPLAY_NAME>`으로 생성하고 migration에 계정이나 비밀번호를 하드코딩하지 않는다. 사용자 생성·삭제·상태 변경 REST API를 만들지 않으며 Alert·Incident와 연결하지 않는다.
 
 | 컬럼 | 실제 PostgreSQL 타입 | 설명 |
 | --- | --- | --- |
@@ -324,12 +324,13 @@ HOT `storage_path`는 Endpoint별 ClickHouse 논리 조회 locator이고 S3 `sto
 | `name` | `VARCHAR(100)` | 화면에 표시할 사용자 이름 |
 | `role` | `VARCHAR(30)` | `ADMIN`, `ANALYST`, `VIEWER` 권한 역할 |
 | `status` | `VARCHAR(30)` | `ACTIVE` 또는 `DISABLED` |
+| `locale` | `VARCHAR(2)` | UI 언어 설정. `EN`, `KO`만 허용하며 기본값은 `EN` |
 | `last_login_at` | `TIMESTAMPTZ NULL` | 마지막 로그인 성공 시각 |
 | `created_at` | `TIMESTAMPTZ` | 계정 생성 시각 |
 | `updated_at` | `TIMESTAMPTZ` | 로그인 또는 계정 상태 마지막 갱신 시각 |
 | `is_delete` | `BOOLEAN` | 소프트 삭제 표시. 로그인은 `FALSE`만 허용 |
 
-`ck_users_login_id_format`은 허용 문자와 소문자 정규화를 강제한다. `uq_users_login_id_active`는 `LOWER(login_id)`에 `WHERE is_delete=FALSE`를 적용하는 partial unique index다.
+`ck_users_login_id_format`은 허용 문자와 소문자 정규화를 강제한다. `ck_users_locale`은 `locale IN ('EN', 'KO')`를 강제한다. `uq_users_login_id_active`는 `LOWER(login_id)`에 `WHERE is_delete=FALSE`를 적용하는 partial unique index다.
 
 ### 8.9 `incident_alerts`
 
@@ -437,6 +438,7 @@ Event 조회, latest-row 선택과 `uniqExact(event_id)` 집계는 `is_delete=fa
 | `event_failures` | `status` | `FAILED`, `REPROCESSED`, `REPROCESS_FAILED` |
 | `endpoints` | `status` | `ONLINE`, `OFFLINE`, `RETIRED` |
 | `users` | `status` | `ACTIVE`, `DISABLED` |
+| `users` | `locale` | `EN`, `KO` |
 | `ingest_metadata` | `storage_backend` | `CLICKHOUSE`, `S3` |
 | `ingest_metadata` | `storage_class` | `HOT`, `GLACIER_FLEXIBLE_RETRIEVAL` |
 | `ingest_metadata` | `storage_status` | `HOT`, `ARCHIVED`, `RESTORE_REQUESTED`, `RESTORED`, `RESTORE_FAILED`, `EXPIRED` |

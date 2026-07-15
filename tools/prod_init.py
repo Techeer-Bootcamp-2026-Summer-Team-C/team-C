@@ -87,6 +87,17 @@ def initialize_postgres(settings: Settings) -> None:
         if not login_id_exists:
             apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_user_login_id.up.sql")
 
+        locale_exists = connection.execute(
+            """
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'locale'
+            )
+            """
+        ).fetchone()[0]
+        if not locale_exists:
+            apply_postgres_file(connection, ROOT / "migrations/postgresql/0003_user_locale.up.sql")
+
         login_id_length = connection.execute(
             """
             SELECT character_maximum_length

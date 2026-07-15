@@ -5,11 +5,13 @@ import { api } from "../api/endpoints";
 import { readTimeFilter, TimeFilterFields } from "../components/filters";
 import { DataTable, EmptyState, ErrorState, Field, GlobalFilterBar, PageHeader, Pagination, Panel, Skeleton, StatusPill } from "../components/ui";
 import type { EventListQuery } from "../contracts";
+import { useI18n } from "../i18n/LocaleContext";
 import { formatDateTime, displayNullable } from "../lib/format";
 import { allowedValue, positiveInteger } from "../lib/params";
 import { numberParam, stringParam, updateParams } from "../lib/url";
 
 export function EventsPage() {
+  const { locale, t } = useI18n();
   const [params, setParams] = useSearchParams();
   const time = readTimeFilter(params);
   const eventType = allowedValue(params.get("eventType"), ["PROCESS_EXECUTION", "NETWORK_CONNECTION", "FILE_EVENT", "DNS_QUERY", "L7_EVENT"] as const);
@@ -26,18 +28,35 @@ export function EventsPage() {
   const archiveNotReady = result.error instanceof ApiError && result.error.code === "ARCHIVE_NOT_READY";
 
   return <div className="page-stack">
-    <PageHeader eyebrow="EVENT EVIDENCE" title="Events" description="HOT ClickHouse and directly read RESTORED Parquet events." />
+    <PageHeader eyebrow={t("events.eyebrow")} title={t("events.title")} description={t("events.description")} />
     <GlobalFilterBar hasFilters={params.size > 0} onClear={() => setParams({})}>
       <TimeFilterFields params={params} setParams={setParams} />
-      <Field label="Endpoint ID"><input inputMode="numeric" onChange={(event) => setParams(updateParams(params, { endpointId: event.target.value }))} value={params.get("endpointId") ?? ""} /></Field>
-      <Field label="Event type"><select onChange={(event) => setParams(updateParams(params, { eventType: event.target.value }))} value={eventType ?? ""}><option value="">All types</option><option>PROCESS_EXECUTION</option><option>NETWORK_CONNECTION</option><option>FILE_EVENT</option><option>DNS_QUERY</option><option>L7_EVENT</option></select></Field>
-      {(["processName", "filePath", "domain", "remoteIp", "dnsQuery", "l7Protocol"] as const).map((field) => <Field key={field} label={field.replace(/([A-Z])/g, " $1")}><input onChange={(event) => setParams(updateParams(params, { [field]: event.target.value }))} value={params.get(field) ?? ""} /></Field>)}
-      <Field label="Order"><select onChange={(event) => setParams(updateParams(params, { sortOrder: event.target.value }))} value={sortOrder}><option value="desc">Newest first</option><option value="asc">Oldest first</option></select></Field>
+      <Field label={t("filter.endpointId")}><input inputMode="numeric" onChange={(event) => setParams(updateParams(params, { endpointId: event.target.value }))} value={params.get("endpointId") ?? ""} /></Field>
+      <Field label={t("events.type")}><select onChange={(event) => setParams(updateParams(params, { eventType: event.target.value }))} value={eventType ?? ""}><option value="">{t("events.allTypes")}</option><option>PROCESS_EXECUTION</option><option>NETWORK_CONNECTION</option><option>FILE_EVENT</option><option>DNS_QUERY</option><option>L7_EVENT</option></select></Field>
+      {(["processName", "filePath", "domain", "remoteIp", "dnsQuery", "l7Protocol"] as const).map((field) => <Field key={field} label={eventFilterLabel(field, locale, t)}><input onChange={(event) => setParams(updateParams(params, { [field]: event.target.value }))} value={params.get(field) ?? ""} /></Field>)}
+      <Field label={t("filter.order")}><select onChange={(event) => setParams(updateParams(params, { sortOrder: event.target.value }))} value={sortOrder}><option value="desc">{t("filter.newestFirst")}</option><option value="asc">{t("filter.oldestFirst")}</option></select></Field>
     </GlobalFilterBar>
     {result.isPending && time.valid ? <Skeleton rows={8} /> : null}
     {result.error ? <ErrorState archiveAction={archiveNotReady} error={result.error} {...(!archiveNotReady ? { onRetry: () => void result.refetch() } : {})} /> : null}
-    {result.data ? <Panel title="Event stream" subtitle={`${result.data.data.total} Event records`}>
-      {result.data.data.items.length ? <><DataTable label="Event stream"><thead><tr><th scope="col" aria-sort={sortOrder === "desc" ? "descending" : "ascending"}>Occurred</th><th scope="col">Endpoint</th><th scope="col">Type</th><th scope="col">Process</th><th scope="col">Network / DNS / L7</th><th scope="col">Ingested</th></tr></thead><tbody>{result.data.data.items.map((event) => <tr key={event.eventId}><td><Link className="table-primary" to={`/events/${event.eventId}?endpointId=${event.endpointId}&occurredAt=${encodeURIComponent(event.occurredAt)}`}><strong>{formatDateTime(event.occurredAt)}</strong><code>{event.eventId}</code></Link></td><td><Link to={`/endpoints/${event.endpointId}`}>{event.hostname}</Link><small>ID {event.endpointId}</small></td><td><StatusPill value={event.eventType} /></td><td>{displayNullable(event.processName)}<small>{displayNullable(event.commandLine)}</small></td><td>{event.remoteDomain ?? event.remoteIp ?? event.dnsQuery ?? event.l7Protocol ?? "Not available"}</td><td>{formatDateTime(event.ingestedAt)}</td></tr>)}</tbody></DataTable><Pagination page={result.data.data} /></> : <EmptyState title="No Events found" message={params.size ? "No Events match the current filters." : "No Events are available in this time range."} />}
+    {result.data ? <Panel title={t("events.stream")} subtitle={t("events.records", { total: result.data.data.total })}>
+      {result.data.data.items.length ? <><DataTable label={t("events.stream")}><thead><tr><th scope="col" aria-sort={sortOrder === "desc" ? "descending" : "ascending"}>{t("events.occurred")}</th><th scope="col">Endpoint</th><th scope="col">{t("events.type")}</th><th scope="col">{t("events.process")}</th><th scope="col">{t("events.network")}</th><th scope="col">{t("events.ingested")}</th></tr></thead><tbody>{result.data.data.items.map((event) => <tr key={event.eventId}><td><Link className="table-primary" to={`/events/${event.eventId}?endpointId=${event.endpointId}&occurredAt=${encodeURIComponent(event.occurredAt)}`}><strong>{formatDateTime(event.occurredAt)}</strong><code>{event.eventId}</code></Link></td><td><Link to={`/endpoints/${event.endpointId}`}>{event.hostname}</Link><small>ID {event.endpointId}</small></td><td><StatusPill value={event.eventType} /></td><td>{displayNullable(event.processName)}<small>{displayNullable(event.commandLine)}</small></td><td>{event.remoteDomain ?? event.remoteIp ?? event.dnsQuery ?? event.l7Protocol ?? t("common.notAvailable")}</td><td>{formatDateTime(event.ingestedAt)}</td></tr>)}</tbody></DataTable><Pagination page={result.data.data} /></> : <EmptyState title={t("events.noResults")} message={params.size ? t("events.noFilterMatch") : t("events.noneInRange")} />}
     </Panel> : null}
   </div>;
+}
+
+function eventFilterLabel(
+  field: "processName" | "filePath" | "domain" | "remoteIp" | "dnsQuery" | "l7Protocol",
+  locale: "EN" | "KO",
+  t: ReturnType<typeof useI18n>["t"],
+): string {
+  if (locale === "EN") return field.replace(/([A-Z])/g, " $1");
+  const labels = {
+    processName: t("event.processName"),
+    filePath: t("event.filePath"),
+    domain: "Remote Domain",
+    remoteIp: "Remote IP",
+    dnsQuery: "DNS Query",
+    l7Protocol: "L7 Protocol",
+  } as const;
+  return labels[field];
 }

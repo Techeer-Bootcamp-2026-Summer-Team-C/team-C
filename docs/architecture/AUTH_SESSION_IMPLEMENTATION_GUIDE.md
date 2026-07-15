@@ -77,7 +77,8 @@ Content-Type: application/json
       "loginId": "security-admin",
       "name": "Security Admin",
       "role": "ADMIN",
-      "status": "ACTIVE"
+      "status": "ACTIVE",
+      "locale": "EN"
     }
   },
   "meta": {
@@ -105,7 +106,7 @@ EDR_ACCESS_TOKEN_TTL_SECONDS=43200
 
 설정 가능한 범위는 300초(5분)부터 604,800초(7일)까지다. Frontend는 응답의 `expiresIn`을 서버 설정값으로 취급하며 별도 상수를 갖지 않는다.
 
-Access Token, `UserDto`, 실제 만료시각은 단일 auth key로 현재 탭의 `sessionStorage`에 기록한다. 새로고침 시 만료시각과 저장 형식을 검증한 뒤 복구하고, 만료·손상·`401`·명시적 로그아웃 시 저장값과 React Query cache를 제거한다. 브라우저 재시작까지 유지하는 장기 인증은 Refresh Token 또는 서버 session을 별도로 설계한다.
+Access Token, `locale`을 포함한 `UserDto`, 실제 만료시각은 단일 auth key로 현재 탭의 `sessionStorage`에 기록한다. 새로고침 시 만료시각과 저장 형식을 검증한 뒤 복구하고, 인증 token을 설정한 다음 `GET /api/v1/users/me`로 Backend 사용자와 locale을 재동기화한다. 만료·손상·`401`·명시적 로그아웃 시 저장값과 React Query cache를 제거한다. 브라우저 재시작까지 유지하는 장기 인증은 Refresh Token 또는 서버 session을 별도로 설계한다.
 
 ## 6. Backend 구현 기준
 

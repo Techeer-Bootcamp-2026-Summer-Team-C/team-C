@@ -378,7 +378,7 @@ HOT `storage_path`는 물리 partition명이 아니라 `clickhouse://edr_events/
 
 ## 11. API와 Dashboard
 
-- 제품 REST API는 Dashboard 15개 + Collector 3개 = 18개다.
+- 제품 REST API는 Dashboard 17개 + Collector 3개 = 20개다.
 - Collector API는 Agent 등록, heartbeat, telemetry batch만 제공한다.
 - PCAP artifact upload/download API와 Agent command API는 없다.
 - Endpoint Risk는 기존 Endpoint 목록·상세·summary DTO를 확장하며 새 REST API를 만들지 않는다.

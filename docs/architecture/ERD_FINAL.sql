@@ -5,11 +5,13 @@ CREATE TABLE `users` (
   `name` VARCHAR(100) NOT NULL COMMENT '사용자 이름',
   `role` VARCHAR(30) NOT NULL COMMENT 'ADMIN, ANALYST 또는 VIEWER',
   `status` VARCHAR(30) NOT NULL COMMENT 'ACTIVE 또는 DISABLED Dashboard 계정 상태',
+  `locale` VARCHAR(2) NOT NULL DEFAULT 'EN' COMMENT 'EN 또는 KO 사용자 UI 언어 설정',
   `last_login_at` DATETIME NULL COMMENT '마지막 로그인 시각',
   `created_at` DATETIME NOT NULL COMMENT '생성 시각',
   `updated_at` DATETIME NOT NULL COMMENT '수정 시각',
   `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '소프트 삭제 여부',
   PRIMARY KEY (`user_id`),
+  CONSTRAINT `ck_users_locale` CHECK (`locale` IN ('EN', 'KO')),
   UNIQUE KEY `uq_users_login_id_active` (`login_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='[PostgreSQL] 실제 unique index는 LOWER(login_id), WHERE is_delete=FALSE 조건을 사용하는 Dashboard RBAC 사용자';
 

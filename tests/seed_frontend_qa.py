@@ -27,6 +27,7 @@ S3_ENDPOINT = os.getenv("EDR_S3_ENDPOINT_URL", "http://127.0.0.1:59000")
 S3_ACCESS_KEY = os.getenv("EDR_S3_ACCESS_KEY_ID", "edr-local")
 S3_SECRET_KEY = os.getenv("EDR_S3_SECRET_ACCESS_KEY", "replace-with-a-local-password")
 S3_BUCKET = os.getenv("EDR_S3_BUCKET", "edr-failures")
+S3_REGION = os.getenv("EDR_AWS_REGION", "us-east-1")
 
 
 def raw_event(
@@ -70,6 +71,7 @@ def main() -> None:
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.down.sql")
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.up.sql")
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_user_login_id.up.sql")
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0003_user_locale.up.sql")
     apply_clickhouse_file(clickhouse, ROOT / "migrations/clickhouse/0001_initial.down.sql")
     apply_clickhouse_file(clickhouse, ROOT / "migrations/clickhouse/0001_initial.up.sql")
 
@@ -207,7 +209,7 @@ def main() -> None:
         endpoint_url=S3_ENDPOINT,
         aws_access_key_id=S3_ACCESS_KEY,
         aws_secret_access_key=S3_SECRET_KEY,
-        region_name="us-east-1",
+        region_name=S3_REGION,
     )
     try:
         s3.create_bucket(Bucket=S3_BUCKET)
@@ -218,6 +220,7 @@ def main() -> None:
         access_key=S3_ACCESS_KEY,
         secret_key=S3_SECRET_KEY,
         bucket=S3_BUCKET,
+        region=S3_REGION,
     )
     restored_row = dict(restored)
     restored_row["event_id"] = str(restored_row["event_id"])
@@ -240,6 +243,15 @@ def main() -> None:
             (3, 'frontend-disabled', %s, 'Disabled Analyst', 'ANALYST', 'DISABLED', %s, %s)
             """,
             (admin_hash, now, now, viewer_hash, now, now, disabled_hash, now, now),
+        )
+        connection.execute(
+            """
+            SELECT setval(
+                pg_get_serial_sequence('users', 'user_id'),
+                (SELECT MAX(user_id) FROM users),
+                TRUE
+            )
+            """
         )
         connection.execute(
             """

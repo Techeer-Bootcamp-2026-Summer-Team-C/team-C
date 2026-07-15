@@ -294,6 +294,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Users Me */
+        get: operations["usersMeGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/me/locale": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update User Locale */
+        patch: operations["usersLocaleUpdate"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1679,6 +1713,11 @@ export interface components {
             data: components["schemas"]["TelemetryBatchData"];
             meta: components["schemas"]["RequestMeta"];
         };
+        /** SuccessEnvelope[UserDto] */
+        SuccessEnvelope_UserDto_: {
+            data: components["schemas"]["UserDto"];
+            meta: components["schemas"]["RequestMeta"];
+        };
         /** TelemetryBatchData */
         TelemetryBatchData: {
             /** Acceptedeventids */
@@ -1779,6 +1818,7 @@ export interface components {
         };
         /** UserDto */
         UserDto: {
+            locale: components["schemas"]["UserLocale"];
             /** Loginid */
             loginId: string;
             /** Name */
@@ -1787,6 +1827,15 @@ export interface components {
             status: components["schemas"]["UserStatus"];
             /** Userid */
             userId: number;
+        };
+        /**
+         * UserLocale
+         * @enum {string}
+         */
+        UserLocale: "EN" | "KO";
+        /** UserLocaleUpdateRequest */
+        UserLocaleUpdateRequest: {
+            locale: components["schemas"]["UserLocale"];
         };
         /**
          * UserRole
@@ -2897,6 +2946,95 @@ export interface operations {
             };
             /** @description The requested resource was not found. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description A required dependency is temporarily unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    usersMeGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_UserDto_"];
+                };
+            };
+            /** @description Authentication failed. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description A required dependency is temporarily unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    usersLocaleUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserLocaleUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_UserDto_"];
+                };
+            };
+            /** @description Request validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication failed. */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

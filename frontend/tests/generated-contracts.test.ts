@@ -18,6 +18,8 @@ describe("generated OpenAPI contract boundary", () => {
     expect(contracts).toContain('from "./api/generated/schema"');
     expect(contracts).not.toMatch(/^export interface /m);
     expect(contracts).toContain('Schemas["EndpointDto"]');
+    expect(contracts).toContain('Schemas["UserLocale"]');
+    expect(contracts).toContain('Schemas["UserLocaleUpdateRequest"]');
     expect(contracts).toContain('QueryOf<"eventsList">');
   });
 

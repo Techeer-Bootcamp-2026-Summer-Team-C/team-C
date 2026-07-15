@@ -1,14 +1,15 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { api } from "../api/endpoints";
 import { configureApiAuth } from "../api/client";
-import type { LoginRequest, UserDto } from "../contracts";
+import type { LoginRequest, UserDto, UserLocale } from "../contracts";
 
 interface AuthValue {
   token: string | null;
   user: UserDto | null;
   login: (request: LoginRequest) => Promise<UserDto>;
+  updateLocale: (locale: UserLocale) => Promise<UserDto>;
   logout: (preserveIntended?: boolean) => void;
   preserveIntended: boolean;
 }
@@ -24,12 +25,14 @@ const AuthContext = createContext<AuthValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const localeUpdateVersion = useRef(0);
   const [session, setSession] = useState<AuthSession | null>(initializeAuthSession);
   const [preserveIntended, setPreserveIntended] = useState(session === null);
   const token = session?.token ?? null;
   const user = session?.user ?? null;
 
   const logout = useCallback((keepIntended = false) => {
+    localeUpdateVersion.current += 1;
     setPreserveIntended(keepIntended);
     configureApiAuth(null, null);
     clearAuthSession();
@@ -40,6 +43,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     configureApiAuth(token, () => logout(true));
   }, [logout, token]);
+
+  useEffect(() => {
+    if (!token) return;
+    let active = true;
+    const syncVersion = localeUpdateVersion.current;
+    void api.currentUser().then((response) => {
+      if (!active || localeUpdateVersion.current !== syncVersion) return;
+      setSession((current) => {
+        if (!current || current.token !== token) return current;
+        const nextSession = { ...current, user: response.data };
+        saveAuthSession(nextSession);
+        return nextSession;
+      });
+    }).catch(() => {
+      // 401 is handled by the configured auth callback. Temporary failures keep the restored session.
+    });
+    return () => { active = false; };
+  }, [token]);
 
   useEffect(() => {
     if (!session) return;
@@ -54,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       async login(request) {
         const response = await api.login(request);
+        localeUpdateVersion.current += 1;
         const nextSession = {
           token: response.data.accessToken,
           user: response.data.user,
@@ -65,10 +87,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(nextSession);
         return response.data.user;
       },
+      async updateLocale(locale) {
+        if (!session) throw new Error("An authenticated session is required.");
+        if (session.user.locale === locale) return session.user;
+        const requestToken = session.token;
+        const updateVersion = ++localeUpdateVersion.current;
+        const response = await api.updateLocale({ locale });
+        setSession((current) => {
+          if (
+            !current ||
+            current.token !== requestToken ||
+            localeUpdateVersion.current !== updateVersion
+          ) return current;
+          const nextSession = { ...current, user: response.data };
+          saveAuthSession(nextSession);
+          return nextSession;
+        });
+        return response.data;
+      },
       logout,
       preserveIntended,
     }),
-    [logout, preserveIntended, token, user],
+    [logout, preserveIntended, session, token, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -79,11 +119,13 @@ function loadAuthSession(): AuthSession | null {
     const raw = window.sessionStorage.getItem(AUTH_SESSION_KEY);
     if (!raw) return null;
     const value: unknown = JSON.parse(raw);
-    if (!isAuthSession(value) || value.expiresAt <= Date.now()) {
+    const normalized = normalizeAuthSession(value);
+    if (!normalized || normalized.expiresAt <= Date.now()) {
       window.sessionStorage.removeItem(AUTH_SESSION_KEY);
       return null;
     }
-    return value;
+    if (!isAuthSession(value)) saveAuthSession(normalized);
+    return normalized;
   } catch {
     clearAuthSession();
     return null;
@@ -118,6 +160,10 @@ function isAuthSession(value: unknown): value is AuthSession {
 }
 
 function isUserDto(value: unknown): value is UserDto {
+  return hasUserDtoFields(value) && isUserLocale(value.locale);
+}
+
+function hasUserDtoFields(value: unknown): value is Record<string, unknown> {
   if (!isRecord(value)) return false;
   return (
     typeof value.userId === "number" &&
@@ -126,6 +172,29 @@ function isUserDto(value: unknown): value is UserDto {
     ["ADMIN", "ANALYST", "VIEWER"].includes(String(value.role)) &&
     ["ACTIVE", "DISABLED"].includes(String(value.status))
   );
+}
+
+function normalizeAuthSession(value: unknown): AuthSession | null {
+  if (!isRecord(value) || typeof value.token !== "string" || typeof value.expiresAt !== "number") return null;
+  const user = normalizeUserDto(value.user);
+  return user ? { token: value.token, expiresAt: value.expiresAt, user } : null;
+}
+
+function normalizeUserDto(value: unknown): UserDto | null {
+  if (!hasUserDtoFields(value)) return null;
+  const locale: UserLocale = isUserLocale(value.locale) ? value.locale : "EN";
+  return {
+    userId: Number(value.userId),
+    loginId: String(value.loginId),
+    name: String(value.name),
+    role: value.role as UserDto["role"],
+    status: value.status as UserDto["status"],
+    locale,
+  };
+}
+
+function isUserLocale(value: unknown): value is UserLocale {
+  return value === "EN" || value === "KO";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

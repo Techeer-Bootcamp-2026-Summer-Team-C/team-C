@@ -28,6 +28,19 @@ def test_postgresql_migration_repository_idempotency_and_rollback() -> None:
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.down.sql")
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.up.sql")
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_user_login_id.up.sql")
+        connection.execute(
+            """
+            INSERT INTO users (login_id, password_hash, name, role, status, created_at, updated_at)
+            VALUES ('migration-user', 'hash', 'Migration User', 'VIEWER', 'ACTIVE', %s, %s)
+            """,
+            (now, now),
+        )
+        connection.commit()
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0003_user_locale.up.sql")
+        assert connection.execute("SELECT locale FROM users WHERE login_id = 'migration-user'").fetchone()[0] == "EN"
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with connection.transaction():
+                connection.execute("UPDATE users SET locale = 'JA' WHERE login_id = 'migration-user'")
         column = connection.execute(
             """
             SELECT data_type, character_maximum_length
@@ -179,6 +192,7 @@ def test_postgresql_migration_repository_idempotency_and_rollback() -> None:
             assert alerts.active_for_endpoint(endpoint_id) == []
             assert incidents.close_expired(now + timedelta(hours=1)) == 1
         finally:
+            apply_postgres_file(connection, ROOT / "migrations/postgresql/0003_user_locale.down.sql")
             apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_user_login_id.down.sql")
             apply_postgres_file(connection, ROOT / "migrations/postgresql/0001_initial.down.sql")
 

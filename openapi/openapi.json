@@ -4537,6 +4537,23 @@
         "title": "SuccessEnvelope[TelemetryBatchData]",
         "type": "object"
       },
+      "SuccessEnvelope_UserDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UserDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[UserDto]",
+        "type": "object"
+      },
       "TelemetryBatchData": {
         "additionalProperties": false,
         "properties": {
@@ -4833,6 +4850,9 @@
       "UserDto": {
         "additionalProperties": false,
         "properties": {
+          "locale": {
+            "$ref": "#/components/schemas/UserLocale"
+          },
           "loginId": {
             "maxLength": 64,
             "minLength": 3,
@@ -4861,9 +4881,31 @@
           "loginId",
           "name",
           "role",
-          "status"
+          "status",
+          "locale"
         ],
         "title": "UserDto",
+        "type": "object"
+      },
+      "UserLocale": {
+        "enum": [
+          "EN",
+          "KO"
+        ],
+        "title": "UserLocale",
+        "type": "string"
+      },
+      "UserLocaleUpdateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "locale": {
+            "$ref": "#/components/schemas/UserLocale"
+          }
+        },
+        "required": [
+          "locale"
+        ],
+        "title": "UserLocaleUpdateRequest",
         "type": "object"
       },
       "UserRole": {
@@ -6805,12 +6847,128 @@
           "Incidents"
         ]
       }
+    },
+    "/api/v1/users/me": {
+      "get": {
+        "operationId": "usersMeGet",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_UserDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Users Me",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/api/v1/users/me/locale": {
+      "patch": {
+        "operationId": "usersLocaleUpdate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserLocaleUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_UserDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Update User Locale",
+        "tags": [
+          "Users"
+        ]
+      }
     }
   },
   "tags": [
     {
       "description": "Dashboard user authentication.",
       "name": "Auth"
+    },
+    {
+      "description": "Authenticated dashboard user profile and preferences.",
+      "name": "Users"
     },
     {
       "description": "Endpoint inventory, health, and Backend-calculated risk.",

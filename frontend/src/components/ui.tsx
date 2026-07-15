@@ -8,6 +8,8 @@ import type {
   PagedData,
   ResponseGuidanceStepDto,
 } from "../contracts";
+import { useI18n } from "../i18n/LocaleContext";
+import type { TranslationKey } from "../i18n/translations";
 import { formatDateTime, humanize } from "../lib/format";
 
 export function PageHeader({ eyebrow, title, description, actions }: {
@@ -64,13 +66,14 @@ export function EdrStatePill({ state, score, reasons, calculatedAt }: {
   reasons: readonly string[];
   calculatedAt: string;
 }) {
+  const { t } = useI18n();
   return (
-    <section className={`edr-state tone-${state.toLowerCase()}`} aria-label={`EDR state ${state}, score ${score}`}>
-      <div><span>Current EDR state</span><strong>{state}</strong></div>
+    <section className={`edr-state tone-${state.toLowerCase()}`} aria-label={t("edrState.aria", { state, score })}>
+      <div><span>{t("edrState.current")}</span><strong>{state}</strong></div>
       <div className="edr-score"><strong>{score}</strong><span>/ 100</span></div>
       <div className="edr-reasons">
-        <span>{reasons.length ? reasons.map(humanize).join(" · ") : "No active risk reasons"}</span>
-        <small>Calculated {formatDateTime(calculatedAt)}</small>
+        <span>{reasons.length ? reasons.map(humanize).join(" · ") : t("edrState.noReasons")}</span>
+        <small>{t("edrState.calculated", { time: formatDateTime(calculatedAt) })}</small>
       </div>
     </section>
   );
@@ -81,7 +84,8 @@ export function GlobalFilterBar({ children, onClear, hasFilters }: {
   onClear: () => void;
   hasFilters: boolean;
 }) {
-  return <section className="filter-bar" aria-label="Filters"><div className="filter-fields">{children}</div><button className="button ghost" disabled={!hasFilters} onClick={onClear} type="button">Clear filters</button></section>;
+  const { t } = useI18n();
+  return <section className="filter-bar" aria-label={t("filter.filters")}><div className="filter-fields">{children}</div><button className="button ghost" disabled={!hasFilters} onClick={onClear} type="button">{t("filter.clear")}</button></section>;
 }
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -93,12 +97,13 @@ export function DataTable({ label, children }: { label: string; children: ReactN
 }
 
 export function Pagination<T>({ page }: { page: PagedData<T> }) {
+  const { t } = useI18n();
   const totalPages = Math.max(1, Math.ceil(page.total / page.size));
   return (
-    <nav className="pagination" aria-label="Pagination">
-      <Link aria-disabled={page.page <= 1} className={page.page <= 1 ? "disabled" : ""} to={pageUrl(page.page - 1)}><ArrowLeft aria-hidden="true" size={15} />Previous</Link>
-      <span>Page {page.page} of {totalPages} · {page.total} results</span>
-      <Link aria-disabled={page.page >= totalPages} className={page.page >= totalPages ? "disabled" : ""} to={pageUrl(page.page + 1)}>Next<ArrowRight aria-hidden="true" size={15} /></Link>
+    <nav className="pagination" aria-label={t("pagination.label")}>
+      <Link aria-disabled={page.page <= 1} className={page.page <= 1 ? "disabled" : ""} to={pageUrl(page.page - 1)}><ArrowLeft aria-hidden="true" size={15} />{t("pagination.previous")}</Link>
+      <span>{t("pagination.summary", { page: page.page, totalPages, total: page.total })}</span>
+      <Link aria-disabled={page.page >= totalPages} className={page.page >= totalPages ? "disabled" : ""} to={pageUrl(page.page + 1)}>{t("pagination.next")}<ArrowRight aria-hidden="true" size={15} /></Link>
     </nav>
   );
 }
@@ -110,7 +115,8 @@ function pageUrl(page: number): string {
 }
 
 export function Skeleton({ rows = 5 }: { rows?: number }) {
-  return <div aria-label="Loading" className="skeleton" role="status"><span className="skeleton-heading" />{Array.from({ length: rows }, (_, index) => <span className="skeleton-row" key={index} />)}</div>;
+  const { t } = useI18n();
+  return <div aria-label={t("common.loading")} className="skeleton" role="status"><span className="skeleton-heading" />{Array.from({ length: rows }, (_, index) => <span className="skeleton-row" key={index} />)}</div>;
 }
 
 export function EmptyState({ title, message }: { title: string; message: string }) {
@@ -122,22 +128,28 @@ export function ErrorState({ error, onRetry, archiveAction = false }: {
   onRetry?: () => void;
   archiveAction?: boolean;
 }) {
+  const { locale, t } = useI18n();
   const apiError = error instanceof ApiError ? error : null;
+  const translatedErrorKey = apiError ? API_ERROR_KEYS[apiError.code] : undefined;
+  const errorMessage = apiError
+    ? locale === "KO" && translatedErrorKey ? t(translatedErrorKey) : apiError.message
+    : t("error.dataLoad");
   return (
     <div className="state-card error" role="alert">
       <AlertTriangle aria-hidden="true" size={22} />
-      <strong>{apiError?.message ?? "The requested data could not be loaded."}</strong>
-      <p>{apiError?.retryable ? "The last successful data may be stale. Retry when the service is available." : "Review the request and try the next action below."}</p>
-      {apiError?.requestId ? <code>Request {apiError.requestId}</code> : <span>Request ID unavailable</span>}
+      <strong>{errorMessage}</strong>
+      <p>{apiError?.retryable ? t("error.retryableHelp") : t("error.actionHelp")}</p>
+      {apiError?.requestId ? <code>{t("common.requestId", { requestId: apiError.requestId })}</code> : <span>{t("common.requestIdUnavailable")}</span>}
       {apiError?.details.length ? <ul>{apiError.details.map((detail, index) => <li key={`${detail.field ?? "state"}-${index}`}>{detail.message}{detail.context ? ` · ${JSON.stringify(detail.context)}` : ""}</li>)}</ul> : null}
-      <div className="state-actions">{onRetry ? <button className="button" onClick={onRetry} type="button"><RefreshCw aria-hidden="true" size={15} />Retry</button> : null}{archiveAction ? <Link className="button" to="/operations/archives">Open archive operations</Link> : null}</div>
+      <div className="state-actions">{onRetry ? <button className="button" onClick={onRetry} type="button"><RefreshCw aria-hidden="true" size={15} />{t("common.retry")}</button> : null}{archiveAction ? <Link className="button" to="/operations/archives">{t("error.archiveAction")}</Link> : null}</div>
     </div>
   );
 }
 
 export function StaleWarning({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  const { t } = useI18n();
   const requestId = error instanceof ApiError ? error.requestId : null;
-  return <div className="stale-warning" role="alert"><AlertTriangle aria-hidden="true" size={17} /><span>Refresh failed. Showing the last successful data.{requestId ? ` Request ${requestId}.` : ""}</span><button onClick={onRetry} type="button">Retry</button></div>;
+  return <div className="stale-warning" role="alert"><AlertTriangle aria-hidden="true" size={17} /><span>{t("error.refreshStale")}{requestId ? ` ${t("common.requestId", { requestId })}.` : ""}</span><button onClick={onRetry} type="button">{t("common.retry")}</button></div>;
 }
 
 export function DefinitionGrid({ items }: { items: readonly { label: string; value: ReactNode }[] }) {
@@ -145,17 +157,20 @@ export function DefinitionGrid({ items }: { items: readonly { label: string; val
 }
 
 export function ResponseGuidance({ steps }: { steps: ResponseGuidanceStepDto[] }) {
-  if (!steps.length) return <EmptyState title="No response guidance" message="The matching RuleV1 version has no guidance steps." />;
+  const { t } = useI18n();
+  if (!steps.length) return <EmptyState title={t("empty.noResponseGuidance")} message={t("empty.responseGuidanceDescription")} />;
   return <ol className="guidance-list">{steps.map((step) => <li key={step.order}><span>{step.order}</span><div><div className="guidance-title"><strong>{step.title}</strong>{step.requiresManualAction ? <StatusPill value="MANUAL ACTION" /> : null}</div><p>{step.description}</p></div></li>)}</ol>;
 }
 
 export function RiskFactorList({ risk }: { risk: EndpointRiskDto }) {
-  if (!risk.riskFactors.length) return <EmptyState title="No active factors" message="The Backend returned no active Alert or Incident risk factors." />;
-  return <ul className="risk-factor-list">{risk.riskFactors.map((factor) => <li key={`${factor.sourceType}-${factor.sourceId}-${factor.code}`}><span className="factor-score">+{factor.contribution}</span><div><strong>{factor.title}</strong><p>{factor.description}</p><Link to={factor.sourceType === "ALERT" ? `/alerts/${factor.sourceId}` : `/incidents/${factor.sourceId}`}>Open {factor.sourceType.toLowerCase()} source</Link></div></li>)}</ul>;
+  const { locale, t } = useI18n();
+  if (!risk.riskFactors.length) return <EmptyState title={t("empty.noRiskFactors")} message={t("empty.riskFactorsDescription")} />;
+  return <ul className="risk-factor-list">{risk.riskFactors.map((factor) => <li key={`${factor.sourceType}-${factor.sourceId}-${factor.code}`}><span className="factor-score">+{factor.contribution}</span><div><strong>{factor.title}</strong><p>{factor.description}</p><Link to={factor.sourceType === "ALERT" ? `/alerts/${factor.sourceId}` : `/incidents/${factor.sourceId}`}>{t("risk.openSource", { sourceType: locale === "KO" ? (factor.sourceType === "ALERT" ? "Alert" : "Incident") : factor.sourceType.toLowerCase() })}</Link></div></li>)}</ul>;
 }
 
 export function SourceEvent({ alert }: { alert: AlertDetailDto }) {
-  if (!alert.sourceEvent) return <EmptyState title="Source event unavailable" message="The event is not currently available in HOT or RESTORED storage." />;
+  const { t } = useI18n();
+  if (!alert.sourceEvent) return <EmptyState title={t("empty.sourceEventUnavailable")} message={t("empty.sourceEventDescription")} />;
   const event = alert.sourceEvent;
   return <Link className="source-event" to={`/events/${event.eventId}?endpointId=${event.endpointId}&occurredAt=${encodeURIComponent(event.occurredAt)}`}><span>{event.eventType}</span><strong>{event.processName ?? event.remoteDomain ?? event.filePath ?? event.eventId}</strong><small>{formatDateTime(event.occurredAt)}</small></Link>;
 }
@@ -163,3 +178,14 @@ export function SourceEvent({ alert }: { alert: AlertDetailDto }) {
 export function MasterDetail({ list, detail }: { list: ReactNode; detail: ReactNode }) {
   return <div className="master-detail"><div>{list}</div><aside>{detail}</aside></div>;
 }
+
+const API_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
+  VALIDATION_ERROR: "error.validation",
+  INVALID_TOKEN: "error.invalidToken",
+  FORBIDDEN: "error.forbidden",
+  NOT_FOUND: "error.notFound",
+  SERVICE_UNAVAILABLE: "error.serviceUnavailable",
+  ARCHIVE_NOT_READY: "error.archiveNotReady",
+  NETWORK_ERROR: "error.network",
+  INVALID_ENVELOPE: "error.invalidEnvelope",
+};

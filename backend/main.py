@@ -15,7 +15,7 @@ from .auth import AuthenticatedUser, decode_access_token, issue_access_token, re
 from .collector import CollectorService
 from .contracts.alerts import AlertDetailDto, AlertDto, AlertStatusUpdateRequest
 from .contracts.archives import ArchiveBucketDto, ArchiveRestoreRequest, ArchiveRestoreStartDto
-from .contracts.auth import LoginData, LoginRequest, UserDto
+from .contracts.auth import LoginData, LoginRequest, UserDto, UserLocaleUpdateRequest
 from .contracts.collector import (
     AgentHeartbeatData,
     AgentHeartbeatRequest,
@@ -27,7 +27,7 @@ from .contracts.collector import (
 from .contracts.common import ErrorBody, ErrorDetail, ErrorEnvelope, PagedData, RequestMeta, SuccessEnvelope
 from .contracts.dashboard import DashboardSummaryDto, EndpointSummaryDto, IngestSummaryDto
 from .contracts.endpoints import EndpointDetailDto, EndpointDto
-from .contracts.enums import DashboardInterval, UserRole, UserStatus
+from .contracts.enums import DashboardInterval, UserLocale, UserRole, UserStatus
 from .contracts.events import EventDetailDto, EventDto
 from .contracts.incidents import IncidentDetailDto, IncidentDto
 from .contracts.requests import (
@@ -58,6 +58,7 @@ from .time_range import resolve_time_range
 
 OPENAPI_TAGS = [
     {"name": "Auth", "description": "Dashboard user authentication."},
+    {"name": "Users", "description": "Authenticated dashboard user profile and preferences."},
     {"name": "Endpoints", "description": "Endpoint inventory, health, and Backend-calculated risk."},
     {"name": "Events", "description": "HOT ClickHouse and RESTORED Parquet event evidence."},
     {"name": "Archives", "description": "Archive restore lifecycle operations."},
@@ -195,9 +196,52 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
                 name=row["name"],
                 role=role,
                 status=UserStatus.ACTIVE,
+                locale=UserLocale(row["locale"]),
             ),
         )
         return _success(request, data)
+
+    @app.get(
+        "/api/v1/users/me",
+        response_model=SuccessEnvelope[UserDto],
+        operation_id="usersMeGet",
+        tags=["Users"],
+        responses=_error_responses(401, 503),
+    )
+    def users_me(
+        request: Request,
+        user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[UserDto]:
+        runtime = _runtime(request)
+        with runtime.postgres() as connection:
+            row = UserRepository(connection).by_user_id(user.user_id)
+        if row is None:
+            raise ApplicationError(401, "INVALID_TOKEN", "The access token identity is no longer active.")
+        return _success(request, _user_dto(row))
+
+    @app.patch(
+        "/api/v1/users/me/locale",
+        response_model=SuccessEnvelope[UserDto],
+        operation_id="usersLocaleUpdate",
+        tags=["Users"],
+        responses=_error_responses(400, 401, 503),
+    )
+    def update_user_locale(
+        request: Request,
+        body: UserLocaleUpdateRequest,
+        user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[UserDto]:
+        runtime = _runtime(request)
+        with runtime.postgres() as connection:
+            row = UserRepository(connection).update_locale(
+                user_id=user.user_id,
+                locale=body.locale,
+                request_id=request.state.request_id,
+                changed_at=datetime.now(UTC),
+            )
+        if row is None:
+            raise ApplicationError(401, "INVALID_TOKEN", "The access token identity is no longer active.")
+        return _success(request, _user_dto(row))
 
     @app.get(
         "/api/v1/endpoints",
@@ -602,6 +646,17 @@ def _remove_null_defaults(value: object) -> None:
     elif isinstance(value, list):
         for nested in value:
             _remove_null_defaults(nested)
+
+
+def _user_dto(row: dict[str, object]) -> UserDto:
+    return UserDto(
+        user_id=int(row["user_id"]),
+        login_id=str(row["login_id"]),
+        name=str(row["name"]),
+        role=UserRole(row["role"]),
+        status=UserStatus(row["status"]),
+        locale=UserLocale(row["locale"]),
+    )
 
 
 def _runtime(request: Request) -> RuntimeServices:

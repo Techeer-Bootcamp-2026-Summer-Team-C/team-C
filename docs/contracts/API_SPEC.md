@@ -12,9 +12,9 @@ Agent는 Process, Network, File, DNS, L7 5종 metadata를 전송한다. Npcap/tc
 
 | 구분 | 개수 |
 | --- | ---: |
-| Dashboard Backend REST API | 15 |
+| Dashboard Backend REST API | 17 |
 | Collector REST API | 3 |
-| **제품 REST API 합계** | **18** |
+| **제품 REST API 합계** | **20** |
 
 `/health/live`, `/health/ready`, `/metrics`, Swagger/OpenAPI 경로는 운영 endpoint이므로 제품 API 개수에서 제외한다. Failure 재처리는 공개 REST API가 아니라 관리자용 Python CLI로 수행한다.
 
@@ -203,20 +203,22 @@ FastAPI/Pydantic response model을 최종 응답 계약으로 사용한다.
 | No | Method | Path | 역할 | Pydantic `data` model |
 | ---: | --- | --- | --- | --- |
 | 1 | POST | `/auth/login` | 로그인 | `LoginData` |
-| 2 | GET | `/endpoints` | Endpoint 목록 | `PagedData<EndpointDto>` |
-| 3 | GET | `/endpoints/{endpointId}` | Endpoint 상세 | `EndpointDetailDto` |
-| 4 | GET | `/events` | Event 목록 | `PagedData<EventDto>` |
-| 5 | GET | `/events/{eventId}` | Event 상세 | `EventDetailDto` |
-| 6 | POST | `/archives/restores` | Archive 복원 시작 | `ArchiveRestoreStartDto` |
-| 7 | GET | `/archives/restores` | Archive 복원 상태 | `PagedData<ArchiveBucketDto>` |
-| 8 | GET | `/alerts` | Alert 목록 | `PagedData<AlertDto>` |
-| 9 | GET | `/alerts/{alertId}` | Alert 상세 | `AlertDetailDto` |
-| 10 | PATCH | `/alerts/{alertId}/status` | Alert 상태 변경 | `AlertDto` |
-| 11 | GET | `/incidents` | Incident 목록 | `PagedData<IncidentDto>` |
-| 12 | GET | `/incidents/{incidentId}` | Incident 상세 | `IncidentDetailDto` |
-| 13 | GET | `/dashboard/summary` | 전체 요약 | `DashboardSummaryDto` |
-| 14 | GET | `/dashboard/endpoints/summary` | Endpoint 요약 | `EndpointSummaryDto` |
-| 15 | GET | `/dashboard/ingest/summary` | 수집·저장·failure 요약 | `IngestSummaryDto` |
+| 2 | GET | `/users/me` | 현재 사용자 조회 | `UserDto` |
+| 3 | PATCH | `/users/me/locale` | 현재 사용자 locale 변경 | `UserDto` |
+| 4 | GET | `/endpoints` | Endpoint 목록 | `PagedData<EndpointDto>` |
+| 5 | GET | `/endpoints/{endpointId}` | Endpoint 상세 | `EndpointDetailDto` |
+| 6 | GET | `/events` | Event 목록 | `PagedData<EventDto>` |
+| 7 | GET | `/events/{eventId}` | Event 상세 | `EventDetailDto` |
+| 8 | POST | `/archives/restores` | Archive 복원 시작 | `ArchiveRestoreStartDto` |
+| 9 | GET | `/archives/restores` | Archive 복원 상태 | `PagedData<ArchiveBucketDto>` |
+| 10 | GET | `/alerts` | Alert 목록 | `PagedData<AlertDto>` |
+| 11 | GET | `/alerts/{alertId}` | Alert 상세 | `AlertDetailDto` |
+| 12 | PATCH | `/alerts/{alertId}/status` | Alert 상태 변경 | `AlertDto` |
+| 13 | GET | `/incidents` | Incident 목록 | `PagedData<IncidentDto>` |
+| 14 | GET | `/incidents/{incidentId}` | Incident 상세 | `IncidentDetailDto` |
+| 15 | GET | `/dashboard/summary` | 전체 요약 | `DashboardSummaryDto` |
+| 16 | GET | `/dashboard/endpoints/summary` | Endpoint 요약 | `EndpointSummaryDto` |
+| 17 | GET | `/dashboard/ingest/summary` | 수집·저장·failure 요약 | `IngestSummaryDto` |
 
 ### 5.2 Collector REST API
 
@@ -226,7 +228,7 @@ FastAPI/Pydantic response model을 최종 응답 계약으로 사용한다.
 | 2 | POST | `/collector/agents/heartbeat` | 상태와 sensor health 갱신 |
 | 3 | POST | `/collector/telemetry/batches` | metadata telemetry ingest |
 
-## 6. Auth API
+## 6. Auth와 Users API
 
 ### 6.1 로그인
 
@@ -252,14 +254,15 @@ POST /api/v1/auth/login
       "loginId": "analyst",
       "name": "Analyst",
       "role": "ANALYST",
-      "status": "ACTIVE"
+      "status": "ACTIVE",
+      "locale": "EN"
     }
   },
   "meta": {"requestId": "req_01HZX..."}
 }
 ```
 
-`LoginData`는 `accessToken: string`, `tokenType: "Bearer"`, `expiresIn: integer`, `user: UserDto`다. `UserDto`는 `userId: integer`, `loginId: string`, `name: string`, `role: ADMIN | ANALYST | VIEWER`, `status: ACTIVE | DISABLED` required field를 반환한다.
+`LoginData`는 `accessToken: string`, `tokenType: "Bearer"`, `expiresIn: integer`, `user: UserDto`다. `UserDto`는 `userId: integer`, `loginId: string`, `name: string`, `role: ADMIN | ANALYST | VIEWER`, `status: ACTIVE | DISABLED`, `locale: EN | KO` required field를 반환한다.
 
 Login ID는 사용자가 지정하며 trim/lowercase 정규화 후 PostgreSQL의 `LOWER(login_id)` partial unique index로 대소문자 구분 없이 중복을 막는다. DB column과 API 길이는 3~64자이고 영문 소문자 또는 숫자로 시작하며 영문, 숫자, `.`, `_`, `@`, `+`, `-`를 허용한다. `@`는 기존 이메일 계정 migration 호환을 위한 허용 문자일 뿐 이메일 형식을 요구하지 않는다. password 요청은 1~1,024자로 제한한다. `is_delete=false AND status=ACTIVE`만 로그인할 수 있고 `DISABLED`는 `403 ACCOUNT_DISABLED`다. Nginx는 로그인 요청을 IP별 분당 10회와 burst 10으로 제한하며 초과 시 `429 RATE_LIMITED`를 반환한다. JWT access token은 현재 브라우저 탭의 `sessionStorage`에 보관해 새로고침 후 복구하며 기본 만료는 12시간이다. `EDR_ACCESS_TOKEN_TTL_SECONDS`로 5분~7일 범위에서 조정한다.
 
@@ -272,6 +275,47 @@ python -m tools.create_admin --login-id <LOGIN_ID> --name <DISPLAY_NAME>
 개발 환경에서 같은 ID의 비밀번호를 다시 지정할 때는 `--reset-existing`을 추가한다. 비밀번호는 기본적으로 숨김 prompt에서 입력하며 `--password-stdin`도 사용할 수 있다.
 
 CLI는 `ACTIVE` ADMIN을 생성한다. 비밀번호나 초기 계정을 migration에 하드코딩하지 않으며 사용자 생성·삭제·상태 변경 REST API는 만들지 않는다.
+
+### 6.2 현재 사용자 조회
+
+```http
+GET /api/v1/users/me
+Authorization: Bearer <token>
+```
+
+`operationId`는 `usersMeGet`이다. `ADMIN`, `ANALYST`, `VIEWER`가 자신의 활성 사용자 정보를 조회할 수 있으며 응답은 `SuccessEnvelope<UserDto>`다. 미인증 요청은 `401`이다.
+
+```json
+{
+  "data": {
+    "userId": 1,
+    "loginId": "analyst",
+    "name": "Analyst",
+    "role": "ANALYST",
+    "status": "ACTIVE",
+    "locale": "EN"
+  },
+  "meta": {"requestId": "req_01HZX..."}
+}
+```
+
+### 6.3 현재 사용자 locale 변경
+
+```http
+PATCH /api/v1/users/me/locale
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+```json
+{
+  "locale": "KO"
+}
+```
+
+`operationId`는 `usersLocaleUpdate`다. 세 Dashboard role 모두 자신의 locale만 변경할 수 있으며 응답은 변경된 `SuccessEnvelope<UserDto>`다. `EN`, `KO` 외의 값은 기존 `400 VALIDATION_ERROR` 계약을 따른다. 같은 locale 요청은 멱등이며 `updated_at`과 audit log를 다시 기록하지 않는다. 실제 변경은 사용자 row와 `USER_LOCALE_CHANGED` audit log를 같은 transaction에서 기록한다.
+
+Backend의 `users.locale`이 최종 source of truth다. JWT claim은 기존 `sub`, `role`, `iat`, `exp` 구조를 유지하고 locale을 포함하지 않으므로 locale 변경에 token 재발급이 필요하지 않다. Backend 오류 메시지는 locale별로 바꾸지 않으며 Frontend는 안정적인 `error.code`를 번역하고 동적 `message`는 fallback으로만 사용한다.
 
 ## 7. Collector REST 계약
 

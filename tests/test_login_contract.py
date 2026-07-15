@@ -1,8 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
-from backend.contracts.auth import LoginRequest, UserDto, normalize_login_id
-from backend.contracts.enums import UserRole, UserStatus
+from backend.contracts.auth import LoginRequest, UserDto, UserLocaleUpdateRequest, normalize_login_id
+from backend.contracts.enums import UserLocale, UserRole, UserStatus
 
 
 def test_login_id_is_user_defined_case_insensitive_and_not_email_only() -> None:
@@ -13,11 +13,28 @@ def test_login_id_is_user_defined_case_insensitive_and_not_email_only() -> None:
         name="Security Admin",
         role=UserRole.ADMIN,
         status=UserStatus.ACTIVE,
+        locale=UserLocale.EN,
     )
 
     assert request.login_id == "security-admin"
     assert user.model_dump(mode="json", by_alias=True)["loginId"] == "security-admin"
     assert normalize_login_id("legacy@example.com") == "legacy@example.com"
+
+
+def test_user_locale_contract_is_required_and_accepts_only_en_or_ko() -> None:
+    assert UserLocaleUpdateRequest.model_validate({"locale": "KO"}).locale is UserLocale.KO
+    with pytest.raises(ValidationError):
+        UserLocaleUpdateRequest.model_validate({"locale": "JA"})
+    with pytest.raises(ValidationError):
+        UserDto.model_validate(
+            {
+                "userId": 1,
+                "loginId": "security-admin",
+                "name": "Security Admin",
+                "role": "ADMIN",
+                "status": "ACTIVE",
+            }
+        )
 
 
 @pytest.mark.parametrize("login_id", ["ab", "has space", "_starts-with-symbol", "한글아이디"])

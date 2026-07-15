@@ -1,4 +1,5 @@
 import type { DashboardTimeQuery, TimePreset } from "../contracts";
+import { useI18n } from "../i18n/LocaleContext";
 import { intervalFor, localDateTimeValue, timePreset, updateParams, utcFromLocal } from "../lib/url";
 import { Field } from "./ui";
 
@@ -28,38 +29,39 @@ export function TimeFilterFields({ params, setParams }: {
   params: URLSearchParams;
   setParams: (next: URLSearchParams) => void;
 }) {
+  const { t } = useI18n();
   const state = readTimeFilter(params);
   return (
     <>
-      <Field label="Time range">
+      <Field label={t("filter.timeRange")}>
         <select
           onChange={(event) => setParams(updateParams(params, { timePreset: event.target.value }))}
           value={state.preset}
         >
-          <option value="LATEST_15M">Latest 15 minutes</option>
-          <option value="LATEST_1H">Latest hour</option>
-          <option value="LATEST_24H">Latest 24 hours</option>
-          <option value="LATEST_7D">Latest 7 days</option>
-          <option value="CUSTOM">Custom UTC range</option>
+          <option value="LATEST_15M">{t("filter.latest15Minutes")}</option>
+          <option value="LATEST_1H">{t("filter.latestHour")}</option>
+          <option value="LATEST_24H">{t("filter.latest24Hours")}</option>
+          <option value="LATEST_7D">{t("filter.latest7Days")}</option>
+          <option value="CUSTOM">{t("filter.customUtcRange")}</option>
         </select>
       </Field>
       {state.preset === "CUSTOM" ? (
         <>
-          <Field label="From">
+          <Field label={t("filter.from")}>
             <input
               onChange={(event) => setParams(updateParams(params, { from: event.target.value ? utcFromLocal(event.target.value) : null }))}
               type="datetime-local"
               value={state.from ? localDateTimeValue(state.from) : ""}
             />
           </Field>
-          <Field label="To">
+          <Field label={t("filter.to")}>
             <input
               onChange={(event) => setParams(updateParams(params, { to: event.target.value ? utcFromLocal(event.target.value) : null }))}
               type="datetime-local"
               value={state.to ? localDateTimeValue(state.to) : ""}
             />
           </Field>
-          {!state.valid ? <span className="field-error">From and to are required, and from must be earlier than to.</span> : null}
+          {!state.valid ? <span className="field-error">{t("filter.invalidRange")}</span> : null}
         </>
       ) : null}
     </>

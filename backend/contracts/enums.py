@@ -74,6 +74,11 @@ class UserRole(StrEnum):
     VIEWER = "VIEWER"
 
 
+class UserLocale(StrEnum):
+    EN = "EN"
+    KO = "KO"
+
+
 class SensorHealth(StrEnum):
     HEALTHY = "HEALTHY"
     DEGRADED = "DEGRADED"
