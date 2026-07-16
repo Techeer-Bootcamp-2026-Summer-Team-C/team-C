@@ -10,6 +10,8 @@ on:
       - "backend/**"
       - "deploy/docker/**"
       - "deploy/nginx/**"
+      - "deploy/portainer/compose.service.yaml"
+      - "deploy/portainer/pin-images.py"
       - "mappings/**"
       - "migrations/**"
       - "rules/**"
@@ -71,6 +73,10 @@ jobs:
   promote:
     needs: build-and-push
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:

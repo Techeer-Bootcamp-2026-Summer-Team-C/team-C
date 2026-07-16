@@ -116,6 +116,8 @@ EDR_S3_BUCKET=<실제 S3 버킷 이름>
 
 비밀번호에 `@`, `:`, `/`, `?`, `#`, `[`, `]` 같은 문자가 있으면 DSN 안의 비밀번호를 URL 인코딩해야 한다. EC2 인스턴스 역할로 S3에 접근하므로 AWS Access Key와 Secret Key는 입력하지 않는다.
 
+> 운영 `edr-c-service`는 현재 `refs/heads/production` 브랜치 + polling으로 자동 배포된다(7절 참조). production 브랜치의 compose는 이미지 SHA가 고정돼 있어 `EDR_IMAGE_TAG`는 CI가 자동으로 채운다. 이 스택을 재구성할 때는 repository reference를 `refs/heads/production`으로 두고 `EDR_IMAGE_TAG` 없이 나머지 비밀 변수만 입력한다.
+
 필요할 때만 다음 포트를 기본값에서 바꾼다.
 
 ```text
@@ -150,11 +152,9 @@ EC2에 저장소 checkout과 PowerShell이 실제로 설치된 경우에만 `-Ss
 
 일반 서비스 배포에서는 인프라 스택을 건드리지 않는다.
 
-1. `main`의 이미지 빌드 성공을 확인한다.
-2. 새 커밋 SHA를 복사한다.
-3. `edr-c-service`의 `EDR_IMAGE_TAG`만 새 SHA로 바꾼다.
-4. 서비스 스택만 다시 배포한다.
-5. health check와 로그를 확인한다.
+`edr-c-service`는 2026-07-16부터 자동 배포된다: `main` push → GitHub Actions 이미지 빌드 → `promote` job이 `production` 브랜치에 이미지 SHA 고정 → Portainer가 `production`을 5분마다 polling해 자동 re-pull·재배포. 수동으로 `EDR_IMAGE_TAG`를 바꿀 필요가 없다.
+
+배포 후 `/nginx-health`, `/health/ready`와 컨테이너 로그로 확인한다. 롤백이 필요하면 이전 이미지 SHA가 GHCR에 남아 있으므로 Portainer에서 해당 SHA로 재배포하면 된다.
 
 외부 볼륨은 스택 수명주기와 분리되어 있어 스택을 다시 배포해도 자동 삭제되지 않는다. 그래도 기존 스택을 처음 전환하는 날에는 별도 백업 없이 삭제 작업을 진행하지 않는다.
 
