@@ -1018,7 +1018,7 @@ Dashboard metric item model은 다음 required field를 사용한다.
 | `storage` | `totalBucketCount: integer`, `byBackend: StorageBackendCountDto[]`, `byClass: StorageClassCountDto[]`, `byStatus: StorageStatusCountDto[]` |
 | `responseGuidance` | `affectedAlertCount`, `ruleCount`, `manualActionStepCount`, `highestSeverity`, `steps: ResponseGuidanceStepDto[]` |
 
-모든 하위 object와 list field는 required다. 집계 결과가 없으면 count는 `0`, list는 `[]`다. `topDomains.domain`은 `COALESCE(remote_domain, http_host)`로 계산하고 DNS query는 `topDnsQueries`에서 별도 집계한다.
+모든 하위 object와 list field는 required다. 집계 결과가 없으면 count는 `0`, list는 `[]`다. `topDomains.domain`은 `COALESCE(remote_domain, http_host)`로 계산하고 DNS query는 `topDnsQueries`에서 별도 집계한다. `top*` list는 count 내림차순, 값 오름차순으로 정렬한 상위 10개까지 반환한다.
 
 `interval`은 `1m`, `5m`, `1h`, `1d`, 최대 point 수는 2,000이다.
 

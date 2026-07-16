@@ -1,3 +1,5 @@
+from collections import Counter
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal, Protocol
 from uuid import UUID
@@ -86,6 +88,21 @@ FAILURE_COLUMNS = [
     "created_at",
     "updated_at",
 ]
+
+DASHBOARD_TOP_LIMIT = 10
+
+
+@dataclass(slots=True)
+class DashboardEventAggregate:
+    total_count: int = 0
+    by_event_type: Counter[str] = field(default_factory=Counter)
+    top_processes: Counter[str] = field(default_factory=Counter)
+    top_remote_ips: Counter[str] = field(default_factory=Counter)
+    top_domains: Counter[str] = field(default_factory=Counter)
+    top_file_hashes: Counter[str] = field(default_factory=Counter)
+    top_dns_queries: Counter[str] = field(default_factory=Counter)
+    top_l7_protocols: Counter[str] = field(default_factory=Counter)
+    time_series: Counter[datetime] = field(default_factory=Counter)
 
 
 class EventRepository:
@@ -271,7 +288,7 @@ class EventRepository:
         )
         result = self.client.query(
             f"""
-            SELECT uniqExact(event_id), maxOrNull(ingested_at)
+            SELECT count(), maxOrNull(ingested_at)
             FROM edr_events FINAL
             WHERE ingested_at >= {{from:DateTime64(3)}}
               AND ingested_at < {{to:DateTime64(3)}}
@@ -280,6 +297,108 @@ class EventRepository:
             parameters={"from": from_, "to": to, "endpoint_id": endpoint_id},
         )
         return int(result.result_rows[0][0]), result.result_rows[0][1]
+
+    def latest_ingested_at(self, *, endpoint_id: int | None = None) -> datetime | None:
+        endpoint_condition = (
+            " AND endpoint_id = {endpoint_id:UInt64}" if endpoint_id is not None else ""
+        )
+        result = self.client.query(
+            f"""
+            SELECT maxOrNull(ingested_at)
+            FROM edr_events FINAL
+            WHERE is_delete = 0{endpoint_condition}
+            """,
+            parameters={"endpoint_id": endpoint_id},
+        )
+        return result.result_rows[0][0]
+
+    def dashboard_summary(
+        self,
+        *,
+        from_: datetime,
+        to: datetime,
+        interval_seconds: int,
+        endpoint_id: int | None = None,
+    ) -> DashboardEventAggregate:
+        if interval_seconds not in {60, 300, 3600, 86400}:
+            raise ValueError("unsupported dashboard interval")
+
+        conditions = [
+            "occurred_at >= {from:DateTime64(3)}",
+            "occurred_at < {to:DateTime64(3)}",
+            "is_delete = 0",
+        ]
+        parameters: dict[str, Any] = {"from": from_, "to": to}
+        if endpoint_id is not None:
+            conditions.append("endpoint_id = {endpoint_id:UInt64}")
+            parameters["endpoint_id"] = endpoint_id
+        where = " AND ".join(conditions)
+
+        total = self.client.query(
+            f"SELECT count() FROM edr_events FINAL WHERE {where}",
+            parameters=parameters,
+        )
+        aggregate = DashboardEventAggregate(total_count=int(total.result_rows[0][0]))
+
+        by_event_type = self.client.query(
+            f"""
+            SELECT event_type, count()
+            FROM edr_events FINAL
+            WHERE {where}
+            GROUP BY event_type
+            """,
+            parameters=parameters,
+        )
+        aggregate.by_event_type.update(
+            {str(value): int(count) for value, count in by_event_type.result_rows}
+        )
+
+        time_series = self.client.query(
+            f"""
+            SELECT
+                toStartOfInterval(occurred_at, INTERVAL {interval_seconds} SECOND, 'UTC') AS bucket_start_at,
+                count()
+            FROM edr_events FINAL
+            WHERE {where}
+            GROUP BY bucket_start_at
+            ORDER BY bucket_start_at
+            """,
+            parameters=parameters,
+        )
+        aggregate.time_series.update(
+            {bucket_start_at: int(count) for bucket_start_at, count in time_series.result_rows}
+        )
+
+        top_dimensions = (
+            ("top_processes", "process_name"),
+            ("top_remote_ips", "remote_ip"),
+            (
+                "top_domains",
+                "coalesce(nullIf(remote_domain, ''), nullIf(http_host, ''))",
+            ),
+            ("top_file_hashes", "file_hash_sha256"),
+            ("top_dns_queries", "dns_query"),
+            ("top_l7_protocols", "l7_protocol"),
+        )
+        for target, expression in top_dimensions:
+            result = self.client.query(
+                f"""
+                SELECT {expression} AS value, count() AS event_count
+                FROM edr_events FINAL
+                WHERE {where}
+                  AND isNotNull({expression})
+                  AND {expression} != ''
+                GROUP BY value
+                ORDER BY event_count DESC, value ASC
+                LIMIT {DASHBOARD_TOP_LIMIT}
+                """,
+                parameters=parameters,
+            )
+            getattr(aggregate, target).update(
+                {str(value): int(count) for value, count in result.result_rows}
+            )
+
+        return aggregate
 
 
 class FailureRepository:

@@ -49,13 +49,12 @@ from .contracts.dashboard import (
     TopRuleDto,
 )
 from .contracts.enums import AlertStatus, DashboardInterval, EventFailureStatus, EventType, Severity
-from .contracts.requests import EventListQuery
 from .errors import ApplicationError
 from .event_service import EventService
 from .policy.edr_state import CollectionHealthInput, ThreatLevelInput, calculate_edr_state
 from .policy.risk import summarize_endpoint_risks
 from .rule_loader import LoadedRule
-from .storage.clickhouse import EventRepository, FailureRepository
+from .storage.clickhouse import DASHBOARD_TOP_LIMIT, EventRepository, FailureRepository
 from .storage.postgres import AlertRepository, EndpointRepository, IncidentRepository, IngestMetadataRepository
 
 
@@ -101,7 +100,12 @@ class SummaryService:
         endpoint_items = self._endpoint_items(calculated_at, endpoint_id=endpoint_id)
         alert_rows = self.alerts.list_rows(from_=from_, to=to, endpoint_id=endpoint_id)
         incident_rows = self.incidents.list_rows(from_=from_, to=to, endpoint_id=endpoint_id)
-        event_items = self._event_items(from_, to, endpoint_id=endpoint_id)
+        event_summary = self.event_service.dashboard_summary(
+            from_=from_,
+            to=to,
+            interval_seconds=seconds,
+            endpoint_id=endpoint_id,
+        )
         failure_rows = self.failures.current_rows(from_=from_, to=to, endpoint_id=endpoint_id)
         storage_rows = _filter_endpoint_rows(self.metadata.all_current(), endpoint_id)
         edr_state = self._edr_state(endpoint_items, calculated_at=calculated_at, endpoint_id=endpoint_id)
@@ -110,8 +114,6 @@ class SummaryService:
         incident_time: dict[datetime, Counter[str]] = {}
         for row in incident_rows:
             incident_time.setdefault(_bucket(row["last_detected_at"], seconds), Counter())[str(row["status"])] += 1
-        event_time = Counter(_bucket(item.occurred_at, seconds) for item in event_items)
-        domains = [item.remote_domain or item.http_host for item in event_items if item.remote_domain or item.http_host]
         return DashboardSummaryDto(
             time_range=TimeRangeDto(from_=from_, to=to),
             interval=interval,
@@ -157,33 +159,39 @@ class SummaryService:
             ),
             endpoints=_endpoint_counts(endpoint_items),
             events=DashboardEventsDto(
-                total_count=len(event_items),
-                by_event_type=_object_enum_counts(
-                    event_items, "event_type", EventType, EventTypeCountDto, "event_type"
-                ),
+                total_count=event_summary.total_count,
+                by_event_type=[
+                    EventTypeCountDto(event_type=value, count=event_summary.by_event_type[value.value])
+                    for value in EventType
+                    if event_summary.by_event_type[value.value]
+                ],
                 top_processes=[
                     TopProcessDto(process_name=value, count=count)
-                    for value, count in _rank_values(item.process_name for item in event_items)
+                    for value, count in _rank(event_summary.top_processes)[:DASHBOARD_TOP_LIMIT]
                 ],
                 top_remote_ips=[
                     TopRemoteIpDto(remote_ip=value, count=count)
-                    for value, count in _rank_values(item.remote_ip for item in event_items)
+                    for value, count in _rank(event_summary.top_remote_ips)[:DASHBOARD_TOP_LIMIT]
                 ],
-                top_domains=[TopDomainDto(domain=value, count=count) for value, count in _rank_values(domains)],
+                top_domains=[
+                    TopDomainDto(domain=value, count=count)
+                    for value, count in _rank(event_summary.top_domains)[:DASHBOARD_TOP_LIMIT]
+                ],
                 top_file_hashes=[
                     TopFileHashDto(file_hash_sha256=value, count=count)
-                    for value, count in _rank_values(item.file_hash_sha256 for item in event_items)
+                    for value, count in _rank(event_summary.top_file_hashes)[:DASHBOARD_TOP_LIMIT]
                 ],
                 top_dns_queries=[
                     TopDnsQueryDto(dns_query=value, count=count)
-                    for value, count in _rank_values(item.dns_query for item in event_items)
+                    for value, count in _rank(event_summary.top_dns_queries)[:DASHBOARD_TOP_LIMIT]
                 ],
                 top_l7_protocols=[
                     TopL7ProtocolDto(l7_protocol=value, count=count)
-                    for value, count in _rank_values(item.l7_protocol for item in event_items)
+                    for value, count in _rank(event_summary.top_l7_protocols)[:DASHBOARD_TOP_LIMIT]
                 ],
                 time_series=[
-                    TimeSeriesPointDto(bucket_start_at=key, count=value) for key, value in sorted(event_time.items())
+                    TimeSeriesPointDto(bucket_start_at=_aware(key), count=value)
+                    for key, value in sorted(event_summary.time_series.items())
                 ],
             ),
             event_failures=DashboardEventFailuresDto(
@@ -337,24 +345,6 @@ class SummaryService:
             for row in self.endpoints.risk_snapshot(endpoint_ids=endpoint_ids)
         ]
 
-    def _event_items(self, from_: datetime, to: datetime, *, endpoint_id: int | None = None):
-        query = EventListQuery(
-            timePreset="CUSTOM",
-            **{"from": from_, "to": to},
-            endpointId=endpoint_id,
-            page=1,
-            size=500,
-            sortOrder="asc",
-        )
-        first = self.event_service.list_rows(query, from_=from_, to=to)
-        items, total = first
-        page = 2
-        while len(items) < total:
-            page_items, _ = self.event_service.list_rows(query.model_copy(update={"page": page}), from_=from_, to=to)
-            items.extend(page_items)
-            page += 1
-        return items
-
     def _edr_state(
         self,
         endpoints,
@@ -371,11 +361,7 @@ class SummaryService:
                 endpoint_ids=[endpoint_id] if endpoint_id is not None else None
             )
         )
-        latest_ingest = self.events.ingest_summary(
-            from_=datetime(1970, 1, 1, tzinfo=UTC),
-            to=calculated_at,
-            endpoint_id=endpoint_id,
-        )[1]
+        latest_ingest = self.events.latest_ingested_at(endpoint_id=endpoint_id)
         recent_failures = self.failures.current_rows(
             from_=calculated_at.replace(microsecond=0) - timedelta(minutes=15),
             to=calculated_at,
