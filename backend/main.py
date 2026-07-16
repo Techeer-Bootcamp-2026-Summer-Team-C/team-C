@@ -31,11 +31,21 @@ from .contracts.endpoints import EndpointDetailDto, EndpointDto
 from .contracts.enums import DashboardInterval, UserLocale, UserRole, UserStatus
 from .contracts.events import EventDetailDto, EventDto, ProcessTreeDto
 from .contracts.incidents import IncidentDetailDto, IncidentDto
+from .contracts.intelligence import (
+    CorrelationDto,
+    DnsLookupDto,
+    DnsLookupQuery,
+    ForwardDnsDto,
+    ForwardDnsQuery,
+    ReverseDnsDto,
+    ReverseDnsQuery,
+)
 from .contracts.investigations import AttackTimelineDto, EgressTopologyDto, EventFailureDto, IncidentInvestigationDto
 from .contracts.operations import OperationsHealthDto
 from .contracts.requests import (
     AlertListQuery,
     ArchiveRestoreListQuery,
+    CorrelationQuery,
     DashboardSummaryQuery,
     DashboardTimeQuery,
     EndpointListQuery,
@@ -47,6 +57,7 @@ from .contracts.requests import (
     TopologyQuery,
 )
 from .dashboard_layouts import DashboardLayoutService
+from .dns_service import DnsIntelligenceService
 from .errors import ApplicationError, RequestValidationError, ServiceUnavailableError
 from .event_service import EventService
 from .investigation_service import FailureService, InvestigationService
@@ -76,6 +87,7 @@ OPENAPI_TAGS = [
     {"name": "Incidents", "description": "Read-only correlated Incident views."},
     {"name": "Dashboard", "description": "Backend-calculated security and collection summaries."},
     {"name": "Operations", "description": "Live dependency and pipeline worker health."},
+    {"name": "Intelligence", "description": "DNS lookups and IP/Domain correlation."},
     {"name": "Collector", "description": "mTLS-authenticated Agent registration and telemetry ingest."},
 ]
 
@@ -719,6 +731,70 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         data = OperationsHealthService(_runtime(request)).snapshot(checked_at=datetime.now(UTC))
         return _success(request, data)
 
+    @app.get(
+        "/api/v1/intelligence/forward-dns",
+        response_model=SuccessEnvelope[ForwardDnsDto],
+        operation_id="intelligenceForwardDns",
+        tags=["Intelligence"],
+        responses=_error_responses(400, 401, 404, 503),
+    )
+    def intelligence_forward_dns(
+        request: Request,
+        query: Annotated[ForwardDnsQuery, Query()],
+        _user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[ForwardDnsDto]:
+        data = _intelligence_service(_runtime(request)).forward(query.domain)
+        return _success(request, data)
+
+    @app.get(
+        "/api/v1/intelligence/reverse-dns",
+        response_model=SuccessEnvelope[ReverseDnsDto],
+        operation_id="intelligenceReverseDns",
+        tags=["Intelligence"],
+        responses=_error_responses(400, 401, 404, 503),
+    )
+    def intelligence_reverse_dns(
+        request: Request,
+        query: Annotated[ReverseDnsQuery, Query()],
+        _user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[ReverseDnsDto]:
+        data = _intelligence_service(_runtime(request)).reverse(query.ip)
+        return _success(request, data)
+
+    @app.get(
+        "/api/v1/intelligence/dns-lookup",
+        response_model=SuccessEnvelope[DnsLookupDto],
+        operation_id="intelligenceDnsLookup",
+        tags=["Intelligence"],
+        responses=_error_responses(400, 401, 404, 503),
+    )
+    def intelligence_dns_lookup(
+        request: Request,
+        query: Annotated[DnsLookupQuery, Query()],
+        _user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[DnsLookupDto]:
+        data = _intelligence_service(_runtime(request)).lookup(query.query, query.record_type)
+        return _success(request, data)
+
+    @app.get(
+        "/api/v1/intelligence/correlate",
+        response_model=SuccessEnvelope[CorrelationDto],
+        operation_id="intelligenceCorrelate",
+        tags=["Intelligence"],
+        responses=_error_responses(400, 401, 503),
+    )
+    def intelligence_correlate(
+        request: Request,
+        query: Annotated[CorrelationQuery, Query()],
+        _user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[CorrelationDto]:
+        runtime = _runtime(request)
+        from_, to = resolve_time_range(query, now=datetime.now(UTC))
+        data = _intelligence_service(runtime).correlate(
+            query.value, from_=from_, to=to, endpoint_ids=query.endpoint_ids
+        )
+        return _success(request, data)
+
     @app.post(
         "/api/v1/collector/agents/register",
         response_model=SuccessEnvelope[AgentRegisterData],
@@ -897,6 +973,10 @@ def _investigation_service(runtime: RuntimeServices, connection) -> Investigatio
         incidents=IncidentRepository(connection),
         events=_event_service(runtime, connection),
     )
+
+
+def _intelligence_service(runtime: RuntimeServices) -> DnsIntelligenceService:
+    return DnsIntelligenceService(events=EventRepository(runtime.clickhouse))
 
 
 def _success(request: Request, data):

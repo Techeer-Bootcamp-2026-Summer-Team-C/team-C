@@ -10,6 +10,8 @@ import type {
   DashboardSummaryDto,
   DashboardSummaryQuery,
   DashboardTimeQuery,
+  CorrelationDto,
+  CorrelationQuery,
   EndpointDetailDto,
   EndpointDto,
   EndpointListQuery,
@@ -132,6 +134,9 @@ export const api = {
   },
   topology(query: TopologyQuery, signal?: AbortSignal): Promise<SuccessEnvelope<EgressTopologyDto>> {
     return apiRequest(`/dashboard/topology${buildQuery(queryRecord(query))}`, {}, signal);
+  },
+  correlation(query: CorrelationQuery, signal?: AbortSignal): Promise<SuccessEnvelope<CorrelationDto>> {
+    return apiRequest(`/intelligence/correlate${buildQuery(queryRecord(query))}`, {}, signal);
   },
   operationsHealth(signal?: AbortSignal): Promise<SuccessEnvelope<OperationsHealthDto>> {
     return apiRequest("/operations/health", {}, signal);

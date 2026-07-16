@@ -17,7 +17,7 @@ def test_operational_health_routes_only() -> None:
     expected = {(contract.method.lower(), "/api/v1" + contract.path) for contract in PRODUCT_API_CONTRACTS}
     actual = {(method, path) for path, operations in openapi_paths.items() for method in operations}
     assert actual == expected
-    assert len(actual) == 29
+    assert len(actual) == 33
 
     register_responses = openapi_paths["/api/v1/collector/agents/register"]["post"]["responses"]
     restore_responses = openapi_paths["/api/v1/archives/restores"]["post"]["responses"]

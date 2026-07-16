@@ -8,7 +8,7 @@ from tools.export_openapi import render_openapi
 ROOT = Path(__file__).parents[1]
 TAGS = {
     "Auth", "Users", "Endpoints", "Events", "Archives",
-    "Alerts", "Incidents", "Dashboard", "Operations", "Collector",
+    "Alerts", "Incidents", "Dashboard", "Operations", "Intelligence", "Collector",
 }
 EXPECTED_RESPONSES = {
     "authLogin": {"200", "400", "401", "403", "429", "503"},
@@ -37,6 +37,10 @@ EXPECTED_RESPONSES = {
     "dashboardGetIngestSummary": {"200", "400", "401", "503"},
     "dashboardGetTopology": {"200", "400", "401", "503"},
     "operationsGetHealth": {"200", "401"},
+    "intelligenceForwardDns": {"200", "400", "401", "404", "503"},
+    "intelligenceReverseDns": {"200", "400", "401", "404", "503"},
+    "intelligenceDnsLookup": {"200", "400", "401", "404", "503"},
+    "intelligenceCorrelate": {"200", "400", "401", "503"},
     "collectorRegisterAgent": {"200", "201", "400", "401", "403", "409", "503"},
     "collectorHeartbeatAgent": {"200", "400", "401", "403", "503"},
     "collectorIngestTelemetryBatch": {"200", "400", "401", "403", "413", "503"},
@@ -56,9 +60,9 @@ def test_openapi_has_exact_product_operations_tags_and_unique_ids() -> None:
     items = operations(schema)
     expected = {(contract.method.lower(), "/api/v1" + contract.path) for contract in PRODUCT_API_CONTRACTS}
     assert {(method, path) for path, method, _operation in items} == expected
-    assert len(items) == 29
+    assert len(items) == 33
     operation_ids = [operation["operationId"] for _path, _method, operation in items]
-    assert len(operation_ids) == len(set(operation_ids)) == 29
+    assert len(operation_ids) == len(set(operation_ids)) == 33
     assert set(operation_ids) == EXPECTED_RESPONSES.keys()
     assert {tag["name"] for tag in schema["tags"]} == TAGS
     assert all(len(operation["tags"]) == 1 and operation["tags"][0] in TAGS for _, _, operation in items)

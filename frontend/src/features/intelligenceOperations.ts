@@ -1,5 +1,7 @@
 import type {
   ArchiveBucketDto,
+  CorrelationDto,
+  CorrelationRelationshipDto,
   EgressTopologyDto,
   IngestSummaryDto,
   OperationsHealthDto,
@@ -9,6 +11,10 @@ import type {
 } from "../contracts";
 
 export type TopologySelection =
+  | { kind: "NODE"; id: string }
+  | { kind: "EDGE"; id: string };
+
+export type CorrelationSelection =
   | { kind: "NODE"; id: string }
   | { kind: "EDGE"; id: string };
 
@@ -48,6 +54,22 @@ export function endpointNodeId(endpointId: number): string {
 
 export function targetNodeId(target: string): string {
   return `target:${target}`;
+}
+
+export function correlationNodeId(valueType: "IP" | "DOMAIN", value: string): string {
+  return `correlation:${valueType}:${value}`;
+}
+
+export function correlationEdgeId(edge: CorrelationRelationshipDto): string {
+  return `correlation-edge:${edge.relation}:${edge.sourceType}:${edge.sourceValue}:${edge.targetType}:${edge.targetValue}`;
+}
+
+export function selectedCorrelationRelationship(
+  correlation: CorrelationDto,
+  selection: CorrelationSelection | null,
+): CorrelationRelationshipDto | null {
+  if (selection?.kind !== "EDGE") return null;
+  return correlation.relationships.find((edge) => correlationEdgeId(edge) === selection.id) ?? null;
 }
 
 export function filterTopology(topology: EgressTopologyDto, search: string, limit: number): EgressTopologyDto {

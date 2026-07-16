@@ -118,3 +118,8 @@ class DashboardSummaryQuery(TimeRangeQuery):
 
 class DashboardTimeQuery(TimeRangeQuery):
     endpoint_id: PositiveId | SkipJsonSchema[None] = None
+
+
+class CorrelationQuery(TimeRangeQuery):
+    value: str
+    endpoint_ids: list[PositiveId] | SkipJsonSchema[None] = None

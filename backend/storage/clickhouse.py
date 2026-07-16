@@ -168,12 +168,15 @@ class EventRepository:
         from_: datetime,
         to: datetime,
         endpoint_id: int | None = None,
+        endpoint_ids: list[int] | None = None,
         event_type: str | None = None,
         process_name: str | None = None,
         file_path: str | None = None,
         domain: str | None = None,
+        related_domain: str | None = None,
         remote_ip: str | None = None,
         dns_query: str | None = None,
+        dns_answer_ip: str | None = None,
         l7_protocol: str | None = None,
     ) -> list[JsonObject]:
         conditions = [
@@ -182,6 +185,10 @@ class EventRepository:
             "is_delete = 0",
         ]
         parameters: dict[str, Any] = {"from": from_, "to": to}
+        if endpoint_ids:
+            # Push endpoint scoping into ClickHouse instead of filtering rows in Python.
+            conditions.append("endpoint_id IN {endpoint_ids:Array(UInt64)}")
+            parameters["endpoint_ids"] = endpoint_ids
         exact_filters = {
             "endpoint_id": (endpoint_id, "UInt64"),
             "event_type": (event_type, "String"),
@@ -201,11 +208,34 @@ class EventRepository:
                 conditions.append(f"positionCaseInsensitiveUTF8(ifNull({column}, ''), {{{column}:String}}) > 0")
                 parameters[column] = value
         if domain is not None:
+            # Substring match. Intended for the Events UI free-text domain filter, where
+            # partial matches are acceptable. Do NOT use this for correlation (see related_domain).
             conditions.append(
                 "(positionCaseInsensitiveUTF8(ifNull(remote_domain, ''), {domain:String}) > 0 "
                 "OR positionCaseInsensitiveUTF8(ifNull(http_host, ''), {domain:String}) > 0)"
             )
             parameters["domain"] = domain
+        if related_domain is not None:
+            # Precise domain-boundary match for correlation: the exact name OR a subdomain of it.
+            # "yahoo.com" matches "yahoo.com" and "mail.yahoo.com", but NOT "notyahoo.com" or
+            # "yahoo.com.evil.example". Substring matching (see `domain` above) would over-match.
+            related_columns = ("remote_domain", "http_host", "tls_sni", "dns_query")
+            clauses = []
+            for column in related_columns:
+                clauses.append(f"lowerUTF8(ifNull({column}, '')) = lowerUTF8({{related_domain:String}})")
+                clauses.append(
+                    f"endsWith(lowerUTF8(ifNull({column}, '')), lowerUTF8(concat('.', {{related_domain:String}})))"
+                )
+            conditions.append("(" + " OR ".join(clauses) + ")")
+            parameters["related_domain"] = related_domain
+        if dns_answer_ip is not None:
+            # dns_answers_json is a Nullable(String) holding a JSON array of resolved IPs
+            # (e.g. ["1.2.3.4","5.6.7.8"]). Parse it into an array and test exact element
+            # membership so "1.2.3.4" never matches "11.2.3.45".
+            conditions.append(
+                "has(JSONExtract(ifNull(dns_answers_json, '[]'), 'Array(String)'), {dns_answer_ip:String})"
+            )
+            parameters["dns_answer_ip"] = dns_answer_ip
         if l7_protocol is not None:
             conditions.append("lowerUTF8(ifNull(l7_protocol, '')) = lowerUTF8({l7_protocol:String})")
             parameters["l7_protocol"] = l7_protocol

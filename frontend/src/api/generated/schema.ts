@@ -398,6 +398,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/intelligence/correlate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Intelligence Correlate */
+        get: operations["intelligenceCorrelate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/intelligence/dns-lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Intelligence Dns Lookup */
+        get: operations["intelligenceDnsLookup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/intelligence/forward-dns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Intelligence Forward Dns */
+        get: operations["intelligenceForwardDns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/intelligence/reverse-dns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Intelligence Reverse Dns */
+        get: operations["intelligenceReverseDns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/operations/health": {
         parameters: {
             query?: never;
@@ -747,6 +815,48 @@ export interface components {
             /** Revokedat */
             revokedAt: string | null;
         };
+        /** CorrelationDto */
+        CorrelationDto: {
+            /** From */
+            from: string;
+            /**
+             * Inputtype
+             * @enum {string}
+             */
+            inputType: "IP" | "DOMAIN";
+            /** Inputvalue */
+            inputValue: string;
+            /** Related */
+            related: components["schemas"]["RelatedValueDto"][];
+            /** Relationships */
+            relationships: components["schemas"]["CorrelationRelationshipDto"][];
+            /** To */
+            to: string;
+        };
+        /** CorrelationRelationshipDto */
+        CorrelationRelationshipDto: {
+            /**
+             * Relation
+             * @enum {string}
+             */
+            relation: "RESOLVES_TO" | "PTR_CANDIDATE" | "SUBDOMAIN_OF";
+            /**
+             * Sourcetype
+             * @enum {string}
+             */
+            sourceType: "IP" | "DOMAIN";
+            /** Sourcevalue */
+            sourceValue: string;
+            /** Sources */
+            sources: ("LIVE_DNS" | "OBSERVED_EVENTS")[];
+            /**
+             * Targettype
+             * @enum {string}
+             */
+            targetType: "IP" | "DOMAIN";
+            /** Targetvalue */
+            targetValue: string;
+        };
         /** DashboardAlertsDto */
         DashboardAlertsDto: {
             /** Byseverity */
@@ -892,6 +1002,14 @@ export interface components {
             /** Y */
             y: number;
         };
+        /** DnsLookupDto */
+        DnsLookupDto: {
+            /** Answers */
+            answers: string[];
+            /** Query */
+            query: string;
+            recordType: components["schemas"]["DnsRecordType"];
+        };
         /** DnsQueryEvent */
         DnsQueryEvent: {
             /** Eventid */
@@ -923,6 +1041,11 @@ export interface components {
             /** Responsecode */
             responseCode?: string;
         };
+        /**
+         * DnsRecordType
+         * @enum {string}
+         */
+        DnsRecordType: "A" | "AAAA" | "MX" | "NS" | "PTR";
         /** EdrStateAxisDto */
         EdrStateAxisDto: {
             /** Reasoncodes */
@@ -1429,6 +1552,13 @@ export interface components {
             processName?: string;
             /** Sha256 */
             sha256?: string;
+        };
+        /** ForwardDnsDto */
+        ForwardDnsDto: {
+            /** Domain */
+            domain: string;
+            /** Ipaddresses */
+            ipAddresses: string[];
         };
         /** IncidentDetailDto */
         IncidentDetailDto: {
@@ -1967,6 +2097,18 @@ export interface components {
             /** Retryable */
             retryable: boolean;
         };
+        /** RelatedValueDto */
+        RelatedValueDto: {
+            /** Sources */
+            sources: ("LIVE_DNS" | "OBSERVED_EVENTS")[];
+            /** Value */
+            value: string;
+            /**
+             * Valuetype
+             * @enum {string}
+             */
+            valueType: "IP" | "DOMAIN";
+        };
         /** RequestMeta */
         RequestMeta: {
             /** Requestid */
@@ -1994,6 +2136,13 @@ export interface components {
             ruleCount: number;
             /** Steps */
             steps: components["schemas"]["ResponseGuidanceStepDto"][];
+        };
+        /** ReverseDnsDto */
+        ReverseDnsDto: {
+            /** Hostnames */
+            hostnames: string[];
+            /** Ip */
+            ip: string;
         };
         /**
          * RiskLevel
@@ -2127,6 +2276,11 @@ export interface components {
             data: components["schemas"]["AttackTimelineDto"];
             meta: components["schemas"]["RequestMeta"];
         };
+        /** SuccessEnvelope[CorrelationDto] */
+        SuccessEnvelope_CorrelationDto_: {
+            data: components["schemas"]["CorrelationDto"];
+            meta: components["schemas"]["RequestMeta"];
+        };
         /** SuccessEnvelope[DashboardLayoutDto] */
         SuccessEnvelope_DashboardLayoutDto_: {
             data: components["schemas"]["DashboardLayoutDto"];
@@ -2135,6 +2289,11 @@ export interface components {
         /** SuccessEnvelope[DashboardSummaryDto] */
         SuccessEnvelope_DashboardSummaryDto_: {
             data: components["schemas"]["DashboardSummaryDto"];
+            meta: components["schemas"]["RequestMeta"];
+        };
+        /** SuccessEnvelope[DnsLookupDto] */
+        SuccessEnvelope_DnsLookupDto_: {
+            data: components["schemas"]["DnsLookupDto"];
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[EgressTopologyDto] */
@@ -2155,6 +2314,11 @@ export interface components {
         /** SuccessEnvelope[EventDetailDto] */
         SuccessEnvelope_EventDetailDto_: {
             data: components["schemas"]["EventDetailDto"];
+            meta: components["schemas"]["RequestMeta"];
+        };
+        /** SuccessEnvelope[ForwardDnsDto] */
+        SuccessEnvelope_ForwardDnsDto_: {
+            data: components["schemas"]["ForwardDnsDto"];
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[IncidentDetailDto] */
@@ -2215,6 +2379,11 @@ export interface components {
         /** SuccessEnvelope[ProcessTreeDto] */
         SuccessEnvelope_ProcessTreeDto_: {
             data: components["schemas"]["ProcessTreeDto"];
+            meta: components["schemas"]["RequestMeta"];
+        };
+        /** SuccessEnvelope[ReverseDnsDto] */
+        SuccessEnvelope_ReverseDnsDto_: {
+            data: components["schemas"]["ReverseDnsDto"];
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[TelemetryBatchData] */
@@ -3922,6 +4091,234 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SuccessEnvelope_AttackTimelineDto_"];
+                };
+            };
+            /** @description Request validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication failed. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description The requested resource was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description A required dependency is temporarily unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    intelligenceCorrelate: {
+        parameters: {
+            query: {
+                timePreset?: components["schemas"]["TimePreset"];
+                from?: string;
+                to?: string;
+                value: string;
+                endpointIds?: number[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_CorrelationDto_"];
+                };
+            };
+            /** @description Request validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication failed. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description A required dependency is temporarily unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    intelligenceDnsLookup: {
+        parameters: {
+            query: {
+                query: string;
+                recordType: components["schemas"]["DnsRecordType"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_DnsLookupDto_"];
+                };
+            };
+            /** @description Request validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication failed. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description The requested resource was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description A required dependency is temporarily unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    intelligenceForwardDns: {
+        parameters: {
+            query: {
+                domain: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_ForwardDnsDto_"];
+                };
+            };
+            /** @description Request validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication failed. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description The requested resource was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description A required dependency is temporarily unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    intelligenceReverseDns: {
+        parameters: {
+            query: {
+                ip: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_ReverseDnsDto_"];
                 };
             };
             /** @description Request validation failed. */
