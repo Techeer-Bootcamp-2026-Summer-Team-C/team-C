@@ -4112,6 +4112,7 @@ export interface operations {
                 from?: string;
                 to?: string;
                 value: string;
+                endpointIds?: number[];
             };
             header?: never;
             path?: never;

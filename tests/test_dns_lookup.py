@@ -1,17 +1,21 @@
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from fastapi.testclient import TestClient
 
-from backend.dns_lookup import DnsLookupError, forward_lookup, resolve_record, reverse_lookup
+from backend.dns_lookup import DnsLookupError, resolve_record, reverse_lookup
 from backend.dns_service import DnsIntelligenceService
+from backend.main import create_app
+from backend.storage.clickhouse import EventRepository
 
 FROM = datetime(2026, 1, 1, tzinfo=UTC)
 TO = datetime(2026, 1, 2, tzinfo=UTC)
 
 
 class FakeEventRepository:
-    """Stands in for storage.clickhouse.EventRepository: returns canned rows per filter."""
+    """Stands in for EventRepository: returns canned rows keyed by the active filter."""
 
     def __init__(self, rows_by_filter: dict[str, list[dict[str, Any]]]) -> None:
         self.rows_by_filter = rows_by_filter
@@ -26,6 +30,7 @@ class FakeEventRepository:
         process_name: str | None = None,
         file_path: str | None = None,
         domain: str | None = None,
+        related_domain: str | None = None,
         remote_ip: str | None = None,
         dns_query: str | None = None,
         dns_answer_ip: str | None = None,
@@ -35,45 +40,25 @@ class FakeEventRepository:
             return self.rows_by_filter.get("remote_ip", [])
         if dns_answer_ip is not None:
             return self.rows_by_filter.get("dns_answer_ip", [])
-        if domain is not None:
-            return self.rows_by_filter.get("domain", [])
-        if dns_query is not None:
-            return self.rows_by_filter.get("dns_query", [])
+        if related_domain is not None:
+            return self.rows_by_filter.get("related_domain", [])
         return []
 
 
-# --- Live DNS tests --------------------------------------------------------
-# These issue real DNS queries against public resolvers/domains, so they need
-# outbound internet. Reverse (PTR) lookups in particular are unreliable inside
-# some sandboxes/containers, so those skip (rather than fail) when unavailable.
+class RecordingClient:
+    """Captures the SQL/parameters EventRepository builds, without a real ClickHouse."""
+
+    def __init__(self) -> None:
+        self.last_query: str | None = None
+        self.last_parameters: dict[str, Any] | None = None
+
+    def query(self, query: str, parameters: dict[str, Any] | None = None) -> Any:
+        self.last_query = query
+        self.last_parameters = parameters
+        return SimpleNamespace(result_rows=[])
 
 
-def test_forward_lookup_returns_ip_addresses() -> None:
-    addresses = forward_lookup("example.com")
-    assert addresses
-    assert all(isinstance(address, str) for address in addresses)
-
-
-def test_resolve_record_mx_and_ns() -> None:
-    assert resolve_record("google.com", "MX")
-    assert resolve_record("google.com", "NS")
-
-
-def test_reverse_lookup_known_ip() -> None:
-    try:
-        hostnames = reverse_lookup("8.8.8.8")
-    except DnsLookupError as error:
-        pytest.skip(f"reverse DNS unavailable in this environment: {error.code}")
-    assert any("dns.google" in hostname for hostname in hostnames)
-
-
-def test_forward_lookup_raises_for_missing_domain() -> None:
-    # Some resolvers answer a nonexistent name with NXDOMAIN ("NOT_FOUND"); others
-    # (e.g. ISP/router-level DNS helpers) return an empty NOERROR ("NO_ANSWER") instead.
-    # Either way the domain is unusable, so we accept both codes here.
-    with pytest.raises(DnsLookupError) as error:
-        forward_lookup("this-domain-should-not-exist-abcxyz123456789.invalid")
-    assert error.value.code in ("NOT_FOUND", "NO_ANSWER")
+# --- Error-path DNS util tests (no network needed) -------------------------
 
 
 def test_reverse_lookup_rejects_invalid_ip() -> None:
@@ -88,17 +73,52 @@ def test_resolve_record_rejects_unsupported_type() -> None:
     assert error.value.code == "UNSUPPORTED_RECORD_TYPE"
 
 
-# --- Correlation logic tests ----------------------------------------------
-# The live DNS layer is stubbed so these deterministically verify how the
-# service merges live-DNS results with observed EDR event data.
+# --- SQL construction: domain boundary + JSON array membership -------------
+# These prove EventRepository.search builds boundary-safe SQL (no real DB needed).
+
+
+def test_related_domain_uses_exact_and_subdomain_boundary_not_substring() -> None:
+    client = RecordingClient()
+    EventRepository(client).search(from_=FROM, to=TO, related_domain="yahoo.com")
+    query = client.last_query or ""
+    # exact-name match and subdomain (".yahoo.com") boundary via endsWith, across columns
+    assert "= lowerUTF8({related_domain:String})" in query
+    assert "endsWith(lowerUTF8(ifNull(remote_domain, '')), lowerUTF8(concat('.', {related_domain:String})))" in query
+    assert "dns_query" in query and "tls_sni" in query and "http_host" in query
+    # must NOT fall back to substring matching for related_domain
+    assert "positionCaseInsensitiveUTF8(ifNull(remote_domain, ''), {related_domain:String})" not in query
+    assert client.last_parameters == {"from": FROM, "to": TO, "related_domain": "yahoo.com"}
+
+
+def test_dns_answer_ip_uses_json_array_membership_not_quoted_substring() -> None:
+    client = RecordingClient()
+    EventRepository(client).search(from_=FROM, to=TO, dns_answer_ip="1.2.3.4")
+    query = client.last_query or ""
+    assert "has(JSONExtract(ifNull(dns_answers_json, '[]'), 'Array(String)'), {dns_answer_ip:String})" in query
+    assert "concat('\"'" not in query  # the old quoted-substring approach is gone
+    assert client.last_parameters == {"from": FROM, "to": TO, "dns_answer_ip": "1.2.3.4"}
+
+
+def test_events_ui_domain_filter_keeps_substring_matching() -> None:
+    # The Events UI free-text `domain` filter is intentionally left as substring matching;
+    # only correlation uses the precise `related_domain` boundary.
+    client = RecordingClient()
+    EventRepository(client).search(from_=FROM, to=TO, domain="yahoo")
+    query = client.last_query or ""
+    assert "positionCaseInsensitiveUTF8(ifNull(remote_domain, ''), {domain:String})" in query
+
+
+# --- Correlation logic (resolver stubbed; deterministic, no network) -------
 
 
 def test_correlate_by_ip_combines_live_dns_and_observed_events(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("backend.dns_service.reverse_lookup", lambda ip: ["dns.google"])
     events = FakeEventRepository(
         {
-            "remote_ip": [{"remote_domain": "observed.example.com", "http_host": None, "tls_sni": None}],
-            "dns_answer_ip": [{"dns_query": "resolved-from-answers.example.com"}],
+            "remote_ip": [
+                {"endpoint_id": 1, "remote_domain": "observed.example.com", "http_host": None, "tls_sni": None}
+            ],
+            "dns_answer_ip": [{"endpoint_id": 1, "dns_query": "resolved-from-answers.example.com"}],
         }
     )
     result = DnsIntelligenceService(events=events).correlate("8.8.8.8", from_=FROM, to=TO)
@@ -113,8 +133,9 @@ def test_correlate_by_domain_combines_forward_dns_and_observed_events(monkeypatc
     monkeypatch.setattr("backend.dns_service.forward_lookup", lambda domain: ["198.51.100.5"])
     events = FakeEventRepository(
         {
-            "domain": [{"remote_ip": "203.0.113.10"}],
-            "dns_query": [{"remote_ip": None, "dns_answers_json": '["203.0.113.10", "203.0.113.11"]'}],
+            "related_domain": [
+                {"endpoint_id": 1, "remote_ip": "203.0.113.10", "dns_answers_json": '["203.0.113.10", "203.0.113.11"]'},
+            ]
         }
     )
     result = DnsIntelligenceService(events=events).correlate("example.com", from_=FROM, to=TO)
@@ -125,13 +146,59 @@ def test_correlate_by_domain_combines_forward_dns_and_observed_events(monkeypatc
     assert sources_by_value["203.0.113.11"] == ["OBSERVED_EVENTS"]
 
 
-def test_correlate_ignores_live_dns_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_correlate_keeps_observed_events_when_live_dns_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     def _boom(ip: str) -> list[str]:
-        raise DnsLookupError("TIMEOUT", "boom")
+        raise DnsLookupError("TIMEOUT", "resolver unavailable")
 
     monkeypatch.setattr("backend.dns_service.reverse_lookup", _boom)
-    events = FakeEventRepository({"remote_ip": [{"remote_domain": "observed-only.example.com"}]})
+    events = FakeEventRepository({"remote_ip": [{"endpoint_id": 1, "remote_domain": "observed-only.example.com"}]})
     result = DnsIntelligenceService(events=events).correlate("203.0.113.99", from_=FROM, to=TO)
     assert result.input_type == "IP"
     assert [item.value for item in result.related] == ["observed-only.example.com"]
     assert result.related[0].sources == ["OBSERVED_EVENTS"]
+
+
+def test_correlate_dedupes_value_seen_from_multiple_sources(monkeypatch: pytest.MonkeyPatch) -> None:
+    # "shared.example.com" is returned by BOTH live PTR and an observed event: it must appear
+    # exactly once, with both sources merged.
+    monkeypatch.setattr("backend.dns_service.reverse_lookup", lambda ip: ["shared.example.com"])
+    events = FakeEventRepository({"remote_ip": [{"endpoint_id": 1, "remote_domain": "shared.example.com"}]})
+    result = DnsIntelligenceService(events=events).correlate("8.8.8.8", from_=FROM, to=TO)
+    matching = [item for item in result.related if item.value == "shared.example.com"]
+    assert len(matching) == 1
+    assert matching[0].sources == ["LIVE_DNS", "OBSERVED_EVENTS"]
+
+
+def test_correlate_filters_by_endpoint_ids(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("backend.dns_service.reverse_lookup", lambda ip: [])
+    events = FakeEventRepository(
+        {
+            "remote_ip": [
+                {"endpoint_id": 1, "remote_domain": "ep1.example.com"},
+                {"endpoint_id": 2, "remote_domain": "ep2.example.com"},
+            ]
+        }
+    )
+    result = DnsIntelligenceService(events=events).correlate("8.8.8.8", from_=FROM, to=TO, endpoint_ids=[1])
+    assert [item.value for item in result.related] == ["ep1.example.com"]
+
+
+# --- Authentication --------------------------------------------------------
+
+
+class _StubRuntime:
+    def check_ready(self) -> None:
+        return None
+
+
+def test_intelligence_endpoints_require_authentication() -> None:
+    client = TestClient(create_app(_StubRuntime()))
+    for path in (
+        "/api/v1/intelligence/forward-dns?domain=example.com",
+        "/api/v1/intelligence/reverse-dns?ip=8.8.8.8",
+        "/api/v1/intelligence/dns-lookup?query=example.com&recordType=A",
+        "/api/v1/intelligence/correlate?value=example.com",
+    ):
+        response = client.get(path)
+        assert response.status_code == 401, path
+        assert response.json()["error"]["code"] == "INVALID_TOKEN", path

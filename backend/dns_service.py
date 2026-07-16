@@ -1,3 +1,20 @@
+"""DNS intelligence service.
+
+Scope of this feature (read-only):
+  - Live DNS lookups (forward / reverse / record types) via the backend resolver.
+  - Correlation of an IP or domain against ALREADY-OBSERVED EDR event data.
+
+Explicitly out of scope here (follow-up work):
+  - Persisting IP<->Domain relationships as first-class entities/edges.
+  - eTLD+1 / Public Suffix based subdomain parent-child modelling.
+  - The Intelligence dashboard graph/visualisation.
+
+Principles:
+  - "Live DNS" is resolved by the backend server (not the endpoint's local resolver).
+    If per-endpoint resolver/cache correlation is needed later, the Agent must collect it.
+  - PTR results never replace the IP; they are surfaced as candidate domains with a source.
+"""
+
 import ipaddress
 import json
 from datetime import datetime
@@ -61,16 +78,36 @@ class DnsIntelligenceService:
             raise _to_application_error(error) from error
         return DnsLookupDto(query=query, record_type=record_type, answers=answers)
 
-    def correlate(self, value: str, *, from_: datetime, to: datetime) -> CorrelationDto:
+    def correlate(
+        self,
+        value: str,
+        *,
+        from_: datetime,
+        to: datetime,
+        endpoint_ids: list[int] | None = None,
+    ) -> CorrelationDto:
         is_ip = _looks_like_ip(value)
+        endpoint_filter = set(endpoint_ids or [])
+        # `related` is keyed by the related value, so a value found through several
+        # search paths (or from both live DNS and our events) is deduped: its sources
+        # accumulate into one set rather than producing duplicate rows.
         related: dict[str, set[str]] = {}
 
         def add(candidate: str | None, source: str) -> None:
             if candidate:
                 related.setdefault(candidate, set()).add(source)
 
+        def observed(**filters: object) -> list[dict]:
+            rows = self.events.search(from_=from_, to=to, **filters)  # type: ignore[arg-type]
+            if endpoint_filter:
+                rows = [row for row in rows if int(row.get("endpoint_id", 0)) in endpoint_filter]
+            return rows
+
         try:
             if is_ip:
+                # PTR results are candidate domains only: they may be absent, stale, or point at
+                # a CDN/hosting hostname rather than the site actually contacted. We surface them
+                # alongside the IP with a LIVE_DNS source; we never replace the IP with the PTR name.
                 for hostname in reverse_lookup(value):
                     add(hostname, "LIVE_DNS")
             else:
@@ -80,16 +117,17 @@ class DnsIntelligenceService:
             pass  # a correlation lookup should still return what our own events know
 
         if is_ip:
-            for row in self.events.search(from_=from_, to=to, remote_ip=value):
+            for row in observed(remote_ip=value):
                 add(row.get("remote_domain"), "OBSERVED_EVENTS")
                 add(row.get("http_host"), "OBSERVED_EVENTS")
                 add(row.get("tls_sni"), "OBSERVED_EVENTS")
-            for row in self.events.search(from_=from_, to=to, dns_answer_ip=value):
+            for row in observed(dns_answer_ip=value):
                 add(row.get("dns_query"), "OBSERVED_EVENTS")
         else:
-            for row in self.events.search(from_=from_, to=to, domain=value):
-                add(row.get("remote_ip"), "OBSERVED_EVENTS")
-            for row in self.events.search(from_=from_, to=to, dns_query=value):
+            # related_domain matches the exact name or a subdomain across remote_domain,
+            # http_host, tls_sni, and dns_query; from each matched event we collect both the
+            # contacted IP and any resolved answer IPs.
+            for row in observed(related_domain=value):
                 add(row.get("remote_ip"), "OBSERVED_EVENTS")
                 for answer in _parse_dns_answers(row.get("dns_answers_json")):
                     add(answer, "OBSERVED_EVENTS")

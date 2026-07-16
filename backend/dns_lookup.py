@@ -70,7 +70,15 @@ def forward_lookup(domain: str, *, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> 
 
 
 def reverse_lookup(ip: str, *, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> list[str]:
-    """IP address -> hostnames (PTR record)."""
+    """IP address -> hostnames (PTR record).
+
+    Private/internal IPs (RFC 1918, loopback, link-local) are intentionally NOT blocked:
+    in an EDR investigation an internal IP is a legitimate lookup target, and the PTR query
+    resolves names only (it does not open a connection to the host). Risk to accept: a caller
+    can make the backend resolver issue PTR queries for arbitrary IPs, which could probe
+    internal reverse-DNS naming. If that becomes a concern, gate internal ranges behind a
+    setting or require an elevated role rather than removing the capability outright.
+    """
     try:
         parsed = ipaddress.ip_address(ip)
     except ValueError as error:

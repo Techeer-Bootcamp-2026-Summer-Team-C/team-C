@@ -9393,6 +9393,19 @@
               "title": "Value",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "endpointIds",
+            "required": false,
+            "schema": {
+              "items": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "title": "Endpointids",
+              "type": "array"
+            }
           }
         ],
         "responses": {

@@ -122,3 +122,4 @@ class DashboardTimeQuery(TimeRangeQuery):
 
 class CorrelationQuery(TimeRangeQuery):
     value: str
+    endpoint_ids: list[PositiveId] | SkipJsonSchema[None] = None

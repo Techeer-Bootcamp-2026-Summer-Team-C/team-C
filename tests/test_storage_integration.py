@@ -335,3 +335,98 @@ def test_clickhouse_migration_event_repository_and_rollback() -> None:
     finally:
         apply_clickhouse_file(client, down)
         client.close()
+
+
+def _dns_event(event_index: int, occurred_at: datetime, *, remote_domain: str, dns_answers: str) -> dict:
+    unique = f"018ff8f4-86de-7b25-9b8a-2d22f6a3c{event_index:03d}"
+    return {
+        "event_id": UUID(unique),
+        "batch_id": UUID("018ff8f4-86de-7b25-9b8a-2d22f6a3c000"),
+        "endpoint_id": 2001,
+        "agent_id": "agent-corr-001",
+        "hostname": "CORR-ENDPOINT",
+        "os_type": "MACOS",
+        "ip_address": None,
+        "event_type": "NETWORK_CONNECTION",
+        "occurred_at": occurred_at,
+        "ingested_at": occurred_at,
+        "process_name": None,
+        "process_path": None,
+        "pid": None,
+        "ppid": None,
+        "command_line": None,
+        "user_name": None,
+        "file_path": None,
+        "file_action": None,
+        "file_hash_sha256": None,
+        "remote_ip": "203.0.113.1",
+        "remote_domain": remote_domain,
+        "remote_port": 443,
+        "protocol": "TCP",
+        "dns_query": None,
+        "dns_record_type": None,
+        "dns_response_code": None,
+        "dns_answers_json": dns_answers,
+        "l7_protocol": None,
+        "http_method": None,
+        "http_host": None,
+        "url": None,
+        "http_status_code": None,
+        "http_user_agent": None,
+        "tls_sni": None,
+        "tls_version": None,
+        "tls_certificate_subject": None,
+        "tls_certificate_issuer": None,
+        "tls_certificate_sha256": None,
+        "raw_payload": "{}",
+        "payload_sha256": "0" * 64,
+        "schema_version": 1,
+        "created_at": occurred_at,
+        "updated_at": occurred_at,
+        "is_delete": 0,
+    }
+
+
+def test_event_search_domain_boundary_and_dns_answer_membership() -> None:
+    client = clickhouse_connect.get_client(
+        host=os.getenv("TEST_CLICKHOUSE_HOST", "127.0.0.1"),
+        port=int(os.getenv("TEST_CLICKHOUSE_PORT", "58123")),
+        username=os.getenv("TEST_CLICKHOUSE_USER", "edr"),
+        password=os.environ["TEST_CLICKHOUSE_PASSWORD"],
+        database=os.getenv("TEST_CLICKHOUSE_DATABASE", "edr"),
+    )
+    down = ROOT / "migrations/clickhouse/0001_initial.down.sql"
+    up = ROOT / "migrations/clickhouse/0001_initial.up.sql"
+    apply_clickhouse_file(client, down)
+    apply_clickhouse_file(client, up)
+    try:
+        now = datetime(2026, 7, 12, tzinfo=UTC)
+        window = (now, now + timedelta(seconds=1))
+        repository = EventRepository(client)
+        repository.insert(
+            [
+                _dns_event(1, now, remote_domain="yahoo.com", dns_answers='["1.2.3.4"]'),
+                _dns_event(2, now, remote_domain="mail.yahoo.com", dns_answers='["5.6.7.8"]'),
+                _dns_event(3, now, remote_domain="finance.yahoo.com", dns_answers="[]"),
+                _dns_event(4, now, remote_domain="notyahoo.com", dns_answers="[]"),
+                _dns_event(5, now, remote_domain="yahoo.com.evil.example", dns_answers='["11.2.3.45"]'),
+            ]
+        )
+
+        matched = {
+            str(row["remote_domain"])
+            for row in repository.search(from_=window[0], to=window[1], related_domain="yahoo.com")
+        }
+        assert matched == {"yahoo.com", "mail.yahoo.com", "finance.yahoo.com"}
+        assert "notyahoo.com" not in matched
+        assert "yahoo.com.evil.example" not in matched
+
+        answer_hits = {
+            str(row["remote_domain"])
+            for row in repository.search(from_=window[0], to=window[1], dns_answer_ip="1.2.3.4")
+        }
+        # exact array-element membership: 1.2.3.4 must NOT match the event holding 11.2.3.45
+        assert answer_hits == {"yahoo.com"}
+    finally:
+        apply_clickhouse_file(client, down)
+        client.close()

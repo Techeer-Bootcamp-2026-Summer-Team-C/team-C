@@ -790,7 +790,9 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
     ) -> SuccessEnvelope[CorrelationDto]:
         runtime = _runtime(request)
         from_, to = resolve_time_range(query, now=datetime.now(UTC))
-        data = _intelligence_service(runtime).correlate(query.value, from_=from_, to=to)
+        data = _intelligence_service(runtime).correlate(
+            query.value, from_=from_, to=to, endpoint_ids=query.endpoint_ids
+        )
         return _success(request, data)
 
     @app.post(
