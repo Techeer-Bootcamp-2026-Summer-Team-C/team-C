@@ -103,3 +103,7 @@ class DashboardSummaryQuery(TimeRangeQuery):
 
 class DashboardTimeQuery(TimeRangeQuery):
     pass
+
+
+class CorrelationQuery(TimeRangeQuery):
+    value: str

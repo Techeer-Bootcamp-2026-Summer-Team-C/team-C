@@ -143,3 +143,11 @@ class DashboardInterval(StrEnum):
     FIVE_MINUTES = "5m"
     ONE_HOUR = "1h"
     ONE_DAY = "1d"
+
+
+class DnsRecordType(StrEnum):
+    A = "A"
+    AAAA = "AAAA"
+    MX = "MX"
+    NS = "NS"
+    PTR = "PTR"

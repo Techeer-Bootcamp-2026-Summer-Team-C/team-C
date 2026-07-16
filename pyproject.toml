@@ -22,6 +22,7 @@ dependencies = [
   "pyjwt>=2.10,<3",
   "pyyaml>=6.0.2,<7",
   "uvicorn>=0.34,<1",
+  "dnspython>=2.8.0",
 ]
 
 [dependency-groups]

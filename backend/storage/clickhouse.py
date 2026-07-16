@@ -174,6 +174,7 @@ class EventRepository:
         domain: str | None = None,
         remote_ip: str | None = None,
         dns_query: str | None = None,
+        dns_answer_ip: str | None = None,
         l7_protocol: str | None = None,
     ) -> list[JsonObject]:
         conditions = [
@@ -206,6 +207,11 @@ class EventRepository:
                 "OR positionCaseInsensitiveUTF8(ifNull(http_host, ''), {domain:String}) > 0)"
             )
             parameters["domain"] = domain
+        if dns_answer_ip is not None:
+            # dns_answers_json is a Nullable(String) column holding a JSON array of resolved
+            # IPs (e.g. ["1.2.3.4","5.6.7.8"]); quote-wrap the value to avoid partial-IP matches.
+            conditions.append("position(ifNull(dns_answers_json, ''), concat('\"', {dns_answer_ip:String}, '\"')) > 0")
+            parameters["dns_answer_ip"] = dns_answer_ip
         if l7_protocol is not None:
             conditions.append("lowerUTF8(ifNull(l7_protocol, '')) = lowerUTF8({l7_protocol:String})")
             parameters["l7_protocol"] = l7_protocol

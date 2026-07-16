@@ -898,6 +898,47 @@
         "title": "CertificateDto",
         "type": "object"
       },
+      "CorrelationDto": {
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "title": "From",
+            "type": "string"
+          },
+          "inputType": {
+            "enum": [
+              "IP",
+              "DOMAIN"
+            ],
+            "title": "Inputtype",
+            "type": "string"
+          },
+          "inputValue": {
+            "title": "Inputvalue",
+            "type": "string"
+          },
+          "related": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedValueDto"
+            },
+            "title": "Related",
+            "type": "array"
+          },
+          "to": {
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "inputValue",
+          "inputType",
+          "from",
+          "to",
+          "related"
+        ],
+        "title": "CorrelationDto",
+        "type": "object"
+      },
       "DashboardAlertsDto": {
         "additionalProperties": false,
         "properties": {
@@ -1366,6 +1407,32 @@
         "title": "DashboardWidgetLayoutDto",
         "type": "object"
       },
+      "DnsLookupDto": {
+        "additionalProperties": false,
+        "properties": {
+          "answers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Answers",
+            "type": "array"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "recordType": {
+            "$ref": "#/components/schemas/DnsRecordType"
+          }
+        },
+        "required": [
+          "query",
+          "recordType",
+          "answers"
+        ],
+        "title": "DnsLookupDto",
+        "type": "object"
+      },
       "DnsQueryEvent": {
         "additionalProperties": false,
         "properties": {
@@ -1434,6 +1501,17 @@
         ],
         "title": "DnsQueryPayload",
         "type": "object"
+      },
+      "DnsRecordType": {
+        "enum": [
+          "A",
+          "AAAA",
+          "MX",
+          "NS",
+          "PTR"
+        ],
+        "title": "DnsRecordType",
+        "type": "string"
       },
       "EdrStateAxisDto": {
         "additionalProperties": false,
@@ -3414,6 +3492,28 @@
         "title": "FileEventPayload",
         "type": "object"
       },
+      "ForwardDnsDto": {
+        "additionalProperties": false,
+        "properties": {
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "ipAddresses": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ipaddresses",
+            "type": "array"
+          }
+        },
+        "required": [
+          "domain",
+          "ipAddresses"
+        ],
+        "title": "ForwardDnsDto",
+        "type": "object"
+      },
       "IncidentDetailDto": {
         "additionalProperties": false,
         "properties": {
@@ -4657,6 +4757,41 @@
         "title": "RejectedEventDto",
         "type": "object"
       },
+      "RelatedValueDto": {
+        "additionalProperties": false,
+        "properties": {
+          "sources": {
+            "items": {
+              "enum": [
+                "LIVE_DNS",
+                "OBSERVED_EVENTS"
+              ],
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          },
+          "valueType": {
+            "enum": [
+              "IP",
+              "DOMAIN"
+            ],
+            "title": "Valuetype",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "valueType",
+          "sources"
+        ],
+        "title": "RelatedValueDto",
+        "type": "object"
+      },
       "RequestMeta": {
         "additionalProperties": false,
         "properties": {
@@ -4744,6 +4879,28 @@
           "steps"
         ],
         "title": "ResponseGuidanceSummaryDto",
+        "type": "object"
+      },
+      "ReverseDnsDto": {
+        "additionalProperties": false,
+        "properties": {
+          "hostnames": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Hostnames",
+            "type": "array"
+          },
+          "ip": {
+            "title": "Ip",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ip",
+          "hostnames"
+        ],
+        "title": "ReverseDnsDto",
         "type": "object"
       },
       "RiskLevel": {
@@ -5141,6 +5298,23 @@
         "title": "SuccessEnvelope[AttackTimelineDto]",
         "type": "object"
       },
+      "SuccessEnvelope_CorrelationDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CorrelationDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[CorrelationDto]",
+        "type": "object"
+      },
       "SuccessEnvelope_DashboardLayoutDto_": {
         "additionalProperties": false,
         "properties": {
@@ -5173,6 +5347,23 @@
           "meta"
         ],
         "title": "SuccessEnvelope[DashboardSummaryDto]",
+        "type": "object"
+      },
+      "SuccessEnvelope_DnsLookupDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DnsLookupDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[DnsLookupDto]",
         "type": "object"
       },
       "SuccessEnvelope_EgressTopologyDto_": {
@@ -5241,6 +5432,23 @@
           "meta"
         ],
         "title": "SuccessEnvelope[EventDetailDto]",
+        "type": "object"
+      },
+      "SuccessEnvelope_ForwardDnsDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ForwardDnsDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[ForwardDnsDto]",
         "type": "object"
       },
       "SuccessEnvelope_IncidentDetailDto_": {
@@ -5428,6 +5636,23 @@
           "meta"
         ],
         "title": "SuccessEnvelope[ProcessTreeDto]",
+        "type": "object"
+      },
+      "SuccessEnvelope_ReverseDnsDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ReverseDnsDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[ReverseDnsDto]",
         "type": "object"
       },
       "SuccessEnvelope_TelemetryBatchData_": {
@@ -8529,6 +8754,341 @@
         ]
       }
     },
+    "/api/v1/intelligence/correlate": {
+      "get": {
+        "operationId": "intelligenceCorrelate",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "timePreset",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TimePreset",
+              "default": "LATEST_24H"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "value",
+            "required": true,
+            "schema": {
+              "title": "Value",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_CorrelationDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Intelligence Correlate",
+        "tags": [
+          "Intelligence"
+        ]
+      }
+    },
+    "/api/v1/intelligence/dns-lookup": {
+      "get": {
+        "operationId": "intelligenceDnsLookup",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "query",
+            "required": true,
+            "schema": {
+              "title": "Query",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "recordType",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/DnsRecordType"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_DnsLookupDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Intelligence Dns Lookup",
+        "tags": [
+          "Intelligence"
+        ]
+      }
+    },
+    "/api/v1/intelligence/forward-dns": {
+      "get": {
+        "operationId": "intelligenceForwardDns",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "domain",
+            "required": true,
+            "schema": {
+              "title": "Domain",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_ForwardDnsDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Intelligence Forward Dns",
+        "tags": [
+          "Intelligence"
+        ]
+      }
+    },
+    "/api/v1/intelligence/reverse-dns": {
+      "get": {
+        "operationId": "intelligenceReverseDns",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ip",
+            "required": true,
+            "schema": {
+              "title": "Ip",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_ReverseDnsDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Intelligence Reverse Dns",
+        "tags": [
+          "Intelligence"
+        ]
+      }
+    },
     "/api/v1/operations/health": {
       "get": {
         "operationId": "operationsGetHealth",
@@ -8714,6 +9274,10 @@
     {
       "description": "Live dependency and pipeline worker health.",
       "name": "Operations"
+    },
+    {
+      "description": "DNS lookups and IP/Domain correlation.",
+      "name": "Intelligence"
     },
     {
       "description": "mTLS-authenticated Agent registration and telemetry ingest.",
