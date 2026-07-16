@@ -1,0 +1,81 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+
+  --surface-canvas: #101215;
+  --surface-shell: #0d0f12;
+  --surface-panel: #171c22;
+  --surface-raised: #202733;
+  --surface-inset: #11161c;
+  --surface-hover: #1b222c;
+  --border-default: #323a46;
+  --border-subtle: #272e38;
+  --text-primary: #eef2f7;
+  --text-secondary: #9aa8ba;
+  --text-tertiary: #768498;
+  --accent-primary: #56d0e6;
+  --status-critical: #f2495c;
+  --status-warning: #ffb357;
+  --status-success: #73bf69;
+  --status-info: #5794f2;
+
+  --gradient-accent-surface: linear-gradient(110deg, color-mix(in srgb, var(--accent-primary) 13%, transparent), color-mix(in srgb, var(--status-info) 7%, transparent) 42%, transparent 78%);
+  --gradient-chart-fill: linear-gradient(180deg, color-mix(in srgb, var(--accent-primary) 28%, transparent), transparent 88%);
+  --elevation-raised: 0 10px 30px rgba(0, 0, 0, .38);
+  --elevation-modal: 0 22px 64px rgba(0, 0, 0, .56);
+
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 10px;
+  --space-6: 12px;
+  --space-7: 14px;
+  --space-8: 16px;
+  --space-10: 20px;
+  --space-12: 24px;
+  --space-16: 32px;
+  --radius-control: 4px;
+  --radius-panel: 6px;
+  --radius-pill: 999px;
+
+  --type-page-title: 24px;
+  --type-section-title: 18px;
+  --type-panel-title: 15px;
+  --type-kpi-primary: 34px;
+  --type-kpi-secondary: 22px;
+  --type-body: 14px;
+  --type-label: 13px;
+  --type-meta: 12px;
+  --type-code: 13px;
+
+  /* Compatibility aliases while legacy page selectors move into layers. */
+  --color-bg: var(--surface-canvas);
+  --color-shell: var(--surface-shell);
+  --color-panel: var(--surface-panel);
+  --color-panel-2: var(--surface-raised);
+  --color-panel-3: var(--surface-inset);
+  --color-panel-hover: var(--surface-hover);
+  --color-line: var(--border-default);
+  --color-line-soft: var(--border-subtle);
+  --color-text: var(--text-primary);
+  --color-muted: var(--text-secondary);
+  --color-muted-2: var(--text-tertiary);
+  --color-red: var(--status-critical);
+  --color-amber: var(--status-warning);
+  --color-green: var(--status-success);
+  --color-blue: var(--status-info);
+  --color-cyan: var(--accent-primary);
+  --font-micro: 11px;
+  --font-caption: var(--type-meta);
+  --font-body-sm: var(--type-label);
+  --font-body: var(--type-body);
+  --font-title-sm: var(--type-panel-title);
+  --font-title-md: 16px;
+  --font-title-lg: var(--type-section-title);
+  --font-display-sm: var(--type-kpi-secondary);
+  --font-display-md: 28px;
+  --font-display-lg: var(--type-kpi-primary);
+}

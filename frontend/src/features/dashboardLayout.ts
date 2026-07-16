@@ -6,7 +6,7 @@ import type {
 } from "../contracts";
 
 export const OVERVIEW_DASHBOARD_KEY = "overview";
-export const OVERVIEW_LAYOUT_VERSION = 1;
+export const OVERVIEW_LAYOUT_VERSION = 2;
 export const DESKTOP_COLUMNS = 12;
 export const TABLET_COLUMNS = 6;
 export const MAX_LAYOUT_ROWS = 256;
@@ -32,28 +32,15 @@ export interface OverviewWidgetDefinition {
 
 export const OVERVIEW_WIDGET_DEFINITIONS: readonly OverviewWidgetDefinition[] = [
   widget("edr-state", "EDR state", "edr", 0, 0, 12, 2, 6, 2, 12, 4),
-  widget("kpi-events", "Events", "kpi", 0, 2, 2, 2, 1, 2, 4, 3),
-  widget("kpi-alerts", "Alerts", "kpi", 2, 2, 2, 2, 1, 2, 4, 3),
-  widget("kpi-open-incidents", "Open incidents", "kpi", 4, 2, 2, 2, 1, 2, 4, 3),
-  widget("kpi-online-endpoints", "Online endpoints", "kpi", 6, 2, 2, 2, 1, 2, 4, 3),
-  widget("kpi-event-failures", "Event failures", "kpi", 8, 2, 2, 2, 1, 2, 4, 3),
-  widget("kpi-storage-buckets", "Storage buckets", "kpi", 10, 2, 2, 2, 1, 2, 4, 3),
-  widget("alert-severity", "Alert severity", "donut", 0, 4, 4, 5, 3, 4, 6, 7),
-  widget("event-volume", "Event volume", "time-series", 4, 4, 8, 5, 6, 4, 12, 8),
-  widget("alert-volume", "Alert volume", "time-series", 0, 9, 6, 5, 6, 4, 12, 8),
-  widget("incident-activity", "Incident activity", "time-series", 6, 9, 6, 5, 6, 4, 12, 8),
-  widget("endpoint-risk", "Endpoint risk", "distribution", 0, 14, 4, 5, 3, 4, 6, 8),
-  widget("highest-risk-endpoints", "Highest-risk endpoints", "list", 4, 14, 4, 5, 4, 4, 8, 8),
-  widget("incident-queue", "Incident queue", "list", 8, 14, 4, 5, 4, 4, 8, 8),
-  widget("response-guidance", "Response guidance summary", "guidance", 0, 19, 12, 5, 6, 4, 12, 9),
-  widget("endpoint-operating-systems", "Endpoint operating systems", "distribution", 0, 24, 4, 4, 3, 4, 6, 7),
-  widget("sensor-health", "Sensor health", "distribution", 4, 24, 4, 4, 3, 4, 6, 7),
-  widget("top-rules", "Top rules", "distribution", 8, 24, 4, 4, 3, 4, 6, 7),
-  widget("mitre-distribution", "MITRE detection distribution", "distribution", 0, 28, 6, 5, 4, 4, 8, 8),
-  widget("process-network-signals", "Process and network signals", "distribution", 6, 28, 6, 5, 4, 4, 8, 8),
-  widget("file-dns-l7-signals", "File, DNS, and L7 signals", "distribution", 0, 33, 6, 5, 4, 4, 8, 8),
-  widget("failure-distribution", "Failure distribution", "distribution", 6, 33, 6, 5, 4, 4, 8, 8),
-  widget("storage-distribution", "Storage distribution", "distribution", 0, 38, 6, 5, 4, 4, 8, 8),
+  widget("kpi-alerts", "Alerts", "kpi", 0, 2, 3, 2, 1, 2, 4, 3),
+  widget("kpi-open-incidents", "Open incidents", "kpi", 3, 2, 3, 2, 1, 2, 4, 3),
+  widget("kpi-high-risk-endpoints", "High-risk endpoints", "kpi", 6, 2, 3, 2, 1, 2, 4, 3),
+  widget("kpi-event-failures", "Event failures", "kpi", 9, 2, 3, 2, 1, 2, 4, 3),
+  widget("detection-activity", "Detection activity", "time-series", 0, 4, 8, 5, 6, 4, 12, 8),
+  widget("alert-severity", "Alert severity", "donut", 8, 4, 4, 5, 3, 4, 6, 7),
+  widget("endpoint-risk", "Endpoint risk", "distribution", 0, 9, 4, 5, 3, 4, 6, 8),
+  widget("highest-risk-endpoints", "Highest-risk endpoints", "list", 4, 9, 8, 5, 4, 4, 8, 8),
+  widget("incident-queue", "Incident queue", "list", 0, 14, 12, 5, 6, 4, 12, 8),
 ] as const;
 
 const DEFINITION_BY_ID = new Map(OVERVIEW_WIDGET_DEFINITIONS.map((definition) => [definition.id, definition]));
@@ -65,6 +52,19 @@ export function createDefaultOverviewLayout(): DashboardWidgetLayout[] {
     ...definition.defaultLayout,
     hidden: false,
   }));
+}
+
+export function resolveOverviewLayout(layoutVersion: number, value: unknown): {
+  widgets: DashboardWidgetLayout[];
+  migrationRequired: boolean;
+} {
+  if (layoutVersion !== 1 || !Array.isArray(value)) {
+    return { widgets: normalizeOverviewLayout(value), migrationRequired: false };
+  }
+  const migrated = value.map((raw) => (
+    isRecord(raw) && raw.id === "event-volume" ? { ...raw, id: "detection-activity" } : raw
+  ));
+  return { widgets: normalizeOverviewLayout(migrated), migrationRequired: true };
 }
 
 export function normalizeOverviewLayout(value: unknown): DashboardWidgetLayout[] {
@@ -118,28 +118,60 @@ export function desktopGridLayout(widgets: readonly DashboardWidgetLayout[], edi
 
 export function tabletGridLayout(widgets: readonly DashboardWidgetLayout[]): Layout {
   const columns = TABLET_COLUMNS;
-  const visible = orderedVisibleWidgets(widgets);
-  const flowed = flowWidgets(
-    visible.map((item) => ({
-      ...item,
-      w: Math.max(1, Math.min(columns, Math.round((item.w * columns) / DESKTOP_COLUMNS))),
-    })),
-    columns,
-  );
-  return flowed.map((item) => ({
-    i: item.id,
-    x: item.x,
-    y: item.y,
-    w: item.w,
-    h: item.h,
-    minW: 1,
-    minH: 2,
-    maxW: columns,
-    maxH: requireDefinition(item.id).maxH,
-    isDraggable: false,
-    isResizable: false,
-    isBounded: true,
-  }));
+  const rowGroups = groupWidgetsByDesktopRow(orderedVisibleWidgets(widgets));
+  const layout: LayoutItem[] = [];
+  let y = 0;
+
+  for (const group of rowGroups) {
+    const rows = tabletRowsForGroup(group, columns);
+    for (const row of rows) {
+      const widths = distributeRowWidths(row, columns);
+      let x = 0;
+      for (const [index, item] of row.entries()) {
+        const w = widths[index] ?? 1;
+        layout.push({
+          i: item.id,
+          x,
+          y,
+          w,
+          h: item.h,
+          minW: 1,
+          minH: 2,
+          maxW: columns,
+          maxH: requireDefinition(item.id).maxH,
+          isDraggable: false,
+          isResizable: false,
+          isBounded: true,
+        });
+        x += w;
+      }
+      y += Math.max(...row.map((item) => item.h));
+    }
+  }
+
+  return layout;
+}
+
+export function mobileGridLayout(widgets: readonly DashboardWidgetLayout[]): Layout {
+  let y = 0;
+  return orderedVisibleWidgets(widgets).map((item) => {
+    const layoutItem = {
+      i: item.id,
+      x: 0,
+      y,
+      w: 1,
+      h: item.h,
+      minW: 1,
+      minH: 2,
+      maxW: 1,
+      maxH: requireDefinition(item.id).maxH,
+      isDraggable: false,
+      isResizable: false,
+      isBounded: true,
+    } satisfies LayoutItem;
+    y += item.h;
+    return layoutItem;
+  });
 }
 
 export function applyDesktopGridLayout(
@@ -303,6 +335,56 @@ function flowWidgets(widgets: readonly DashboardWidgetLayout[], columns: number)
     }
     return next;
   });
+}
+
+function groupWidgetsByDesktopRow(widgets: readonly DashboardWidgetLayout[]): DashboardWidgetLayout[][] {
+  const groups: DashboardWidgetLayout[][] = [];
+  for (const item of widgets) {
+    const current = groups.at(-1);
+    if (!current || current[0]?.y !== item.y) groups.push([item]);
+    else current.push(item);
+  }
+  return groups;
+}
+
+function tabletRowsForGroup(
+  group: readonly DashboardWidgetLayout[],
+  columns: number,
+): DashboardWidgetLayout[][] {
+  const isFourKpiRow = group.length === 4
+    && group.every((item) => requireDefinition(item.id).kind === "kpi");
+  const chunkSize = isFourKpiRow ? 2 : columns;
+  const rows: DashboardWidgetLayout[][] = [];
+  for (let index = 0; index < group.length; index += chunkSize) {
+    rows.push(group.slice(index, index + chunkSize));
+  }
+  return rows;
+}
+
+function distributeRowWidths(row: readonly DashboardWidgetLayout[], columns: number): number[] {
+  if (!row.length) return [];
+  const widths = row.map(() => 1);
+  let remaining = Math.max(0, columns - row.length);
+  const totalWeight = row.reduce((sum, item) => sum + item.w, 0);
+  const shares = row.map((item, index) => ({
+    index,
+    exact: totalWeight > 0 ? (item.w / totalWeight) * remaining : remaining / row.length,
+  }));
+
+  for (const share of shares) {
+    const whole = Math.floor(share.exact);
+    widths[share.index] = (widths[share.index] ?? 1) + whole;
+    remaining -= whole;
+  }
+  shares.sort((first, second) => (
+    (second.exact - Math.floor(second.exact)) - (first.exact - Math.floor(first.exact))
+      || first.index - second.index
+  ));
+  for (let index = 0; index < remaining; index += 1) {
+    const share = shares[index % shares.length];
+    if (share) widths[share.index] = (widths[share.index] ?? 1) + 1;
+  }
+  return widths;
 }
 
 function collides(first: DashboardWidgetLayout, second: DashboardWidgetLayout): boolean {

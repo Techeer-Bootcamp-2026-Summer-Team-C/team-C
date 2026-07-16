@@ -1,6 +1,6 @@
-import { AlertTriangle, ArrowLeft, ArrowRight, CircleAlert, RefreshCw } from "lucide-react";
-import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { AlertTriangle, ArrowLeft, ArrowRight, CircleAlert, RefreshCw, SlidersHorizontal, X } from "lucide-react";
+import { useId, useState, type ReactNode } from "react";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { ApiError } from "../api/client";
 import type {
   AlertDetailDto,
@@ -11,6 +11,9 @@ import type {
 import { useI18n } from "../i18n/LocaleContext";
 import type { TranslationKey } from "../i18n/translations";
 import { formatDateTime, humanize } from "../lib/format";
+import { Badge, Button, Drawer, IconButton } from "./primitives";
+
+export { Field } from "./primitives";
 
 export function PageHeader({ eyebrow, title, description, actions }: {
   eyebrow: string;
@@ -33,10 +36,11 @@ export function Panel({ title, subtitle, meta, children, className = "" }: {
   children: ReactNode;
   className?: string;
 }) {
+  const titleId = useId();
   return (
-    <section className={`panel ${className}`}>
+    <section aria-labelledby={titleId} className={`panel ${className}`}>
       <header className="panel-heading">
-        <div><h2>{title}</h2>{subtitle ? <p>{subtitle}</p> : null}</div>
+        <div><h2 id={titleId}>{title}</h2>{subtitle ? <p>{subtitle}</p> : null}</div>
         {meta ? <div className="panel-meta">{meta}</div> : null}
       </header>
       <div className="panel-body">{children}</div>
@@ -57,7 +61,7 @@ export function KpiCard({ label, value, detail, icon, to, tone = "neutral" }: {
 }
 
 export function StatusPill({ value }: { value: string }) {
-  return <span className={`status-pill tone-${value.toLowerCase().replaceAll(" ", "-")}`}><i aria-hidden="true" />{humanize(value)}</span>;
+  return <Badge className={`status-pill tone-${value.toLowerCase().replaceAll(" ", "-")}`}><i aria-hidden="true" />{humanize(value)}</Badge>;
 }
 
 export function EdrStatePill({ state, score, reasons, calculatedAt }: {
@@ -85,34 +89,86 @@ export function GlobalFilterBar({ children, onClear, hasFilters }: {
   onClear: () => void;
   hasFilters: boolean;
 }) {
+  return <FilterBar hasFilters={hasFilters} onClear={onClear} primary={children} />;
+}
+
+export interface AppliedFilter {
+  key: string;
+  label: string;
+  value: string;
+}
+
+export function FilterBar({ primary, advanced, appliedFilters = [], onRemoveFilter, onClear, hasFilters }: {
+  primary: ReactNode;
+  advanced?: ReactNode;
+  appliedFilters?: readonly AppliedFilter[];
+  onRemoveFilter?: (key: string) => void;
+  onClear: () => void;
+  hasFilters: boolean;
+}) {
   const { t } = useI18n();
-  return <section className="filter-bar" aria-label={t("filter.filters")}><div className="filter-fields">{children}</div><button className="button ghost" disabled={!hasFilters} onClick={onClear} type="button">{t("filter.clear")}</button></section>;
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  return <section aria-label={t("filter.filters")} className="filter-bar">
+    <div className="filter-bar-main">
+      <div className="filter-fields">{primary}</div>
+      <div className="filter-actions">
+        {advanced ? <Button aria-expanded={advancedOpen} onClick={() => setAdvancedOpen(true)} type="button" variant="ghost"><SlidersHorizontal aria-hidden="true" size={16} />{t("filter.more")}</Button> : null}
+        <Button disabled={!hasFilters} onClick={onClear} type="button" variant="ghost">{t("filter.clear")}</Button>
+      </div>
+    </div>
+    {appliedFilters.length ? <ul aria-label={t("filter.active")} className="applied-filter-list">
+      {appliedFilters.map((filter) => <li key={filter.key}><span>{filter.label}</span><strong>{filter.value}</strong>{onRemoveFilter ? <IconButton aria-label={t("filter.remove", { label: filter.label })} onClick={() => onRemoveFilter(filter.key)} type="button"><X aria-hidden="true" size={13} /></IconButton> : null}</li>)}
+    </ul> : null}
+    {advanced ? <Drawer closeLabel={t("filter.closeMore")} label={t("filter.moreTitle")} onClose={() => setAdvancedOpen(false)} open={advancedOpen} side="right" title={t("filter.moreTitle")}>
+      <div className="filter-drawer-fields">{advanced}</div>
+      <div className="filter-drawer-actions"><Button onClick={() => setAdvancedOpen(false)} type="button" variant="primary">{t("filter.done")}</Button></div>
+    </Drawer> : null}
+  </section>;
 }
 
-export function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="field"><span>{label}</span>{children}</label>;
+export function DataTable({ label, caption = label, children, busy = false }: { label: string; caption?: string; children: ReactNode; busy?: boolean }) {
+  return <div aria-busy={busy || undefined} aria-label={`${label} table`} className="table-scroll" role="region" tabIndex={0}><table><caption className="sr-only">{caption}</caption>{children}</table></div>;
 }
 
-export function DataTable({ label, children }: { label: string; children: ReactNode }) {
-  return <div className="table-scroll" role="region" aria-label={label} tabIndex={0}><table>{children}</table></div>;
+export function SortableHeader({ label, active, direction, onSort }: {
+  label: string;
+  active: boolean;
+  direction: "asc" | "desc";
+  onSort: () => void;
+}) {
+  const { t } = useI18n();
+  const state = active ? (direction === "desc" ? "descending" : "ascending") : "none";
+  const next = active && direction === "desc" ? t("filter.ascending") : t("filter.descending");
+  return <th aria-sort={state} scope="col"><button aria-label={t("filter.sortColumn", { label, direction: next })} className="sort-header" onClick={onSort} type="button"><span>{label}</span><span aria-hidden="true">{active ? (direction === "desc" ? "↓" : "↑") : "↕"}</span></button></th>;
 }
 
 export function Pagination<T>({ page }: { page: PagedData<T> }) {
   const { t } = useI18n();
+  const location = useLocation();
+  const [params, setParams] = useSearchParams();
   const totalPages = Math.max(1, Math.ceil(page.total / page.size));
+  const pageUrl = (targetPage: number): string => {
+    const next = new URLSearchParams(params);
+    if (targetPage <= 1) next.delete("page"); else next.set("page", String(targetPage));
+    return `${location.pathname}${next.size ? `?${next}` : ""}`;
+  };
   return (
     <nav className="pagination" aria-label={t("pagination.label")}>
-      <Link aria-disabled={page.page <= 1} className={page.page <= 1 ? "disabled" : ""} to={pageUrl(page.page - 1)}><ArrowLeft aria-hidden="true" size={15} />{t("pagination.previous")}</Link>
+      {page.page <= 1 ? <span aria-disabled="true" className="disabled"><ArrowLeft aria-hidden="true" size={15} />{t("pagination.previous")}</span> : <Link to={pageUrl(page.page - 1)}><ArrowLeft aria-hidden="true" size={15} />{t("pagination.previous")}</Link>}
       <span>{t("pagination.summary", { page: page.page, totalPages, total: page.total })}</span>
-      <Link aria-disabled={page.page >= totalPages} className={page.page >= totalPages ? "disabled" : ""} to={pageUrl(page.page + 1)}>{t("pagination.next")}<ArrowRight aria-hidden="true" size={15} /></Link>
+      <label className="page-size"><span>{t("pagination.pageSize")}</span><select aria-label={t("pagination.pageSize")} onChange={(event) => setParams(updateListParams(params, { size: event.target.value }))} value={String(page.size)}>{![25, 50, 100].includes(page.size) ? <option value={page.size}>{page.size}</option> : null}<option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label>
+      {page.page >= totalPages ? <span aria-disabled="true" className="disabled">{t("pagination.next")}<ArrowRight aria-hidden="true" size={15} /></span> : <Link to={pageUrl(page.page + 1)}>{t("pagination.next")}<ArrowRight aria-hidden="true" size={15} /></Link>}
     </nav>
   );
 }
 
-function pageUrl(page: number): string {
-  const params = new URLSearchParams(window.location.search);
-  if (page <= 1) params.delete("page"); else params.set("page", String(page));
-  return `${window.location.pathname}${params.size ? `?${params}` : ""}`;
+function updateListParams(current: URLSearchParams, values: Record<string, string | null>): URLSearchParams {
+  const next = new URLSearchParams(current);
+  for (const [key, value] of Object.entries(values)) {
+    if (!value) next.delete(key); else next.set(key, value);
+  }
+  next.delete("page");
+  return next;
 }
 
 export function Skeleton({ rows = 5 }: { rows?: number }) {
@@ -132,19 +188,55 @@ export function ErrorState({ error, onRetry, archiveAction = false }: {
   const { locale, t } = useI18n();
   const apiError = error instanceof ApiError ? error : null;
   const translatedErrorKey = apiError ? API_ERROR_KEYS[apiError.code] : undefined;
+  const stateClass = apiError?.code === "FORBIDDEN" ? "forbidden" : apiError?.code === "ARCHIVE_NOT_READY" ? "archive-not-ready" : "error";
   const errorMessage = apiError
     ? locale === "KO" && translatedErrorKey ? t(translatedErrorKey) : apiError.message
     : t("error.dataLoad");
   return (
-    <div className="state-card error" role="alert">
+    <div className={`state-card ${stateClass}`} role="alert">
       <AlertTriangle aria-hidden="true" size={22} />
       <strong>{errorMessage}</strong>
       <p>{apiError?.retryable ? t("error.retryableHelp") : t("error.actionHelp")}</p>
       {apiError?.requestId ? <code>{t("common.requestId", { requestId: apiError.requestId })}</code> : <span>{t("common.requestIdUnavailable")}</span>}
       {apiError?.details.length ? <ul>{apiError.details.map((detail, index) => <li key={`${detail.field ?? "state"}-${index}`}>{detail.message}{detail.context ? ` · ${JSON.stringify(detail.context)}` : ""}</li>)}</ul> : null}
-      <div className="state-actions">{onRetry ? <button className="button" onClick={onRetry} type="button"><RefreshCw aria-hidden="true" size={15} />{t("common.retry")}</button> : null}{archiveAction ? <Link className="button" to="/operations/archives">{t("error.archiveAction")}</Link> : null}</div>
+      <div className="state-actions">{onRetry ? <button className="button" onClick={onRetry} type="button"><RefreshCw aria-hidden="true" size={15} />{t("common.retry")}</button> : null}{archiveAction || apiError?.code === "ARCHIVE_NOT_READY" ? <Link className="button" to="/operations/archives">{t("error.archiveAction")}</Link> : null}</div>
     </div>
   );
+}
+
+export function InvalidFilterState({ message }: { message?: string }) {
+  const { t } = useI18n();
+  return <div className="state-card invalid" role="alert"><CircleAlert aria-hidden="true" size={22} /><strong>{t("filter.invalidTitle")}</strong><p>{message ?? t("filter.invalidDescription")}</p></div>;
+}
+
+export function RefetchingIndicator() {
+  const { t } = useI18n();
+  return <div aria-live="polite" className="refetching-indicator" role="status"><RefreshCw aria-hidden="true" size={14} /><span>{t("common.refreshing")}</span></div>;
+}
+
+export function PartialFailureWarning({ message }: { message: string }) {
+  const { t } = useI18n();
+  return <div className="partial-warning" role="status"><AlertTriangle aria-hidden="true" size={17} /><div><strong>{t("error.partialTitle")}</strong><span>{message}</span></div></div>;
+}
+
+export function QueryFeedback({ invalid = false, invalidMessage, pending, fetching, refetchError = false, error, hasData, onRetry, rows = 8 }: {
+  invalid?: boolean;
+  invalidMessage?: string;
+  pending: boolean;
+  fetching: boolean;
+  refetchError?: boolean;
+  error: unknown;
+  hasData: boolean;
+  onRetry: () => void;
+  rows?: number;
+}) {
+  if (invalid) return <InvalidFilterState {...(invalidMessage ? { message: invalidMessage } : {})} />;
+  return <>
+    {pending ? <Skeleton rows={rows} /> : null}
+    {error && !hasData ? <ErrorState error={error} onRetry={onRetry} /> : null}
+    {refetchError && hasData ? <StaleWarning error={error} onRetry={onRetry} /> : null}
+    {fetching && hasData && !refetchError ? <RefetchingIndicator /> : null}
+  </>;
 }
 
 export function StaleWarning({ error, onRetry }: { error: unknown; onRetry: () => void }) {
@@ -160,7 +252,7 @@ export function DefinitionGrid({ items }: { items: readonly { label: string; val
 export function ResponseGuidance({ steps }: { steps: ResponseGuidanceStepDto[] }) {
   const { t } = useI18n();
   if (!steps.length) return <EmptyState title={t("empty.noResponseGuidance")} message={t("empty.responseGuidanceDescription")} />;
-  return <ol className="guidance-list">{steps.map((step) => <li key={step.order}><span>{step.order}</span><div><div className="guidance-title"><strong>{step.title}</strong>{step.requiresManualAction ? <StatusPill value="MANUAL ACTION" /> : null}</div><p>{step.description}</p></div></li>)}</ol>;
+  return <ol aria-label={t("alert.guidanceSteps")} className="guidance-list">{steps.map((step) => <li key={step.order}><span>{step.order}</span><div><div className="guidance-title"><strong>{step.title}</strong>{step.requiresManualAction ? <Badge tone="warning">{t("alert.manualAction")}</Badge> : null}</div><p>{step.description}</p></div></li>)}</ol>;
 }
 
 export function RiskFactorList({ risk }: { risk: EndpointRiskDto }) {
@@ -176,8 +268,22 @@ export function SourceEvent({ alert }: { alert: AlertDetailDto }) {
   return <Link className="source-event" to={`/events/${event.eventId}?endpointId=${event.endpointId}&occurredAt=${encodeURIComponent(event.occurredAt)}`}><span>{event.eventType}</span><strong>{event.processName ?? event.remoteDomain ?? event.filePath ?? event.eventId}</strong><small>{formatDateTime(event.occurredAt)}</small></Link>;
 }
 
-export function MasterDetail({ list, detail }: { list: ReactNode; detail: ReactNode }) {
-  return <div className="master-detail"><div>{list}</div><aside>{detail}</aside></div>;
+export function Inspector({ title, description, children, actions }: { title: string; description?: string; children: ReactNode; actions?: ReactNode }) {
+  const titleId = useId();
+  return <aside aria-labelledby={titleId} className="inspector"><header><div><span className="eyebrow">INSPECTOR</span><h2 id={titleId}>{title}</h2>{description ? <p>{description}</p> : null}</div>{actions ? <div className="inspector-actions">{actions}</div> : null}</header><div className="inspector-body">{children}</div></aside>;
+}
+
+export function MasterDetail({ list, detail, label }: { list: ReactNode; detail: ReactNode; label?: string }) {
+  return <section {...(label ? { "aria-label": label } : {})} className="master-detail"><div className="master-list">{list}</div><div className="master-inspector">{detail}</div></section>;
+}
+
+export function ChartFrame({ title, description, meta, children, fallback }: { title: string; description: string; meta?: ReactNode; children: ReactNode; fallback: ReactNode }) {
+  const titleId = useId();
+  return <section aria-labelledby={titleId} className="chart-frame"><header><div><h2 id={titleId}>{title}</h2><p>{description}</p></div>{meta ? <div className="chart-frame-meta">{meta}</div> : null}</header><div className="chart-frame-visual">{children}</div><details className="chart-frame-fallback"><summary>{useChartDataLabel()}</summary>{fallback}</details></section>;
+}
+
+function useChartDataLabel(): string {
+  return useI18n().t("charts.viewData", { label: "data" });
 }
 
 const API_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {

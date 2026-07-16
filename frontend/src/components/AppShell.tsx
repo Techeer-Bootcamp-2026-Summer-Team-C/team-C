@@ -1,34 +1,75 @@
 import {
   Activity,
+  Archive,
   BellRing,
+  CircleUserRound,
   Database,
   LogOut,
   Menu,
   MonitorDot,
-  Radar,
   PanelLeftClose,
   PanelLeftOpen,
   Printer,
+  Radar,
   Search,
   Server,
   ShieldCheck,
+  type LucideIcon,
 } from "lucide-react";
-import { type FormEvent, useState } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Suspense, type FormEvent, useEffect, useRef, useState } from "react";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import type { UserLocale } from "../contracts";
 import { useI18n } from "../i18n/LocaleContext";
+import type { TranslationKey } from "../i18n/translations";
+import { Badge, Button, Dialog, Drawer, Popover, SelectField, Tooltip } from "./primitives";
 
-const NAVIGATION = [
-  { to: "/", labelKey: "navigation.overview", icon: MonitorDot, end: true },
-  { to: "/alerts", labelKey: "navigation.alerts", icon: BellRing, end: false },
-  { to: "/incidents", labelKey: "navigation.incidents", icon: ShieldCheck, end: false },
-  { to: "/endpoints", labelKey: "navigation.endpoints", icon: Server, end: false },
-  { to: "/events", labelKey: "navigation.events", icon: Activity, end: false },
-  { to: "/intelligence", labelKey: "navigation.intelligence", icon: Radar, end: false },
-  { to: "/operations", labelKey: "navigation.operations", icon: Database, end: false },
+interface NavigationItem {
+  to: string;
+  labelKey: TranslationKey;
+  icon: LucideIcon;
+  end: boolean;
+  child?: boolean;
+}
+
+interface NavigationGroup {
+  labelKey: TranslationKey;
+  items: readonly NavigationItem[];
+}
+
+const NAVIGATION_GROUPS: readonly NavigationGroup[] = [
+  {
+    labelKey: "navigation.groupOverview",
+    items: [{ to: "/", labelKey: "navigation.overview", icon: MonitorDot, end: true }],
+  },
+  {
+    labelKey: "navigation.groupTriage",
+    items: [
+      { to: "/alerts", labelKey: "navigation.alerts", icon: BellRing, end: false },
+      { to: "/incidents", labelKey: "navigation.incidents", icon: ShieldCheck, end: false },
+    ],
+  },
+  {
+    labelKey: "navigation.groupEvidence",
+    items: [
+      { to: "/endpoints", labelKey: "navigation.endpoints", icon: Server, end: false },
+      { to: "/events", labelKey: "navigation.events", icon: Activity, end: false },
+    ],
+  },
+  {
+    labelKey: "navigation.groupAnalysis",
+    items: [{ to: "/intelligence", labelKey: "navigation.intelligence", icon: Radar, end: false }],
+  },
+  {
+    labelKey: "navigation.groupPlatform",
+    items: [
+      { to: "/operations", labelKey: "navigation.operations", icon: Database, end: true },
+      { to: "/operations/archives", labelKey: "navigation.archives", icon: Archive, end: true, child: true },
+    ],
+  },
 ] as const;
 
+const NAVIGATION_ITEMS = NAVIGATION_GROUPS.flatMap((group) => group.items);
 const COMPACT_KEY = "edr.compactNavigation";
 
 export function AppShell() {
@@ -36,16 +77,17 @@ export function AppShell() {
   const { dateLocale, locale, t } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const [compact, setCompact] = useState(() => localStorage.getItem(COMPACT_KEY) !== "false");
-  const [compactNavOpen, setCompactNavOpen] = useState(false);
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [localeSaving, setLocaleSaving] = useState(false);
   const [localeError, setLocaleError] = useState(false);
   const [search, setSearch] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
-  const pageTitle = NAVIGATION.find((item) =>
-    item.end ? location.pathname === item.to : location.pathname.startsWith(item.to),
-  );
-  const pageTitleText = pageTitle ? t(pageTitle.labelKey) : t("navigation.console");
+  const breadcrumbs = buildBreadcrumbs(location.pathname, t);
+  const pageTitleText = breadcrumbs.at(-1)?.label ?? t("navigation.console");
+
+  useEffect(() => { setMobileNavigationOpen(false); }, [location.pathname]);
 
   function toggleCompact(): void {
     setCompact((current) => {
@@ -53,10 +95,6 @@ export function AppShell() {
       localStorage.setItem(COMPACT_KEY, String(next));
       return next;
     });
-  }
-
-  function logOut(): void {
-    auth.logout();
   }
 
   async function changeLocale(nextLocale: UserLocale): Promise<void> {
@@ -85,45 +123,33 @@ export function AppShell() {
   return (
     <div className={compact ? "app-shell compact" : "app-shell"}>
       <a className="skip-link" href="#main-content">{t("navigation.skipToContent")}</a>
-      <aside className={compactNavOpen ? "nav-rail compact-nav-open" : "nav-rail"}>
-        <div className="brand-mark" aria-label="EDR Console">EC</div>
-        <nav aria-label={t("navigation.primary")}>
-          {NAVIGATION.map(({ to, labelKey, icon: Icon, end }) => {
-            const label = t(labelKey);
-            return (
-            <NavLink
-              aria-label={label}
-              className={({ isActive }) => (isActive ? "nav-item active" : "nav-item")}
-              end={end}
-              key={to}
-              onClick={() => setCompactNavOpen(false)}
-              title={label}
-              to={to}
-            >
-              <Icon aria-hidden="true" size={19} />
-              <span>{label}</span>
-            </NavLink>
-            );
-          })}
-        </nav>
-        <button className="nav-compact" onClick={toggleCompact} type="button">
-          {compact ? <PanelLeftOpen aria-hidden="true" size={18} /> : <PanelLeftClose aria-hidden="true" size={18} />}
-          <span>{compact ? t("navigation.expand") : t("navigation.compact")}</span>
-        </button>
+      <aside className="nav-rail desktop-navigation">
+        <PrimaryNavigation compact={compact} onNavigate={() => undefined} onToggleCompact={toggleCompact} />
       </aside>
+      <Drawer
+        closeLabel={t("navigation.close")}
+        label={t("navigation.primary")}
+        onClose={() => setMobileNavigationOpen(false)}
+        open={mobileNavigationOpen}
+        returnFocusRef={mobileMenuButtonRef}
+      >
+        <PrimaryNavigation compact={false} mobile onNavigate={() => setMobileNavigationOpen(false)} onToggleCompact={toggleCompact} />
+      </Drawer>
       <section className="console-shell">
         <header className="top-bar">
           <button
-            aria-expanded={compactNavOpen}
+            aria-controls="mobile-primary-navigation"
+            aria-expanded={mobileNavigationOpen}
             aria-label={t("navigation.toggle")}
-            className="compact-nav-menu"
-            onClick={() => setCompactNavOpen((current) => !current)}
+            className="mobile-nav-menu icon-button"
+            onClick={() => setMobileNavigationOpen(true)}
+            ref={mobileMenuButtonRef}
             type="button"
           >
             <Menu aria-hidden="true" size={20} />
           </button>
           <div className="top-title">
-            <span>EDR / OPERATIONS</span>
+            <Breadcrumbs items={breadcrumbs} label={t("navigation.breadcrumb")} />
             <strong>{pageTitleText}</strong>
           </div>
           <form className="global-search" onSubmit={submitSearch} role="search">
@@ -132,38 +158,130 @@ export function AppShell() {
           </form>
           <div className="session-summary">
             <div className="locale-control">
-              <label className="locale-selector">
-                <span>{t("language.label")}</span>
-                <select
-                  aria-label={t("language.label")}
-                  disabled={localeSaving}
-                  onChange={(event) => void changeLocale(event.target.value as UserLocale)}
-                  value={locale}
-                >
-                  <option value="EN">{t("language.english")}</option>
-                  <option value="KO">{t("language.korean")}</option>
-                </select>
-              </label>
+              <SelectField
+                className="locale-selector"
+                disabled={localeSaving}
+                label={t("language.label")}
+                onChange={(event) => void changeLocale(event.target.value as UserLocale)}
+                value={locale}
+              >
+                <option value="EN">{t("language.english")}</option>
+                <option value="KO">{t("language.korean")}</option>
+              </SelectField>
               {localeError ? <span className="locale-error" role="alert">{t("language.saveError")}</span> : null}
             </div>
-            <button aria-label={t("report.openAria")} className="icon-button" onClick={() => setReportOpen(true)} title={t("report.printTitle")} type="button"><Printer aria-hidden="true" size={18} /></button>
-            <span className="role-label">{auth.user?.role}</span>
-            <span>{auth.user?.name}</span>
-            <button aria-label={t("navigation.logout")} className="icon-button" onClick={logOut} title={t("navigation.logout")} type="button">
-              <LogOut aria-hidden="true" size={18} />
-            </button>
+            <Popover label={t("navigation.accountMenu")} trigger={<CircleUserRound aria-hidden="true" size={19} />}>
+              <div className="account-summary">
+                <Badge tone="info">{auth.user?.role}</Badge>
+                <strong>{auth.user?.name}</strong>
+                <small>{auth.user?.loginId}</small>
+              </div>
+              <div className="account-actions">
+                <Button onClick={() => setReportOpen(true)} type="button" variant="ghost"><Printer aria-hidden="true" size={17} />{t("report.openAria")}</Button>
+                <Button onClick={() => auth.logout()} type="button" variant="ghost"><LogOut aria-hidden="true" size={17} />{t("navigation.logout")}</Button>
+              </div>
+            </Popover>
           </div>
         </header>
         <main className="main-content" id="main-content" tabIndex={-1}>
-          <Outlet />
+          <Suspense fallback={<div aria-label={t("common.loading")} className="route-loading" role="status"><span />{t("common.loading")}</div>}>
+            <Outlet />
+          </Suspense>
         </main>
-        {reportOpen ? <div className="modal-backdrop" role="presentation" onMouseDown={() => setReportOpen(false)}><section aria-labelledby="report-title" aria-modal="true" className="report-modal" onMouseDown={(event) => event.stopPropagation()} role="dialog">
-          <span className="eyebrow">BROWSER REPORT</span><h2 id="report-title">{t("report.snapshot", { page: pageTitleText })}</h2>
+        <Dialog
+          actions={<>
+            <Button onClick={() => setReportOpen(false)} type="button" variant="ghost">{t("report.cancel")}</Button>
+            <Button onClick={() => window.print()} type="button"><Printer aria-hidden="true" size={16} />{t("report.printSave")}</Button>
+          </>}
+          closeLabel={t("report.close")}
+          eyebrow="BROWSER REPORT"
+          onClose={() => setReportOpen(false)}
+          open={reportOpen}
+          title={t("report.snapshot", { page: pageTitleText })}
+        >
           <p>{t("report.description")}</p>
-          <dl><div><dt>{t("report.page")}</dt><dd>{location.pathname}</dd></div><div><dt>{t("report.generated")}</dt><dd>{new Date().toLocaleString(dateLocale)}</dd></div><div><dt>{t("report.userRole")}</dt><dd>{auth.user?.role}</dd></div></dl>
-          <div className="modal-actions"><button className="button ghost" onClick={() => setReportOpen(false)} type="button">{t("report.cancel")}</button><button className="button" onClick={() => window.print()} type="button"><Printer aria-hidden="true" size={16} />{t("report.printSave")}</button></div>
-        </section></div> : null}
+          <dl className="report-details">
+            <div><dt>{t("report.page")}</dt><dd>{location.pathname}</dd></div>
+            <div><dt>{t("report.generated")}</dt><dd>{new Date().toLocaleString(dateLocale)}</dd></div>
+            <div><dt>{t("report.userRole")}</dt><dd>{auth.user?.role}</dd></div>
+          </dl>
+        </Dialog>
       </section>
     </div>
   );
+}
+
+function PrimaryNavigation({ compact, mobile = false, onNavigate, onToggleCompact }: {
+  compact: boolean;
+  mobile?: boolean;
+  onNavigate: () => void;
+  onToggleCompact: () => void;
+}) {
+  const { t } = useI18n();
+  const compactLabel = compact ? t("navigation.expand") : t("navigation.compact");
+  return <div className="navigation-content" id={mobile ? "mobile-primary-navigation" : undefined}>
+    <div className="brand-mark" aria-label="EDR Console"><span>EC</span><strong>EDR Console</strong></div>
+    <nav aria-label={t("navigation.primary")}>
+      {NAVIGATION_GROUPS.map((group) => <section className="nav-group" key={group.labelKey}>
+        <h2>{t(group.labelKey)}</h2>
+        {group.items.map(({ to, labelKey, icon: Icon, end, child }) => {
+          const label = t(labelKey);
+          return <NavLink
+            aria-label={label}
+            className={({ isActive }) => `nav-item ${child ? "nav-child " : ""}${isActive ? "active" : ""}`.trim()}
+            end={end}
+            key={to}
+            onClick={onNavigate}
+            title={compact ? label : undefined}
+            to={to}
+          >
+            <Icon aria-hidden="true" size={18} />
+            <span>{label}</span>
+          </NavLink>;
+        })}
+      </section>)}
+    </nav>
+    {!mobile ? <Tooltip label={compactLabel}>
+      <button aria-label={compactLabel} className="nav-compact" onClick={onToggleCompact} type="button">
+        {compact ? <PanelLeftOpen aria-hidden="true" size={18} /> : <PanelLeftClose aria-hidden="true" size={18} />}
+        <span>{compact ? t("navigation.expand") : t("navigation.compact")}</span>
+      </button>
+    </Tooltip> : null}
+  </div>;
+}
+
+function Breadcrumbs({ items, label }: { items: BreadcrumbItem[]; label: string }) {
+  return <nav aria-label={label} className="breadcrumbs">
+    <ol>
+      <li><Link to="/">EDR</Link></li>
+      {items.map((item, index) => <li key={`${item.label}-${item.to ?? "current"}`}>
+        {item.to && index < items.length - 1 ? <Link to={item.to}>{item.label}</Link> : <span aria-current={index === items.length - 1 ? "page" : undefined}>{item.label}</span>}
+      </li>)}
+    </ol>
+  </nav>;
+}
+
+interface BreadcrumbItem {
+  label: string;
+  to?: string;
+}
+
+function buildBreadcrumbs(pathname: string, t: ReturnType<typeof useI18n>["t"]): BreadcrumbItem[] {
+  if (pathname === "/") return [{ label: t("navigation.overview") }];
+  if (pathname === "/operations/archives") {
+    return [
+      { label: t("navigation.operations"), to: "/operations" },
+      { label: t("navigation.archives") },
+    ];
+  }
+  const matched = [...NAVIGATION_ITEMS]
+    .sort((left, right) => right.to.length - left.to.length)
+    .find((item) => pathname === item.to || pathname.startsWith(`${item.to}/`));
+  if (!matched) return [{ label: t("navigation.console") }];
+  if (pathname === matched.to) return [{ label: t(matched.labelKey) }];
+  const identifier = pathname.slice(matched.to.length + 1).split("/")[0];
+  return [
+    { label: t(matched.labelKey), to: matched.to },
+    { label: `${t(matched.labelKey).replace(/s$/, "")} #${identifier}` },
+  ];
 }

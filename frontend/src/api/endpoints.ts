@@ -23,6 +23,7 @@ import type {
   FailureListQuery,
   IncidentDetailDto,
   IncidentDto,
+  IncidentInvestigationDto,
   IncidentListQuery,
   IngestSummaryDto,
   LoginData,
@@ -94,6 +95,12 @@ export const api = {
   },
   incidentTimeline(incidentId: number, signal?: AbortSignal): Promise<SuccessEnvelope<AttackTimelineDto>> {
     return apiRequest(`/incidents/${incidentId}/timeline`, {}, signal);
+  },
+  incidentInvestigation(
+    incidentId: number,
+    signal?: AbortSignal,
+  ): Promise<SuccessEnvelope<IncidentInvestigationDto>> {
+    return apiRequest(`/incidents/${incidentId}/investigation`, {}, signal);
   },
   dashboard(query: DashboardSummaryQuery, signal?: AbortSignal): Promise<SuccessEnvelope<DashboardSummaryDto>> {
     return apiRequest(`/dashboard/summary${buildQuery(queryRecord(query))}`, {}, signal);

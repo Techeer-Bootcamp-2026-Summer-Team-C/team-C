@@ -449,6 +449,17 @@
         "title": "AlertDto",
         "type": "object"
       },
+      "AlertSortBy": {
+        "enum": [
+          "priority",
+          "detectedAt",
+          "severity",
+          "riskScore",
+          "status"
+        ],
+        "title": "AlertSortBy",
+        "type": "string"
+      },
       "AlertStatus": {
         "enum": [
           "OPEN",
@@ -1177,7 +1188,10 @@
             "type": "boolean"
           },
           "layoutVersion": {
-            "minimum": 1.0,
+            "enum": [
+              1,
+              2
+            ],
             "title": "Layoutversion",
             "type": "integer"
           },
@@ -1208,7 +1222,10 @@
         "additionalProperties": false,
         "properties": {
           "layoutVersion": {
-            "minimum": 1.0,
+            "enum": [
+              1,
+              2
+            ],
             "title": "Layoutversion",
             "type": "integer"
           },
@@ -3620,6 +3637,75 @@
         "title": "IncidentDto",
         "type": "object"
       },
+      "IncidentInvestigationDto": {
+        "additionalProperties": false,
+        "properties": {
+          "edgeCount": {
+            "minimum": 0.0,
+            "title": "Edgecount",
+            "type": "integer"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/InvestigationEdgeDto"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "fallback": {
+            "$ref": "#/components/schemas/InvestigationFallbackDto"
+          },
+          "incidentId": {
+            "minimum": 1.0,
+            "title": "Incidentid",
+            "type": "integer"
+          },
+          "nodeCount": {
+            "minimum": 0.0,
+            "title": "Nodecount",
+            "type": "integer"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/InvestigationNodeDto"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "partial": {
+            "title": "Partial",
+            "type": "boolean"
+          },
+          "timeRange": {
+            "$ref": "#/components/schemas/TimeRangeDto"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/InvestigationWarningDto"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "incidentId",
+          "timeRange",
+          "nodes",
+          "edges",
+          "nodeCount",
+          "edgeCount",
+          "truncated",
+          "partial",
+          "warnings",
+          "fallback"
+        ],
+        "title": "IncidentInvestigationDto",
+        "type": "object"
+      },
       "IncidentReferenceDto": {
         "additionalProperties": false,
         "properties": {
@@ -3838,6 +3924,374 @@
           "storage"
         ],
         "title": "IngestSummaryDto",
+        "type": "object"
+      },
+      "InvestigationEdgeDto": {
+        "additionalProperties": false,
+        "properties": {
+          "alertId": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alertid"
+          },
+          "edgeId": {
+            "title": "Edgeid",
+            "type": "string"
+          },
+          "eventId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eventid"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/InvestigationEvidence"
+          },
+          "incidentId": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incidentid"
+          },
+          "observedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observedat"
+          },
+          "relation": {
+            "$ref": "#/components/schemas/InvestigationRelation"
+          },
+          "sourceNodeId": {
+            "title": "Sourcenodeid",
+            "type": "string"
+          },
+          "targetNodeId": {
+            "title": "Targetnodeid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "edgeId",
+          "sourceNodeId",
+          "targetNodeId",
+          "relation",
+          "evidence",
+          "incidentId",
+          "alertId",
+          "eventId",
+          "observedAt"
+        ],
+        "title": "InvestigationEdgeDto",
+        "type": "object"
+      },
+      "InvestigationEvidence": {
+        "enum": [
+          "OBSERVED"
+        ],
+        "title": "InvestigationEvidence",
+        "type": "string"
+      },
+      "InvestigationFallbackDto": {
+        "additionalProperties": false,
+        "properties": {
+          "alertTableAvailable": {
+            "title": "Alerttableavailable",
+            "type": "boolean"
+          },
+          "eventTableAvailable": {
+            "title": "Eventtableavailable",
+            "type": "boolean"
+          },
+          "timelineAvailable": {
+            "title": "Timelineavailable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "timelineAvailable",
+          "alertTableAvailable",
+          "eventTableAvailable"
+        ],
+        "title": "InvestigationFallbackDto",
+        "type": "object"
+      },
+      "InvestigationNodeDto": {
+        "additionalProperties": false,
+        "properties": {
+          "alertId": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alertid"
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination"
+          },
+          "endpointId": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpointid"
+          },
+          "eventId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eventid"
+          },
+          "eventType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "incidentId": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incidentid"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "nodeId": {
+            "title": "Nodeid",
+            "type": "string"
+          },
+          "nodeType": {
+            "$ref": "#/components/schemas/InvestigationNodeType"
+          },
+          "occurredAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurredat"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "processName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processname"
+          },
+          "protocol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protocol"
+          },
+          "riskScore": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Riskscore"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Severity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "nodeId",
+          "nodeType",
+          "label",
+          "endpointId",
+          "incidentId",
+          "alertId",
+          "eventId",
+          "pid",
+          "processName",
+          "destination",
+          "protocol",
+          "occurredAt",
+          "severity",
+          "eventType",
+          "riskScore"
+        ],
+        "title": "InvestigationNodeDto",
+        "type": "object"
+      },
+      "InvestigationNodeType": {
+        "enum": [
+          "INCIDENT",
+          "ALERT",
+          "EVENT",
+          "PROCESS",
+          "DESTINATION"
+        ],
+        "title": "InvestigationNodeType",
+        "type": "string"
+      },
+      "InvestigationRelation": {
+        "enum": [
+          "CONTAINS",
+          "TRIGGERED_BY",
+          "PARENT_OF",
+          "CONNECTED_TO"
+        ],
+        "title": "InvestigationRelation",
+        "type": "string"
+      },
+      "InvestigationWarningCode": {
+        "enum": [
+          "EVENT_NOT_FOUND",
+          "ARCHIVE_NOT_READY"
+        ],
+        "title": "InvestigationWarningCode",
+        "type": "string"
+      },
+      "InvestigationWarningDto": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/InvestigationWarningCode"
+          },
+          "endpointId": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpointid"
+          },
+          "eventId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eventid"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "occurredAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurredat"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "eventId",
+          "endpointId",
+          "occurredAt"
+        ],
+        "title": "InvestigationWarningDto",
         "type": "object"
       },
       "L7Event": {
@@ -5260,6 +5714,23 @@
         "title": "SuccessEnvelope[IncidentDetailDto]",
         "type": "object"
       },
+      "SuccessEnvelope_IncidentInvestigationDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/IncidentInvestigationDto"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[IncidentInvestigationDto]",
+        "type": "object"
+      },
       "SuccessEnvelope_IngestSummaryDto_": {
         "additionalProperties": false,
         "properties": {
@@ -6041,6 +6512,15 @@
             "schema": {
               "title": "Rulecode",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AlertSortBy",
+              "default": "priority"
             }
           },
           {
@@ -6854,6 +7334,16 @@
               "title": "To",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "endpointId",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "title": "Endpointid",
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -6940,6 +7430,16 @@
               "format": "date-time",
               "title": "To",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "endpointId",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "title": "Endpointid",
+              "type": "integer"
             }
           }
         ],
@@ -7258,6 +7758,16 @@
           },
           {
             "in": "query",
+            "name": "endpointId",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "title": "Endpointid",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
             "name": "interval",
             "required": true,
             "schema": {
@@ -7463,6 +7973,17 @@
               },
               "title": "Endpointids",
               "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
             }
           },
           {
@@ -8447,6 +8968,83 @@
           }
         ],
         "summary": "Incident Detail",
+        "tags": [
+          "Incidents"
+        ]
+      }
+    },
+    "/api/v1/incidents/{incidentId}/investigation": {
+      "get": {
+        "operationId": "incidentsGetInvestigation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incidentId",
+            "required": true,
+            "schema": {
+              "title": "Incidentid",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_IncidentInvestigationDto_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Incident Investigation",
         "tags": [
           "Incidents"
         ]

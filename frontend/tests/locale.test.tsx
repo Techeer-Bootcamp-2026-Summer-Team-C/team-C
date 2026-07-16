@@ -110,9 +110,10 @@ describe("authenticated locale lifecycle", () => {
     await userEvent.type(screen.getByLabelText("Login ID"), "analyst");
     await userEvent.type(screen.getByLabelText("Password"), "password");
     await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
-    expect(await screen.findByRole("button", { name: "로그아웃" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "계정 메뉴 열기" })).toBeInTheDocument();
     expect(document.documentElement.lang).toBe("ko");
 
+    await userEvent.click(screen.getByRole("button", { name: "계정 메뉴 열기" }));
     await userEvent.click(screen.getByRole("button", { name: "로그아웃" }));
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
     expect(screen.getByText("Move from signal to evidence.")).toBeInTheDocument();
@@ -134,6 +135,7 @@ describe("authenticated locale lifecycle", () => {
     renderShell();
     await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Language" }), "KO");
     expect(screen.getByRole("combobox", { name: "Language" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Open account menu" }));
     await userEvent.click(screen.getByRole("button", { name: "Log out" }));
     expect(sessionStorage.getItem("edr.authSession")).toBeNull();
 

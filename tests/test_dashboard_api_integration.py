@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 from backend.auth import hash_password, issue_access_token
 from backend.contracts.enums import UserRole
+from backend.dashboard_layouts import default_overview_widgets
 from backend.main import create_app
 from backend.runtime import RuntimeServices
 from backend.settings import Settings
@@ -281,41 +282,32 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
         assert me.status_code == 200
         assert me.json()["data"]["locale"] == "EN"
         assert (
-            client.patch(
-                "/api/v1/users/me/locale", headers=_auth(admin_token), json={"locale": "JA"}
-            ).status_code
+            client.patch("/api/v1/users/me/locale", headers=_auth(admin_token), json={"locale": "JA"}).status_code
             == 400
         )
-        changed_locale = client.patch(
-            "/api/v1/users/me/locale", headers=_auth(admin_token), json={"locale": "KO"}
-        )
-        same_locale = client.patch(
-            "/api/v1/users/me/locale", headers=_auth(admin_token), json={"locale": "KO"}
-        )
+        changed_locale = client.patch("/api/v1/users/me/locale", headers=_auth(admin_token), json={"locale": "KO"})
+        same_locale = client.patch("/api/v1/users/me/locale", headers=_auth(admin_token), json={"locale": "KO"})
         assert changed_locale.status_code == same_locale.status_code == 200
         assert changed_locale.json()["data"]["locale"] == same_locale.json()["data"]["locale"] == "KO"
         assert (
-            client.patch(
-                "/api/v1/users/me/locale", headers=_auth(viewer_token), json={"locale": "EN"}
-            ).json()["data"]["locale"]
+            client.patch("/api/v1/users/me/locale", headers=_auth(viewer_token), json={"locale": "EN"}).json()["data"][
+                "locale"
+            ]
             == "EN"
         )
         assert (
-            client.patch(
-                "/api/v1/users/me/locale", headers=_auth(analyst_token), json={"locale": "KO"}
-            ).json()["data"]["locale"]
+            client.patch("/api/v1/users/me/locale", headers=_auth(analyst_token), json={"locale": "KO"}).json()["data"][
+                "locale"
+            ]
             == "KO"
         )
         assert (
-            client.patch(
-                "/api/v1/users/2/locale", headers=_auth(admin_token), json={"locale": "EN"}
-            ).status_code
-            == 404
+            client.patch("/api/v1/users/2/locale", headers=_auth(admin_token), json={"locale": "EN"}).status_code == 404
         )
         assert (
-            client.post(
-                "/api/v1/auth/login", json={"loginId": "admin", "password": "admin-password"}
-            ).json()["data"]["user"]["locale"]
+            client.post("/api/v1/auth/login", json={"loginId": "admin", "password": "admin-password"}).json()["data"][
+                "user"
+            ]["locale"]
             == "KO"
         )
         with psycopg.connect(postgres_dsn) as connection:
@@ -344,6 +336,34 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
         )
         assert endpoint_list.status_code == 200
         assert endpoint_list.json()["data"]["items"][0]["risk"]["score"] >= 85
+        endpoint_search_page_1 = client.get(
+            "/api/v1/endpoints",
+            headers=_auth(admin_token),
+            params={"q": "agent", "page": 1, "size": 1, "sortBy": "registeredAt", "sortOrder": "asc"},
+        ).json()["data"]
+        endpoint_search_page_2 = client.get(
+            "/api/v1/endpoints", headers=_auth(admin_token), params={"q": "agent", "page": 2, "size": 1}
+        ).json()["data"]
+        assert endpoint_search_page_1["total"] == endpoint_search_page_2["total"] == 3
+        endpoint_search_ids = [
+            endpoint_search_page_1["items"][0]["endpointId"],
+            endpoint_search_page_2["items"][0]["endpointId"],
+        ]
+        assert endpoint_search_ids == [1, 2]
+        endpoint_exact = client.get("/api/v1/endpoints", headers=_auth(admin_token), params={"q": "2"}).json()["data"]
+        assert endpoint_exact["total"] == 1
+        assert endpoint_exact["items"][0]["endpointId"] == 2
+        assert (
+            client.get(
+                "/api/v1/endpoints", headers=_auth(admin_token), params={"q": "agent", "status": "OFFLINE"}
+            ).json()["data"]["total"]
+            == 1
+        )
+        assert (
+            client.get("/api/v1/endpoints", headers=_auth(admin_token), params={"q": "agent-%"}).json()["data"]["total"]
+            == 0
+        )
+        assert client.get("/api/v1/endpoints", headers=_auth(admin_token), params={"q": "x" * 129}).status_code == 400
         assert client.get("/api/v1/endpoints/1", headers=_auth(admin_token)).status_code == 200
         assert client.get("/api/v1/endpoints/999", headers=_auth(admin_token)).status_code == 404
 
@@ -392,11 +412,27 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
         )
 
         assert client.get("/api/v1/alerts", headers=_auth(admin_token)).status_code == 200
+        assert (
+            client.get(
+                "/api/v1/alerts", headers=_auth(admin_token), params={"sortBy": "riskScore", "sortOrder": "asc"}
+            ).status_code
+            == 200
+        )
+        assert client.get("/api/v1/alerts", headers=_auth(admin_token), params={"sortBy": "title"}).status_code == 400
         alert_detail = client.get("/api/v1/alerts/1", headers=_auth(admin_token))
         assert alert_detail.status_code == 200
         assert [item["order"] for item in alert_detail.json()["data"]["responseGuidance"]] == [1]
         assert client.get("/api/v1/incidents", headers=_auth(admin_token)).status_code == 200
         assert client.get("/api/v1/incidents/1", headers=_auth(admin_token)).status_code == 200
+        investigation = client.get("/api/v1/incidents/1/investigation", headers=_auth(admin_token))
+        assert investigation.status_code == 200
+        investigation_data = investigation.json()["data"]
+        assert investigation_data["nodeCount"] == len(investigation_data["nodes"])
+        assert investigation_data["edgeCount"] == len(investigation_data["edges"])
+        assert all(edge["evidence"] == "OBSERVED" for edge in investigation_data["edges"])
+        assert client.get("/api/v1/incidents/1/investigation").status_code == 401
+        assert client.get("/api/v1/incidents/1/investigation", headers=_auth(viewer_token)).status_code == 200
+        assert client.get("/api/v1/incidents/999/investigation", headers=_auth(admin_token)).status_code == 404
         assert client.patch("/api/v1/incidents/1", headers=_auth(admin_token), json={}).status_code == 405
 
         assert (
@@ -444,46 +480,58 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
         default_layout = client.get("/api/v1/dashboard/layouts/overview", headers=_auth(admin_token))
         assert default_layout.status_code == 200
         assert default_layout.json()["data"]["isDefault"] is True
+        assert default_layout.json()["data"]["layoutVersion"] == 2
         assert default_layout.json()["data"]["revision"] == 0
-        assert len(default_layout.json()["data"]["widgets"]) == 23
-        admin_widgets = default_layout.json()["data"]["widgets"]
-        admin_widgets[0]["hidden"] = True
+        assert len(default_layout.json()["data"]["widgets"]) == 10
+        v1_widgets = [widget.model_dump(by_alias=True) for widget in default_overview_widgets(1)]
+        v1_widgets[0]["hidden"] = True
         saved_layout = client.put(
             "/api/v1/dashboard/layouts/overview",
             headers=_auth(admin_token),
-            json={"layoutVersion": 1, "revision": 0, "widgets": admin_widgets},
+            json={"layoutVersion": 1, "revision": 0, "widgets": v1_widgets},
         )
         assert saved_layout.status_code == 200
+        assert saved_layout.json()["data"]["layoutVersion"] == 1
         assert saved_layout.json()["data"]["revision"] == 1
         assert saved_layout.json()["data"]["widgets"][0]["hidden"] is True
-        admin_widgets = saved_layout.json()["data"]["widgets"]
-        admin_widgets[1]["hidden"] = True
+        loaded_v1 = client.get("/api/v1/dashboard/layouts/overview", headers=_auth(admin_token))
+        assert loaded_v1.status_code == 200
+        assert loaded_v1.json()["data"]["layoutVersion"] == 1
+        assert loaded_v1.json()["data"]["revision"] == 1
+        v2_widgets = [widget.model_dump(by_alias=True) for widget in default_overview_widgets(2)]
+        v2_widgets[1]["hidden"] = True
         updated_layout = client.put(
             "/api/v1/dashboard/layouts/overview",
             headers=_auth(admin_token),
-            json={"layoutVersion": 1, "revision": 1, "widgets": admin_widgets},
+            json={"layoutVersion": 2, "revision": 1, "widgets": v2_widgets},
         )
         assert updated_layout.status_code == 200
+        assert updated_layout.json()["data"]["layoutVersion"] == 2
         assert updated_layout.json()["data"]["revision"] == 2
         assert updated_layout.json()["data"]["widgets"][1]["hidden"] is True
+        reloaded_v2 = client.get("/api/v1/dashboard/layouts/overview", headers=_auth(admin_token))
+        assert reloaded_v2.status_code == 200
+        assert reloaded_v2.json()["data"]["layoutVersion"] == 2
+        assert reloaded_v2.json()["data"]["revision"] == 2
         admin_widgets = updated_layout.json()["data"]["widgets"]
         viewer_layout = client.get("/api/v1/dashboard/layouts/overview", headers=_auth(viewer_token))
         assert viewer_layout.status_code == 200
         assert viewer_layout.json()["data"]["isDefault"] is True
+        assert viewer_layout.json()["data"]["layoutVersion"] == 2
         assert viewer_layout.json()["data"]["widgets"][0]["hidden"] is False
 
         duplicate_widgets = list(admin_widgets) + [dict(admin_widgets[0])]
         invalid_cases = (
             [dict(widget, id="unknown-widget") if index == 0 else widget for index, widget in enumerate(admin_widgets)],
             duplicate_widgets,
-            [dict(widget, w=5) if widget["id"] == "event-volume" else widget for widget in admin_widgets],
-            [dict(widget, x=12) if widget["id"] == "kpi-events" else widget for widget in admin_widgets],
+            [dict(widget, w=5) if widget["id"] == "detection-activity" else widget for widget in admin_widgets],
+            [dict(widget, x=12) if widget["id"] == "kpi-alerts" else widget for widget in admin_widgets],
         )
         for widgets in invalid_cases:
             invalid = client.put(
                 "/api/v1/dashboard/layouts/overview",
                 headers=_auth(admin_token),
-                json={"layoutVersion": 1, "revision": 2, "widgets": widgets},
+                json={"layoutVersion": 2, "revision": 2, "widgets": widgets},
             )
             assert invalid.status_code == 400, invalid.text
             assert invalid.json()["error"]["code"] == "INVALID_DASHBOARD_LAYOUT"
@@ -491,11 +539,15 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
         conflict = client.put(
             "/api/v1/dashboard/layouts/overview",
             headers=_auth(admin_token),
-            json={"layoutVersion": 1, "revision": 0, "widgets": admin_widgets},
+            json={"layoutVersion": 2, "revision": 0, "widgets": admin_widgets},
         )
         assert conflict.status_code == 409
         assert conflict.json()["error"]["code"] == "DASHBOARD_LAYOUT_REVISION_CONFLICT"
         with psycopg.connect(postgres_dsn) as connection:
+            stored_version, stored_revision = connection.execute(
+                "SELECT layout_version, revision FROM user_dashboard_layouts WHERE user_id = 1"
+            ).fetchone()
+            assert (stored_version, stored_revision) == (2, 2)
             connection.execute(
                 "UPDATE user_dashboard_layouts SET layout_json = '[{\"broken\":true}]'::jsonb WHERE user_id = 1"
             )
@@ -503,10 +555,14 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
         recovered = client.get("/api/v1/dashboard/layouts/overview", headers=_auth(admin_token))
         assert recovered.status_code == 200
         assert recovered.json()["data"]["isDefault"] is True
-        assert len(recovered.json()["data"]["widgets"]) == 23
+        assert recovered.json()["data"]["layoutVersion"] == 2
+        assert recovered.json()["data"]["revision"] == 2
+        assert len(recovered.json()["data"]["widgets"]) == 10
         reset_layout = client.delete("/api/v1/dashboard/layouts/overview", headers=_auth(admin_token))
         assert reset_layout.status_code == 200
         assert reset_layout.json()["data"]["isDefault"] is True
+        assert reset_layout.json()["data"]["layoutVersion"] == 2
+        assert reset_layout.json()["data"]["revision"] == 0
         assert client.delete("/api/v1/dashboard/layouts/overview", headers=_auth(admin_token)).status_code == 200
 
         restored_restore = client.post(

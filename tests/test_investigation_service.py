@@ -102,3 +102,37 @@ def test_ingest_summary_calculates_event_and_failure_rates() -> None:
     summary = service.ingest_summary(from_=NOW, to=NOW.replace(hour=4))
     assert summary.events.rate_per_minute == 2
     assert summary.event_failures.rate_per_minute == 2 / 60
+
+
+def test_ingest_summary_scopes_events_failures_and_storage_to_endpoint() -> None:
+    event_calls: list[dict[str, object]] = []
+    failure_calls: list[dict[str, object]] = []
+
+    def ingest_summary(**filters):
+        event_calls.append(filters)
+        return (7, NOW)
+
+    def current_rows(**filters):
+        failure_calls.append(filters)
+        return [{"status": "FAILED", "failed_at": NOW}]
+
+    storage = [
+        {"endpoint_id": 1, "storage_backend": "S3", "storage_status": "RESTORED"},
+        {"endpoint_id": 2, "storage_backend": "S3", "storage_status": "RESTORED"},
+    ]
+    service = SummaryService(
+        endpoints=SimpleNamespace(),
+        alerts=SimpleNamespace(),
+        incidents=SimpleNamespace(),
+        metadata=SimpleNamespace(all_current=lambda: storage),
+        events=SimpleNamespace(ingest_summary=ingest_summary),
+        failures=SimpleNamespace(current_rows=current_rows),
+        event_service=SimpleNamespace(),
+    )
+
+    summary = service.ingest_summary(from_=NOW, to=NOW.replace(hour=4), endpoint_id=2)
+
+    assert event_calls == [{"from_": NOW, "to": NOW.replace(hour=4), "endpoint_id": 2}]
+    assert failure_calls == [{"from_": NOW, "to": NOW.replace(hour=4), "endpoint_id": 2}]
+    assert summary.events.ingested_count == 7
+    assert summary.storage.restored_bucket_count == 1
