@@ -88,6 +88,7 @@ class SummaryService:
         to: datetime,
         interval: DashboardInterval,
         calculated_at: datetime,
+        endpoint_id: int | None = None,
     ) -> DashboardSummaryDto:
         seconds = {
             DashboardInterval.ONE_MINUTE: 60,
@@ -97,13 +98,13 @@ class SummaryService:
         }[interval]
         if ceil((to - from_).total_seconds() / seconds) > 2000:
             raise ApplicationError(400, "VALIDATION_ERROR", "Dashboard interval exceeds 2,000 points.")
-        endpoint_items = self._endpoint_items(calculated_at)
-        alert_rows = self.alerts.list_rows(from_=from_, to=to)
-        incident_rows = self.incidents.list_rows(from_=from_, to=to)
-        event_items = self._event_items(from_, to)
-        failure_rows = self.failures.current_rows(from_=from_, to=to)
-        storage_rows = self.metadata.all_current()
-        edr_state = self._edr_state(endpoint_items, calculated_at=calculated_at)
+        endpoint_items = self._endpoint_items(calculated_at, endpoint_id=endpoint_id)
+        alert_rows = self.alerts.list_rows(from_=from_, to=to, endpoint_id=endpoint_id)
+        incident_rows = self.incidents.list_rows(from_=from_, to=to, endpoint_id=endpoint_id)
+        event_items = self._event_items(from_, to, endpoint_id=endpoint_id)
+        failure_rows = self.failures.current_rows(from_=from_, to=to, endpoint_id=endpoint_id)
+        storage_rows = _filter_endpoint_rows(self.metadata.all_current(), endpoint_id)
+        edr_state = self._edr_state(endpoint_items, calculated_at=calculated_at, endpoint_id=endpoint_id)
 
         alert_time = Counter(_bucket(row["detected_at"], seconds) for row in alert_rows)
         incident_time: dict[datetime, Counter[str]] = {}
@@ -206,10 +207,17 @@ class SummaryService:
             response_guidance=self._response_guidance(alert_rows),
         )
 
-    def endpoint_summary(self, *, from_: datetime, to: datetime, calculated_at: datetime) -> EndpointSummaryDto:
-        endpoint_items = self._endpoint_items(calculated_at)
-        alert_rows = self.alerts.list_rows(from_=from_, to=to)
-        incident_rows = self.incidents.list_rows(from_=from_, to=to)
+    def endpoint_summary(
+        self,
+        *,
+        from_: datetime,
+        to: datetime,
+        calculated_at: datetime,
+        endpoint_id: int | None = None,
+    ) -> EndpointSummaryDto:
+        endpoint_items = self._endpoint_items(calculated_at, endpoint_id=endpoint_id)
+        alert_rows = self.alerts.list_rows(from_=from_, to=to, endpoint_id=endpoint_id)
+        incident_rows = self.incidents.list_rows(from_=from_, to=to, endpoint_id=endpoint_id)
         summary = summarize_endpoint_risks([item.risk for item in endpoint_items], calculated_at=calculated_at)
         sensor_counter = Counter(
             (item.sensor, item.status) for endpoint in endpoint_items for item in endpoint.sensor_health
@@ -249,10 +257,18 @@ class SummaryService:
             ),
         )
 
-    def ingest_summary(self, *, from_: datetime, to: datetime) -> IngestSummaryDto:
-        event_count, latest_ingested_at = self.events.ingest_summary(from_=from_, to=to)
-        failures = self.failures.current_rows(from_=from_, to=to)
-        storage = self.metadata.all_current()
+    def ingest_summary(
+        self,
+        *,
+        from_: datetime,
+        to: datetime,
+        endpoint_id: int | None = None,
+    ) -> IngestSummaryDto:
+        event_count, latest_ingested_at = self.events.ingest_summary(
+            from_=from_, to=to, endpoint_id=endpoint_id
+        )
+        failures = self.failures.current_rows(from_=from_, to=to, endpoint_id=endpoint_id)
+        storage = _filter_endpoint_rows(self.metadata.all_current(), endpoint_id)
         duration_minutes = max((to - from_).total_seconds() / 60, 1 / 60)
         return IngestSummaryDto(
             time_range=TimeRangeDto(from_=from_, to=to),
@@ -314,11 +330,22 @@ class SummaryService:
             steps=steps,
         )
 
-    def _endpoint_items(self, calculated_at: datetime):
-        return [endpoint_dto(row, calculated_at=calculated_at) for row in self.endpoints.risk_snapshot()]
+    def _endpoint_items(self, calculated_at: datetime, *, endpoint_id: int | None = None):
+        endpoint_ids = [endpoint_id] if endpoint_id is not None else None
+        return [
+            endpoint_dto(row, calculated_at=calculated_at)
+            for row in self.endpoints.risk_snapshot(endpoint_ids=endpoint_ids)
+        ]
 
-    def _event_items(self, from_: datetime, to: datetime):
-        query = EventListQuery(timePreset="CUSTOM", **{"from": from_, "to": to}, page=1, size=500, sortOrder="asc")
+    def _event_items(self, from_: datetime, to: datetime, *, endpoint_id: int | None = None):
+        query = EventListQuery(
+            timePreset="CUSTOM",
+            **{"from": from_, "to": to},
+            endpointId=endpoint_id,
+            page=1,
+            size=500,
+            sortOrder="asc",
+        )
         first = self.event_service.list_rows(query, from_=from_, to=to)
         items, total = first
         page = 2
@@ -328,20 +355,33 @@ class SummaryService:
             page += 1
         return items
 
-    def _edr_state(self, endpoints, *, calculated_at: datetime) -> EdrStateDto:
+    def _edr_state(
+        self,
+        endpoints,
+        *,
+        calculated_at: datetime,
+        endpoint_id: int | None = None,
+    ) -> EdrStateDto:
         risks = [item.risk for item in endpoints]
         risk_summary = summarize_endpoint_risks(risks, calculated_at=calculated_at)
         open_incidents = sum(item.risk.open_incident_count for item in endpoints)
         critical_alerts = sum(
             sum(alert["severity"] == "CRITICAL" for alert in row["active_alerts"])
-            for row in self.endpoints.risk_snapshot()
+            for row in self.endpoints.risk_snapshot(
+                endpoint_ids=[endpoint_id] if endpoint_id is not None else None
+            )
         )
-        latest_ingest = self.events.ingest_summary(from_=datetime(1970, 1, 1, tzinfo=UTC), to=calculated_at)[1]
+        latest_ingest = self.events.ingest_summary(
+            from_=datetime(1970, 1, 1, tzinfo=UTC),
+            to=calculated_at,
+            endpoint_id=endpoint_id,
+        )[1]
         recent_failures = self.failures.current_rows(
             from_=calculated_at.replace(microsecond=0) - timedelta(minutes=15),
             to=calculated_at,
+            endpoint_id=endpoint_id,
         )
-        storage = self.metadata.all_current()
+        storage = _filter_endpoint_rows(self.metadata.all_current(), endpoint_id)
         sensors = [
             sensor for endpoint in endpoints if endpoint.status != "RETIRED" for sensor in endpoint.sensor_health
         ]
@@ -439,3 +479,9 @@ def _aware(value):
 
 def _storage_count(rows, backend, status):
     return sum(row["storage_backend"] == backend and row["storage_status"] == status for row in rows)
+
+
+def _filter_endpoint_rows(rows, endpoint_id: int | None):
+    if endpoint_id is None:
+        return rows
+    return [row for row in rows if int(row["endpoint_id"]) == endpoint_id]

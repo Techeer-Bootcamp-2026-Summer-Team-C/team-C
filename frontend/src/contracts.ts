@@ -96,6 +96,15 @@ export type IncidentDto = Schemas["IncidentDto"];
 export type IncidentDetailDto = Schemas["IncidentDetailDto"];
 export type AttackTimelineItemDto = Schemas["AttackTimelineItemDto"];
 export type AttackTimelineDto = Schemas["AttackTimelineDto"];
+export type InvestigationNodeType = Schemas["InvestigationNodeType"];
+export type InvestigationRelation = Schemas["InvestigationRelation"];
+export type InvestigationEvidence = Schemas["InvestigationEvidence"];
+export type InvestigationWarningCode = Schemas["InvestigationWarningCode"];
+export type InvestigationNodeDto = Schemas["InvestigationNodeDto"];
+export type InvestigationEdgeDto = Schemas["InvestigationEdgeDto"];
+export type InvestigationWarningDto = Schemas["InvestigationWarningDto"];
+export type InvestigationFallbackDto = Schemas["InvestigationFallbackDto"];
+export type IncidentInvestigationDto = Schemas["IncidentInvestigationDto"];
 
 export type TimeRangeDto = Schemas["TimeRangeDto"];
 export type SeverityCountDto = Schemas["SeverityCountDto"];

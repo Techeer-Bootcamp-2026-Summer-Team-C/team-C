@@ -28,6 +28,13 @@ PRODUCT_API_CONTRACTS: tuple[ApiContract, ...] = (
     ApiContract("GET", "/incidents", "IncidentListQuery", "PagedData<IncidentDto>", "JWT_READ"),
     ApiContract("GET", "/incidents/{incidentId}", "path", "IncidentDetailDto", "JWT_READ"),
     ApiContract("GET", "/incidents/{incidentId}/timeline", "path", "AttackTimelineDto", "JWT_READ"),
+    ApiContract(
+        "GET",
+        "/incidents/{incidentId}/investigation",
+        "path",
+        "IncidentInvestigationDto",
+        "JWT_READ",
+    ),
     ApiContract("GET", "/dashboard/summary", "DashboardSummaryQuery", "DashboardSummaryDto", "JWT_READ"),
     ApiContract("GET", "/dashboard/layouts/{dashboardKey}", "path", "DashboardLayoutDto", "JWT_READ"),
     ApiContract(

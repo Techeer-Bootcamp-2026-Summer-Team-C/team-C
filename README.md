@@ -123,3 +123,37 @@ ADMIN
 frontend-admin
 frontend-admin-password
 ```
+
+### 7~31일 다중 Endpoint 시연 데이터
+
+Overview의 장기 추세, Endpoint 목록, Intelligence Topology, Alert/Incident 분포를 확인하려면 먼저 생성 규모를
+미리 봅니다. `--dry-run`은 데이터베이스를 변경하지 않습니다.
+
+```powershell
+uv run --env-file .env python -m tools.seed_dashboard_long_range `
+  --days 7 `
+  --endpoints 20 `
+  --events-per-endpoint-day 100 `
+  --seed 20260715 `
+  --dry-run
+```
+
+확인한 규모로 실제 시드 데이터를 생성합니다. 이 명령은 기존 로컬 PostgreSQL과 ClickHouse QA 데이터를
+초기화하므로 `--confirm-reset`을 명시해야 합니다.
+
+```powershell
+uv run --env-file .env python -m tools.seed_dashboard_long_range `
+  --days 7 `
+  --endpoints 20 `
+  --events-per-endpoint-day 100 `
+  --seed 20260715 `
+  --confirm-reset
+```
+
+기본 예시는 20개 Endpoint, 약 14,000개 Event, 280개 Alert, 40개 Incident와 Failure/Storage 상태를 만든다.
+생성 후 Dashboard에서 `최근 7일`을 선택하고 다음 계정으로 로그인합니다.
+
+```text
+ADMIN  frontend-admin / frontend-admin-password
+VIEWER frontend-viewer / frontend-viewer-password
+```

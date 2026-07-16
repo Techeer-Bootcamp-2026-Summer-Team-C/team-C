@@ -1,7 +1,12 @@
 from backend.contracts.enums import (
+    AlertSortBy,
     EdrStateReasonCode,
     EndpointStatus,
     EventType,
+    InvestigationEvidence,
+    InvestigationNodeType,
+    InvestigationRelation,
+    InvestigationWarningCode,
     StorageStatus,
     TimePreset,
     UserLocale,
@@ -18,6 +23,11 @@ def test_contract_enum_literals_are_exact() -> None:
     assert values(StorageStatus) == ["HOT", "ARCHIVED", "RESTORE_REQUESTED", "RESTORED", "RESTORE_FAILED", "EXPIRED"]
     assert values(TimePreset) == ["LATEST_15M", "LATEST_1H", "LATEST_24H", "LATEST_7D", "CUSTOM"]
     assert values(UserLocale) == ["EN", "KO"]
+    assert values(AlertSortBy) == ["priority", "detectedAt", "severity", "riskScore", "status"]
+    assert values(InvestigationNodeType) == ["INCIDENT", "ALERT", "EVENT", "PROCESS", "DESTINATION"]
+    assert values(InvestigationRelation) == ["CONTAINS", "TRIGGERED_BY", "PARENT_OF", "CONNECTED_TO"]
+    assert values(InvestigationEvidence) == ["OBSERVED"]
+    assert values(InvestigationWarningCode) == ["EVENT_NOT_FOUND", "ARCHIVE_NOT_READY"]
     assert values(EdrStateReasonCode) == [
         "MEDIUM_ENDPOINT_RISK",
         "HIGH_ENDPOINT_RISK",

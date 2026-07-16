@@ -187,6 +187,7 @@ services:
       dockerfile: Dockerfile.dev
     environment:
       EDR_BACKEND_PROXY_TARGET: http://backend:8000
+      VITE_INCIDENT_GRAPH_ENABLED: ${VITE_INCIDENT_GRAPH_ENABLED:-true}
     depends_on:
       backend:
         condition: service_healthy

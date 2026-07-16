@@ -28,6 +28,7 @@ EXPECTED_RESPONSES = {
     "incidentsList": {"200", "400", "401", "503"},
     "incidentsGet": {"200", "400", "401", "404", "503"},
     "incidentsGetTimeline": {"200", "400", "401", "404", "503"},
+    "incidentsGetInvestigation": {"200", "400", "401", "404", "503"},
     "dashboardGetSummary": {"200", "400", "401", "503"},
     "dashboardLayoutsGet": {"200", "401", "404", "503"},
     "dashboardLayoutsPut": {"200", "400", "401", "404", "409", "503"},
@@ -59,9 +60,9 @@ def test_openapi_has_exact_product_operations_tags_and_unique_ids() -> None:
     items = operations(schema)
     expected = {(contract.method.lower(), "/api/v1" + contract.path) for contract in PRODUCT_API_CONTRACTS}
     assert {(method, path) for path, method, _operation in items} == expected
-    assert len(items) == 32
+    assert len(items) == 33
     operation_ids = [operation["operationId"] for _path, _method, operation in items]
-    assert len(operation_ids) == len(set(operation_ids)) == 32
+    assert len(operation_ids) == len(set(operation_ids)) == 33
     assert set(operation_ids) == EXPECTED_RESPONSES.keys()
     assert {tag["name"] for tag in schema["tags"]} == TAGS
     assert all(len(operation["tags"]) == 1 and operation["tags"][0] in TAGS for _, _, operation in items)
@@ -103,6 +104,33 @@ def test_openapi_request_and_envelope_components_are_codegen_ready() -> None:
     assert schemas["UserLocale"]["enum"] == ["EN", "KO"]
     assert schemas["DnsQueryPayload"]["required"] == ["query", "recordType"]
     assert "default" not in schemas["DnsQueryPayload"]["properties"]["responseCode"]
+    assert schemas["AlertSortBy"]["enum"] == ["priority", "detectedAt", "severity", "riskScore", "status"]
+    assert schemas["InvestigationEvidence"]["enum"] == ["OBSERVED"]
+    assert schemas["DashboardLayoutDto"]["properties"]["layoutVersion"] == {
+        "enum": [1, 2],
+        "title": "Layoutversion",
+        "type": "integer",
+    }
+    investigation = schema["paths"]["/api/v1/incidents/{incidentId}/investigation"]["get"]
+    assert investigation["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/SuccessEnvelope_IncidentInvestigationDto_"
+    }
+
+
+def test_dashboard_summary_operations_accept_optional_positive_endpoint_scope() -> None:
+    schema = create_app().openapi()
+    for path in (
+        "/api/v1/dashboard/summary",
+        "/api/v1/dashboard/endpoints/summary",
+        "/api/v1/dashboard/ingest/summary",
+    ):
+        parameters = {
+            parameter["name"]: parameter
+            for parameter in schema["paths"][path]["get"]["parameters"]
+        }
+        endpoint_id = parameters["endpointId"]
+        assert endpoint_id["required"] is False
+        assert endpoint_id["schema"]["minimum"] == 1
 
 
 def test_checked_in_openapi_artifact_matches_app() -> None:

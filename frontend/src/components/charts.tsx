@@ -46,6 +46,57 @@ export function IncidentSeriesChart({ rows, mode = "standard" }: { rows: Inciden
   return <div className={`time-chart ${mode}`}><svg role="img" aria-label={t("charts.incidentSeriesAria")} viewBox="0 0 520 180"><path className="chart-grid" d="M20 30H500 M20 90H500 M20 150H500" /><path className="chart-line alert" d={linePath(open)} /><path className="chart-line closed" d={linePath(closed)} /></svg><div className="inline-legend"><span><i className="open" />{t("charts.open")}</span><span><i className="closed" />{t("charts.closed")}</span></div><details><summary>{t("charts.viewIncidentData")}</summary><table><thead><tr><th scope="col">{t("charts.bucket")}</th><th scope="col">{t("charts.open")}</th><th scope="col">{t("charts.closed")}</th></tr></thead><tbody>{rows.map((row) => <tr key={row.bucketStartAt}><td>{formatCompactDate(row.bucketStartAt)}</td><td>{row.openCount}</td><td>{row.closedCount}</td></tr>)}</tbody></table></details></div>;
 }
 
+export function DetectionActivityChart({ events, alerts, incidents }: {
+  events: TimeSeriesPointDto[];
+  alerts: TimeSeriesPointDto[];
+  incidents: IncidentTimeSeriesPointDto[];
+}) {
+  const { t } = useI18n();
+  if (!events.length && !alerts.length && !incidents.length) {
+    return <EmptyState title={t("charts.noDetectionActivity")} message={t("charts.noSeriesDescription")} />;
+  }
+  return <div className="detection-activity-grid">
+    <ActivitySeries label={t("overview.events")} rows={events} tone="event" />
+    <ActivitySeries label={t("overview.alerts")} rows={alerts} tone="alert" />
+    <IncidentActivitySeries label={t("overview.incidents")} rows={incidents} />
+  </div>;
+}
+
+export function DetectionActivityTable({ events, alerts, incidents }: {
+  events: TimeSeriesPointDto[];
+  alerts: TimeSeriesPointDto[];
+  incidents: IncidentTimeSeriesPointDto[];
+}) {
+  const { t } = useI18n();
+  return <div className="detection-activity-tables">
+    <ActivityDataTable label={t("overview.events")} rows={events} />
+    <ActivityDataTable label={t("overview.alerts")} rows={alerts} />
+    <table><caption>{t("overview.incidents")}</caption><thead><tr><th scope="col">{t("charts.bucket")}</th><th scope="col">{t("charts.open")}</th><th scope="col">{t("charts.closed")}</th></tr></thead><tbody>{incidents.map((row) => <tr key={row.bucketStartAt}><td>{formatCompactDate(row.bucketStartAt)}</td><td>{row.openCount}</td><td>{row.closedCount}</td></tr>)}</tbody></table>
+  </div>;
+}
+
+function ActivitySeries({ label, rows, tone }: { label: string; rows: TimeSeriesPointDto[]; tone: "event" | "alert" }) {
+  const { t } = useI18n();
+  const sampled = sampleRows(rows, 12);
+  const points = miniCoordinates(sampled.map((row) => row.count));
+  const latest = rows.at(-1)?.count ?? 0;
+  return <section className="activity-series" aria-label={label}><header><span>{label}</span><strong>{latest}</strong></header>{rows.length ? <svg aria-label={t("charts.seriesAria", { label })} role="img" viewBox="0 0 240 90"><path className="chart-grid" d="M10 20H230 M10 45H230 M10 70H230" /><path className={`chart-line ${tone}`} d={linePath(points)} />{points.map((point, index) => <circle cx={point.x} cy={point.y} key={sampled[index]?.bucketStartAt} r="3"><title>{sampled[index] ? `${formatCompactDate(sampled[index].bucketStartAt)}: ${sampled[index].count}` : ""}</title></circle>)}</svg> : <span className="activity-empty">{t("common.none")}</span>}</section>;
+}
+
+function IncidentActivitySeries({ label, rows }: { label: string; rows: IncidentTimeSeriesPointDto[] }) {
+  const { t } = useI18n();
+  const sampled = sampleRows(rows, 12);
+  const open = miniCoordinates(sampled.map((row) => row.openCount));
+  const closed = miniCoordinates(sampled.map((row) => row.closedCount));
+  const latest = rows.at(-1);
+  return <section className="activity-series" aria-label={label}><header><span>{label}</span><strong>{latest?.openCount ?? 0} / {latest?.closedCount ?? 0}</strong></header>{rows.length ? <svg aria-label={t("charts.incidentSeriesAria")} role="img" viewBox="0 0 240 90"><path className="chart-grid" d="M10 20H230 M10 45H230 M10 70H230" /><path className="chart-line alert" d={linePath(open)} /><path className="chart-line closed" d={linePath(closed)} /></svg> : <span className="activity-empty">{t("common.none")}</span>}</section>;
+}
+
+function ActivityDataTable({ label, rows }: { label: string; rows: TimeSeriesPointDto[] }) {
+  const { t } = useI18n();
+  return <table><caption>{label}</caption><thead><tr><th scope="col">{t("charts.bucket")}</th><th scope="col">{t("charts.count")}</th></tr></thead><tbody>{rows.map((row) => <tr key={row.bucketStartAt}><td>{formatCompactDate(row.bucketStartAt)}</td><td>{row.count}</td></tr>)}</tbody></table>;
+}
+
 function DistributionRows({ rows, maximum }: { rows: readonly { label: string; count: number; tone?: string }[]; maximum: number }) {
   return <>{rows.map((row) => <div className="count-row" key={row.label}><div><span title={row.label}>{row.label}</span><strong>{row.count}</strong></div><span className={`count-track ${row.tone ?? ""}`}><i style={{ width: `${(row.count / maximum) * 100}%` }} /></span></div>)}</>;
 }
@@ -64,6 +115,14 @@ function coordinates(values: number[]): { x: number; y: number }[] {
   return values.map((value, index) => ({
     x: values.length === 1 ? 260 : 20 + (index * 480) / Math.max(values.length - 1, 1),
     y: 150 - (value / maximum) * 120,
+  }));
+}
+
+function miniCoordinates(values: number[]): { x: number; y: number }[] {
+  const maximum = Math.max(...values, 1);
+  return values.map((value, index) => ({
+    x: values.length === 1 ? 120 : 10 + (index * 220) / Math.max(values.length - 1, 1),
+    y: 70 - (value / maximum) * 50,
   }));
 }
 

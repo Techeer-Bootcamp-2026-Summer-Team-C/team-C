@@ -33,9 +33,41 @@ class AlertStatus(StrEnum):
     RESOLVED = "RESOLVED"
 
 
+class AlertSortBy(StrEnum):
+    PRIORITY = "priority"
+    DETECTED_AT = "detectedAt"
+    SEVERITY = "severity"
+    RISK_SCORE = "riskScore"
+    STATUS = "status"
+
+
 class IncidentStatus(StrEnum):
     OPEN = "OPEN"
     CLOSED = "CLOSED"
+
+
+class InvestigationNodeType(StrEnum):
+    INCIDENT = "INCIDENT"
+    ALERT = "ALERT"
+    EVENT = "EVENT"
+    PROCESS = "PROCESS"
+    DESTINATION = "DESTINATION"
+
+
+class InvestigationRelation(StrEnum):
+    CONTAINS = "CONTAINS"
+    TRIGGERED_BY = "TRIGGERED_BY"
+    PARENT_OF = "PARENT_OF"
+    CONNECTED_TO = "CONNECTED_TO"
+
+
+class InvestigationEvidence(StrEnum):
+    OBSERVED = "OBSERVED"
+
+
+class InvestigationWarningCode(StrEnum):
+    EVENT_NOT_FOUND = "EVENT_NOT_FOUND"
+    ARCHIVE_NOT_READY = "ARCHIVE_NOT_READY"
 
 
 class EventFailureStatus(StrEnum):

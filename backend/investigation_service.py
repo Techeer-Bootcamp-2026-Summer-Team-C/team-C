@@ -1,17 +1,31 @@
 from collections import Counter
 from datetime import UTC, datetime
+from hashlib import sha256
 from typing import Any
 from uuid import UUID
 
 from .api_services import endpoint_dto
 from .contracts.common import PagedData
-from .contracts.enums import EventType, Severity
+from .contracts.dashboard import TimeRangeDto
+from .contracts.enums import (
+    EventType,
+    InvestigationEvidence,
+    InvestigationNodeType,
+    InvestigationRelation,
+    InvestigationWarningCode,
+    Severity,
+)
 from .contracts.events import ProcessTreeDto, ProcessTreeNodeDto
 from .contracts.investigations import (
     AttackTimelineDto,
     AttackTimelineItemDto,
     EgressTopologyDto,
     EventFailureDto,
+    IncidentInvestigationDto,
+    InvestigationEdgeDto,
+    InvestigationFallbackDto,
+    InvestigationNodeDto,
+    InvestigationWarningDto,
     TopologyEdgeDto,
     TopologyNodeDto,
 )
@@ -20,6 +34,23 @@ from .errors import ApplicationError
 from .event_service import EventService
 from .storage.clickhouse import FailureRepository
 from .storage.postgres import AlertRepository, EndpointRepository, IncidentRepository
+
+MAX_INVESTIGATION_NODES = 250
+MAX_INVESTIGATION_EDGES = 500
+
+_NODE_TYPE_ORDER = {
+    InvestigationNodeType.INCIDENT: 0,
+    InvestigationNodeType.ALERT: 1,
+    InvestigationNodeType.EVENT: 2,
+    InvestigationNodeType.PROCESS: 3,
+    InvestigationNodeType.DESTINATION: 4,
+}
+_RELATION_ORDER = {
+    InvestigationRelation.CONTAINS: 0,
+    InvestigationRelation.TRIGGERED_BY: 1,
+    InvestigationRelation.PARENT_OF: 2,
+    InvestigationRelation.CONNECTED_TO: 3,
+}
 
 
 class FailureService:
@@ -161,6 +192,273 @@ class InvestigationService:
         items.sort(key=lambda item: (item.occurred_at, item.item_type, item.alert_id or 0))
         return AttackTimelineDto(incident_id=incident_id, endpoint_id=endpoint_id, items=items)
 
+    def investigation(self, incident_id: int) -> IncidentInvestigationDto:
+        incident = self.incidents.detail(incident_id)
+        if incident is None:
+            raise ApplicationError(404, "NOT_FOUND", "Incident was not found.")
+
+        endpoint_id = int(incident["endpoint_id"])
+        incident_node_id = f"incident:{incident_id}"
+        nodes: dict[str, InvestigationNodeDto] = {}
+        edges: dict[str, InvestigationEdgeDto] = {}
+        warnings: dict[tuple[InvestigationWarningCode, str], InvestigationWarningDto] = {}
+
+        def add_node(node: InvestigationNodeDto) -> None:
+            existing = nodes.get(node.node_id)
+            if existing is None:
+                nodes[node.node_id] = node
+            elif (
+                node.node_type is InvestigationNodeType.PROCESS
+                and existing.process_name is None
+                and node.process_name is not None
+            ):
+                nodes[node.node_id] = node
+
+        def add_edge(edge: InvestigationEdgeDto) -> None:
+            edges.setdefault(edge.edge_id, edge)
+
+        add_node(
+            _investigation_node(
+                node_id=incident_node_id,
+                node_type=InvestigationNodeType.INCIDENT,
+                label=str(incident["title"]),
+                endpoint_id=endpoint_id,
+                incident_id=incident_id,
+                occurred_at=_utc_timestamp(incident["first_detected_at"]),
+                severity=Severity(str(incident["severity"])),
+            )
+        )
+
+        alert_rows = sorted(
+            self.incidents.alerts_for_incident(incident_id),
+            key=lambda row: (_utc_timestamp(row["event_occurred_at"]), int(row["alert_id"])),
+        )
+        archive_not_ready = False
+        for alert in alert_rows:
+            alert_id = int(alert["alert_id"])
+            alert_endpoint_id = int(alert["endpoint_id"])
+            event_id = str(alert["event_id"])
+            event_occurred_at = _utc_timestamp(alert["event_occurred_at"])
+            alert_node_id = f"alert:{alert_id}"
+            add_node(
+                _investigation_node(
+                    node_id=alert_node_id,
+                    node_type=InvestigationNodeType.ALERT,
+                    label=str(alert["title"]),
+                    endpoint_id=alert_endpoint_id,
+                    incident_id=incident_id,
+                    alert_id=alert_id,
+                    event_id=event_id,
+                    occurred_at=_utc_timestamp(alert["detected_at"]),
+                    severity=Severity(str(alert["severity"])),
+                    risk_score=float(alert["risk_score"]),
+                )
+            )
+            add_edge(
+                _investigation_edge(
+                    edge_id=f"contains:{incident_id}:{alert_id}",
+                    source_node_id=incident_node_id,
+                    target_node_id=alert_node_id,
+                    relation=InvestigationRelation.CONTAINS,
+                    incident_id=incident_id,
+                    alert_id=alert_id,
+                    event_id=event_id,
+                    observed_at=_utc_timestamp(alert["detected_at"]),
+                )
+            )
+
+            try:
+                event = self.events.detail(
+                    event_id=UUID(event_id),
+                    endpoint_id=alert_endpoint_id,
+                    occurred_at=event_occurred_at,
+                )
+            except ApplicationError as error:
+                if error.code != "ARCHIVE_NOT_READY":
+                    raise
+                archive_not_ready = True
+                warning_code = InvestigationWarningCode.ARCHIVE_NOT_READY
+                warning_message = "Event evidence is in an archive bucket that is not ready."
+                event = None
+            else:
+                warning_code = InvestigationWarningCode.EVENT_NOT_FOUND
+                warning_message = "Event evidence is not present in HOT or RESTORED storage."
+
+            if event is None:
+                warning_key = (warning_code, event_id)
+                warnings.setdefault(
+                    warning_key,
+                    InvestigationWarningDto(
+                        code=warning_code,
+                        message=warning_message,
+                        event_id=event_id,
+                        endpoint_id=alert_endpoint_id,
+                        occurred_at=event_occurred_at,
+                    ),
+                )
+                continue
+
+            event_node_id = f"event:{event_id}"
+            add_node(
+                _investigation_node(
+                    node_id=event_node_id,
+                    node_type=InvestigationNodeType.EVENT,
+                    label=_event_label(event),
+                    endpoint_id=alert_endpoint_id,
+                    incident_id=incident_id,
+                    alert_id=alert_id,
+                    event_id=event_id,
+                    pid=event.pid,
+                    process_name=event.process_name,
+                    destination=_event_destination(event),
+                    protocol=_event_protocol(event),
+                    occurred_at=event.occurred_at,
+                    event_type=event.event_type,
+                )
+            )
+            add_edge(
+                _investigation_edge(
+                    edge_id=f"triggered-by-alert:{alert_id}:{event_id}",
+                    source_node_id=alert_node_id,
+                    target_node_id=event_node_id,
+                    relation=InvestigationRelation.TRIGGERED_BY,
+                    incident_id=incident_id,
+                    alert_id=alert_id,
+                    event_id=event_id,
+                    observed_at=event.occurred_at,
+                )
+            )
+
+            process_node_id = _process_node_id(alert_endpoint_id, event_id, event.pid, event.process_name)
+            if process_node_id is None:
+                continue
+            add_node(
+                _investigation_node(
+                    node_id=process_node_id,
+                    node_type=InvestigationNodeType.PROCESS,
+                    label=event.process_name or f"PID {event.pid}",
+                    endpoint_id=alert_endpoint_id,
+                    incident_id=incident_id,
+                    alert_id=alert_id,
+                    event_id=event_id,
+                    pid=event.pid,
+                    process_name=event.process_name,
+                    occurred_at=event.occurred_at,
+                )
+            )
+            add_edge(
+                _investigation_edge(
+                    edge_id=f"triggered-by-event:{event_id}:{process_node_id}",
+                    source_node_id=event_node_id,
+                    target_node_id=process_node_id,
+                    relation=InvestigationRelation.TRIGGERED_BY,
+                    incident_id=incident_id,
+                    alert_id=alert_id,
+                    event_id=event_id,
+                    observed_at=event.occurred_at,
+                )
+            )
+
+            if event.pid is not None and event.ppid is not None:
+                parent_node_id = f"process:{alert_endpoint_id}:{event.ppid}"
+                add_node(
+                    _investigation_node(
+                        node_id=parent_node_id,
+                        node_type=InvestigationNodeType.PROCESS,
+                        label=f"PID {event.ppid}",
+                        endpoint_id=alert_endpoint_id,
+                        incident_id=incident_id,
+                        alert_id=alert_id,
+                        event_id=event_id,
+                        pid=event.ppid,
+                        occurred_at=event.occurred_at,
+                    )
+                )
+                add_edge(
+                    _investigation_edge(
+                        edge_id=f"parent-of:{event_id}:{parent_node_id}:{process_node_id}",
+                        source_node_id=parent_node_id,
+                        target_node_id=process_node_id,
+                        relation=InvestigationRelation.PARENT_OF,
+                        incident_id=incident_id,
+                        alert_id=alert_id,
+                        event_id=event_id,
+                        observed_at=event.occurred_at,
+                    )
+                )
+
+            destination = _event_destination(event)
+            if destination is None:
+                continue
+            protocol = _event_protocol(event)
+            destination_key = f"{alert_endpoint_id}\0{protocol}\0{destination}".encode()
+            destination_node_id = f"destination:{alert_endpoint_id}:{sha256(destination_key).hexdigest()[:16]}"
+            add_node(
+                _investigation_node(
+                    node_id=destination_node_id,
+                    node_type=InvestigationNodeType.DESTINATION,
+                    label=destination,
+                    endpoint_id=alert_endpoint_id,
+                    incident_id=incident_id,
+                    alert_id=alert_id,
+                    event_id=event_id,
+                    destination=destination,
+                    protocol=protocol,
+                    occurred_at=event.occurred_at,
+                )
+            )
+            add_edge(
+                _investigation_edge(
+                    edge_id=f"connected-to:{event_id}:{process_node_id}:{destination_node_id}",
+                    source_node_id=process_node_id,
+                    target_node_id=destination_node_id,
+                    relation=InvestigationRelation.CONNECTED_TO,
+                    incident_id=incident_id,
+                    alert_id=alert_id,
+                    event_id=event_id,
+                    observed_at=event.occurred_at,
+                )
+            )
+
+        ordered_nodes = sorted(
+            nodes.values(),
+            key=lambda node: (_NODE_TYPE_ORDER[node.node_type], _sortable_time(node.occurred_at), node.node_id),
+        )
+        ordered_edges = sorted(
+            edges.values(),
+            key=lambda edge: (_RELATION_ORDER[edge.relation], _sortable_time(edge.observed_at), edge.edge_id),
+        )
+        returned_nodes = ordered_nodes[:MAX_INVESTIGATION_NODES]
+        returned_node_ids = {node.node_id for node in returned_nodes}
+        reference_safe_edges = [
+            edge
+            for edge in ordered_edges
+            if edge.source_node_id in returned_node_ids and edge.target_node_id in returned_node_ids
+        ]
+        returned_edges = reference_safe_edges[:MAX_INVESTIGATION_EDGES]
+        truncated = len(returned_nodes) < len(ordered_nodes) or len(returned_edges) < len(ordered_edges)
+        ordered_warnings = sorted(warnings.values(), key=lambda item: (item.code.value, item.event_id or ""))
+
+        return IncidentInvestigationDto(
+            incident_id=incident_id,
+            time_range=TimeRangeDto(
+                from_=_utc_timestamp(incident["window_start_at"]),
+                to=_utc_timestamp(incident["window_end_at"]),
+            ),
+            nodes=returned_nodes,
+            edges=returned_edges,
+            node_count=len(returned_nodes),
+            edge_count=len(returned_edges),
+            truncated=truncated,
+            partial=bool(ordered_warnings),
+            warnings=ordered_warnings,
+            fallback=InvestigationFallbackDto(
+                timeline_available=True,
+                alert_table_available=True,
+                event_table_available=not archive_not_ready,
+            ),
+        )
+
     def topology(
         self,
         *,
@@ -253,6 +551,99 @@ class InvestigationService:
             items.extend(page_items)
             page += 1
         return items
+
+
+def _investigation_node(
+    *,
+    node_id: str,
+    node_type: InvestigationNodeType,
+    label: str,
+    endpoint_id: int | None = None,
+    incident_id: int | None = None,
+    alert_id: int | None = None,
+    event_id: str | None = None,
+    pid: int | None = None,
+    process_name: str | None = None,
+    destination: str | None = None,
+    protocol: str | None = None,
+    occurred_at: datetime | None = None,
+    severity: Severity | None = None,
+    event_type: EventType | None = None,
+    risk_score: float | None = None,
+) -> InvestigationNodeDto:
+    return InvestigationNodeDto(
+        node_id=node_id,
+        node_type=node_type,
+        label=label,
+        endpoint_id=endpoint_id,
+        incident_id=incident_id,
+        alert_id=alert_id,
+        event_id=event_id,
+        pid=pid,
+        process_name=process_name,
+        destination=destination,
+        protocol=protocol,
+        occurred_at=occurred_at,
+        severity=severity,
+        event_type=event_type,
+        risk_score=risk_score,
+    )
+
+
+def _investigation_edge(
+    *,
+    edge_id: str,
+    source_node_id: str,
+    target_node_id: str,
+    relation: InvestigationRelation,
+    incident_id: int | None,
+    alert_id: int | None,
+    event_id: str | None,
+    observed_at: datetime | None,
+) -> InvestigationEdgeDto:
+    return InvestigationEdgeDto(
+        edge_id=edge_id,
+        source_node_id=source_node_id,
+        target_node_id=target_node_id,
+        relation=relation,
+        evidence=InvestigationEvidence.OBSERVED,
+        incident_id=incident_id,
+        alert_id=alert_id,
+        event_id=event_id,
+        observed_at=observed_at,
+    )
+
+
+def _process_node_id(endpoint_id: int, event_id: str, pid: int | None, process_name: str | None) -> str | None:
+    if pid is not None:
+        return f"process:{endpoint_id}:{pid}"
+    if process_name:
+        return f"process:{endpoint_id}:event:{event_id}"
+    return None
+
+
+def _event_destination(event: Any) -> str | None:
+    return event.remote_domain or event.http_host or event.tls_sni or event.remote_ip or event.dns_query
+
+
+def _event_protocol(event: Any) -> str | None:
+    if _event_destination(event) is None:
+        return None
+    return event.l7_protocol or event.protocol or ("DNS" if event.dns_query else "UNKNOWN")
+
+
+def _event_label(event: Any) -> str:
+    return event.process_name or _event_destination(event) or event.file_path or event.event_type.value
+
+
+def _utc_timestamp(value: Any) -> datetime:
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+    return datetime.fromisoformat(str(value).replace("Z", "+00:00")).astimezone(UTC)
+
+
+def _sortable_time(value: datetime | None) -> datetime:
+    return value or datetime.min.replace(tzinfo=UTC)
 
 
 def _event_summary(event) -> str:

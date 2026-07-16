@@ -1,7 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  ChevronDown,
+  Clock3,
   EyeOff,
   GripVertical,
+  Monitor,
   RefreshCw,
   RotateCcw,
   Save,
@@ -22,17 +25,21 @@ import { useSearchParams } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { api } from "../api/endpoints";
 import { readTimeFilter, TimeFilterFields } from "../components/filters";
-import { ErrorState, GlobalFilterBar, PageHeader, Skeleton, StaleWarning } from "../components/ui";
+import { Popover } from "../components/primitives";
+import { ErrorState, PageHeader, Skeleton, StaleWarning } from "../components/ui";
+import type { EndpointDto } from "../contracts";
 import { useI18n } from "../i18n/LocaleContext";
 import {
   applyDesktopGridLayout,
   createDefaultOverviewLayout,
   desktopGridLayout,
   layoutsEqual,
+  mobileGridLayout,
   moveWidgetInOrder,
   normalizeOverviewLayout,
   OVERVIEW_DASHBOARD_KEY,
   OVERVIEW_LAYOUT_VERSION,
+  resolveOverviewLayout,
   resizeWidgetByStep,
   restoreWidgetAtGridPosition,
   setWidgetHidden,
@@ -48,104 +55,136 @@ import {
 } from "../features/overviewWidgetRegistry";
 import { translate } from "../i18n/translations";
 import { formatDateTime } from "../lib/format";
+import { updateParams } from "../lib/url";
 import { pollingInterval } from "../query/policy";
 
-type DashboardBreakpoint = "lg" | "md";
+type DashboardBreakpoint = "lg" | "md" | "sm";
 type SaveStatus = "idle" | "unsaved" | "saving" | "saved" | "error" | "conflict";
-const DASHBOARD_BREAKPOINTS = { lg: 1200, md: 0 } as const;
-const DASHBOARD_COLUMNS = { lg: 12, md: 6 } as const;
-const DASHBOARD_MARGINS = { lg: [12, 12], md: [10, 10] } as const;
+type MigrationStatus = "idle" | "pending" | "saving" | "failed" | "complete";
+const DASHBOARD_BREAKPOINTS = { lg: 1080, md: 768, sm: 0 } as const;
+const DASHBOARD_COLUMNS = { lg: 12, md: 6, sm: 1 } as const;
+const DASHBOARD_MARGINS = { lg: [12, 12], md: [8, 8], sm: [8, 8] } as const;
+const DASHBOARD_CONTAINER_PADDING = { lg: [0, 0], md: [0, 0], sm: [0, 0] } as const;
 const DASHBOARD_WIDGET_MIME = "application/x-edr-dashboard-widget";
+let dashboardMigrationNoticeState: "pending" | "complete" | null = null;
+const autoMigratedLayoutResponses = new WeakSet<object>();
 type Translate = ReturnType<typeof useI18n>["t"];
 const defaultTranslate: Translate = (key, params) => translate("EN", key, params);
+
+export function readOverviewEndpointId(params: URLSearchParams): number | undefined {
+  const endpointId = Number(params.get("endpointId"));
+  return Number.isInteger(endpointId) && endpointId > 0 ? endpointId : undefined;
+}
 
 export function OverviewPage() {
   const { t } = useI18n();
   const [params, setParams] = useSearchParams();
   const time = readTimeFilter(params);
-  const summaryQuery = { ...time.query, interval: time.interval };
+  const selectedEndpointId = readOverviewEndpointId(params);
+  const scopedTimeQuery = {
+    ...time.query,
+    ...(selectedEndpointId ? { endpointId: selectedEndpointId } : {}),
+  };
+  const summaryQuery = { ...scopedTimeQuery, interval: time.interval };
   const dashboard = useQuery({ queryKey: ["dashboard", summaryQuery], queryFn: ({ signal }) => api.dashboard(summaryQuery, signal), enabled: time.valid, staleTime: 30_000, refetchInterval: pollingInterval(30_000) });
-  const endpoints = useQuery({ queryKey: ["endpoint-summary", time.query], queryFn: ({ signal }) => api.endpointSummary(time.query, signal), enabled: time.valid, staleTime: 30_000, refetchInterval: pollingInterval(30_000) });
-  const ingest = useQuery({ queryKey: ["ingest-summary", time.query], queryFn: ({ signal }) => api.ingestSummary(time.query, signal), enabled: time.valid, staleTime: 30_000, refetchInterval: pollingInterval(30_000) });
-  const topEndpoints = useQuery({ queryKey: ["overview-endpoint-risk"], queryFn: ({ signal }) => api.endpoints({ page: 1, size: 5, sortBy: "riskScore", sortOrder: "desc" }, signal), staleTime: 30_000, refetchInterval: pollingInterval(30_000) });
-  const incidentQueue = useQuery({ queryKey: ["overview-incidents", time.query], queryFn: ({ signal }) => api.incidents({ ...time.query, status: "OPEN", page: 1, size: 5, sortOrder: "desc" }, signal), enabled: time.valid, staleTime: 30_000, refetchInterval: pollingInterval(30_000) });
+  const endpoints = useQuery({ queryKey: ["endpoint-summary", scopedTimeQuery], queryFn: ({ signal }) => api.endpointSummary(scopedTimeQuery, signal), enabled: time.valid, staleTime: 30_000, refetchInterval: pollingInterval(30_000) });
+  const ingest = useQuery({ queryKey: ["ingest-summary", scopedTimeQuery], queryFn: ({ signal }) => api.ingestSummary(scopedTimeQuery, signal), enabled: time.valid, staleTime: 30_000, refetchInterval: pollingInterval(30_000) });
+  const endpointInventory = useQuery({ queryKey: ["overview-endpoint-inventory"], queryFn: ({ signal }) => api.endpoints({ page: 1, size: 500, sortBy: "riskScore", sortOrder: "desc" }, signal), staleTime: 30_000, refetchInterval: pollingInterval(30_000) });
+  const incidentQuery = { ...scopedTimeQuery, status: "OPEN" as const, page: 1, size: 5, sortOrder: "desc" as const };
+  const incidentQueue = useQuery({ queryKey: ["overview-incidents", incidentQuery], queryFn: ({ signal }) => api.incidents(incidentQuery, signal), enabled: time.valid, staleTime: 30_000, refetchInterval: pollingInterval(30_000) });
   const savedLayout = useQuery({
     queryKey: ["dashboard-layout", OVERVIEW_DASHBOARD_KEY],
     queryFn: ({ signal }) => api.dashboardLayout(OVERVIEW_DASHBOARD_KEY, signal),
     staleTime: Number.POSITIVE_INFINITY,
     retry: false,
   });
-  const allQueries = [dashboard, endpoints, ingest, topEndpoints, incidentQueue];
+  const allQueries = [dashboard, endpoints, ingest, endpointInventory, incidentQueue];
   const initialError = allQueries.map((query) => query.error).find(Boolean) ?? null;
   const loading = allQueries.some((query) => query.isPending);
+  const refreshing = allQueries.some((query) => query.isFetching);
   const lastRefreshedAt = Math.max(...allQueries.map((query) => query.dataUpdatedAt));
+  const refreshData = () => Promise.all(allQueries.map((query) => query.refetch()));
 
-  const widgetData = dashboard.data && endpoints.data && ingest.data && topEndpoints.data && incidentQueue.data ? {
+  const endpointOptions = endpointInventory.data?.data.items ?? [];
+  const topEndpoints = selectedEndpointId
+    ? endpointOptions.filter((endpoint) => endpoint.endpointId === selectedEndpointId)
+    : endpointOptions.slice(0, 5);
+  const widgetData = dashboard.data && endpoints.data && ingest.data && endpointInventory.data && incidentQueue.data ? {
     dashboard: dashboard.data.data,
     endpoints: endpoints.data.data,
     ingest: ingest.data.data,
-    topEndpoints: topEndpoints.data.data.items,
+    topEndpoints,
     incidentQueue: incidentQueue.data.data.items,
+    selectedEndpointId,
   } satisfies OverviewWidgetData : null;
 
   return (
     <div className="page-stack">
-      <PageHeader eyebrow={t("overview.eyebrow")} title={t("overview.title")} description={t("overview.description")} actions={<span className="last-refreshed">{t("overview.lastRefreshed", { time: lastRefreshedAt ? formatDateTime(new Date(lastRefreshedAt).toISOString()) : t("overview.notYet") })}</span>} />
-      <GlobalFilterBar hasFilters={params.size > 0} onClear={() => setParams({})}><TimeFilterFields params={params} setParams={setParams} /></GlobalFilterBar>
+      <PageHeader eyebrow={t("overview.eyebrow")} title={t("overview.title")} description={t("overview.description")} />
       {!time.valid ? <ErrorState error={new Error(t("filter.invalidRange"))} /> : null}
       {loading && time.valid ? <OverviewSkeleton /> : null}
       {initialError && allQueries.every((query) => !query.data) ? <ErrorState error={initialError} onRetry={() => void Promise.all(allQueries.map((query) => query.refetch()))} /> : null}
       {allQueries.some((query) => query.isRefetchError) && allQueries.every((query) => query.data) ? <StaleWarning error={initialError} onRetry={() => void Promise.all(allQueries.map((query) => query.refetch()))} /> : null}
       {widgetData ? <OverviewContent
         data={widgetData}
+        endpointOptions={endpointOptions}
         layoutLoadError={savedLayout.error}
         layoutLoadedAt={savedLayout.dataUpdatedAt}
         layoutLoading={savedLayout.isPending}
         layoutResponse={savedLayout.data?.data}
+        lastRefreshedAt={lastRefreshedAt}
+        onRefresh={refreshData}
         onReloadLayout={async () => { await savedLayout.refetch(); }}
+        params={params}
+        refreshing={refreshing}
+        selectedEndpointId={selectedEndpointId}
+        setParams={setParams}
+        timePreset={time.preset}
       /> : null}
     </div>
   );
 }
 
-function OverviewContent({ data, layoutResponse, layoutLoadError, layoutLoadedAt, layoutLoading, onReloadLayout }: {
+function OverviewContent({ data, endpointOptions, layoutResponse, layoutLoadError, layoutLoadedAt, layoutLoading, lastRefreshedAt, onRefresh, onReloadLayout, params, refreshing, selectedEndpointId, setParams, timePreset }: {
   data: OverviewWidgetData;
+  endpointOptions: EndpointDto[];
   layoutResponse: DashboardLayoutResponse | undefined;
   layoutLoadError: unknown;
   layoutLoadedAt: number;
   layoutLoading: boolean;
+  lastRefreshedAt: number;
+  onRefresh: () => Promise<unknown>;
   onReloadLayout: () => Promise<void>;
+  params: URLSearchParams;
+  refreshing: boolean;
+  selectedEndpointId: number | undefined;
+  setParams: (next: URLSearchParams) => void;
+  timePreset: string;
 }) {
   const { t } = useI18n();
-  const editor = useDashboardLayoutEditor(layoutResponse, layoutLoadedAt, t);
+  const editor = useDashboardLayoutEditor(layoutResponse, layoutLoadedAt, t, { autoMigrate: true });
   const { width, containerRef, mounted } = useContainerWidth({ initialWidth: 1200 });
   const [draggingWidgetId, setDraggingWidgetId] = useState<string | null>(null);
   const [hideDropActive, setHideDropActive] = useState(false);
   const hideZoneRef = useRef<HTMLElement | null>(null);
   const externalWidgetRef = useRef<string | null>(null);
-  const breakpoint: DashboardBreakpoint = width >= DASHBOARD_BREAKPOINTS.lg ? "lg" : "md";
+  const breakpoint: DashboardBreakpoint = width >= DASHBOARD_BREAKPOINTS.lg ? "lg" : width >= DASHBOARD_BREAKPOINTS.md ? "md" : "sm";
   const desktopEditing = editor.isEditing && breakpoint === "lg";
   const finishEditing = editor.finishEditing;
   useEffect(() => {
-    if (breakpoint === "md" && editor.isEditing) finishEditing();
+    if (breakpoint !== "lg" && editor.isEditing) void finishEditing();
   }, [breakpoint, editor.isEditing, finishEditing]);
   const layouts = useMemo<ResponsiveLayouts<DashboardBreakpoint>>(() => ({
     lg: desktopGridLayout(editor.draft, desktopEditing),
     md: tabletGridLayout(editor.draft),
+    sm: mobileGridLayout(editor.draft),
   }), [desktopEditing, editor.draft]);
   const activeLayout = layouts[breakpoint] ?? layouts.lg ?? [];
   const hiddenWidgets = editor.draft.filter((item) => item.hidden);
-  const hiddenTrayHint = breakpoint === "md"
+  const hiddenTrayHint = breakpoint !== "lg"
     ? (hiddenWidgets.length ? t("dashboardLayout.hiddenTablet") : t("dashboardLayout.arrangementDesktop"))
     : (draggingWidgetId ? t("dashboardLayout.dropHide") : hiddenWidgets.length ? t("dashboardLayout.hiddenCount", { count: hiddenWidgets.length }) : t("dashboardLayout.dragHide"));
-  const canStartEditing = breakpoint === "lg" && !layoutLoading && !layoutLoadError;
-  const editorHint = editor.isEditing
-    ? (breakpoint === "lg" ? t("dashboardLayout.editHintDesktop") : t("dashboardLayout.tabletGenerated"))
-    : layoutLoading
-      ? t("dashboardLayout.loading")
-      : breakpoint === "md"
-        ? t("dashboardLayout.tabletSaved")
-        : t("dashboardLayout.idleHint");
+  const canStartEditing = breakpoint === "lg" && !layoutLoading && !layoutLoadError && !["pending", "saving", "failed"].includes(editor.migrationStatus);
   const visibleWidgetKey = editor.draft.filter((item) => !item.hidden).map((item) => item.id).join("|");
   const commitGrid = editor.commitGrid;
   const dragConfig = useMemo(() => ({
@@ -225,22 +264,33 @@ function OverviewContent({ data, layoutResponse, layoutLoadError, layoutLoadedAt
 
   return (
     <>
-      <section className={`dashboard-editor-bar ${editor.isEditing ? "editing" : ""}`} aria-label={t("dashboardLayout.controlsAria")}>
-        <div>
-          <strong>{editor.isEditing ? t("dashboardLayout.editing") : t("dashboardLayout.layout")}</strong>
-          <span>{editorHint}</span>
+      <section className={`overview-toolbar ${editor.isEditing ? "editing" : ""}`} aria-label={t("overview.toolbarAria")}>
+        <div className="overview-toolbar-controls">
+          <OverviewEndpointSelect
+            endpointOptions={endpointOptions}
+            onChange={(endpointId) => setParams(updateParams(params, { endpointId }))}
+            selectedEndpointId={selectedEndpointId}
+          />
+          <Popover className="overview-toolbar-popover time" label={t("filter.timeRange")} trigger={<><Clock3 aria-hidden="true" size={15} /><span>{timePresetLabel(timePreset, t)}</span><ChevronDown aria-hidden="true" size={14} /></>}>
+            <div className="overview-time-fields"><TimeFilterFields params={params} setParams={setParams} /></div>
+          </Popover>
+          <button aria-busy={refreshing} className="button ghost overview-refresh" disabled={refreshing} onClick={() => void onRefresh()} type="button"><RefreshCw aria-hidden="true" className={refreshing ? "spin" : ""} size={15} />{refreshing ? t("overview.refreshing") : t("overview.refresh")}</button>
+          <span className="overview-refresh-meta">{t("overview.lastRefreshed", { time: lastRefreshedAt ? formatDateTime(new Date(lastRefreshedAt).toISOString()) : t("overview.notYet") })}<small>{t("overview.autoRefresh")}</small></span>
         </div>
         <div className="dashboard-editor-actions">
           {editor.isEditing ? <>
             <button className="button ghost dashboard-editor-only" disabled={editor.saveStatus === "saving"} onClick={editor.cancelEditing} type="button"><X aria-hidden="true" size={15} />{t("dashboardLayout.cancel")}</button>
             <button className="button ghost dashboard-editor-only" disabled={editor.saveStatus === "saving"} onClick={() => void editor.resetLayout()} type="button"><RotateCcw aria-hidden="true" size={15} />{t("dashboardLayout.resetDefault")}</button>
             <button className="button dashboard-editor-only" disabled={editor.saveStatus === "saving"} onClick={() => void editor.saveNow()} type="button"><Save aria-hidden="true" size={15} />{t("dashboardLayout.save")}</button>
-            <button className="button primary dashboard-editor-only" onClick={editor.finishEditing} type="button">{t("dashboardLayout.done")}</button>
+            <button className="button primary dashboard-editor-only" onClick={() => void editor.finishEditing()} type="button">{t("dashboardLayout.done")}</button>
           </> : <button className="button dashboard-edit-button" disabled={!canStartEditing} onClick={editor.startEditing} type="button"><Settings2 aria-hidden="true" size={15} />{t("dashboardLayout.edit")}</button>}
         </div>
       </section>
       {layoutLoadError ? <div className="dashboard-layout-message error" role="alert"><span>{t("dashboardLayout.loadError")}</span><button className="button ghost" onClick={() => void onReloadLayout()} type="button"><RefreshCw aria-hidden="true" size={15} />{t("dashboardLayout.reload")}</button></div> : null}
       {editor.conflict ? <div className="dashboard-layout-message conflict" role="alert"><span>{t("dashboardLayout.conflict")}</span><button className="button" onClick={() => void editor.reload(onReloadLayout)} type="button"><RefreshCw aria-hidden="true" size={15} />{t("dashboardLayout.reloadLatest")}</button></div> : null}
+      {editor.migrationStatus === "saving" || editor.migrationStatus === "pending" ? <div className="dashboard-layout-message" role="status">{t("dashboardLayout.migrationSaving")}</div> : null}
+      {editor.migrationStatus === "failed" && !editor.conflict ? <div className="dashboard-layout-message error" role="alert"><span>{t("dashboardLayout.saveError")}</span><button className="button" onClick={() => void editor.retryMigration()} type="button">{t("dashboardLayout.migrationRetry")}</button></div> : null}
+      {editor.migrationNotice ? <div className="dashboard-layout-message migration-success" role="status"><span><strong>{t("dashboardLayout.migrationSuccess")}</strong>{t("dashboardLayout.migrationDescription")}</span><button className="button ghost" onClick={editor.dismissMigrationNotice} type="button">{t("dashboardLayout.migrationDismiss")}</button></div> : null}
       {editor.errorMessage ? <div className="dashboard-layout-message error" role="alert">{editor.errorMessage}</div> : null}
       <div className="dashboard-save-status" aria-live="polite" role="status">{saveStatusText(editor.saveStatus, t)}</div>
       {editor.isEditing ? <aside
@@ -265,11 +315,12 @@ function OverviewContent({ data, layoutResponse, layoutLoadError, layoutLoadedAt
       </aside> : null}
       <div className="dashboard-grid-shell" ref={containerRef}>
         {mounted ? <ResponsiveGridLayout<DashboardBreakpoint>
-          key={`${breakpoint}:${layoutLoadedAt}:${visibleWidgetKey}`}
+          key={`${breakpoint}:${visibleWidgetKey}`}
           breakpoints={DASHBOARD_BREAKPOINTS}
           className={`dashboard-grid ${desktopEditing ? "is-editing" : ""}`}
           cols={DASHBOARD_COLUMNS}
           compactor={verticalCompactor}
+          containerPadding={DASHBOARD_CONTAINER_PADDING}
           dragConfig={dragConfig}
           dropConfig={dropConfig}
           layouts={layouts}
@@ -307,6 +358,35 @@ function OverviewContent({ data, layoutResponse, layoutLoadError, layoutLoadedAt
       </div>
     </>
   );
+}
+
+export function OverviewEndpointSelect({ endpointOptions, selectedEndpointId, onChange }: {
+  endpointOptions: EndpointDto[];
+  selectedEndpointId: number | undefined;
+  onChange: (endpointId: number | undefined) => void;
+}) {
+  const { t } = useI18n();
+  const selectedEndpointExists = selectedEndpointId === undefined
+    || endpointOptions.some((endpoint) => endpoint.endpointId === selectedEndpointId);
+  return <label className="overview-endpoint-select">
+    <Monitor aria-hidden="true" size={15} />
+    <span className="sr-only">{t("overview.endpointScope")}</span>
+    <select
+      aria-label={t("overview.endpointScope")}
+      onChange={(event) => onChange(event.target.value ? Number(event.target.value) : undefined)}
+      value={selectedEndpointId ?? ""}
+    >
+      <option value="">{t("overview.allEndpoints")}</option>
+      {!selectedEndpointExists && selectedEndpointId !== undefined
+        ? <option value={selectedEndpointId}>{`Endpoint ${selectedEndpointId}`}</option>
+        : null}
+      {endpointOptions.map((endpoint) => (
+        <option key={endpoint.endpointId} value={endpoint.endpointId}>
+          {`${endpoint.hostname} · ID ${endpoint.endpointId}`}
+        </option>
+      ))}
+    </select>
+  </label>;
 }
 
 function WidgetDragSurface({ widgetId, title, hideable, onHide, onMove, onResize }: {
@@ -387,21 +467,28 @@ export function useDashboardLayoutEditor(
   layoutResponse: DashboardLayoutResponse | undefined,
   layoutLoadedAt = layoutResponse ? 1 : 0,
   t: Translate = defaultTranslate,
+  options: { autoMigrate?: boolean } = {},
 ) {
   const [draft, setDraftState] = useState<DashboardWidgetLayout[]>(createDefaultOverviewLayout);
   const [isEditing, setIsEditing] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [conflict, setConflict] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [migrationStatus, setMigrationStatus] = useState<MigrationStatus>("idle");
+  const [migrationNotice, setMigrationNotice] = useState(false);
+  const [migrationRequest, setMigrationRequest] = useState<number | null>(null);
   const draftRef = useRef(draft);
   const committedRef = useRef(draft);
   const revisionRef = useRef(0);
   const editBaselineRef = useRef(draft);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const savingRef = useRef(false);
+  const inFlightRef = useRef<DashboardWidgetLayout[] | null>(null);
   const queuedRef = useRef<DashboardWidgetLayout[] | null>(null);
-  const persistRef = useRef<(candidate: DashboardWidgetLayout[]) => Promise<void>>(async () => undefined);
+  const drainPromiseRef = useRef<Promise<boolean> | null>(null);
+  const persistRef = useRef<(candidate: DashboardWidgetLayout[]) => Promise<boolean>>(async () => true);
   const layoutResponseRef = useRef(layoutResponse);
+  const migrationAttemptedAtRef = useRef<number | null>(null);
+  const migrationPromiseRef = useRef<Promise<boolean> | null>(null);
   layoutResponseRef.current = layoutResponse;
 
   const setDraft = useCallback((next: DashboardWidgetLayout[]) => {
@@ -412,7 +499,8 @@ export function useDashboardLayoutEditor(
   useEffect(() => {
     const response = layoutResponseRef.current;
     if (!response || layoutLoadedAt === 0) return;
-    const merged = normalizeOverviewLayout(response.widgets);
+    const resolved = resolveOverviewLayout(response.layoutVersion, response.widgets);
+    const merged = resolved.widgets;
     revisionRef.current = response.revision;
     committedRef.current = merged;
     editBaselineRef.current = merged;
@@ -420,48 +508,108 @@ export function useDashboardLayoutEditor(
     setConflict(false);
     setErrorMessage(null);
     setSaveStatus("idle");
-  }, [layoutLoadedAt, setDraft]);
+    if (resolved.migrationRequired && options.autoMigrate
+      && migrationAttemptedAtRef.current !== layoutLoadedAt && !autoMigratedLayoutResponses.has(response)) {
+      migrationAttemptedAtRef.current = layoutLoadedAt;
+      autoMigratedLayoutResponses.add(response);
+      setMigrationStatus("pending");
+      setMigrationRequest(layoutLoadedAt);
+    } else if (!resolved.migrationRequired) {
+      setMigrationStatus("idle");
+      if (readMigrationNotice() === "pending") setMigrationNotice(true);
+    }
+  }, [layoutLoadedAt, options.autoMigrate, setDraft]);
 
-  const persistNow = useCallback(async (candidate: DashboardWidgetLayout[]) => {
+  const persistNow = useCallback((candidate: DashboardWidgetLayout[]): Promise<boolean> => {
     const normalized = normalizeOverviewLayout(candidate);
-    if (savingRef.current) {
-      queuedRef.current = normalized;
-      return;
-    }
-    savingRef.current = true;
-    setSaveStatus("saving");
-    setErrorMessage(null);
-    try {
-      const response = await api.saveDashboardLayout(OVERVIEW_DASHBOARD_KEY, {
-        layoutVersion: OVERVIEW_LAYOUT_VERSION,
-        revision: revisionRef.current,
-        widgets: normalized,
-      });
-      const saved = normalizeOverviewLayout(response.data.widgets);
-      revisionRef.current = response.data.revision;
-      committedRef.current = saved;
-      if (!queuedRef.current) setDraft(saved);
-      setSaveStatus("saved");
-    } catch (error) {
-      queuedRef.current = null;
-      setDraft(committedRef.current);
-      if (error instanceof ApiError && error.status === 409) {
-        setConflict(true);
-        setSaveStatus("conflict");
-      } else {
-        setErrorMessage(error instanceof Error ? error.message : t("dashboardLayout.saveError"));
-        setSaveStatus("error");
+    const activeDrain = drainPromiseRef.current;
+    if (activeDrain) {
+      if (!inFlightRef.current || !layoutsEqual(normalized, inFlightRef.current)) {
+        queuedRef.current = normalized;
       }
-    } finally {
-      savingRef.current = false;
-      const queued = queuedRef.current;
-      queuedRef.current = null;
-      if (queued) void persistRef.current(queued);
+      return activeDrain;
     }
+    queuedRef.current = normalized;
+    const drain = (async () => {
+      let succeeded = true;
+      while (queuedRef.current) {
+        const next = queuedRef.current;
+        queuedRef.current = null;
+        inFlightRef.current = next;
+        setSaveStatus("saving");
+        setErrorMessage(null);
+        try {
+          const response = await api.saveDashboardLayout(OVERVIEW_DASHBOARD_KEY, {
+            layoutVersion: OVERVIEW_LAYOUT_VERSION,
+            revision: revisionRef.current,
+            widgets: next,
+          });
+          const saved = normalizeOverviewLayout(response.data.widgets);
+          revisionRef.current = response.data.revision;
+          committedRef.current = saved;
+          if (!queuedRef.current) {
+            setDraft(saved);
+            setSaveStatus("saved");
+          }
+        } catch (error) {
+          queuedRef.current = null;
+          setDraft(committedRef.current);
+          if (error instanceof ApiError && error.status === 409) {
+            setConflict(true);
+            setSaveStatus("conflict");
+          } else {
+            setErrorMessage(error instanceof Error ? error.message : t("dashboardLayout.saveError"));
+            setSaveStatus("error");
+          }
+          succeeded = false;
+          break;
+        } finally {
+          inFlightRef.current = null;
+        }
+      }
+      drainPromiseRef.current = null;
+      return succeeded;
+    })();
+    drainPromiseRef.current = drain;
+    return drain;
   }, [setDraft, t]);
 
   useEffect(() => { persistRef.current = persistNow; }, [persistNow]);
+  const runMigration = useCallback((): Promise<boolean> => {
+    if (migrationPromiseRef.current) return migrationPromiseRef.current;
+    const migration = (async () => {
+      setMigrationStatus("saving");
+      const succeeded = await persistRef.current(draftRef.current);
+      if (succeeded) {
+        writeMigrationNotice("pending");
+        setMigrationNotice(true);
+        setMigrationStatus("complete");
+      } else {
+        setMigrationStatus("failed");
+      }
+      return succeeded;
+    })();
+    const trackedMigration = migration.finally(() => {
+      if (migrationPromiseRef.current === trackedMigration) migrationPromiseRef.current = null;
+    });
+    migrationPromiseRef.current = trackedMigration;
+    return trackedMigration;
+  }, []);
+  useEffect(() => {
+    if (migrationRequest === null) return;
+    setMigrationRequest(null);
+    void runMigration();
+  }, [migrationRequest, runMigration]);
   useEffect(() => () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); }, []);
+  useEffect(() => {
+    if (saveStatus !== "unsaved" && saveStatus !== "saving") return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [saveStatus]);
 
   const queueSave = useCallback((next: DashboardWidgetLayout[]) => {
     setDraft(next);
@@ -473,12 +621,12 @@ export function useDashboardLayoutEditor(
   const saveNow = useCallback(async () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = null;
-    await persistRef.current(draftRef.current);
+    return persistRef.current(draftRef.current);
   }, []);
 
-  const finishEditing = useCallback(() => {
-    void saveNow();
-    setIsEditing(false);
+  const finishEditing = useCallback(async () => {
+    const saved = await saveNow();
+    if (saved) setIsEditing(false);
   }, [saveNow]);
 
   return {
@@ -487,6 +635,13 @@ export function useDashboardLayoutEditor(
     saveStatus,
     conflict,
     errorMessage,
+    migrationStatus,
+    migrationNotice,
+    retryMigration: runMigration,
+    dismissMigrationNotice() {
+      writeMigrationNotice("complete");
+      setMigrationNotice(false);
+    },
     startEditing() {
       editBaselineRef.current = committedRef.current;
       setIsEditing(true);
@@ -500,7 +655,7 @@ export function useDashboardLayoutEditor(
       const baseline = editBaselineRef.current;
       setDraft(baseline);
       setIsEditing(false);
-      if (!layoutsEqual(baseline, committedRef.current)) void persistRef.current(baseline);
+      if (drainPromiseRef.current || !layoutsEqual(baseline, committedRef.current)) void persistRef.current(baseline);
       else setSaveStatus("idle");
     },
     commitGrid: useCallback((layout: Layout) => {
@@ -553,6 +708,22 @@ export function useDashboardLayoutEditor(
       setErrorMessage(null);
     },
   };
+}
+
+function timePresetLabel(preset: string, t: Translate): string {
+  if (preset === "LATEST_15M") return t("filter.latest15Minutes");
+  if (preset === "LATEST_1H") return t("filter.latestHour");
+  if (preset === "LATEST_7D") return t("filter.latest7Days");
+  if (preset === "CUSTOM") return t("filter.customUtcRange");
+  return t("filter.latest24Hours");
+}
+
+function readMigrationNotice(): string | null {
+  return dashboardMigrationNoticeState;
+}
+
+function writeMigrationNotice(value: "pending" | "complete") {
+  dashboardMigrationNoticeState = value;
 }
 
 function saveStatusText(status: SaveStatus, t: Translate): string {

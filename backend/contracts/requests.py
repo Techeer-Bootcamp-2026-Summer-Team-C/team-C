@@ -1,11 +1,23 @@
 from datetime import timedelta
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, StringConstraints, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
 from .common import ContractModel, NonNegativeInt, PositiveId, UtcDateTime, validate_max_31_day_range
-from .enums import AlertStatus, EventFailureStatus, EventType, IncidentStatus, OsType, RiskLevel, Severity, TimePreset
+from .enums import (
+    AlertSortBy,
+    AlertStatus,
+    EventFailureStatus,
+    EventType,
+    IncidentStatus,
+    OsType,
+    RiskLevel,
+    Severity,
+    TimePreset,
+)
+
+EndpointSearchQuery = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128)]
 
 
 class PaginationQuery(ContractModel):
@@ -32,6 +44,7 @@ class TimeRangeQuery(ContractModel):
 
 class EndpointListQuery(PaginationQuery):
     endpoint_ids: list[PositiveId] | SkipJsonSchema[None] = None
+    q: EndpointSearchQuery | SkipJsonSchema[None] = None
     status: Literal["ONLINE", "OFFLINE", "RETIRED"] | SkipJsonSchema[None] = None
     os_type: OsType | SkipJsonSchema[None] = None
     risk_level: RiskLevel | SkipJsonSchema[None] = None
@@ -87,6 +100,7 @@ class AlertListQuery(PaginationQuery, TimeRangeQuery):
     status: AlertStatus | SkipJsonSchema[None] = None
     severity: Severity | SkipJsonSchema[None] = None
     rule_code: str | SkipJsonSchema[None] = None
+    sort_by: AlertSortBy = AlertSortBy.PRIORITY
     sort_order: Literal["asc", "desc"] = "desc"
 
 
@@ -98,11 +112,12 @@ class IncidentListQuery(PaginationQuery, TimeRangeQuery):
 
 
 class DashboardSummaryQuery(TimeRangeQuery):
+    endpoint_id: PositiveId | SkipJsonSchema[None] = None
     interval: Literal["1m", "5m", "1h", "1d"]
 
 
 class DashboardTimeQuery(TimeRangeQuery):
-    pass
+    endpoint_id: PositiveId | SkipJsonSchema[None] = None
 
 
 class CorrelationQuery(TimeRangeQuery):

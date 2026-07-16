@@ -52,9 +52,14 @@ class MemoryDashboardLayoutRepository:
         self.rows.pop((user_id, dashboard_key), None)
 
 
-def _body(*, revision: int = 0, widgets: list[DashboardWidgetLayoutDto] | None = None) -> DashboardLayoutPutRequest:
+def _body(
+    *,
+    layout_version: int = DASHBOARD_LAYOUT_VERSION,
+    revision: int = 0,
+    widgets: list[DashboardWidgetLayoutDto] | None = None,
+) -> DashboardLayoutPutRequest:
     return DashboardLayoutPutRequest(
-        layout_version=DASHBOARD_LAYOUT_VERSION,
+        layout_version=layout_version,
         revision=revision,
         widgets=widgets or default_overview_widgets(),
     )
@@ -62,7 +67,19 @@ def _body(*, revision: int = 0, widgets: list[DashboardWidgetLayoutDto] | None =
 
 def test_default_layout_contains_every_registered_widget_without_overlap() -> None:
     widgets = default_overview_widgets()
-    assert len(widgets) == len({widget.id for widget in widgets}) == 23
+    assert len(widgets) == len({widget.id for widget in widgets}) == 10
+    assert {widget.id for widget in widgets} == {
+        "edr-state",
+        "kpi-alerts",
+        "kpi-open-incidents",
+        "kpi-high-risk-endpoints",
+        "kpi-event-failures",
+        "detection-activity",
+        "alert-severity",
+        "endpoint-risk",
+        "highest-risk-endpoints",
+        "incident-queue",
+    }
     assert all(widget.x + widget.w <= 12 for widget in widgets)
     visible = [widget for widget in widgets if not widget.hidden]
     for index, widget in enumerate(visible):
@@ -77,22 +94,22 @@ def test_default_layout_contains_every_registered_widget_without_overlap() -> No
 
 def test_merge_adds_new_widgets_ignores_deleted_and_duplicate_ids_and_normalizes() -> None:
     stored = [
-        {"id": "event-volume", "x": 99, "y": -4, "w": 99, "h": 1, "hidden": False},
-        {"id": "event-volume", "x": 0, "y": 30, "w": 8, "h": 5, "hidden": True},
-        {"id": "kpi-events", "x": 0, "y": 2, "w": 2, "h": 2, "hidden": "false"},
+        {"id": "detection-activity", "x": 99, "y": -4, "w": 99, "h": 1, "hidden": False},
+        {"id": "detection-activity", "x": 0, "y": 30, "w": 8, "h": 5, "hidden": True},
+        {"id": "kpi-alerts", "x": 0, "y": 2, "w": 3, "h": 2, "hidden": "false"},
         {"id": "removed-widget", "x": 0, "y": 0, "w": 1, "h": 1, "hidden": False},
     ]
     widgets, usable = merge_stored_overview_layout(stored)
-    event_volume = next(widget for widget in widgets if widget.id == "event-volume")
-    events = next(widget for widget in widgets if widget.id == "kpi-events")
+    detection_activity = next(widget for widget in widgets if widget.id == "detection-activity")
+    alerts = next(widget for widget in widgets if widget.id == "kpi-alerts")
     assert usable is True
-    assert len(widgets) == 23
-    assert event_volume.w == 12
-    assert event_volume.h == 4
-    assert event_volume.x == 0
-    assert event_volume.y >= 0
-    assert event_volume.hidden is False
-    assert events.hidden is False
+    assert len(widgets) == 10
+    assert detection_activity.w == 12
+    assert detection_activity.h == 4
+    assert detection_activity.x == 0
+    assert detection_activity.y >= 0
+    assert detection_activity.hidden is False
+    assert alerts.hidden is False
 
 
 def test_corrupted_layout_falls_back_to_default() -> None:
@@ -102,6 +119,72 @@ def test_corrupted_layout_falls_back_to_default() -> None:
     widgets, usable = merge_stored_overview_layout([{"broken": True}])
     assert usable is False
     assert widgets == default_overview_widgets()
+
+
+def test_v1_layout_loads_then_saves_and_reloads_as_v2() -> None:
+    repository = MemoryDashboardLayoutRepository()
+    service = DashboardLayoutService(repository)
+    changed = default_overview_widgets(1)
+    changed[0] = changed[0].model_copy(update={"hidden": True})
+
+    saved_v1 = service.put(
+        user_id=1,
+        dashboard_key="overview",
+        body=_body(layout_version=1, widgets=changed),
+        now=datetime.now(UTC),
+    )
+    loaded_v1 = service.get(user_id=1, dashboard_key="overview")
+    assert saved_v1.layout_version == loaded_v1.layout_version == 1
+    assert loaded_v1.revision == 1
+    assert loaded_v1.widgets[0].hidden is True
+
+    migrated = default_overview_widgets(2)
+    migrated[1] = migrated[1].model_copy(update={"hidden": True})
+    saved_v2 = service.put(
+        user_id=1,
+        dashboard_key="overview",
+        body=_body(layout_version=2, revision=loaded_v1.revision, widgets=migrated),
+        now=datetime.now(UTC),
+    )
+    reloaded_v2 = service.get(user_id=1, dashboard_key="overview")
+    assert saved_v2.layout_version == reloaded_v2.layout_version == 2
+    assert reloaded_v2.revision == 2
+    assert len(loaded_v1.widgets) == 23
+    assert len(reloaded_v2.widgets) == 10
+    assert reloaded_v2.widgets[1].hidden is True
+    assert repository.rows[(1, "overview")]["layout_version"] == 2
+
+
+def test_corrupted_v1_layout_keeps_version_and_revision_when_falling_back() -> None:
+    repository = MemoryDashboardLayoutRepository()
+    repository.rows[(1, "overview")] = {
+        "layout_version": 1,
+        "revision": 7,
+        "layout_json": [{"broken": True}],
+        "updated_at": datetime.now(UTC),
+    }
+    response = DashboardLayoutService(repository).get(user_id=1, dashboard_key="overview")
+
+    assert response.layout_version == 1
+    assert response.revision == 7
+    assert response.is_default is True
+    assert response.widgets == default_overview_widgets(1)
+
+
+def test_unsupported_stored_layout_version_is_rejected() -> None:
+    repository = MemoryDashboardLayoutRepository()
+    repository.rows[(1, "overview")] = {
+        "layout_version": 3,
+        "revision": 1,
+        "layout_json": [],
+        "updated_at": datetime.now(UTC),
+    }
+
+    with pytest.raises(ApplicationError) as caught:
+        DashboardLayoutService(repository).get(user_id=1, dashboard_key="overview")
+
+    assert caught.value.status_code == 400
+    assert caught.value.code == "VALIDATION_ERROR"
 
 
 def test_layouts_are_isolated_by_authenticated_user_and_reset_is_idempotent() -> None:
@@ -117,15 +200,18 @@ def test_layouts_are_isolated_by_authenticated_user_and_reset_is_idempotent() ->
         now=datetime.now(UTC),
     )
     assert saved.revision == 1
+    assert saved.layout_version == DASHBOARD_LAYOUT_VERSION == 2
     assert service.get(user_id=101, dashboard_key="overview").widgets[0].hidden is True
     other = service.get(user_id=202, dashboard_key="overview")
     assert other.is_default is True
+    assert other.layout_version == 2
     assert other.widgets[0].hidden is False
 
     first_reset = service.delete(user_id=101, dashboard_key="overview")
     second_reset = service.delete(user_id=101, dashboard_key="overview")
     assert first_reset.is_default is second_reset.is_default is True
     assert first_reset.revision == second_reset.revision == 0
+    assert first_reset.layout_version == second_reset.layout_version == 2
 
 
 def test_revision_conflict_does_not_overwrite_newer_layout() -> None:
@@ -146,7 +232,7 @@ def test_revision_conflict_does_not_overwrite_newer_layout() -> None:
     [
         (lambda widgets: widgets.append(widgets[0].model_copy()), "Duplicate widget id"),
         (lambda widgets: widgets.__setitem__(0, widgets[0].model_copy(update={"id": "unknown"})), "Unknown widget id"),
-        (lambda widgets: widgets.__setitem__(8, widgets[8].model_copy(update={"w": 5})), "size constraints"),
+        (lambda widgets: widgets.__setitem__(5, widgets[5].model_copy(update={"w": 5})), "size constraints"),
         (lambda widgets: widgets.__setitem__(1, widgets[1].model_copy(update={"x": 11})), "12-column grid"),
         (lambda widgets: widgets.__setitem__(1, widgets[1].model_copy(update={"y": 255})), "maximum dashboard rows"),
         (lambda widgets: widgets.__setitem__(1, widgets[1].model_copy(update={"y": 1})), "overlaps"),

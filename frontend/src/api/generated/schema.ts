@@ -364,6 +364,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/incidents/{incidentId}/investigation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Incident Investigation */
+        get: operations["incidentsGetInvestigation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/incidents/{incidentId}/timeline": {
         parameters: {
             query?: never;
@@ -659,6 +676,11 @@ export interface components {
             updatedAt: string;
         };
         /**
+         * AlertSortBy
+         * @enum {string}
+         */
+        AlertSortBy: "priority" | "detectedAt" | "severity" | "riskScore" | "status";
+        /**
          * AlertStatus
          * @enum {string}
          */
@@ -893,8 +915,11 @@ export interface components {
             dashboardKey: string;
             /** Isdefault */
             isDefault: boolean;
-            /** Layoutversion */
-            layoutVersion: number;
+            /**
+             * Layoutversion
+             * @enum {integer}
+             */
+            layoutVersion: 1 | 2;
             /** Revision */
             revision: number;
             /** Widgets */
@@ -902,8 +927,11 @@ export interface components {
         };
         /** DashboardLayoutPutRequest */
         DashboardLayoutPutRequest: {
-            /** Layoutversion */
-            layoutVersion: number;
+            /**
+             * Layoutversion
+             * @enum {integer}
+             */
+            layoutVersion: 1 | 2;
             /** Revision */
             revision: number;
             /** Widgets */
@@ -1570,6 +1598,27 @@ export interface components {
             /** Windowstartat */
             windowStartAt: string;
         };
+        /** IncidentInvestigationDto */
+        IncidentInvestigationDto: {
+            /** Edgecount */
+            edgeCount: number;
+            /** Edges */
+            edges: components["schemas"]["InvestigationEdgeDto"][];
+            fallback: components["schemas"]["InvestigationFallbackDto"];
+            /** Incidentid */
+            incidentId: number;
+            /** Nodecount */
+            nodeCount: number;
+            /** Nodes */
+            nodes: components["schemas"]["InvestigationNodeDto"][];
+            /** Partial */
+            partial: boolean;
+            timeRange: components["schemas"]["TimeRangeDto"];
+            /** Truncated */
+            truncated: boolean;
+            /** Warnings */
+            warnings: components["schemas"]["InvestigationWarningDto"][];
+        };
         /** IncidentReferenceDto */
         IncidentReferenceDto: {
             /** Incidentid */
@@ -1640,6 +1689,96 @@ export interface components {
             events: components["schemas"]["IngestEventsDto"];
             storage: components["schemas"]["IngestStorageDto"];
             timeRange: components["schemas"]["TimeRangeDto"];
+        };
+        /** InvestigationEdgeDto */
+        InvestigationEdgeDto: {
+            /** Alertid */
+            alertId: number | null;
+            /** Edgeid */
+            edgeId: string;
+            /** Eventid */
+            eventId: string | null;
+            evidence: components["schemas"]["InvestigationEvidence"];
+            /** Incidentid */
+            incidentId: number | null;
+            /** Observedat */
+            observedAt: string | null;
+            relation: components["schemas"]["InvestigationRelation"];
+            /** Sourcenodeid */
+            sourceNodeId: string;
+            /** Targetnodeid */
+            targetNodeId: string;
+        };
+        /**
+         * InvestigationEvidence
+         * @enum {string}
+         */
+        InvestigationEvidence: "OBSERVED";
+        /** InvestigationFallbackDto */
+        InvestigationFallbackDto: {
+            /** Alerttableavailable */
+            alertTableAvailable: boolean;
+            /** Eventtableavailable */
+            eventTableAvailable: boolean;
+            /** Timelineavailable */
+            timelineAvailable: boolean;
+        };
+        /** InvestigationNodeDto */
+        InvestigationNodeDto: {
+            /** Alertid */
+            alertId: number | null;
+            /** Destination */
+            destination: string | null;
+            /** Endpointid */
+            endpointId: number | null;
+            /** Eventid */
+            eventId: string | null;
+            eventType: components["schemas"]["EventType"] | null;
+            /** Incidentid */
+            incidentId: number | null;
+            /** Label */
+            label: string;
+            /** Nodeid */
+            nodeId: string;
+            nodeType: components["schemas"]["InvestigationNodeType"];
+            /** Occurredat */
+            occurredAt: string | null;
+            /** Pid */
+            pid: number | null;
+            /** Processname */
+            processName: string | null;
+            /** Protocol */
+            protocol: string | null;
+            /** Riskscore */
+            riskScore: number | null;
+            severity: components["schemas"]["Severity"] | null;
+        };
+        /**
+         * InvestigationNodeType
+         * @enum {string}
+         */
+        InvestigationNodeType: "INCIDENT" | "ALERT" | "EVENT" | "PROCESS" | "DESTINATION";
+        /**
+         * InvestigationRelation
+         * @enum {string}
+         */
+        InvestigationRelation: "CONTAINS" | "TRIGGERED_BY" | "PARENT_OF" | "CONNECTED_TO";
+        /**
+         * InvestigationWarningCode
+         * @enum {string}
+         */
+        InvestigationWarningCode: "EVENT_NOT_FOUND" | "ARCHIVE_NOT_READY";
+        /** InvestigationWarningDto */
+        InvestigationWarningDto: {
+            code: components["schemas"]["InvestigationWarningCode"];
+            /** Endpointid */
+            endpointId: number | null;
+            /** Eventid */
+            eventId: string | null;
+            /** Message */
+            message: string;
+            /** Occurredat */
+            occurredAt: string | null;
         };
         /** L7Event */
         L7Event: {
@@ -2161,6 +2300,11 @@ export interface components {
             data: components["schemas"]["IncidentDetailDto"];
             meta: components["schemas"]["RequestMeta"];
         };
+        /** SuccessEnvelope[IncidentInvestigationDto] */
+        SuccessEnvelope_IncidentInvestigationDto_: {
+            data: components["schemas"]["IncidentInvestigationDto"];
+            meta: components["schemas"]["RequestMeta"];
+        };
         /** SuccessEnvelope[IngestSummaryDto] */
         SuccessEnvelope_IngestSummaryDto_: {
             data: components["schemas"]["IngestSummaryDto"];
@@ -2411,6 +2555,7 @@ export interface operations {
                 status?: components["schemas"]["AlertStatus"];
                 severity?: components["schemas"]["Severity"];
                 ruleCode?: string;
+                sortBy?: components["schemas"]["AlertSortBy"];
                 sortOrder?: "asc" | "desc";
             };
             header?: never;
@@ -2990,6 +3135,7 @@ export interface operations {
                 timePreset?: components["schemas"]["TimePreset"];
                 from?: string;
                 to?: string;
+                endpointId?: number;
             };
             header?: never;
             path?: never;
@@ -3041,6 +3187,7 @@ export interface operations {
                 timePreset?: components["schemas"]["TimePreset"];
                 from?: string;
                 to?: string;
+                endpointId?: number;
             };
             header?: never;
             path?: never;
@@ -3261,6 +3408,7 @@ export interface operations {
                 timePreset?: components["schemas"]["TimePreset"];
                 from?: string;
                 to?: string;
+                endpointId?: number;
                 interval: "1m" | "5m" | "1h" | "1d";
             };
             header?: never;
@@ -3365,6 +3513,7 @@ export interface operations {
                 page?: number;
                 size?: number;
                 endpointIds?: number[];
+                q?: string;
                 status?: "ONLINE" | "OFFLINE" | "RETIRED";
                 osType?: components["schemas"]["OsType"];
                 riskLevel?: components["schemas"]["RiskLevel"];
@@ -3800,6 +3949,64 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SuccessEnvelope_IncidentDetailDto_"];
+                };
+            };
+            /** @description Request validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication failed. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description The requested resource was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description A required dependency is temporarily unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    incidentsGetInvestigation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                incidentId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_IncidentInvestigationDto_"];
                 };
             };
             /** @description Request validation failed. */
