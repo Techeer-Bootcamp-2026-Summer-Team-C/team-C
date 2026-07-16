@@ -1,0 +1,173 @@
+import { LineChart } from "echarts/charts";
+import { AxisPointerComponent, GridComponent, TooltipComponent } from "echarts/components";
+import { init, use as registerECharts, type EChartsType } from "echarts/core";
+import { CanvasRenderer } from "echarts/renderers";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { IncidentTimeSeriesPointDto, TimeSeriesPointDto } from "../../contracts";
+import { useI18n } from "../../i18n/LocaleContext";
+import { formatCompactDate } from "../../lib/format";
+import { EmptyState } from "../../components/ui";
+import { buildDetectionActivityModel, valueAt } from "./overviewChartModel";
+
+registerECharts([LineChart, GridComponent, TooltipComponent, AxisPointerComponent, CanvasRenderer]);
+
+export default function DetectionActivityPanel({ events, alerts, incidents }: {
+  events: TimeSeriesPointDto[];
+  alerts: TimeSeriesPointDto[];
+  incidents: IncidentTimeSeriesPointDto[];
+}) {
+  const { t } = useI18n();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<EChartsType | null>(null);
+  const renderedRef = useRef(false);
+  const [selectedTimestamp, setSelectedTimestamp] = useState<number | null>(null);
+  const model = useMemo(() => buildDetectionActivityModel(events, alerts, incidents), [alerts, events, incidents]);
+  const [selectionModel, setSelectionModel] = useState(model.timestamps);
+  const labels = useMemo(() => [t("overview.events"), t("overview.alerts"), t("overview.openIncidents")], [t]);
+
+  if (selectionModel !== model.timestamps) {
+    setSelectionModel(model.timestamps);
+    if (selectedTimestamp !== null && !model.timestamps.includes(selectedTimestamp)) setSelectedTimestamp(null);
+  }
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !model.domain) return;
+    const chart = init(container, undefined, { renderer: "canvas" });
+    chartRef.current = chart;
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    const animate = !renderedRef.current && !reducedMotion;
+    container.dataset.animation = animate ? "enabled" : "disabled";
+    const styles = getComputedStyle(document.documentElement);
+    const color = (name: string, fallback: string) => styles.getPropertyValue(name).trim() || fallback;
+    const colors = [color("--status-info", "#4ea1ff"), color("--status-warning", "#ffb44a"), color("--status-critical", "#ff5470")];
+    chart.setOption({
+      animation: animate,
+      animationDuration: 280,
+      axisPointer: { link: [{ xAxisIndex: "all" }] },
+      grid: [
+        { left: 70, right: 16, top: 14, height: 58 },
+        { left: 70, right: 16, top: 100, height: 58 },
+        { left: 70, right: 16, top: 186, height: 58 },
+      ],
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "cross" },
+        backgroundColor: color("--surface-raised", "#18212b"),
+        borderColor: color("--border-default", "#354252"),
+        textStyle: { color: color("--text-primary", "#eef4fb"), fontSize: 12 },
+        formatter: (raw: unknown) => formatTooltip(raw, labels),
+      },
+      xAxis: model.series.map((_series, index) => ({
+        type: "time",
+        gridIndex: index,
+        min: model.domain?.[0],
+        max: model.domain?.[1],
+        axisLabel: { color: color("--text-tertiary", "#7f8da0"), hideOverlap: true, show: index === 2 },
+        axisLine: { lineStyle: { color: color("--border-subtle", "#27313d") } },
+        axisTick: { show: false },
+        splitLine: { show: false },
+      })),
+      yAxis: model.series.map((_series, index) => ({
+        type: "value",
+        gridIndex: index,
+        name: labels[index],
+        nameLocation: "middle",
+        nameGap: 48,
+        nameTextStyle: { color: color("--text-secondary", "#aab7c7"), fontWeight: 700 },
+        axisLabel: { color: color("--text-tertiary", "#7f8da0"), fontSize: 10 },
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: { lineStyle: { color: color("--border-subtle", "#27313d") } },
+      })),
+      series: model.series.map((series, index) => ({
+        name: labels[index],
+        type: "line",
+        xAxisIndex: index,
+        yAxisIndex: index,
+        data: series.points,
+        symbol: "circle",
+        symbolSize: 6,
+        showSymbol: series.points.length < 18,
+        connectNulls: false,
+        lineStyle: { color: colors[index], width: 2 },
+        itemStyle: { color: colors[index] },
+        emphasis: { focus: "series" },
+      })),
+    });
+    renderedRef.current = true;
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => chart.resize());
+    observer?.observe(container);
+    const resizeForPrint = () => chart.resize();
+    window.addEventListener("resize", resizeForPrint);
+    window.addEventListener("beforeprint", resizeForPrint);
+    window.addEventListener("afterprint", resizeForPrint);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", resizeForPrint);
+      window.removeEventListener("beforeprint", resizeForPrint);
+      window.removeEventListener("afterprint", resizeForPrint);
+      chart.dispose();
+      chartRef.current = null;
+    };
+  }, [labels, model]);
+
+  if (!model.domain) return <EmptyState title={t("charts.noDetectionActivity")} message={t("charts.noSeriesDescription")} />;
+
+  const latest = model.series.map((series) => series.points.at(-1)?.[1]);
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  return <div className="detection-activity-echarts">
+    <p className="sr-only">{t("charts.detectionSummary", { events: latest[0] ?? t("common.none"), alerts: latest[1] ?? t("common.none"), incidents: latest[2] ?? t("common.none") })}</p>
+    <ul aria-label={t("charts.currentValues")} className="activity-current-values">
+      {labels.map((label, index) => <li key={label}><span>{label}</span><strong>{latest[index] ?? t("common.none")}</strong></li>)}
+    </ul>
+    <p className="activity-time-context">{t("charts.timeContext", {
+      from: formatCompactDate(new Date(model.domain[0]).toISOString()),
+      to: formatCompactDate(new Date(model.domain[1]).toISOString()),
+      timezone,
+    })}</p>
+    <div aria-hidden="true" className="detection-echarts-canvas" ref={containerRef} />
+    <div aria-label={t("charts.bucketSelection")} className="chart-point-controls" role="group">
+      {model.timestamps.map((timestamp) => <button
+        aria-pressed={selectedTimestamp === timestamp}
+        key={timestamp}
+        onClick={() => selectTimestamp(timestamp)}
+        onFocus={() => selectTimestamp(timestamp)}
+        type="button"
+      >{formatCompactDate(new Date(timestamp).toISOString())}</button>)}
+    </div>
+    {selectedTimestamp === null ? null : <p aria-live="polite" className="chart-selected-value">{selectionSummary(selectedTimestamp)}</p>}
+  </div>;
+
+  function selectTimestamp(timestamp: number) {
+    setSelectedTimestamp(timestamp);
+    const seriesIndex = model.series.findIndex((series) => typeof valueAt(series, timestamp) === "number");
+    const selectedSeries = model.series[seriesIndex];
+    const dataIndex = selectedSeries ? selectedSeries.points.findIndex(([pointTimestamp]) => pointTimestamp === timestamp) : -1;
+    if (seriesIndex >= 0 && dataIndex >= 0) chartRef.current?.dispatchAction({ type: "showTip", seriesIndex, dataIndex });
+  }
+
+  function selectionSummary(timestamp: number): string {
+    const values = model.series.map((series, index) => {
+      const value = valueAt(series, timestamp);
+      return `${labels[index]} ${value ?? t("common.none")}`;
+    });
+    return `${formatCompactDate(new Date(timestamp).toISOString())}: ${values.join(", ")}`;
+  }
+}
+
+function formatTooltip(raw: unknown, labels: string[]): string {
+  const params = Array.isArray(raw) ? raw : [raw];
+  const rows = params.filter(isTooltipParam);
+  if (!rows.length) return "";
+  const firstRow = rows[0];
+  const timestamp = firstRow && Array.isArray(firstRow.value) ? Number(firstRow.value[0]) : Number.NaN;
+  return [`<strong>${Number.isFinite(timestamp) ? formatCompactDate(new Date(timestamp).toISOString()) : ""}</strong>`, ...rows.map((row) => {
+    const value = Array.isArray(row.value) ? row.value[1] : row.value;
+    return `${labels[row.seriesIndex] ?? row.seriesName}: ${String(value)}`;
+  })].join("<br>");
+}
+
+function isTooltipParam(value: unknown): value is { value: unknown; seriesIndex: number; seriesName: string } {
+  return typeof value === "object" && value !== null && "value" in value && "seriesIndex" in value && "seriesName" in value;
+}

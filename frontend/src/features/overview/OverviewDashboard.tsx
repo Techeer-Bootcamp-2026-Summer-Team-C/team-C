@@ -1,0 +1,117 @@
+import { BellRing, ShieldAlert, ShieldCheck, Siren } from "lucide-react";
+import { lazy, Suspense } from "react";
+import { DetectionActivityTable } from "../../components/charts";
+import { ChartFrame, EdrStateSummary, ErrorState, KpiCard, Panel, Skeleton, StaleWarning } from "../../components/ui";
+import type { DashboardSummaryDto, EndpointDto, EndpointSummaryDto, IncidentDto, TimeRangeQuery } from "../../contracts";
+import { useI18n } from "../../i18n/LocaleContext";
+import { DistributionBars, severityDistributionRows } from "./DistributionBars";
+import { IncidentQueueTable, RiskEndpointTable } from "./InvestigationQueues";
+
+const DetectionActivityPanel = lazy(() => import("./DetectionActivityPanel"));
+
+export const OVERVIEW_BLOCK_IDS = [
+  "edr-state",
+  "kpi-alerts",
+  "kpi-critical-alerts",
+  "kpi-high-risk-endpoints",
+  "kpi-open-incidents",
+  "detection-activity",
+  "alert-severity",
+  "endpoint-risk",
+  "highest-risk-endpoints",
+  "incident-queue",
+] as const;
+
+export interface OverviewDashboardData {
+  dashboard: DashboardSummaryDto | undefined;
+  endpoints: EndpointSummaryDto | undefined;
+  topEndpoints: EndpointDto[];
+  incidentQueue: IncidentDto[];
+  selectedEndpointId: number | undefined;
+  timeRange: TimeRangeQuery;
+}
+
+export interface OverviewPanelState {
+  pending: boolean;
+  error: unknown;
+  stale: boolean;
+  onRetry: () => void;
+}
+
+const IDLE_PANEL_STATE: OverviewPanelState = { pending: false, error: null, stale: false, onRetry: () => undefined };
+const IDLE_SUMMARY_STATE = { dashboard: IDLE_PANEL_STATE, endpoints: IDLE_PANEL_STATE };
+
+export function OverviewDashboard({ data, queueState = { endpoints: IDLE_PANEL_STATE, incidents: IDLE_PANEL_STATE }, summaryState = IDLE_SUMMARY_STATE }: {
+  data: OverviewDashboardData;
+  queueState?: { endpoints: OverviewPanelState; incidents: OverviewPanelState };
+  summaryState?: { dashboard: OverviewPanelState; endpoints: OverviewPanelState };
+}) {
+  const { t } = useI18n();
+  return <section aria-label={t("overview.dashboardAria")} className="overview-dashboard">
+    <div className="overview-summary-row">
+      <OverviewBlock id="edr-state"><ResourceFeedback data={data.dashboard} render={(dashboard) => <EdrStateSummary state={dashboard.edrState} />} rows={3} state={summaryState.dashboard} /></OverviewBlock>
+      <OverviewBlock id="kpi-alerts"><ResourceFeedback data={data.dashboard} render={(dashboard) => <KpiCard detail={t("overview.alertsDetail")} icon={<BellRing size={18} />} label={t("overview.totalAlerts")} to={timeScopedPath("/alerts", data.timeRange, data.selectedEndpointId)} tone="critical" value={dashboard.alerts.totalCount} />} rows={2} state={summaryState.dashboard} /></OverviewBlock>
+      <OverviewBlock id="kpi-critical-alerts"><ResourceFeedback data={data.dashboard} render={(dashboard) => {
+        const criticalAlerts = dashboard.alerts.bySeverity.find((row) => row.severity === "CRITICAL")?.count ?? 0;
+        return <KpiCard detail={t("overview.criticalAlertsDetail")} icon={<Siren size={18} />} label={t("overview.criticalAlerts")} to={timeScopedPath("/alerts?severity=CRITICAL", data.timeRange, data.selectedEndpointId)} tone={criticalAlerts ? "critical" : "neutral"} value={criticalAlerts} />;
+      }} rows={2} state={summaryState.dashboard} /></OverviewBlock>
+      <OverviewBlock id="kpi-high-risk-endpoints"><ResourceFeedback data={data.endpoints} render={(endpoints) => <KpiCard detail={t("overview.highRiskEndpointsDetail")} icon={<ShieldAlert size={18} />} label={t("overview.highRiskEndpoints")} to={scopedPath("/endpoints?riskLevel=HIGH&sortBy=riskScore&sortOrder=desc", data.selectedEndpointId, "endpointIds")} tone={endpoints.risk.highRiskEndpointCount ? "warning" : "neutral"} value={endpoints.risk.highRiskEndpointCount} />} rows={2} state={summaryState.endpoints} /></OverviewBlock>
+      <OverviewBlock id="kpi-open-incidents"><ResourceFeedback data={data.dashboard} render={(dashboard) => <KpiCard detail={t("overview.currentlyOpen")} icon={<ShieldCheck size={18} />} label={t("overview.openIncidents")} to={timeScopedPath("/incidents?status=OPEN", data.timeRange, data.selectedEndpointId)} tone={dashboard.incidents.openCount ? "critical" : "neutral"} value={dashboard.incidents.openCount} />} rows={2} state={summaryState.dashboard} /></OverviewBlock>
+    </div>
+    <div className="overview-analysis-row">
+      <OverviewBlock id="detection-activity"><ResourceFeedback data={data.dashboard} render={(dashboard) => <ChartFrame description={t("overview.detectionActivityDescription")} fallback={<DetectionActivityTable alerts={dashboard.alerts.timeSeries} events={dashboard.events.timeSeries} incidents={dashboard.incidents.timeSeries} />} title={t("overview.detectionActivity")}><Suspense fallback={<Skeleton rows={4} />}><DetectionActivityPanel alerts={dashboard.alerts.timeSeries} events={dashboard.events.timeSeries} incidents={dashboard.incidents.timeSeries} /></Suspense></ChartFrame>} rows={5} state={summaryState.dashboard} /></OverviewBlock>
+      <OverviewBlock id="alert-severity"><ResourceFeedback data={data.dashboard} render={(dashboard) => <Panel title={t("overview.alertSeverity")} subtitle={t("overview.serverDistribution")}><DistributionBars label={t("overview.alertSeverity")} rows={severityDistributionRows(dashboard.alerts.bySeverity)} total={dashboard.alerts.totalCount} /></Panel>} rows={5} state={summaryState.dashboard} /></OverviewBlock>
+      <OverviewBlock id="endpoint-risk"><ResourceFeedback data={data.endpoints} render={(endpoints) => <Panel title={t("overview.endpointRisk")} subtitle={t("overview.querySnapshot")} meta={<span>{t("overview.highest", { value: endpoints.risk.highestScore ?? t("common.none") })}</span>}><DistributionBars label={t("overview.endpointRisk")} rows={endpoints.risk.byLevel.map((row) => ({ category: row.level, count: row.count }))} total={endpoints.totalCount} /></Panel>} rows={5} state={summaryState.endpoints} /></OverviewBlock>
+    </div>
+    <div className="overview-queue-row">
+      <OverviewBlock id="highest-risk-endpoints"><Panel title={t("overview.highestRiskEndpoints")} subtitle={t("overview.currentRiskSnapshot")}>
+        <QueueFeedback items={data.topEndpoints} render={(items) => <RiskEndpointTable endpoints={items} />} state={queueState.endpoints} />
+      </Panel></OverviewBlock>
+      <OverviewBlock id="incident-queue"><Panel title={t("overview.incidentQueueWidget")} subtitle={t("overview.recentOpenIncidents")}>
+        <QueueFeedback items={data.incidentQueue} render={(items) => <IncidentQueueTable incidents={items} />} state={queueState.incidents} />
+      </Panel></OverviewBlock>
+    </div>
+  </section>;
+}
+
+function ResourceFeedback<Item>({ data, render, rows, state }: {
+  data: Item | undefined;
+  render: (data: Item) => React.ReactNode;
+  rows: number;
+  state: OverviewPanelState;
+}) {
+  if (data !== undefined) return <>{render(data)}</>;
+  if (state.error) return <ErrorState error={state.error} onRetry={state.onRetry} />;
+  return <Skeleton rows={rows} />;
+}
+
+function QueueFeedback<Item>({ items, render, state }: { items: Item[]; render: (items: Item[]) => React.ReactNode; state: OverviewPanelState }) {
+  if (state.pending && !items.length) return <Skeleton rows={5} />;
+  if (state.error && !items.length) return <ErrorState error={state.error} onRetry={state.onRetry} />;
+  return <>{state.stale && items.length ? <StaleWarning error={state.error} onRetry={state.onRetry} /> : null}{render(items)}</>;
+}
+
+function OverviewBlock({ id, children }: { id: typeof OVERVIEW_BLOCK_IDS[number]; children: React.ReactNode }) {
+  return <div className="overview-block" data-overview-block={id}>{children}</div>;
+}
+
+function scopedPath(path: string, endpointId: number | undefined, parameter = "endpointId"): string {
+  if (endpointId === undefined) return path;
+  return `${path}${path.includes("?") ? "&" : "?"}${parameter}=${endpointId}`;
+}
+
+function timeScopedPath(path: string, timeRange: TimeRangeQuery, endpointId: number | undefined): string {
+  const [pathname, rawQuery = ""] = path.split("?");
+  const params = new URLSearchParams(rawQuery);
+  if (timeRange.timePreset) params.set("timePreset", timeRange.timePreset);
+  if (timeRange.timePreset === "CUSTOM") {
+    if (timeRange.from) params.set("from", timeRange.from);
+    if (timeRange.to) params.set("to", timeRange.to);
+  } else {
+    params.delete("from");
+    params.delete("to");
+  }
+  if (endpointId !== undefined) params.set("endpointId", String(endpointId));
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname ?? path;
+}

@@ -158,7 +158,6 @@ it("preserves the English regression copy and uses the agreed mixed Korean termi
   expect(translate("KO", "event.rawPayload")).toBe("원본 Payload");
   expect(translate("KO", "event.processTree")).toBe("Process Tree");
   expect(translate("KO", "operations.failureQueue")).toBe("Failure Queue");
-  expect(translate("KO", "dashboardLayout.edit")).toBe("Dashboard 편집");
   expect(translate("KO", "intelligence.mitreTactics")).toBe("MITRE Tactic");
 });
 
