@@ -40,10 +40,14 @@ export default function DetectionActivityPanel({ events, alerts, incidents }: {
     container.dataset.animation = animate ? "enabled" : "disabled";
     const styles = getComputedStyle(document.documentElement);
     const color = (name: string, fallback: string) => styles.getPropertyValue(name).trim() || fallback;
-    const colors = [color("--chart-events", "#4bc8e8"), color("--chart-alerts", "#8b7cff"), color("--chart-incidents", "#f06db2")];
+    const colors = [color("--chart-events", "#2563e9"), color("--chart-alerts", "#7c83fd"), color("--chart-incidents", "#16a249")];
+    const fills = [color("--chart-events-fill", "rgba(37, 99, 233, .18)"), color("--chart-alerts-fill", "rgba(124, 131, 253, .12)"), color("--chart-incidents-fill", "rgba(22, 162, 73, .1)")];
+    const transparentFills = ["rgba(37, 99, 233, 0)", "rgba(124, 131, 253, 0)", "rgba(22, 162, 73, 0)"];
+    const chartFont = color("--font-ui", '"Inter Variable", "Pretendard Variable", sans-serif');
     chart.setOption({
       animation: animate,
       animationDuration: 280,
+      textStyle: { fontFamily: chartFont },
       axisPointer: { link: [{ xAxisIndex: "all" }] },
       grid: [
         { left: 44, right: 16, top: 14, height: 58 },
@@ -53,9 +57,9 @@ export default function DetectionActivityPanel({ events, alerts, incidents }: {
       tooltip: {
         trigger: "axis",
         axisPointer: { type: "cross" },
-        backgroundColor: color("--surface-raised", "#32333b"),
-        borderColor: color("--border-default", "#707381"),
-        textStyle: { color: color("--text-primary", "#f2f3f7"), fontSize: 12 },
+        backgroundColor: color("--surface-raised", "#1b1b20"),
+        borderColor: color("--border-default", "#5d5e67"),
+        textStyle: { color: color("--text-primary", "#f5f5f6"), fontFamily: chartFont, fontSize: 12 },
         formatter: (raw: unknown) => formatTooltip(raw, labels),
       },
       xAxis: model.series.map((_series, index) => ({
@@ -63,18 +67,18 @@ export default function DetectionActivityPanel({ events, alerts, incidents }: {
         gridIndex: index,
         min: model.domain?.[0],
         max: model.domain?.[1],
-        axisLabel: { color: color("--chart-axis", "#9a9daa"), hideOverlap: true, show: index === 2 },
-        axisLine: { lineStyle: { color: color("--chart-grid", "#3a3c46") } },
+        axisLabel: { color: color("--chart-axis", "#8d8f98"), hideOverlap: true, show: index === 2 },
+        axisLine: { lineStyle: { color: color("--chart-grid", "#24252a") } },
         axisTick: { show: false },
         splitLine: { show: false },
       })),
       yAxis: model.series.map((_series, index) => ({
         type: "value",
         gridIndex: index,
-        axisLabel: { color: color("--chart-axis", "#9a9daa"), fontSize: 10 },
+        axisLabel: { color: color("--chart-axis", "#8d8f98"), fontSize: 10 },
         axisLine: { show: false },
         axisTick: { show: false },
-        splitLine: { lineStyle: { color: color("--chart-grid", "#3a3c46") } },
+        splitLine: { lineStyle: { color: color("--chart-grid", "#24252a") } },
       })),
       series: model.series.map((series, index) => ({
         name: labels[index],
@@ -87,6 +91,19 @@ export default function DetectionActivityPanel({ events, alerts, incidents }: {
         showSymbol: series.points.length < 18,
         connectNulls: false,
         lineStyle: { color: colors[index], width: 2 },
+        areaStyle: {
+          color: {
+            type: "linear",
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: fills[index] },
+              { offset: 1, color: transparentFills[index] },
+            ],
+          },
+        },
         itemStyle: { color: colors[index] },
         emphasis: { focus: "series" },
       })),

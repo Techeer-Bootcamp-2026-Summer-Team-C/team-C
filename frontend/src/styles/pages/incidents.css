@@ -17,7 +17,7 @@
 .incident-queue { display: flex; flex-direction: column; }
 .incident-queue-row { min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-5); color: var(--color-text); border-bottom: 1px solid var(--color-line-soft); }
 .incident-queue-row:hover { background: var(--color-panel-hover); text-decoration: none; }
-.incident-queue-row.selected { background: color-mix(in srgb, var(--color-blue) 10%, var(--color-panel-3)); box-shadow: inset 3px 0 var(--color-blue); }
+.incident-queue-row.selected { color: var(--selection-text); background: var(--surface-selected); box-shadow: inset 3px 0 var(--focus-ring-color); }
 .incident-queue-row > span { display: flex; gap: var(--space-2); }
 .incident-queue-row strong, .incident-queue-row code, .incident-queue-row small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .incident-queue-row code, .incident-queue-row small { color: var(--color-muted); }
@@ -33,16 +33,16 @@
 .investigation-legend .legend-alert { background: var(--color-amber); }
 .investigation-legend .legend-event { background: var(--color-blue); }
 .investigation-legend .legend-process { background: var(--color-green); }
-.investigation-legend .legend-destination { background: var(--color-purple); }
+.investigation-legend .legend-destination { background: var(--status-info); }
 .investigation-legend b { color: var(--color-text); }
 
 .investigation-graph { min-width: 0; height: 480px; overflow: hidden; background: var(--color-panel-3); border: 1px solid var(--color-line-soft); border-radius: var(--radius-control); }
 .investigation-graph .react-flow__node { width: 160px; min-height: 64px; padding: var(--space-3); color: var(--color-text); background: var(--color-panel); border: 1px solid var(--color-line); border-left: 3px solid var(--color-cyan); border-radius: var(--radius-control); box-shadow: var(--shadow-1); }
-.investigation-graph .react-flow__node.selected { border-color: var(--color-blue); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-blue) 35%, transparent); }
+.investigation-graph .react-flow__node.selected { border-color: var(--focus-ring-color); box-shadow: var(--focus-ring); }
 .investigation-graph .react-flow__node.node-alert { border-left-color: var(--color-amber); }
 .investigation-graph .react-flow__node.node-event { border-left-color: var(--color-blue); }
 .investigation-graph .react-flow__node.node-process { border-left-color: var(--color-green); }
-.investigation-graph .react-flow__node.node-destination { border-left-color: var(--color-purple); }
+.investigation-graph .react-flow__node.node-destination { border-left-color: var(--status-info); }
 .investigation-node-label { min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); text-align: left; }
 .investigation-node-label small { color: var(--color-muted); font-size: var(--font-caption); letter-spacing: .08em; }
 .investigation-node-label strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -54,7 +54,7 @@
 
 .investigation-fallback { min-height: 320px; display: grid; place-content: center; justify-items: center; gap: var(--space-4); padding: var(--space-8); text-align: center; background: var(--color-panel-3); border: 1px dashed var(--color-line); border-radius: var(--radius-control); }
 .investigation-fallback p { max-width: 480px; color: var(--color-muted); }
-.investigation-warnings { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: var(--space-5); list-style: none; background: color-mix(in srgb, var(--color-amber) 7%, var(--color-panel)); border: 1px solid color-mix(in srgb, var(--color-amber) 28%, var(--color-line)); border-radius: var(--radius-control); }
+.investigation-warnings { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: var(--space-5); list-style: none; background: var(--status-warning-surface); border: 1px solid var(--status-warning); border-radius: var(--radius-control); }
 .investigation-warnings li { display: flex; align-items: center; gap: var(--space-3); }
 .investigation-warnings li span:nth-child(2) { flex: 1; color: var(--color-muted); }
 .context-links, .evidence-links { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-5); flex-wrap: wrap; }
@@ -63,7 +63,7 @@
 .evidence-select, .timeline-select-control { color: var(--color-cyan); background: transparent; border: 0; text-decoration: underline; text-underline-offset: 3px; }
 .evidence-select:hover, .timeline-select-control:hover { color: var(--color-text); }
 .timeline-heading .timeline-select-control { margin-left: 0; }
-.attack-timeline li.selected { margin-inline: calc(var(--space-4) * -1); padding-inline: var(--space-4); background: color-mix(in srgb, var(--color-blue) 8%, transparent); border-radius: var(--radius-control); }
+.attack-timeline li.selected { margin-inline: calc(var(--space-4) * -1); padding-inline: var(--space-4); color: var(--selection-text); background: var(--surface-selected); border-radius: var(--radius-control); }
 
 @media (max-width: 1180px) {
   .incident-workbench { grid-template-columns: 300px minmax(0, 1fr); }

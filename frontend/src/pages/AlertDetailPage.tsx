@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient, type UseMutationResult } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, Save } from "lucide-react";
+import { Activity, ArrowLeft, BellRing, CheckCircle2, Radar, Save, Server, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/endpoints";
@@ -104,6 +104,7 @@ function AlertDetail({ alert, canUpdate, mutation, nextAlert, params, queue, que
     </Panel>
     <div className="triage-detail page-stack">
       <PageHeader eyebrow={`${alert.ruleCode} · RULE V${alert.ruleVersion}`} title={alert.title} description={alert.summary} actions={<><StatusPill value={alert.severity} /><StatusPill value={alert.status} /></>} />
+      <AlertEvidenceChain alert={alert} />
       {mutation.error ? <ErrorState error={mutation.error} /> : null}
       {mutation.isSuccess ? <div className="mutation-success"><CheckCircle2 aria-hidden="true" size={16} />{t("alert.workflowSaved")}</div> : null}
       <section className="detail-grid">
@@ -131,5 +132,26 @@ function AlertDetail({ alert, canUpdate, mutation, nextAlert, params, queue, que
         <Panel className="wide" title={t("alert.responseGuidance")} subtitle={t("alert.guidanceRuleVersion", { ruleCode: alert.ruleCode, version: alert.ruleVersion })}><ResponseGuidance steps={alert.responseGuidance} /></Panel>
       </section>
     </div>
+  </section>;
+}
+
+function AlertEvidenceChain({ alert }: { alert: import("../contracts").AlertDetailDto }) {
+  const { t } = useI18n();
+  const sourceEvent = alert.sourceEvent;
+  const incident = alert.incidents[0];
+  const steps = [
+    { label: "Endpoint", detail: `Endpoint ${alert.endpointId}`, icon: <Server size={16} />, to: `/endpoints/${alert.endpointId}`, state: "linked" },
+    { label: "Event", detail: sourceEvent?.eventId ?? alert.eventId, icon: <Activity size={16} />, to: sourceEvent ? `/events/${sourceEvent.eventId}?endpointId=${sourceEvent.endpointId}&occurredAt=${encodeURIComponent(sourceEvent.occurredAt)}` : undefined, state: sourceEvent ? "linked" : "unavailable" },
+    { label: "Rule", detail: `${alert.ruleCode} · v${alert.ruleVersion}`, icon: <Radar size={16} />, to: undefined, state: "observed" },
+    { label: "Alert", detail: `#${alert.alertId}`, icon: <BellRing size={16} />, to: undefined, state: "current" },
+    { label: "Incident", detail: incident ? `#${incident.incidentId}${alert.incidents.length > 1 ? ` +${alert.incidents.length - 1}` : ""}` : t("alert.notConnected"), icon: <ShieldAlert size={16} />, to: incident ? `/incidents/${incident.incidentId}` : undefined, state: incident ? "linked" : "unavailable" },
+  ] as const;
+  return <section aria-label={t("alert.evidenceChain")} className="evidence-chain">
+    <header><div><span>{t("alert.evidenceChain")}</span><strong>{t("alert.evidenceChainDescription")}</strong></div><StatusPill value="OBSERVED" /></header>
+    <ol>{steps.map((step, index) => <li className={step.state} key={step.label}>
+      <span className="evidence-chain-index">{String(index + 1).padStart(2, "0")}</span>
+      <span className="evidence-chain-icon" aria-hidden="true">{step.icon}</span>
+      <div><span>{step.label}</span>{step.to ? <Link to={step.to}>{step.detail}</Link> : <strong>{step.detail}</strong>}</div>
+    </li>)}</ol>
   </section>;
 }

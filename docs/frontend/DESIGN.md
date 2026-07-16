@@ -187,47 +187,49 @@ PLATFORM
 ### 6.1 분위기 — `확정`
 
 - 전문적인 EDR investigation console
-- neutral surface를 중심으로 한 낮은 채도의 dark UI
-- blue-violet은 primary action과 active navigation에, 별도 periwinkle은 keyboard focus에 제한
+- near-black neutral surface를 중심으로 한 낮은 채도의 dark-only 운영 UI
+- royal blue는 primary action과 active navigation에, 밝은 blue는 keyboard focus에 사용하고 violet은 Detection Activity의 Alerts series에만 제한
 - red, orange, yellow, blue, green, cyan은 의미가 정해진 severity·health·information 상태에만 사용
-- Case 1 dark theme에서는 gradient를 사용하지 않고 surface 명도 차이와 여백으로 깊이를 구분
+- 일반 UI에는 gradient를 사용하지 않고 surface 명도 차이와 여백으로 깊이를 구분
 - panel 수보다 정보 위계와 whitespace로 구획
-- 이번 개편은 dark-only로 배포하되 semantic token은 future light theme를 추가할 수 있게 역할 기반으로 정의
+- theme 전환과 `edr.theme` 저장은 제공하지 않는다. Case 2의 dark token을 유일한 구현 기준으로 사용한다.
 
-### 6.2 Gradient — `사용 안 함`
+### 6.2 Gradient — `차트 영역 채움만 허용`
 
-Case 1 dark theme의 background, surface, selection과 chart series fill에는 gradient를 사용하지 않는다. 정보의 깊이는 `canvas → shell → panel → raised` 명도 단계, border와 whitespace로 구분한다. glow, glass effect와 상태색 기반 ambient background도 사용하지 않는다.
+Background, surface, selection과 일반 component에는 gradient를 사용하지 않는다. Detection Activity의 line 아래 연속량을 보조하는 낮은 opacity의 수직 area fill만 허용한다. 정보의 깊이는 `canvas → shell → panel → raised` 명도 단계, border와 whitespace로 구분하며 glow와 상태색 기반 ambient background는 사용하지 않는다.
 
-### 6.3 Color 역할 — `값 확정 / Case 1`
+### 6.3 Color 역할 — `값 확정 / Case 2 dark-only`
 
-2026-07-17 전달된 `case-1-design-tokens.yaml`의 color 값을 구현 기준으로 확정했다. component에는 raw color를 추가하지 않고 `frontend/src/styles/tokens.css`의 semantic token을 사용한다. 전달 파일에 포함된 font와 typography 값은 이번 변경 범위가 아니므로 6.4의 임시 baseline을 유지한다.
+2026-07-17 `case-2-design-tokens.yaml`의 `final-selected` 값을 구현 기준으로 확정했다. component에는 raw color를 추가하지 않고 `frontend/src/styles/tokens.css`의 semantic token을 사용한다.
 
 | Semantic token | Prototype baseline | 역할 |
 | --- | --- | --- |
-| `--surface-canvas` | `#121318` | 전체 배경 |
-| `--surface-shell` | `#17181D` | Navigation, top bar |
-| `--surface-panel` | `#27282E` | 기본 panel |
-| `--surface-raised` | `#32333B` | popover, selected surface |
-| `--surface-inset` | `#1D1E24` | input, code, nested block |
-| `--surface-hover` | `#34353D` | interactive hover |
-| `--border-default` | `#707381` | control과 panel 경계 |
-| `--border-subtle` | `#3A3C46` | 내부 구분선과 chart grid |
-| `--focus-ring-color` | `#8EA2FF` | keyboard focus |
-| `--text-primary` | `#F2F3F7` | 제목과 핵심 값 |
-| `--text-secondary` | `#C7C9D2` | 설명과 보조 정보 |
-| `--text-tertiary` | `#9A9DAA` | 낮은 우선순위 meta |
-| `--accent-primary` | `#8296FF` | primary action과 active navigation |
-| `--status-critical` | `#FF5968` | Critical, RED, unavailable |
-| `--status-high` | `#FF8A4C` | High severity와 high risk |
-| `--status-medium` | `#F4B942` | Medium severity |
-| `--status-low` | `#8DB5FF` | Low severity |
-| `--status-warning` | `#E5D36C` | YELLOW, offline, degraded, stale |
-| `--status-success` | `#6AD7A3` | GREEN, online, healthy, resolved |
-| `--status-info` | `#4BC8E8` | Open, in progress, informational state |
-| `--status-neutral` | `#A6A9B6` | Closed, retired, unknown |
-| `--chart-events` | `#4BC8E8` | Detection Activity Events |
-| `--chart-alerts` | `#8B7CFF` | Detection Activity Alerts |
-| `--chart-incidents` | `#F06DB2` | Detection Activity Open Incidents |
+| `--surface-canvas` | `#09090B` | 전체 배경 |
+| `--surface-shell` | `#17161B` | Navigation, top bar |
+| `--surface-panel` | `#0C0C0F` | 기본 panel |
+| `--surface-raised` | `#1B1B20` | popover, tooltip |
+| `--surface-inset` | `#07070A` | input, code, nested block |
+| `--surface-hover` | `#202126` | interactive hover |
+| `--surface-selected` | `#1D3989` | selected row와 context |
+| `--border-default` | `#5D5E67` | control과 raised surface 경계 |
+| `--border-panel` | `#34353C` | card와 panel의 낮은 대비 외곽선 |
+| `--border-subtle` | `#25262B` | 내부 구분선 |
+| `--focus-ring-color` | `#4C85FF` | keyboard focus |
+| `--text-primary` | `#F5F5F6` | 제목과 핵심 값 |
+| `--text-secondary` | `#C5C6CC` | 설명과 보조 정보 |
+| `--text-tertiary` | `#9698A1` | 낮은 우선순위 meta |
+| `--accent-primary` | `#2563E9` | primary action과 active navigation |
+| `--status-critical` | `#F04444` | Critical, RED, unavailable |
+| `--status-high` | `#F97316` | High severity와 high risk |
+| `--status-medium` | `#EAB308` | Medium severity |
+| `--status-low` | `#60A5FA` | Low severity |
+| `--status-warning` | `#E7D56A` | YELLOW, offline, degraded, stale |
+| `--status-success` | `#22C55E` | GREEN, online, healthy, resolved |
+| `--status-info` | `#38BDF8` | Open, in progress, informational state |
+| `--status-neutral` | `#A1A1AA` | Closed, retired, unknown |
+| `--chart-events` | `#2563E9` | Detection Activity Events |
+| `--chart-alerts` | `#7C83FD` | Detection Activity Alerts 전용 violet |
+| `--chart-incidents` | `#16A249` | Detection Activity Open Incidents |
 
 규칙:
 
@@ -238,29 +240,32 @@ Case 1 dark theme의 background, surface, selection과 chart series fill에는 g
 - red는 화면 면적의 5% 미만으로 제한하고 card fill 또는 장식 border에 사용하지 않는다.
 - 위험 KPI는 수치와 icon에만 semantic color를 주고 zero 값은 neutral로 표시한다.
 
-### 6.4 Typography — `역할 확정 / 값 임시`
+### 6.4 Typography — `값 확정 / self-hosted`
 
-본문·제목·수치·metadata·code의 역할과 가독성 규칙은 확정한다. 아래 font family, size, weight와 scale은 팀이 최종 서체 체계를 지정하기 전까지 사용하는 구현 baseline이다. 후속 변경은 typography token과 root font stack에서 일괄 교체한다.
+본문·제목·수치·metadata·code의 역할과 가독성 규칙과 값을 확정한다. 외부 CDN 요청 없이 bundle에 포함한 WOFF2를 `font-display: swap`으로 제공한다.
 
-현재 UI는 `Inter`, `Segoe UI`, system UI 순서, ID·hash·path·raw payload는 `Cascadia Code`, `Consolas`, monospace 순서를 임시로 사용한다.
+English UI와 data는 `Inter Variable`, 한국어는 `Pretendard Variable`, ID·hash·path·IP·raw payload는 `IBM Plex Mono` 400/500/600을 사용한다.
 
 | Token | Size | Weight | Line height | Letter spacing | 사용처 |
 | --- | ---: | ---: | ---: | ---: | --- |
-| `--type-page-title` | 24px | 800 | 1.2 | -0.01em | Page title |
-| `--type-section-title` | 18px | 800 | 1.25 | -0.005em | 주요 section과 workspace title |
-| `--type-panel-title` | 15px | 700 | 1.35 | 0 | Panel, table, inspector title |
-| `--type-kpi-primary` | 34px | 900 | 1 | -0.015em | 가장 중요한 KPI 값 |
-| `--type-kpi-secondary` | 22px | 800 | 1.1 | -0.01em | 보조 KPI, chart center value |
-| `--type-body` | 14px | 400 | 1.5 | 0 | 기본 설명과 table cell |
-| `--type-body-strong` | 14px | 600 | 1.5 | 0 | 강조 본문과 primary row value |
-| `--type-label` | 13px | 600 | 1.35 | 0 | Field label, compact control |
-| `--type-meta` | 12px | 500 | 1.4 | 0.01em | timestamp, secondary metadata |
-| `--type-code` | 13px | 500 | 1.45 | 0 | ID, hash, path, IP, raw value |
+| `--type-service-name` | 12px | 600 | 1.25 | 0.18em | Service identity |
+| `--type-edr-score` | 32px | 600 | 1 | 0 | EDR 종합 점수 |
+| `--type-kpi-primary` | 30px | 600 | 1.15 | -0.025em | 주요 KPI 값 |
+| `--type-kpi-secondary` | 20px | 600 | 1.1 | 0 | 보조 KPI, chart center value |
+| `--type-section-title` | 20px | 600 | 1.25 | -0.015em | Page section title |
+| `--type-panel-title` | 14px | 600 | 1.3 | -0.005em | Panel, table, inspector title |
+| `--type-body` | 13px | 400 | 1.55 | 0 | 기본 설명 |
+| `--type-label` | 12px | 500 | 1.35 | 0 | Control과 field label |
+| `--type-table-body` | 12px | 400 | 1.45 | 0 | Table body |
+| `--type-table-header` | 11px | 600 | 1.35 | 0.015em | Table header |
+| `--type-meta` | 11px | 500 | 1.45 | 0.015em | timestamp, metadata |
+| `--type-code` | 12px | 400 | 1.45 | 0 | ID, hash, path, IP, raw value |
 
 규칙:
 
-- 13px 이하는 짧은 label과 metadata에만 사용하고 설명, 오류, guidance 본문은 최소 14px이다.
+- 11px는 table header, badge와 짧은 metadata에만 사용한다.
 - 숫자 비교가 중요한 KPI와 table column에는 `font-variant-numeric: tabular-nums`를 적용한다.
+- weight는 400~700 범위로 제한하고 800/900은 사용하지 않는다.
 - uppercase는 짧은 eyebrow, group label, enum에만 제한한다.
 - 긴 ID·hash·path는 의미를 ellipsis로만 숨기지 않고 accessible detail과 copy 경로를 제공한다.
 - EN과 KO에서 title과 label이 두 줄이 되어도 control 높이와 focus 영역이 깨지지 않아야 한다.
@@ -871,6 +876,12 @@ Update only the assigned Work Package status and evidence in OVERVIEW_DASHBOARD_
 | D-016 | 2026-07-17 | Color와 typography는 semantic 역할·접근성 규칙만 확정하고 실제 palette·font 값은 팀 지정 전 임시 baseline으로 관리 | 구조 개선과 브랜드 결정을 분리하고 후속 변경을 token 교체로 제한 | `docs/frontend/DESIGN.md`, `frontend/src/styles/tokens.css` |
 | D-017 | 2026-07-17 | Overview를 EDR command strip, KPI 4개, Detection Activity, Alert Severity donut, 조사 queue 2개의 고정 9-block으로 조정하고 Endpoint Risk panel 제거 | 위험 표현 중복과 상단 dead space를 줄이고 현재 상태와 조사 대상을 빠르게 판독 | `docs/frontend/OVERVIEW_DASHBOARD_REDESIGN_PLAN.md`, `frontend/src/features/overview/OverviewDashboard.tsx` |
 | D-018 | 2026-07-17 | Case 1 dark color palette를 확정하고 severity, health, interaction과 chart series를 별도 semantic token으로 분리 | red 피로도와 상태 의미 충돌을 줄이고 후속 색상 교체를 token 단위로 제한 | `case-1-design-tokens.yaml`, `frontend/src/styles/tokens.css` |
+| D-019 | 2026-07-17 | D-011과 D-018의 dark-only·Case 1 값을 dual theme SOC console로 대체하고 244px 기본 Sidebar, cyan action, violet analysis context를 확정 | Team B 운영 UX의 구조를 적용하되 브랜드 자산과 계약을 복제하지 않고 모든 화면을 같은 token으로 교체 | `frontend/src/theme/ThemeProvider.tsx`, `frontend/src/styles/tokens.css`, `frontend/src/components/AppShell.tsx` |
+| D-020 | 2026-07-17 | Intelligence의 ATT&CK 관측 surface를 대표 분석 화면으로 올리고 count 기반 red heat를 적용하되 Rule Coverage는 API 부재를 명시 | tactic-technique 관계, 활성 Rule catalog와 severity mapping을 프론트에서 추정하지 않음 | `frontend/src/pages/IntelligencePage.tsx` |
+| D-021 | 2026-07-17 | Operations에 Agent부터 PostgreSQL까지 9단계 수집 경로를 표시하고 계약된 probe가 없는 Agent·Nginx는 `NO PROBE`로 표시 | 다계층 수집 구조를 운영자가 이해하면서도 가짜 healthy 상태를 만들지 않음 | `frontend/src/pages/OperationsPage.tsx` |
+| D-022 | 2026-07-17 | Alert 상세에 Endpoint → Event → Rule → Alert → Incident Evidence Chain을 추가 | Team B의 로그→원본 근거 이동 UX를 Team C 실제 링크와 DTO만으로 구현 | `frontend/src/pages/AlertDetailPage.tsx` |
+| D-023 | 2026-07-17 | Case 2 `final-selected`를 시각 기준으로 확정해 D-019의 dual theme·cyan/violet UI를 dark-only near-black·royal-blue console로 대체하고 Inter/Pretendard/IBM Plex Mono를 self-host | 전달된 최종 token과 구현 명세를 단일 source of truth로 만들고 화면별 스타일 드리프트를 차단 | `case-2-design-tokens.yaml`, `case-2-filled-design-spec.md`, `frontend/src/styles/tokens.css`, `frontend/src/main.tsx` |
+| D-024 | 2026-07-17 | 일반 panel 외곽선을 control 경계와 분리한 `border-panel`로 낮춘다 | 고밀도 운영 화면에서 card 경계가 content보다 먼저 튀지 않게 하면서 input, focus와 semantic status 대비는 유지 | `frontend/src/styles/tokens.css`, `frontend/src/styles/patterns.css`, `frontend/src/styles/pages/` |
 
 ## 17. 관련 문서와 코드
 

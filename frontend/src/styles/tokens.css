@@ -1,72 +1,85 @@
 :root {
   color-scheme: dark;
-  font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-family: "Inter Variable", Inter, "Pretendard Variable", Pretendard, "Noto Sans KR", system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 
-  /* Case 1 dark security operations palette. Typography remains provisional. */
-  --surface-canvas: #121318;
-  --surface-shell: #17181d;
-  --surface-panel: #27282e;
-  --surface-raised: #32333b;
-  --surface-inset: #1d1e24;
-  --surface-hover: #34353d;
-  --surface-selected: rgba(130, 150, 255, .18);
-  --surface-disabled: rgba(255, 255, 255, .06);
-  --overlay-scrim: rgba(5, 6, 9, .72);
-  --shadow-color: rgba(0, 0, 0, .48);
+  --font-brand: "Inter Variable", Inter, "Pretendard Variable", Pretendard, "Noto Sans KR", system-ui, sans-serif;
+  --font-ui: "Inter Variable", Inter, "Pretendard Variable", Pretendard, "Noto Sans KR", system-ui, sans-serif;
+  --font-data: "Inter Variable", Inter, "Pretendard Variable", Pretendard, system-ui, sans-serif;
+  --font-korean: "Pretendard Variable", Pretendard, "Noto Sans KR", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "Pretendard Variable", Pretendard, Consolas, "Courier New", monospace;
+  --font-sans: var(--font-ui);
 
-  --border-default: #707381;
-  --border-subtle: #3a3c46;
-  --border-strong: #8b8e9c;
-  --chart-grid: #3a3c46;
-  --chart-axis: #9a9daa;
-  --focus-ring-color: #8ea2ff;
+  --surface-canvas: #09090b;
+  --surface-shell: #17161b;
+  --surface-panel: #0c0c0f;
+  --surface-raised: #1b1b20;
+  --surface-inset: #07070a;
+  --surface-hover: #202126;
+  --surface-selected: #1d3989;
+  --surface-disabled: rgba(255, 255, 255, .05);
+  --overlay-scrim: rgba(0, 0, 0, .76);
+  --shadow-color: rgba(0, 0, 0, .55);
+
+  --border-default: #5d5e67;
+  --border-panel: #34353c;
+  --border-subtle: #25262b;
+  --border-strong: #787a85;
+  --divider: var(--border-subtle);
+  --chart-grid: #24252a;
+  --chart-axis: #8d8f98;
+  --focus-ring-color: #4c85ff;
   --focus-ring: 0 0 0 2px var(--focus-ring-color);
 
-  --text-primary: #f2f3f7;
-  --text-secondary: #c7c9d2;
-  --text-tertiary: #9a9daa;
-  --text-disabled: #747784;
-  --text-placeholder: #8b8e9c;
-  --text-inverse: #121318;
-  --text-link: #b8c6ff;
-  --text-link-hover: #d7deff;
-  --text-code: #c8d3ff;
+  --text-primary: #f5f5f6;
+  --text-secondary: #c5c6cc;
+  --text-tertiary: #9698a1;
+  --text-disabled: #62646d;
+  --text-placeholder: #858791;
+  --text-inverse: #f8faff;
+  --text-link: #84adff;
+  --text-link-hover: #b6ceff;
+  --text-code: #a9c4ff;
 
-  --accent-primary: #8296ff;
-  --accent-hover: #98a9ff;
-  --accent-active: #6d80e8;
-  --accent-muted: rgba(130, 150, 255, .16);
-  --selection-background: rgba(130, 150, 255, .24);
+  --accent-primary: #2563e9;
+  --accent-hover: #3b74f2;
+  --accent-active: #1d4fc4;
+  --accent-muted: rgba(37, 99, 233, .18);
+  --selection-background: #1d3989;
+  --selection-text: var(--text-primary);
 
-  --status-critical: #ff5968;
-  --status-high: #ff8a4c;
-  --status-medium: #f4b942;
-  --status-low: #8db5ff;
-  --status-success: #6ad7a3;
-  --status-warning: #e5d36c;
-  --status-info: #4bc8e8;
-  --status-neutral: #a6a9b6;
-  --status-error-surface: rgba(255, 89, 104, .12);
-  --status-warning-surface: rgba(229, 211, 108, .12);
-  --status-success-surface: rgba(106, 215, 163, .12);
+  --status-critical: #f04444;
+  --status-high: #f97316;
+  --status-medium: #eab308;
+  --status-low: #60a5fa;
+  --status-success: #22c55e;
+  --status-warning: #e7d56a;
+  --status-info: #38bdf8;
+  --status-neutral: #a1a1aa;
+  --status-error-surface: rgba(240, 68, 68, .12);
+  --status-warning-surface: rgba(231, 213, 106, .12);
+  --status-success-surface: rgba(34, 197, 94, .12);
 
   --kpi-total-alerts: var(--accent-primary);
   --kpi-critical-alerts: var(--status-critical);
   --kpi-high-risk-endpoints: var(--status-high);
   --kpi-open-incidents: var(--status-info);
-  --chart-events: #4bc8e8;
-  --chart-alerts: #8b7cff;
-  --chart-incidents: #f06db2;
-  --chart-missing: #8b8e9c;
-  --donut-track: #3a3c46;
+  --chart-events: #2563e9;
+  --chart-alerts: #7c83fd;
+  --chart-incidents: #16a249;
+  --chart-events-fill: rgba(37, 99, 233, .18);
+  --chart-alerts-fill: rgba(124, 131, 253, .12);
+  --chart-incidents-fill: rgba(22, 162, 73, .1);
+  --chart-missing: #858791;
+  --chart-zero: var(--text-secondary);
+  --donut-track: #25262b;
+  --donut-gap: var(--surface-panel);
 
   --gradient-accent-surface: none;
-  --gradient-chart-fill: none;
-  --elevation-tooltip: 0 6px 18px rgba(0, 0, 0, .32);
-  --elevation-raised: 0 8px 24px rgba(0, 0, 0, .36);
-  --elevation-modal: 0 20px 56px var(--shadow-color);
+  --elevation-tooltip: 0 6px 18px rgba(0, 0, 0, .36);
+  --elevation-raised: 0 10px 28px rgba(0, 0, 0, .42);
+  --elevation-modal: 0 24px 64px var(--shadow-color);
 
   --space-1: 2px;
   --space-2: 4px;
@@ -79,19 +92,37 @@
   --space-10: 20px;
   --space-12: 24px;
   --space-16: 32px;
-  --radius-control: 4px;
-  --radius-panel: 6px;
+  --space-20: 40px;
+  --radius-control: 7px;
+  --radius-panel: 10px;
   --radius-pill: 999px;
 
-  --type-page-title: 24px;
-  --type-section-title: 18px;
-  --type-panel-title: 15px;
-  --type-kpi-primary: 34px;
-  --type-kpi-secondary: 22px;
-  --type-body: 14px;
-  --type-label: 13px;
-  --type-meta: 12px;
-  --type-code: 13px;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --type-service-name: 12px;
+  --type-edr-score: 32px;
+  --type-kpi-primary: 30px;
+  --type-kpi-secondary: 20px;
+  --type-section-title: 20px;
+  --type-panel-title: 14px;
+  --type-page-title: var(--type-section-title);
+  --type-body: 13px;
+  --type-control: 12px;
+  --type-label: 12px;
+  --type-table-body: 12px;
+  --type-table-header: 11px;
+  --type-meta: 11px;
+  --type-badge: 11px;
+  --type-code: 12px;
+  --type-tooltip: 11px;
+  --type-empty-title: 14px;
+  --type-empty-body: 12px;
+
+  --sidebar-width: 244px;
+  --sidebar-compact-width: 72px;
+  --topbar-height: 68px;
 
   /* Compatibility aliases while legacy page selectors move into layers. */
   --color-bg: var(--surface-canvas);
@@ -101,6 +132,7 @@
   --color-panel-3: var(--surface-inset);
   --color-panel-hover: var(--surface-hover);
   --color-line: var(--border-default);
+  --color-line-panel: var(--border-panel);
   --color-line-soft: var(--border-subtle);
   --color-text: var(--text-primary);
   --color-muted: var(--text-secondary);
@@ -113,15 +145,20 @@
   --color-green: var(--status-success);
   --color-blue: var(--status-info);
   --color-cyan: var(--accent-primary);
+  --color-purple: var(--status-info);
   --color-neutral: var(--status-neutral);
-  --font-micro: 11px;
+  --shadow-1: none;
+  --shadow-3: var(--elevation-raised);
+  --font-micro: var(--type-meta);
   --font-caption: var(--type-meta);
   --font-body-sm: var(--type-label);
   --font-body: var(--type-body);
   --font-title-sm: var(--type-panel-title);
-  --font-title-md: 16px;
+  --font-title-md: var(--type-panel-title);
   --font-title-lg: var(--type-section-title);
   --font-display-sm: var(--type-kpi-secondary);
-  --font-display-md: 28px;
+  --font-display-md: var(--type-kpi-primary);
   --font-display-lg: var(--type-kpi-primary);
 }
+
+::selection { color: var(--selection-text); background: var(--selection-background); }

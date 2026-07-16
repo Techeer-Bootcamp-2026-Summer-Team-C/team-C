@@ -44,8 +44,8 @@ describe("application shell foundation", () => {
     expect(within(breadcrumb).getByRole("link", { name: "Operations" })).toHaveAttribute("href", "/operations");
     expect(within(breadcrumb).getByText("Archives")).toHaveAttribute("aria-current", "page");
 
-    await userEvent.click(screen.getByRole("button", { name: "Expand navigation" }));
-    expect(screen.getByRole("button", { name: "Compact navigation" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Compact navigation" }));
+    expect(screen.getByRole("button", { name: "Expand navigation" })).toBeInTheDocument();
   });
 
   it("operates the mobile Drawer and account/report surfaces by keyboard", async () => {
@@ -69,6 +69,14 @@ describe("application shell foundation", () => {
     expect(screen.getByRole("button", { name: "Close report" })).toHaveFocus();
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "Archives snapshot" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the Case 2 shell dark-only without a theme switch", async () => {
+    renderRootShell();
+    await screen.findByRole("heading", { name: "Overview destination" });
+    expect(document.documentElement).not.toHaveAttribute("data-theme");
+    expect(localStorage.getItem("edr.theme")).toBeNull();
+    expect(screen.queryByRole("button", { name: /theme/i })).not.toBeInTheDocument();
   });
 });
 

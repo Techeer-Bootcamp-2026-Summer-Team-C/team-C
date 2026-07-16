@@ -79,7 +79,7 @@ export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
-  const [compact, setCompact] = useState(() => localStorage.getItem(COMPACT_KEY) !== "false");
+  const [compact, setCompact] = useState(() => localStorage.getItem(COMPACT_KEY) === "true");
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [localeSaving, setLocaleSaving] = useState(false);
   const [localeError, setLocaleError] = useState(false);
@@ -156,6 +156,13 @@ export function AppShell() {
               <strong>{pageTitleText}</strong>
             </>}
           </div>
+          <div aria-label={t("navigation.investigationPath")} className="investigation-path">
+            <span><Activity aria-hidden="true" size={14} />{t("navigation.pathSignal")}</span>
+            <i aria-hidden="true" />
+            <span><Search aria-hidden="true" size={14} />{t("navigation.pathEvidence")}</span>
+            <i aria-hidden="true" />
+            <span><ShieldCheck aria-hidden="true" size={14} />{t("navigation.pathDecision")}</span>
+          </div>
           <form className="global-search" onSubmit={submitSearch} role="search">
             <Search aria-hidden="true" size={16} />
             <input aria-label={t("search.aria")} onChange={(event) => setSearch(event.target.value)} placeholder={t("search.placeholder")} value={search} />
@@ -224,7 +231,10 @@ function PrimaryNavigation({ compact, mobile = false, onNavigate, onToggleCompac
   const { t } = useI18n();
   const compactLabel = compact ? t("navigation.expand") : t("navigation.compact");
   return <div className="navigation-content" id={mobile ? "mobile-primary-navigation" : undefined}>
-    <div className="brand-mark" aria-label={SERVICE_NAME}><span aria-hidden="true">{SERVICE_MARK}</span><strong title={SERVICE_NAME}>{SERVICE_NAME}</strong></div>
+    <div className="brand-mark" aria-label={SERVICE_NAME}>
+      <span aria-hidden="true">{SERVICE_MARK}</span>
+      <div><strong title={SERVICE_NAME}>{SERVICE_NAME}</strong><small>{t("navigation.endpointDefense")}</small></div>
+    </div>
     <nav aria-label={t("navigation.primary")}>
       {NAVIGATION_GROUPS.map((group) => <section className="nav-group" key={group.labelKey}>
         <h2>{t(group.labelKey)}</h2>
@@ -245,6 +255,7 @@ function PrimaryNavigation({ compact, mobile = false, onNavigate, onToggleCompac
         })}
       </section>)}
     </nav>
+    <div className="navigation-mode" aria-hidden="true"><span>EDR / SOC</span><small>{t("navigation.evidenceFirst")}</small></div>
     {!mobile ? <Tooltip label={compactLabel}>
       <button aria-label={compactLabel} className="nav-compact" onClick={onToggleCompact} type="button">
         {compact ? <PanelLeftOpen aria-hidden="true" size={18} /> : <PanelLeftClose aria-hidden="true" size={18} />}

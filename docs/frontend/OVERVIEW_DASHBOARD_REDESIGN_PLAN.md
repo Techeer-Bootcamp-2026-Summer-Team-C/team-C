@@ -554,3 +554,43 @@ Bundle 변화:
 - Bundle 변화: REF-05 대비 `OverviewPage` 17.14 kB / 5.53 kB gzip으로 +0.01 / +0.01 kB, lazy `DetectionActivityPanel` 499.66 kB / 170.84 kB gzip으로 -0.01 / ±0.00 kB, 공통 index 359.33 kB / 112.84 kB로 동일하다. 새 dependency는 없다.
 - 남은 위험: service name과 font·typography token은 아직 팀 확정 전이다. 전달 palette의 border default가 기존보다 밝아졌으므로 큰 화면의 전체 border 밀도는 팀 시각 검토에서 추가 조정될 수 있다. 1440px 색상 전용 screenshot 비교는 미검증이다.
 - 다음 Package: 팀 font·typography 전달 또는 다음 시각 피드백.
+
+### REF-07. 공격 실험 UX·다계층 수집 운영 콘솔 통합
+
+- 상태: 완료
+- 입력: Team B에서 참고할 공격 실험 UX와 다계층 수집 방식, 추가 의견의 운영 콘솔 방향. Team C의 현재 API·DTO·권한·route·error/stale/partial-failure 처리는 계약 기준으로 유지한다.
+- 범위: dark/light semantic token, 244px SOC navigation shell, `Signal → Evidence → Decision` 조사 흐름, Overview observed signal stream, Alert Evidence Chain, ATT&CK observed heat, Operations 9단계 collection path, Login product path와 375/768/1440 responsive layout.
+- 설계 판단: 외부 프로젝트는 화면 구조와 조사 흐름만 참고했다. 현재 API가 제공하지 않는 Rule Coverage, health probe, replay, 공격 실행, 추세와 담당자/SLA는 생성하지 않는다. ATT&CK는 관측된 tactic/technique count만 표현하며 coverage는 unavailable로 명시한다. Collection Path는 현재 health 응답과 worker 상태만 연결하고 Agent·Nginx처럼 probe가 없는 계층은 `NO PROBE`로 표시한다. Alert chain은 실제 Endpoint/Event/Rule/Alert/Incident 식별자가 있을 때만 link 또는 observed 상태로 렌더링한다.
+- 변경 파일: `frontend/src/theme/ThemeProvider.tsx`, `frontend/src/main.tsx`, `frontend/src/components/AppShell.tsx`, `frontend/src/features/overview/OverviewDashboard.tsx`, `frontend/src/pages/AlertDetailPage.tsx`, `frontend/src/pages/IntelligencePage.tsx`, `frontend/src/pages/LoginPage.tsx`, `frontend/src/pages/OperationsPage.tsx`, 관련 style·i18n·test, `docs/frontend/DESIGN.md`, `docs/frontend/FRONTEND_SPEC.md`, 이 실행계획. Backend, OpenAPI artifact와 generated schema는 변경하지 않았다.
+- 실행한 검증: `npm run typecheck` passed, `npm run lint` passed, 전체 `npm run test` → 21 files / 97 tests passed, `npm run build` passed, `npm run openapi:check` → OpenAPI artifact current와 generated schema check passed, `git diff --check` passed. 새 theme storage key는 source-boundary test에서 `edr.theme` 하나만 좁게 허용하며 credential·route storage 금지는 유지한다.
+- 브라우저 QA: live local Backend와 로그인 session에서 Overview 1440/768/375, Intelligence ATT&CK, Operations collection path, Alert Evidence Chain, Login과 dark/light 전환을 확인했다. console에는 React development 안내 외 warning/error가 없었다. 증거: `frontend/output/playwright/team-b-redesign/overview-signal-v1-1440.png`, `overview-tablet-768.png`, `overview-mobile-375.png`, `intelligence-attack-surface-v1.png`, `operations-collection-path-v1.png`, `alert-evidence-chain-v1.png`, `alert-evidence-chain-light.png`, `login-light-v1.png`.
+- 런타임 관찰: local 8080의 cached Backend는 Alert list의 `sortBy=priority` 요청에 400을 반환했지만 Alert detail은 정상 응답했다. 이번 Frontend 계약이나 query를 변경하지 않았으며, 현재 source/OpenAPI와 local cached Backend image 사이의 환경 drift로 분리한다.
+- Bundle 변화: final `OverviewPage` 18.04 kB / 5.65 kB gzip, `OperationsPage` 14.95 kB / 4.28 kB gzip, `IntelligencePage` 20.22 kB / 5.32 kB gzip, 공통 index 366.17 kB / 114.58 kB gzip. 새 runtime dependency는 없다.
+- 남은 위험: 실제 공격 실행 control과 replay는 제품 계약에 없으므로 구현하지 않았다. live Backend image를 최신 source로 rebuild하기 전 Alert queue runtime drift는 남아 있다. 시각 검토 후 density·copy 미세 조정은 별도 후속 Package로 진행할 수 있다.
+- 다음 Package: 팀 시각 피드백에 따른 polish 또는 최신 Backend image 통합 검증.
+
+### REF-08. Case 2 final-selected token·typography 적용
+
+- 상태: 완료
+- 입력: `case-2-design-tokens.yaml`, `case-2-filled-design-spec.md`의 dark-only color, typography, font hosting, gradient와 상태색 제약.
+- 범위: dual theme 제거, 전역 surface·border·text·action·status·chart token 교체, Inter Variable·Pretendard Variable·IBM Plex Mono self-host, Overview chart area fill과 숫자·table typography, 장기 Frontend 문서·회귀 테스트 동기화. Backend, API, DTO와 data 계산은 변경하지 않았다.
+- 설계 판단: near-black canvas와 shell 위에서 royal blue를 primary action과 active navigation에만 사용한다. Violet은 Detection Activity Alerts series에만 남기고 일반 UI·상태·action에서는 제거했다. 일반 component gradient와 card shadow는 제거하고 Detection Activity line 아래의 낮은 opacity 수직 area fill만 허용했다. Theme switch와 `edr.theme` 저장은 삭제했다.
+- Font: NPM의 OFL-1.1 font package를 bundle source로 사용한다. Inter Latin variable WOFF2, Pretendard Variable WOFF2, IBM Plex Mono 400/500/600 Latin WOFF2만 빌드에 포함하며 모두 `font-display: swap`이다. 외부 font CDN 요청은 없다.
+- 실행한 검증: `npm run typecheck` passed, `npm run lint` passed, 핵심 6 files / 34 tests passed, 전체 `npm run test` → 21 files / 97 tests passed, `npm run build` passed. production font asset은 Inter 48.26 kB, IBM Plex Mono 14.71/14.89/15.62 kB, Pretendard Variable 2,057.69 kB다. ECharts lazy chunk는 500.11 kB / 171.04 kB gzip으로 route 격리를 유지한다.
+- 브라우저 QA: live local Backend와 7일 seed를 연결한 `http://127.0.0.1:5175/?timePreset=LATEST_7D`에서 1440×1100, 375×812, EN/KO를 검증했다. computed token은 canvas `#09090B`, shell `#17161B`, panel `#0C0C0F`, accent `#2563E9`, focus `#4C85FF`, chart `#2563E9/#7C83FD/#16A249`다. Inter Variable, Pretendard Variable, IBM Plex Mono 400/500/600은 모두 loaded, theme control 0건, document/main horizontal overflow 0건, console warning/error 0건이었다.
+- 증거: `frontend/output/playwright/team-b-redesign/case-2-overview-1440.png`, `case-2-overview-375.png`, `case-2-overview-375-bottom.png`, `case-2-overview-ko-1440.png`.
+- 남은 위험: Service name은 입력 명세에서 `TBD`이므로 기존 `EDR Console` fallback을 유지한다. Pretendard Variable 단일 asset은 2.06 MB이므로 초기 한글 사용 시 font 전송량 최적화 여지가 있다. ECharts chunk warning은 기존 route-local chart dependency에서 계속 발생한다.
+- 다음 Package: 실제 service name 반영 또는 팀 시각 피드백에 따른 미세 조정.
+
+### REF-09. Panel border hierarchy 완화
+
+- 상태: 완료
+- 입력: 데스크톱 화면에서 각 box 외곽선이 content보다 밝게 튄다는 팀 시각 피드백.
+- 범위: 공통 panel·card·filter·state surface, Overview toolbar·signal·posture, Alert Evidence Chain, Login form과 Event Raw Payload의 외곽선. Button, input, popover, focus ring과 semantic status line은 제외한다.
+- 설계 판단: control boundary 접근성을 담당하는 `border-default`는 유지하고, panel 외곽선 전용 `border-panel`을 `border-subtle`과 `border-default` 사이 명도로 분리한다. Surface 구획은 유지하되 고밀도 화면에서 모든 panel이 같은 강도로 경쟁하지 않게 한다.
+- 변경 파일: `frontend/src/styles/tokens.css`, `frontend/src/styles/patterns.css`, `frontend/src/styles/pages/overview.css`, `frontend/src/styles/pages/alerts.css`, `frontend/src/styles/pages/endpoints-events.css`, `frontend/src/styles/pages/login.css`, `docs/frontend/DESIGN.md`, `docs/frontend/FRONTEND_SPEC.md`, 이 실행계획.
+- 실행한 검증: `npm run test -- overview-redesign.test.tsx app-shell-foundation.test.tsx components.test.tsx` → 3 files / 21 tests passed. `npm run lint`, `npm run typecheck`, `npm run build`, `git diff --check` 모두 passed.
+- 브라우저 QA: 계약형 mock과 Vite를 사용한 1440×1100 Overview에서 9 blocks, document/main horizontal overflow `false`, console error/warning 0건을 확인했다. panel 외곽선은 `#34353C`, control 외곽선은 `#5D5E67`, 내부 divider는 `#25262B`로 분리됐고 Login form은 panel token, autofocus input은 focus ring을 유지했다. 증거: `frontend/output/playwright/team-b-redesign/qa-border-refinement-final-1440.png`.
+- Bundle 변화: CSS token과 selector 교체만 포함하며 새 runtime dependency와 JS 동작 변화는 없다. Production build는 passed했고 기존 ECharts lazy chunk warning은 동일하다.
+- 남은 위험: 없음. 모바일은 사용자 요청에 따라 이번 시각 판정에서 제외했다.
+- 다음 Package: 없음.
