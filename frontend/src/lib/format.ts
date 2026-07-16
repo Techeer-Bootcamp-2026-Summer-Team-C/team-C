@@ -23,6 +23,18 @@ export function formatCompactDate(value: string): string {
   }).format(new Date(value));
 }
 
+export function formatQueueDateTime(value: string): string {
+  const parts = new Intl.DateTimeFormat(displayLocale, {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(value));
+  const part = (type: Intl.DateTimeFormatPartTypes): string => parts.find((item) => item.type === type)?.value ?? "--";
+  return `${part("month")}-${part("day")} ${part("hour")}:${part("minute")}`;
+}
+
 export function humanize(value: string): string {
   return value.toLowerCase().replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase());
 }

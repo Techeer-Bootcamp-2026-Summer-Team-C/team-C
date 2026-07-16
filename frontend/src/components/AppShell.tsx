@@ -20,6 +20,7 @@ import { Suspense, type FormEvent, useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import type { UserLocale } from "../contracts";
+import { SERVICE_MARK, SERVICE_NAME } from "../config/branding";
 import { useI18n } from "../i18n/LocaleContext";
 import type { TranslationKey } from "../i18n/translations";
 import { Badge, Button, Dialog, Drawer, Popover, SelectField, Tooltip } from "./primitives";
@@ -86,6 +87,7 @@ export function AppShell() {
   const [reportOpen, setReportOpen] = useState(false);
   const breadcrumbs = buildBreadcrumbs(location.pathname, t);
   const pageTitleText = breadcrumbs.at(-1)?.label ?? t("navigation.console");
+  const overviewRoute = location.pathname === "/";
 
   useEffect(() => { setMobileNavigationOpen(false); }, [location.pathname]);
 
@@ -148,9 +150,11 @@ export function AppShell() {
           >
             <Menu aria-hidden="true" size={20} />
           </button>
-          <div className="top-title">
-            <Breadcrumbs items={breadcrumbs} label={t("navigation.breadcrumb")} />
-            <strong>{pageTitleText}</strong>
+          <div className={`top-title${overviewRoute ? " service-title" : ""}`}>
+            {overviewRoute ? <strong title={SERVICE_NAME}>{SERVICE_NAME}</strong> : <>
+              <Breadcrumbs items={breadcrumbs} label={t("navigation.breadcrumb")} />
+              <strong>{pageTitleText}</strong>
+            </>}
           </div>
           <form className="global-search" onSubmit={submitSearch} role="search">
             <Search aria-hidden="true" size={16} />
@@ -220,7 +224,7 @@ function PrimaryNavigation({ compact, mobile = false, onNavigate, onToggleCompac
   const { t } = useI18n();
   const compactLabel = compact ? t("navigation.expand") : t("navigation.compact");
   return <div className="navigation-content" id={mobile ? "mobile-primary-navigation" : undefined}>
-    <div className="brand-mark" aria-label="EDR Console"><span>EC</span><strong>EDR Console</strong></div>
+    <div className="brand-mark" aria-label={SERVICE_NAME}><span aria-hidden="true">{SERVICE_MARK}</span><strong title={SERVICE_NAME}>{SERVICE_NAME}</strong></div>
     <nav aria-label={t("navigation.primary")}>
       {NAVIGATION_GROUPS.map((group) => <section className="nav-group" key={group.labelKey}>
         <h2>{t(group.labelKey)}</h2>

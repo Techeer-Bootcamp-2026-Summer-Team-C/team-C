@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { api } from "../api/endpoints";
 import { readTimeFilter, TimeFilterFields } from "../components/filters";
 import { Popover } from "../components/primitives";
-import { ErrorState, PageHeader, PartialFailureWarning, StaleWarning } from "../components/ui";
+import { ErrorState, PartialFailureWarning, StaleWarning } from "../components/ui";
 import { OverviewDashboard } from "../features/overview/OverviewDashboard";
 import { EndpointScopePicker } from "../features/overview/EndpointScopePicker";
 import { useI18n } from "../i18n/LocaleContext";
@@ -57,7 +57,7 @@ export function OverviewPage() {
 
   return (
     <div className="page-stack overview-page">
-      <PageHeader eyebrow={t("overview.eyebrow")} title={t("overview.title")} description={t("overview.description")} />
+      <h1 className="sr-only">{t("overview.title")}</h1>
       {!time.valid ? <ErrorState error={new Error(t("filter.invalidRange"))} /> : null}
       {time.valid ? <OverviewToolbar
         lastRefreshedAt={lastRefreshedAt}
