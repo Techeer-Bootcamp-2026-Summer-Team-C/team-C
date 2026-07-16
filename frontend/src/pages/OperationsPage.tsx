@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Archive, Cloud, Database, HardDrive, Radio, RefreshCcw, Server } from "lucide-react";
+import { Activity, Archive, Cloud, Cpu, Database, HardDrive, MonitorDot, Radio, RefreshCcw, Server, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/endpoints";
@@ -78,6 +78,8 @@ export function PipelineSnapshot({ health, ingest }: { health: OperationsHealthD
     },
   };
   return <Panel className="pipeline-snapshot-panel" title={t("operations.currentPipelineSnapshot")} subtitle={t("operations.currentPipelineSnapshotSubtitle")} meta={<StatusPill value={health.status} />}>
+    <CollectionPath health={health} />
+    <div className="pipeline-section-label"><span>{t("operations.problemSummary")}</span><small>{t("operations.problemSummaryDescription")}</small></div>
     <ol aria-label={t("operations.currentPipelineSnapshot")} className="pipeline-snapshot">
       {stages.map((stage) => <li className={`tone-${stage.status.toLowerCase()}`} key={stage.id}>
         <div><span>{t(`operations.stage${stage.id}` as "operations.stageCOLLECTION" | "operations.stageDETECTION" | "operations.stageSTORAGE")}</span><StatusPill value={stage.status} /></div>
@@ -87,6 +89,44 @@ export function PipelineSnapshot({ health, ingest }: { health: OperationsHealthD
     </ol>
     <p className="snapshot-caveat">{t("operations.snapshotCaveat", { time: formatDateTime(health.checkedAt) })}</p>
   </Panel>;
+}
+
+export function CollectionPath({ health }: { health: OperationsHealthDto }) {
+  const { t } = useI18n();
+  const service = (name: string) => health.services.find((item) => item.service === name);
+  const worker = (name: string) => health.workers.find((item) => item.worker.toLowerCase().includes(name));
+  const backend = service("Backend API");
+  const kafka = service("Kafka");
+  const clickhouse = service("ClickHouse");
+  const postgres = service("PostgreSQL");
+  const storageWorker = worker("storage");
+  const detectionWorker = worker("detection");
+  const nodes = [
+    { label: t("operations.pathAgent"), detail: t("operations.noHealthProbe"), status: "NO PROBE", icon: <MonitorDot size={17} /> },
+    { label: "Nginx / mTLS", detail: t("operations.noHealthProbe"), status: "NO PROBE", icon: <ShieldCheck size={17} /> },
+    { label: t("operations.pathCollector"), detail: backend ? `${backend.latencyMs} ms · ${backend.detail}` : t("operations.noHealthProbe"), status: backend?.status ?? "NO PROBE", icon: <Server size={17} /> },
+    { label: "Kafka telemetry.raw", detail: kafka?.detail ?? t("operations.noHealthProbe"), status: kafka?.status ?? "NO PROBE", icon: <Radio size={17} /> },
+    { label: t("operations.pathStorageWorker"), detail: workerDetail(storageWorker, t("operations.unknown")), status: storageWorker?.status ?? "NO PROBE", icon: <Cpu size={17} /> },
+    { label: "ClickHouse", detail: clickhouse ? `${clickhouse.latencyMs} ms · ${clickhouse.detail}` : t("operations.noHealthProbe"), status: clickhouse?.status ?? "NO PROBE", icon: <Database size={17} /> },
+    { label: "Kafka telemetry.validated", detail: kafka?.detail ?? t("operations.noHealthProbe"), status: kafka?.status ?? "NO PROBE", icon: <Radio size={17} /> },
+    { label: t("operations.pathDetectionWorker"), detail: workerDetail(detectionWorker, t("operations.unknown")), status: detectionWorker?.status ?? "NO PROBE", icon: <Cpu size={17} /> },
+    { label: "PostgreSQL", detail: postgres ? `${postgres.latencyMs} ms · ${postgres.detail}` : t("operations.noHealthProbe"), status: postgres?.status ?? "NO PROBE", icon: <Database size={17} /> },
+  ];
+  return <section aria-label={t("operations.collectionPath")} className="collection-path-board">
+    <header><div><span>{t("operations.collectionPath")}</span><strong>{t("operations.collectionPathSubtitle")}</strong></div><StatusPill value={health.status} /></header>
+    <ol>{nodes.map((node, index) => <li className={`tone-${node.status.toLowerCase().replaceAll(" ", "-")}`} key={node.label}>
+      <span className="collection-path-index">{String(index + 1).padStart(2, "0")}</span>
+      <span className="collection-path-icon" aria-hidden="true">{node.icon}</span>
+      <div><strong>{node.label}</strong><small>{node.detail}</small></div>
+      <StatusPill value={node.status} />
+    </li>)}</ol>
+    <p>{t("operations.collectionPathCaveat")}</p>
+  </section>;
+}
+
+function workerDetail(worker: OperationsHealthDto["workers"][number] | undefined, unknown: string): string {
+  if (!worker) return unknown;
+  return `${worker.memberCount ?? unknown} member · lag ${worker.lag ?? unknown}`;
 }
 
 function LiveHealth({ data }: { data: OperationsHealthDto }) {

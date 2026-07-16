@@ -78,6 +78,7 @@ export function IntelligencePage() {
     {summaryUnavailable && topologyUnavailable ? <ErrorState error={error} onRetry={() => void Promise.all([summary.refetch(), topology.refetch()])} /> : null}
     {(summaryUnavailable !== topologyUnavailable) ? <PartialFailureWarning message={summaryUnavailable ? t("intelligence.summaryUnavailable") : t("intelligence.topologyUnavailable")} /> : null}
     {(summary.isRefetchError || topology.isRefetchError) && (summary.data || topology.data) ? <StaleWarning error={error} onRetry={() => void Promise.all([summary.refetch(), topology.refetch()])} /> : null}
+    {(summary.data || topology.data) ? <IntelligenceContent dashboard={summary.data?.data ?? null} topology={topology.data?.data ?? null} /> : null}
     {time.valid ? <CorrelationWorkspace
       correlation={correlation.data?.data ?? null}
       error={correlation.error}
@@ -97,7 +98,6 @@ export function IntelligencePage() {
       value={correlationValue}
       key={correlationValue}
     /> : null}
-    {(summary.data || topology.data) ? <IntelligenceContent dashboard={summary.data?.data ?? null} topology={topology.data?.data ?? null} /> : null}
   </div>;
 }
 
@@ -238,6 +238,11 @@ function MitreAndSignals({ dashboard }: { dashboard: DashboardSummaryDto }) {
 
   return <section className="intelligence-analysis-grid">
     <Panel className="mitre-workspace" title={t("intelligence.mitreMatrix")} subtitle={t("intelligence.mitreMatrixSubtitle")} meta={<Badge tone="info">{t("intelligence.currentAlertSnapshot")}</Badge>}>
+      <div className="mitre-status-strip" role="status">
+        <div><span>{t("intelligence.observedTactics")}</span><strong>{tactics.length}</strong></div>
+        <div><span>{t("intelligence.observedTechniques")}</span><strong>{techniques.length}</strong></div>
+        <div className="mitre-coverage-gap"><Badge tone="neutral">{t("intelligence.coverageUnavailable")}</Badge><small>{t("intelligence.coverageUnavailableDescription")}</small></div>
+      </div>
       <div className="mitre-layout">
         <div className="mitre-matrix" aria-label={t("intelligence.mitreMatrix")}>
           <MitreGroup label={t("intelligence.mitreTactics")} rows={tactics.map((row) => ({ type: "TACTIC" as const, code: row.mitreTacticCode, name: row.mitreTacticName, count: row.count }))} selection={selection} onSelect={setSelection} />
@@ -281,7 +286,12 @@ function MitreGroup({
   onSelect: (selection: MitreSelection) => void;
 }) {
   const { t } = useI18n();
-  return <section><h3>{label}</h3>{rows.length ? <div className="mitre-cells">{rows.map((row) => <button aria-pressed={selection?.type === row.type && selection.code === row.code} className={selection?.type === row.type && selection.code === row.code ? "selected" : undefined} key={`${row.type}-${row.code}`} onClick={() => onSelect(row)} type="button"><code>{row.code}</code><strong>{row.name}</strong><span>{t("intelligence.alertsCount", { count: row.count })}</span></button>)}</div> : <EmptyState title={t("intelligence.noMappings")} message={t("intelligence.noMappingsDescription")} />}</section>;
+  const maximum = Math.max(...rows.map((row) => row.count), 0);
+  return <section><h3>{label}</h3>{rows.length ? <div className="mitre-cells">{rows.map((row) => {
+    const selected = selection?.type === row.type && selection.code === row.code;
+    const heat = maximum > 0 ? Math.max(1, Math.ceil((row.count / maximum) * 3)) : 0;
+    return <button aria-pressed={selected} className={`${selected ? "selected " : ""}heat-${heat}`.trim()} key={`${row.type}-${row.code}`} onClick={() => onSelect(row)} type="button"><code>{row.code}</code><strong>{row.name}</strong><span>{t("intelligence.alertsCount", { count: row.count })}</span></button>;
+  })}</div> : <EmptyState title={t("intelligence.noMappings")} message={t("intelligence.noMappingsDescription")} />}</section>;
 }
 
 export function TopologyWorkspace({ topology, graphEnabled }: { topology: EgressTopologyDto; graphEnabled: boolean }) {

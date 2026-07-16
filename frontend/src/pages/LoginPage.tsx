@@ -1,4 +1,4 @@
-import { LockKeyhole, Shield } from "lucide-react";
+import { Activity, Database, LockKeyhole, Radar, Search, Shield } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../api/client";
@@ -40,6 +40,12 @@ export function LoginPage() {
         <span>EDR / SINGLE TENANT</span>
         <h1>Move from signal to evidence.</h1>
         <p>Review current risk, collection health, Alerts, Incidents, Endpoint state, and event evidence from one operational console.</p>
+        <ol aria-label="EDR evidence flow" className="login-signal-route">
+          <li><Activity aria-hidden="true" size={17} /><span>01</span><strong>Signal</strong><small>Endpoint telemetry</small></li>
+          <li><Database aria-hidden="true" size={17} /><span>02</span><strong>Collect</strong><small>Durable event intake</small></li>
+          <li><Radar aria-hidden="true" size={17} /><span>03</span><strong>Detect</strong><small>RuleV1 mapping</small></li>
+          <li><Search aria-hidden="true" size={17} /><span>04</span><strong>Investigate</strong><small>Evidence chain</small></li>
+        </ol>
         <div className="login-boundary"><strong>Read the state. Follow the source.</strong><span>Risk and EDR State are calculated by the Backend.</span></div>
       </section>
       <section className="login-panel">

@@ -1,4 +1,4 @@
-import { BellRing, CircleAlert, ShieldAlert, Siren } from "lucide-react";
+import { Activity, BellRing, CircleAlert, MonitorDot, ShieldAlert, Siren } from "lucide-react";
 import { lazy, Suspense } from "react";
 import { DetectionActivityTable } from "../../components/charts";
 import { ChartFrame, EdrStateSummary, ErrorState, KpiCard, Panel, Skeleton, StaleWarning } from "../../components/ui";
@@ -47,6 +47,7 @@ export function OverviewDashboard({ data, queueState = { endpoints: IDLE_PANEL_S
 }) {
   const { t } = useI18n();
   return <section aria-label={t("overview.dashboardAria")} className="overview-dashboard">
+    {data.dashboard && data.endpoints ? <SignalRibbon dashboard={data.dashboard} endpoints={data.endpoints} /> : null}
     <div className="overview-posture-row">
       <OverviewBlock id="edr-state"><ResourceFeedback data={data.dashboard} render={(dashboard) => <EdrStateSummary state={dashboard.edrState} />} rows={3} state={summaryState.dashboard} /></OverviewBlock>
     </div>
@@ -71,6 +72,22 @@ export function OverviewDashboard({ data, queueState = { endpoints: IDLE_PANEL_S
         <QueueFeedback items={data.incidentQueue} render={(items) => <IncidentQueueList incidents={items} />} state={queueState.incidents} />
       </Panel></OverviewBlock>
     </div>
+  </section>;
+}
+
+function SignalRibbon({ dashboard, endpoints }: { dashboard: DashboardSummaryDto; endpoints: EndpointSummaryDto }) {
+  const { t } = useI18n();
+  const signals = [
+    { icon: <Activity aria-hidden="true" size={16} />, label: t("overview.signalEvents"), value: dashboard.events.totalCount, tone: "events" },
+    { icon: <Siren aria-hidden="true" size={16} />, label: t("overview.signalDetections"), value: dashboard.alerts.totalCount, tone: "alerts" },
+    { icon: <MonitorDot aria-hidden="true" size={16} />, label: t("overview.signalEndpointReach"), value: `${endpoints.onlineCount} / ${endpoints.totalCount}`, tone: "endpoints" },
+    { icon: <ShieldAlert aria-hidden="true" size={16} />, label: t("overview.signalOpenCases"), value: dashboard.incidents.openCount, tone: "incidents" },
+  ] as const;
+  return <section aria-label={t("overview.signalRibbon")} className="overview-signal-ribbon">
+    <header><span aria-hidden="true" /><strong>{t("overview.signalRibbon")}</strong><small>{t("overview.backendSnapshot")}</small></header>
+    <div>{signals.map((signal) => <article className={`signal-${signal.tone}`} key={signal.label}>
+      {signal.icon}<span>{signal.label}</span><strong>{signal.value}</strong>
+    </article>)}</div>
   </section>;
 }
 

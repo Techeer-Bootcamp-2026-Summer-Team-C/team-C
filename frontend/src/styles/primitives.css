@@ -17,9 +17,9 @@
   justify-content: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-6);
-  font-size: var(--type-label);
-  font-weight: 800;
-  line-height: 1.25;
+  font-size: var(--type-control);
+  font-weight: var(--weight-medium);
+  line-height: 1.4;
 }
 
 .icon-button {
@@ -34,7 +34,7 @@
 .icon-button:hover {
   color: var(--text-primary);
   background: var(--surface-hover);
-  border-color: var(--text-tertiary);
+  border-color: var(--border-strong);
   text-decoration: none;
 }
 
@@ -59,7 +59,7 @@
   gap: var(--space-3);
   color: var(--text-secondary);
   font-size: var(--type-label);
-  font-weight: 700;
+  font-weight: var(--weight-medium);
 }
 
 .field > span,
@@ -81,7 +81,7 @@
 .field textarea:hover { border-color: var(--text-tertiary); }
 .field input:focus-visible,
 .field select:focus-visible,
-.field textarea:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 1px; border-color: var(--accent-primary); }
+.field textarea:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 1px; border-color: var(--focus-ring-color); }
 .field small { color: var(--text-tertiary); font-weight: 500; line-height: 1.35; }
 .field .field-error,
 .field.invalid > small { color: var(--status-critical); }
@@ -100,15 +100,15 @@
   border-radius: var(--radius-pill);
   color: var(--text-secondary);
   background: var(--surface-inset);
-  font-size: var(--type-meta);
-  font-weight: 800;
-  line-height: 1.2;
+  font-size: var(--type-badge);
+  font-weight: var(--weight-semibold);
+  line-height: 1.4;
   white-space: nowrap;
 }
-.badge-info { color: var(--status-info); border-color: color-mix(in srgb, var(--status-info) 55%, var(--border-default)); }
-.badge-success { color: var(--status-success); border-color: color-mix(in srgb, var(--status-success) 55%, var(--border-default)); }
-.badge-warning { color: var(--status-warning); border-color: color-mix(in srgb, var(--status-warning) 55%, var(--border-default)); }
-.badge-critical { color: var(--status-critical); border-color: color-mix(in srgb, var(--status-critical) 55%, var(--border-default)); }
+.badge-info { color: var(--status-info); border-color: var(--status-info); }
+.badge-success { color: var(--status-success); border-color: var(--status-success); }
+.badge-warning { color: var(--status-warning); border-color: var(--status-warning); }
+.badge-critical { color: var(--status-critical); border-color: var(--status-critical); }
 
 .tooltip { position: relative; display: inline-flex; }
 .tooltip-content {
@@ -124,8 +124,9 @@
   border: 1px solid var(--border-default);
   border-radius: var(--radius-control);
   box-shadow: var(--elevation-tooltip);
-  font-size: var(--type-meta);
-  font-weight: 700;
+  font-size: var(--type-tooltip);
+  font-weight: var(--weight-regular);
+  line-height: 1.45;
   opacity: 0;
   pointer-events: none;
   transform: translate(4px, 50%);
@@ -157,7 +158,6 @@
   inset: 0;
   z-index: 100;
   background: var(--overlay-scrim);
-  backdrop-filter: blur(3px);
 }
 .modal-layer { display: grid; place-items: center; padding: var(--space-12); }
 .dialog-surface {

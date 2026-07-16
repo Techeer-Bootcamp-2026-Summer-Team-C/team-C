@@ -1,15 +1,16 @@
 * { box-sizing: border-box; }
 html, body, #root { min-width: 0; width: 100%; min-height: 100%; }
 html { background: var(--surface-canvas); }
-body { margin: 0; background: var(--surface-canvas); color: var(--text-primary); font-size: var(--type-body); line-height: 1.5; }
+body { margin: 0; background: var(--surface-canvas); color: var(--text-primary); font-family: var(--font-ui); font-size: var(--type-body); font-weight: var(--weight-regular); line-height: 1.5; }
 button, input, select, textarea { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 a { color: var(--text-link); text-decoration: none; }
 a:hover { color: var(--text-link-hover); text-decoration: underline; }
 button { color: inherit; }
-code, pre, .path-value { font-family: "Cascadia Code", Consolas, "SFMono-Regular", monospace; font-size: var(--type-code); overflow-wrap: anywhere; }
+code, pre, kbd, samp, .path-value { font-family: var(--font-mono); font-size: var(--type-code); font-weight: var(--weight-regular); line-height: 1.5; overflow-wrap: anywhere; }
 h1, h2, h3, p { margin: 0; }
+h1, h2, h3 { font-family: var(--font-ui); font-style: normal; font-weight: var(--weight-semibold); }
 :focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
 .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
-.skip-link { position: fixed; left: var(--space-6); top: -60px; z-index: 120; padding: var(--space-4) var(--space-6); color: var(--text-inverse); background: var(--accent-primary); border-radius: var(--radius-control); font-weight: 800; }
+.skip-link { position: fixed; left: var(--space-6); top: -60px; z-index: 120; padding: var(--space-4) var(--space-6); color: var(--text-inverse); background: var(--accent-primary); border-radius: var(--radius-control); font-weight: var(--weight-semibold); }
 .skip-link:focus { top: var(--space-6); }

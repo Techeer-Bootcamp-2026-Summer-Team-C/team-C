@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 const SOURCE = resolve("src");
 
 describe("Frontend responsibility boundaries", () => {
-  it("keeps fetch inside src/api and browser storage within the approved auth and layout boundaries", () => {
+  it("keeps fetch inside src/api and browser storage within approved auth and layout boundaries", () => {
     for (const file of sourceFiles(SOURCE)) {
       const content = readFileSync(file, "utf8");
       const name = relative(SOURCE, file).replace(/\\/g, "/");
