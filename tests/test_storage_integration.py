@@ -337,12 +337,14 @@ def test_clickhouse_migration_event_repository_and_rollback() -> None:
         client.close()
 
 
-def _dns_event(event_index: int, occurred_at: datetime, *, remote_domain: str, dns_answers: str) -> dict:
+def _dns_event(
+    event_index: int, occurred_at: datetime, *, remote_domain: str, dns_answers: str, endpoint_id: int = 2001
+) -> dict:
     unique = f"018ff8f4-86de-7b25-9b8a-2d22f6a3c{event_index:03d}"
     return {
         "event_id": UUID(unique),
         "batch_id": UUID("018ff8f4-86de-7b25-9b8a-2d22f6a3c000"),
-        "endpoint_id": 2001,
+        "endpoint_id": endpoint_id,
         "agent_id": "agent-corr-001",
         "hostname": "CORR-ENDPOINT",
         "os_type": "MACOS",
@@ -427,6 +429,40 @@ def test_event_search_domain_boundary_and_dns_answer_membership() -> None:
         }
         # exact array-element membership: 1.2.3.4 must NOT match the event holding 11.2.3.45
         assert answer_hits == {"yahoo.com"}
+    finally:
+        apply_clickhouse_file(client, down)
+        client.close()
+
+
+def test_event_search_endpoint_ids_pushdown() -> None:
+    client = clickhouse_connect.get_client(
+        host=os.getenv("TEST_CLICKHOUSE_HOST", "127.0.0.1"),
+        port=int(os.getenv("TEST_CLICKHOUSE_PORT", "58123")),
+        username=os.getenv("TEST_CLICKHOUSE_USER", "edr"),
+        password=os.environ["TEST_CLICKHOUSE_PASSWORD"],
+        database=os.getenv("TEST_CLICKHOUSE_DATABASE", "edr"),
+    )
+    down = ROOT / "migrations/clickhouse/0001_initial.down.sql"
+    up = ROOT / "migrations/clickhouse/0001_initial.up.sql"
+    apply_clickhouse_file(client, down)
+    apply_clickhouse_file(client, up)
+    try:
+        now = datetime(2026, 7, 12, tzinfo=UTC)
+        window = (now, now + timedelta(seconds=1))
+        repository = EventRepository(client)
+        repository.insert(
+            [
+                _dns_event(10, now, remote_domain="ep1.example.com", dns_answers="[]", endpoint_id=1),
+                _dns_event(11, now, remote_domain="ep2.example.com", dns_answers="[]", endpoint_id=2),
+            ]
+        )
+        scoped = {
+            str(row["remote_domain"])
+            for row in repository.search(
+                from_=window[0], to=window[1], related_domain="example.com", endpoint_ids=[1]
+            )
+        }
+        assert scoped == {"ep1.example.com"}
     finally:
         apply_clickhouse_file(client, down)
         client.close()

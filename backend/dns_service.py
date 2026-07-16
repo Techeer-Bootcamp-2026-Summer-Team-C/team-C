@@ -21,7 +21,7 @@ from datetime import datetime
 
 from .contracts.enums import DnsRecordType
 from .contracts.intelligence import CorrelationDto, DnsLookupDto, ForwardDnsDto, RelatedValueDto, ReverseDnsDto
-from .dns_lookup import DnsLookupError, forward_lookup, reverse_lookup
+from .dns_lookup import DnsLookupError, forward_lookup, normalize_domain, reverse_lookup
 from .dns_lookup import lookup as raw_lookup
 from .errors import ApplicationError
 from .storage.clickhouse import EventRepository
@@ -30,17 +30,43 @@ from .storage.clickhouse import EventRepository
 def _to_application_error(error: DnsLookupError) -> ApplicationError:
     if error.code in ("NOT_FOUND", "NO_ANSWER"):
         return ApplicationError(404, "NOT_FOUND", error.message)
-    if error.code in ("INVALID_IP", "UNSUPPORTED_RECORD_TYPE"):
+    if error.code in ("INVALID_IP", "INVALID_DOMAIN", "UNSUPPORTED_RECORD_TYPE"):
         return ApplicationError(400, "VALIDATION_ERROR", error.message)
     return ApplicationError(503, "SERVICE_UNAVAILABLE", error.message, True)
 
 
-def _looks_like_ip(value: str) -> bool:
+def _canonical(value: str) -> tuple[str, str]:
+    """Canonicalize a related value for dedupe (lenient, never raises).
+
+    IPs collapse to their canonical form (so different IPv6 notations dedupe); domains
+    are lowercased with the trailing dot stripped. Returns (canonical_value, value_type).
+    """
+    stripped = value.strip()
     try:
-        ipaddress.ip_address(value)
-        return True
+        return ipaddress.ip_address(stripped).compressed, "IP"
     except ValueError:
-        return False
+        return stripped.rstrip(".").lower(), "DOMAIN"
+
+
+def _classify_target(value: str) -> tuple[str, bool]:
+    """Classify a correlate target as a valid IP or a valid domain (strict, raises on bad input).
+
+    Returns (canonical_value, is_ip). A value that looks like an IP attempt (contains ':' or
+    is only digits and dots) but does not parse as an IP is rejected as INVALID_IP rather than
+    being silently treated as a domain name.
+    """
+    stripped = value.strip()
+    if not stripped:
+        raise DnsLookupError("INVALID_DOMAIN", "Value must not be empty")
+    looks_like_ip_attempt = ":" in stripped or (
+        "." in stripped and all(part.isdigit() for part in stripped.split("."))
+    )
+    if looks_like_ip_attempt:
+        try:
+            return ipaddress.ip_address(stripped).compressed, True
+        except ValueError as error:
+            raise DnsLookupError("INVALID_IP", f"Not a valid IP address: {value}") from error
+    return normalize_domain(stripped), False
 
 
 def _parse_dns_answers(raw: str | None) -> list[str]:
@@ -59,10 +85,11 @@ class DnsIntelligenceService:
 
     def forward(self, domain: str) -> ForwardDnsDto:
         try:
-            addresses = forward_lookup(domain)
+            normalized = normalize_domain(domain)
+            addresses = forward_lookup(normalized)
         except DnsLookupError as error:
             raise _to_application_error(error) from error
-        return ForwardDnsDto(domain=domain, ip_addresses=addresses)
+        return ForwardDnsDto(domain=normalized, ip_addresses=addresses)
 
     def reverse(self, ip: str) -> ReverseDnsDto:
         try:
@@ -86,63 +113,60 @@ class DnsIntelligenceService:
         to: datetime,
         endpoint_ids: list[int] | None = None,
     ) -> CorrelationDto:
-        is_ip = _looks_like_ip(value)
-        endpoint_filter = set(endpoint_ids or [])
-        # `related` is keyed by the related value, so a value found through several
-        # search paths (or from both live DNS and our events) is deduped: its sources
-        # accumulate into one set rather than producing duplicate rows.
-        related: dict[str, set[str]] = {}
+        try:
+            target, is_ip = _classify_target(value)
+        except DnsLookupError as error:
+            raise _to_application_error(error) from error
+        # `related` is keyed by the CANONICAL value, so a value found through several search
+        # paths, from both live DNS and our events, or written in a different-but-equivalent
+        # form (trailing dot, mixed case, alternate IPv6 notation) is deduped into one row
+        # with its sources merged.
+        related: dict[str, tuple[str, set[str]]] = {}
 
         def add(candidate: str | None, source: str) -> None:
-            if candidate:
-                related.setdefault(candidate, set()).add(source)
-
-        def observed(**filters: object) -> list[dict]:
-            rows = self.events.search(from_=from_, to=to, **filters)  # type: ignore[arg-type]
-            if endpoint_filter:
-                rows = [row for row in rows if int(row.get("endpoint_id", 0)) in endpoint_filter]
-            return rows
+            if not candidate:
+                return
+            canonical, value_type = _canonical(str(candidate))
+            if not canonical:
+                return
+            related.setdefault(canonical, (value_type, set()))[1].add(source)
 
         try:
             if is_ip:
                 # PTR results are candidate domains only: they may be absent, stale, or point at
                 # a CDN/hosting hostname rather than the site actually contacted. We surface them
                 # alongside the IP with a LIVE_DNS source; we never replace the IP with the PTR name.
-                for hostname in reverse_lookup(value):
+                for hostname in reverse_lookup(target):
                     add(hostname, "LIVE_DNS")
             else:
-                for address in forward_lookup(value):
+                for address in forward_lookup(target):
                     add(address, "LIVE_DNS")
         except DnsLookupError:
             pass  # a correlation lookup should still return what our own events know
 
         if is_ip:
-            for row in observed(remote_ip=value):
+            for row in self.events.search(from_=from_, to=to, endpoint_ids=endpoint_ids, remote_ip=target):
                 add(row.get("remote_domain"), "OBSERVED_EVENTS")
                 add(row.get("http_host"), "OBSERVED_EVENTS")
                 add(row.get("tls_sni"), "OBSERVED_EVENTS")
-            for row in observed(dns_answer_ip=value):
+            for row in self.events.search(from_=from_, to=to, endpoint_ids=endpoint_ids, dns_answer_ip=target):
                 add(row.get("dns_query"), "OBSERVED_EVENTS")
         else:
             # related_domain matches the exact name or a subdomain across remote_domain,
             # http_host, tls_sni, and dns_query; from each matched event we collect both the
             # contacted IP and any resolved answer IPs.
-            for row in observed(related_domain=value):
+            for row in self.events.search(from_=from_, to=to, endpoint_ids=endpoint_ids, related_domain=target):
                 add(row.get("remote_ip"), "OBSERVED_EVENTS")
                 for answer in _parse_dns_answers(row.get("dns_answers_json")):
                     add(answer, "OBSERVED_EVENTS")
 
         items = [
-            RelatedValueDto(
-                value=candidate,
-                value_type="IP" if _looks_like_ip(candidate) else "DOMAIN",
-                sources=sorted(sources),
-            )
-            for candidate, sources in related.items()
+            RelatedValueDto(value=canonical, value_type=value_type, sources=sorted(sources))
+            for canonical, (value_type, sources) in related.items()
         ]
         items.sort(key=lambda item: (-len(item.sources), item.value))
         return CorrelationDto(
-            input_value=value,
+            input_value=target,
             input_type="IP" if is_ip else "DOMAIN",
             from_=from_,
             to=to,

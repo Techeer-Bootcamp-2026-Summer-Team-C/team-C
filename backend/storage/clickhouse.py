@@ -168,6 +168,7 @@ class EventRepository:
         from_: datetime,
         to: datetime,
         endpoint_id: int | None = None,
+        endpoint_ids: list[int] | None = None,
         event_type: str | None = None,
         process_name: str | None = None,
         file_path: str | None = None,
@@ -184,6 +185,10 @@ class EventRepository:
             "is_delete = 0",
         ]
         parameters: dict[str, Any] = {"from": from_, "to": to}
+        if endpoint_ids:
+            # Push endpoint scoping into ClickHouse instead of filtering rows in Python.
+            conditions.append("endpoint_id IN {endpoint_ids:Array(UInt64)}")
+            parameters["endpoint_ids"] = endpoint_ids
         exact_filters = {
             "endpoint_id": (endpoint_id, "UInt64"),
             "event_type": (event_type, "String"),

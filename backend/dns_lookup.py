@@ -7,6 +7,11 @@ import dns.reversename
 DEFAULT_TIMEOUT_SECONDS = 3.0
 FORWARD_RECORD_TYPES = ("A", "AAAA", "MX", "NS")
 SUPPORTED_RECORD_TYPES = (*FORWARD_RECORD_TYPES, "PTR")
+MAX_DOMAIN_LENGTH = 253
+MAX_LABEL_LENGTH = 63
+# Errors that mean "the resolver could not determine an answer" (vs. an authoritative
+# "does not exist"). These must be preserved so the API can map them to 503, not 404.
+INFRASTRUCTURE_CODES = ("TIMEOUT", "NO_NAMESERVERS")
 
 
 class DnsLookupError(Exception):
@@ -16,6 +21,30 @@ class DnsLookupError(Exception):
         super().__init__(message)
         self.code = code
         self.message = message
+
+
+def normalize_domain(domain: str) -> str:
+    """Validate and canonicalize a domain name: trim, lowercase, drop the trailing dot.
+
+    Rejects empty/oversized names, empty or oversized labels, and names that are not
+    valid IDNA. Raises DnsLookupError("INVALID_DOMAIN", ...) which maps to HTTP 400.
+    """
+    candidate = domain.strip().rstrip(".").lower()
+    if not candidate:
+        raise DnsLookupError("INVALID_DOMAIN", "Domain must not be empty")
+    if len(candidate) > MAX_DOMAIN_LENGTH:
+        raise DnsLookupError("INVALID_DOMAIN", f"Domain exceeds {MAX_DOMAIN_LENGTH} characters: {domain}")
+    labels = candidate.split(".")
+    for label in labels:
+        if not label:
+            raise DnsLookupError("INVALID_DOMAIN", f"Domain has an empty label: {domain}")
+        if len(label) > MAX_LABEL_LENGTH:
+            raise DnsLookupError("INVALID_DOMAIN", f"Domain label exceeds {MAX_LABEL_LENGTH} characters: {domain}")
+    try:
+        candidate.encode("idna")
+    except (UnicodeError, ValueError) as error:
+        raise DnsLookupError("INVALID_DOMAIN", f"Domain is not a valid name: {domain}") from error
+    return candidate
 
 
 def _resolver(timeout: float) -> dns.resolver.Resolver:
@@ -38,6 +67,7 @@ def resolve_record(domain: str, record_type: str, *, timeout: float = DEFAULT_TI
     record_type = record_type.upper()
     if record_type not in FORWARD_RECORD_TYPES:
         raise DnsLookupError("UNSUPPORTED_RECORD_TYPE", f"Unsupported record type: {record_type}")
+    domain = normalize_domain(domain)
     try:
         answer = _resolver(timeout).resolve(domain, record_type)
     except dns.resolver.NXDOMAIN as error:
@@ -52,21 +82,29 @@ def resolve_record(domain: str, record_type: str, *, timeout: float = DEFAULT_TI
 
 
 def forward_lookup(domain: str, *, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> list[str]:
-    """Domain -> IP addresses. Tries A (IPv4) and AAAA (IPv6); a missing AAAA is not an error."""
+    """Domain -> IP addresses. Tries A (IPv4) and AAAA (IPv6); a missing AAAA is not an error.
+
+    If both queries fail, the error is preserved by severity rather than flattened: an
+    infrastructure failure (TIMEOUT / NO_NAMESERVERS) is raised so the API returns 503,
+    NXDOMAIN is raised as NOT_FOUND, and only a true empty answer becomes NO_ANSWER.
+    """
+    domain = normalize_domain(domain)
     addresses: list[str] = []
-    saw_not_found = False
+    errors: list[DnsLookupError] = []
     for record_type in ("A", "AAAA"):
         try:
             addresses.extend(resolve_record(domain, record_type, timeout=timeout))
         except DnsLookupError as error:
-            if error.code == "NOT_FOUND":
-                saw_not_found = True
-            continue
-    if not addresses:
-        if saw_not_found:
-            raise DnsLookupError("NOT_FOUND", f"Domain does not exist: {domain}")
-        raise DnsLookupError("NO_ANSWER", f"No A or AAAA records for {domain}")
-    return addresses
+            errors.append(error)
+    if addresses:
+        return addresses
+    for error in errors:
+        if error.code in INFRASTRUCTURE_CODES:
+            raise error
+    for error in errors:
+        if error.code == "NOT_FOUND":
+            raise error
+    raise DnsLookupError("NO_ANSWER", f"No A or AAAA records for {domain}")
 
 
 def reverse_lookup(ip: str, *, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> list[str]:
