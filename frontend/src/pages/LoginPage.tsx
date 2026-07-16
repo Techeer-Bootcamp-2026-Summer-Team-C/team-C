@@ -3,6 +3,7 @@ import { useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { Button, TextField } from "../components/primitives";
 
 export function LoginPage() {
   const auth = useAuth();
@@ -44,10 +45,10 @@ export function LoginPage() {
       <section className="login-panel">
         <form onSubmit={(event) => void submit(event)}>
           <div className="login-heading"><LockKeyhole aria-hidden="true" size={20} /><div><span>AUTHENTICATED ACCESS</span><h2>Sign in</h2></div></div>
-          <label className="field"><span>Login ID</span><input autoCapitalize="none" autoComplete="username" autoFocus maxLength={64} minLength={3} onChange={(event) => setLoginId(event.target.value)} spellCheck={false} type="text" value={loginId} /></label>
-          <label className="field"><span>Password</span><input autoComplete="current-password" maxLength={1024} onChange={(event) => setPassword(event.target.value)} type="password" value={password} /></label>
+          <TextField label="Login ID" autoCapitalize="none" autoComplete="username" autoFocus maxLength={64} minLength={3} onChange={(event) => setLoginId(event.target.value)} spellCheck={false} type="text" value={loginId} />
+          <TextField label="Password" autoComplete="current-password" maxLength={1024} onChange={(event) => setPassword(event.target.value)} type="password" value={password} />
           {error ? <div className="login-error" role="alert"><strong>{error.code === "ACCOUNT_DISABLED" ? "Account disabled" : "Sign in failed"}</strong><span>{error.message}</span>{error.requestId ? <code>Request {error.requestId}</code> : null}</div> : null}
-          <button className="button primary login-submit" disabled={loading} type="submit">{loading ? "Signing in…" : "Sign in"}</button>
+          <Button className="login-submit" loading={loading} type="submit" variant="primary">{loading ? "Signing in…" : "Sign in"}</Button>
           <p className="login-note">Your session survives page refreshes in this tab and expires automatically.</p>
         </form>
       </section>

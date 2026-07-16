@@ -229,14 +229,25 @@ class EventRepository:
             return None
         return dict(zip(EVENT_COLUMNS, result.result_rows[0], strict=True))
 
-    def ingest_summary(self, *, from_: datetime, to: datetime) -> tuple[int, datetime | None]:
+    def ingest_summary(
+        self,
+        *,
+        from_: datetime,
+        to: datetime,
+        endpoint_id: int | None = None,
+    ) -> tuple[int, datetime | None]:
+        endpoint_condition = (
+            " AND endpoint_id = {endpoint_id:UInt64}" if endpoint_id is not None else ""
+        )
         result = self.client.query(
-            """
+            f"""
             SELECT uniqExact(event_id), maxOrNull(ingested_at)
             FROM edr_events FINAL
-            WHERE ingested_at >= {from:DateTime64(3)} AND ingested_at < {to:DateTime64(3)} AND is_delete = 0
+            WHERE ingested_at >= {{from:DateTime64(3)}}
+              AND ingested_at < {{to:DateTime64(3)}}
+              AND is_delete = 0{endpoint_condition}
             """,
-            parameters={"from": from_, "to": to},
+            parameters={"from": from_, "to": to, "endpoint_id": endpoint_id},
         )
         return int(result.result_rows[0][0]), result.result_rows[0][1]
 
@@ -306,6 +317,7 @@ class FailureRepository:
         status: str | None = None,
         failure_stage: str | None = None,
         retryable: bool | None = None,
+        endpoint_id: int | None = None,
         sort_order: Literal["asc", "desc"] = "desc",
     ) -> list[JsonObject]:
         conditions: list[str] = []
@@ -325,6 +337,9 @@ class FailureRepository:
         if retryable is not None:
             conditions.append("retryable = {retryable:Bool}")
             parameters["retryable"] = retryable
+        if endpoint_id is not None:
+            conditions.append("endpoint_id = {endpoint_id:UInt64}")
+            parameters["endpoint_id"] = endpoint_id
         where = " WHERE " + " AND ".join(conditions) if conditions else ""
         result = self.client.query(
             f"SELECT {', '.join(FAILURE_COLUMNS)} FROM event_failures FINAL{where} "

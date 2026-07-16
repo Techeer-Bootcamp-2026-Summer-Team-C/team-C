@@ -1,0 +1,16 @@
+.chart-grid { stroke: var(--border-subtle); }
+.chart-line { stroke: var(--status-info); }
+.chart-line.alert { stroke: var(--status-warning); }
+.chart-line.closed { stroke: var(--text-tertiary); }
+.time-chart circle { fill: var(--surface-panel); stroke: var(--accent-primary); }
+.inline-legend .open { background: var(--status-warning); }
+.inline-legend .closed { background: var(--text-tertiary); }
+.count-track { background: var(--surface-inset); }
+.count-track i { background: var(--status-info); }
+.count-track.critical i,
+.count-track.unavailable i { background: var(--status-critical); }
+.count-track.high i,
+.count-track.degraded i { background: var(--status-warning); }
+.count-track.medium i { background: var(--status-info); }
+.count-track.low i,
+.count-track.healthy i { background: var(--status-success); }

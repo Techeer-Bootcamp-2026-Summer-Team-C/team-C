@@ -13,10 +13,12 @@ export interface TimeFilterState {
 }
 
 export function readTimeFilter(params: URLSearchParams): TimeFilterState {
+  const rawPreset = params.get("timePreset");
   const preset = timePreset(params);
   const from = params.get("from") ?? undefined;
   const to = params.get("to") ?? undefined;
-  const valid = preset !== "CUSTOM" || Boolean(from && to && Date.parse(from) < Date.parse(to));
+  const presetValid = rawPreset === null || ["LATEST_15M", "LATEST_1H", "LATEST_24H", "LATEST_7D", "CUSTOM"].includes(rawPreset);
+  const valid = presetValid && (preset !== "CUSTOM" || Boolean(from && to && Date.parse(from) < Date.parse(to)));
   const query: DashboardTimeQuery = { timePreset: preset };
   if (preset === "CUSTOM" && from && to) {
     query.from = from;

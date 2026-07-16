@@ -28,12 +28,33 @@ class EndpointService:
     def list(self, query: EndpointListQuery, *, calculated_at: datetime) -> PagedData[EndpointDto]:
         rows = self.repository.risk_snapshot(
             endpoint_ids=query.endpoint_ids,
+            q=query.q,
             status=query.status,
             os_type=query.os_type,
         )
         items = [endpoint_dto(row, calculated_at=calculated_at) for row in rows]
         if query.risk_level is not None:
             items = [item for item in items if item.risk.level is query.risk_level]
+        if query.q is not None:
+            normalized_query = query.q.casefold()
+            status_rank = {"ONLINE": 0, "OFFLINE": 1, "RETIRED": 2}
+            items.sort(
+                key=lambda item: (
+                    0 if normalized_query in {item.hostname.casefold(), item.agent_id.casefold()} else 1,
+                    status_rank[item.status.value],
+                    -item.risk.score,
+                    item.hostname.casefold(),
+                    item.endpoint_id,
+                )
+            )
+            total = len(items)
+            start = (query.page - 1) * query.size
+            return PagedData(
+                items=items[start : start + query.size],
+                page=query.page,
+                size=query.size,
+                total=total,
+            )
         items.sort(key=lambda item: item.endpoint_id)
         reverse = query.sort_order == "desc"
         if query.sort_by == "riskScore":
@@ -90,6 +111,7 @@ class AlertService:
             status=query.status,
             severity=query.severity.value if query.severity else None,
             rule_code=query.rule_code,
+            sort_by=query.sort_by,
             sort_order=query.sort_order,
         )
         total = len(rows)

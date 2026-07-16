@@ -42,6 +42,8 @@ def test_postgresql_migration_repository_idempotency_and_rollback() -> None:
             with connection.transaction():
                 connection.execute("UPDATE users SET locale = 'JA' WHERE login_id = 'migration-user'")
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0004_user_dashboard_layouts.up.sql")
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0005_query_search_sort_indexes.up.sql")
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0005_query_search_sort_indexes.up.sql")
         column = connection.execute(
             """
             SELECT data_type, character_maximum_length
@@ -55,10 +57,32 @@ def test_postgresql_migration_repository_idempotency_and_rollback() -> None:
         ).fetchone()[0]
         assert "lower" in index_definition.lower()
         assert "is_delete" in index_definition.lower()
+        query_indexes = {
+            row[0]
+            for row in connection.execute(
+                """
+                SELECT indexname FROM pg_indexes
+                WHERE schemaname = 'public' AND indexname IN (
+                    'idx_endpoints_hostname_lower_prefix',
+                    'idx_endpoints_agent_id_lower_prefix',
+                    'idx_alerts_detected_at'
+                )
+                """
+            ).fetchall()
+        }
+        assert query_indexes == {
+            "idx_endpoints_hostname_lower_prefix",
+            "idx_endpoints_agent_id_lower_prefix",
+            "idx_alerts_detected_at",
+        }
         try:
             endpoint_id = EndpointRepository(connection).insert(
                 EndpointInsert("agent-test-001", "TEST-ENDPOINT", OsType.MACOS, now)
             )
+            endpoint_rows = EndpointRepository(connection)
+            assert [row["endpoint_id"] for row in endpoint_rows.risk_snapshot(q="test")] == [endpoint_id]
+            assert [row["endpoint_id"] for row in endpoint_rows.risk_snapshot(q=str(endpoint_id))] == [endpoint_id]
+            assert endpoint_rows.risk_snapshot(q="TEST%") == []
             alert_insert = AlertInsert(
                 endpoint_id=endpoint_id,
                 event_id=UUID("018ff8f4-86de-7b25-9b8a-2d22f6a3e001"),

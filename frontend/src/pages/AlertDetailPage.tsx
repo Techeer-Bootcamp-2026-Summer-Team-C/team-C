@@ -6,11 +6,10 @@ import { api } from "../api/endpoints";
 import { useAuth } from "../auth/AuthContext";
 import { readTimeFilter } from "../components/filters";
 import { DefinitionGrid, EmptyState, ErrorState, Field, PageHeader, Panel, ResponseGuidance, Skeleton, SourceEvent, StatusPill } from "../components/ui";
-import type { AlertDto, AlertListQuery, AlertStatus, SuccessEnvelope } from "../contracts";
+import type { AlertDto, AlertStatus, SuccessEnvelope } from "../contracts";
 import { useI18n } from "../i18n/LocaleContext";
-import { alertDetailUrl, nextActionableAlert } from "../features/alertTriage";
+import { alertDetailUrl, alertTriageQueueQuery, nextActionableAlert } from "../features/alertTriage";
 import { formatDateTime } from "../lib/format";
-import { allowedValue, positiveInteger } from "../lib/params";
 import { canMutate } from "../query/policy";
 
 export function AlertDetailPage() {
@@ -22,7 +21,7 @@ export function AlertDetailPage() {
   const auth = useAuth();
   const queryClient = useQueryClient();
   const time = readTimeFilter(params);
-  const queueQuery = triageQueueQuery(params);
+  const queueQuery = alertTriageQueueQuery(params);
   const result = useQuery({ queryKey: ["alert", alertId], queryFn: ({ signal }) => api.alert(alertId, signal), enabled: valid });
   const queueResult = useQuery({
     queryKey: ["alert-triage-queue", queueQuery],
@@ -62,22 +61,11 @@ interface TriageSubmission {
   nextAlertId?: number;
 }
 
-function triageQueueQuery(params: URLSearchParams): AlertListQuery {
-  const time = readTimeFilter(params);
-  const query: AlertListQuery = { ...time.query, page: 1, size: 500, sortOrder: allowedValue(params.get("sortOrder"), ["asc", "desc"] as const) ?? "desc" };
-  const severity = allowedValue(params.get("severity"), ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const);
-  const endpointId = positiveInteger(params.get("endpointId"));
-  const ruleCode = (params.get("ruleCode") ?? "").trim();
-  if (severity) query.severity = severity;
-  if (endpointId) query.endpointId = endpointId;
-  if (ruleCode) query.ruleCode = ruleCode;
-  return query;
-}
-
 export async function invalidateAlertData(queryClient: Pick<QueryClient, "invalidateQueries">, alertId: number) {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ["alert", alertId] }),
     queryClient.invalidateQueries({ queryKey: ["alerts"] }),
+    queryClient.invalidateQueries({ queryKey: ["alert-triage-queue"] }),
     queryClient.invalidateQueries({ queryKey: ["endpoints"] }),
   ]);
 }
@@ -106,7 +94,7 @@ function AlertDetail({ alert, canUpdate, mutation, nextAlert, params, queue, que
           key={item.alertId}
           to={alertDetailUrl(item.alertId, params)}
         >
-          <span><StatusPill value={item.severity} /><small>{t("alert.riskValue", { score: item.riskScore })}</small></span>
+          <span className="triage-row-heading"><span><StatusPill value={item.severity} /><StatusPill value={item.status} /></span><small>{t("alert.riskValue", { score: item.riskScore })}</small></span>
           <strong>{item.title}</strong>
           <code>{item.ruleCode} · {item.agentId}</code>
           <small>{formatDateTime(item.detectedAt)}</small>
@@ -140,7 +128,7 @@ function AlertDetail({ alert, canUpdate, mutation, nextAlert, params, queue, que
         </div> : <div className="read-only-note"><StatusPill value={alert.status} /><span>{t("alert.viewerControlsHidden")}</span></div>}</Panel>
         <Panel title={t("alert.sourceEvent")} subtitle={t("alert.sourceEventSubtitle")}><SourceEvent alert={alert} /></Panel>
         <Panel title={t("alert.connectedIncidents")} subtitle={t("alert.correlationReferences")}>{alert.incidents.length ? <div className="link-list">{alert.incidents.map((incident) => <Link key={incident.incidentId} to={`/incidents/${incident.incidentId}`}><span><strong>{incident.title}</strong><small>{formatDateTime(incident.windowStartAt)} – {formatDateTime(incident.windowEndAt)}</small></span><span><StatusPill value={incident.severity} /><StatusPill value={incident.status} /></span></Link>)}</div> : <EmptyState title={t("alert.noConnectedIncidents")} message={t("alert.noConnectedDescription")} />}</Panel>
-        <Panel className="wide" title={t("alert.responseGuidance")} subtitle={t("alert.guidanceSubtitle")}><ResponseGuidance steps={alert.responseGuidance} /></Panel>
+        <Panel className="wide" title={t("alert.responseGuidance")} subtitle={t("alert.guidanceRuleVersion", { ruleCode: alert.ruleCode, version: alert.ruleVersion })}><ResponseGuidance steps={alert.responseGuidance} /></Panel>
       </section>
     </div>
   </section>;

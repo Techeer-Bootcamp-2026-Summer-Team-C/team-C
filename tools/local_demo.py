@@ -192,6 +192,7 @@ def _initialize() -> None:
                 apply_postgres_file(connection, ROOT / "migrations/postgresql/0003_user_locale.up.sql")
             if connection.execute("SELECT to_regclass('public.user_dashboard_layouts')").fetchone()[0] is None:
                 apply_postgres_file(connection, ROOT / "migrations/postgresql/0004_user_dashboard_layouts.up.sql")
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0005_query_search_sort_indexes.up.sql")
         login_id_length = connection.execute(
             """
             SELECT character_maximum_length

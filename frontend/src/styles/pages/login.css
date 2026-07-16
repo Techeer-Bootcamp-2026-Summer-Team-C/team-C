@@ -1,0 +1,37 @@
+.login-layout { min-width: 0; background: var(--surface-canvas); }
+.login-context {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--surface-shell);
+  background-image: var(--gradient-accent-surface);
+  border-color: var(--border-subtle);
+}
+.login-context::after {
+  content: "";
+  position: absolute;
+  width: min(42vw, 620px);
+  aspect-ratio: 1;
+  right: -24%;
+  bottom: -55%;
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.login-context > * { position: relative; z-index: 1; }
+.login-mark { color: var(--accent-primary); background: var(--surface-panel); border-color: var(--border-default); }
+.login-context > p { color: var(--text-secondary); }
+.login-boundary { background: var(--surface-inset); border-color: var(--accent-primary); }
+.login-panel form { background: var(--surface-panel); border-color: var(--border-default); box-shadow: var(--elevation-raised); }
+.login-heading { border-color: var(--border-subtle); }
+.login-error { border-color: var(--status-critical); background: var(--surface-inset); }
+
+@media (max-width: 900px) {
+  .login-layout { grid-template-columns: 1fr; }
+  .login-context { min-height: 38vh; border-right: 0; border-bottom: 1px solid var(--border-subtle); }
+}
+
+@media (max-width: 480px) {
+  .login-context { padding: var(--space-10); }
+  .login-panel { padding: var(--space-6); }
+  .login-panel form { padding: var(--space-8); }
+}

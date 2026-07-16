@@ -31,7 +31,7 @@ from .contracts.endpoints import EndpointDetailDto, EndpointDto
 from .contracts.enums import DashboardInterval, UserLocale, UserRole, UserStatus
 from .contracts.events import EventDetailDto, EventDto, ProcessTreeDto
 from .contracts.incidents import IncidentDetailDto, IncidentDto
-from .contracts.investigations import AttackTimelineDto, EgressTopologyDto, EventFailureDto
+from .contracts.investigations import AttackTimelineDto, EgressTopologyDto, EventFailureDto, IncidentInvestigationDto
 from .contracts.operations import OperationsHealthDto
 from .contracts.requests import (
     AlertListQuery,
@@ -538,6 +538,23 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         return _success(request, data)
 
     @app.get(
+        "/api/v1/incidents/{incidentId}/investigation",
+        response_model=SuccessEnvelope[IncidentInvestigationDto],
+        operation_id="incidentsGetInvestigation",
+        tags=["Incidents"],
+        responses=_error_responses(400, 401, 404, 503),
+    )
+    def incident_investigation(
+        incidentId: int,
+        request: Request,
+        _user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[IncidentInvestigationDto]:
+        runtime = _runtime(request)
+        with runtime.postgres() as connection:
+            data = _investigation_service(runtime, connection).investigation(incidentId)
+        return _success(request, data)
+
+    @app.get(
         "/api/v1/dashboard/summary",
         response_model=SuccessEnvelope[DashboardSummaryDto],
         operation_id="dashboardGetSummary",
@@ -554,7 +571,11 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         from_, to = resolve_time_range(query, now=calculated_at)
         with runtime.postgres() as connection:
             data = _summary_service(runtime, connection).dashboard(
-                from_=from_, to=to, interval=DashboardInterval(query.interval), calculated_at=calculated_at
+                from_=from_,
+                to=to,
+                interval=DashboardInterval(query.interval),
+                calculated_at=calculated_at,
+                endpoint_id=query.endpoint_id,
             )
         return _success(request, data)
 
@@ -575,7 +596,7 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         from_, to = resolve_time_range(query, now=calculated_at)
         with runtime.postgres() as connection:
             data = _summary_service(runtime, connection).endpoint_summary(
-                from_=from_, to=to, calculated_at=calculated_at
+                from_=from_, to=to, calculated_at=calculated_at, endpoint_id=query.endpoint_id
             )
         return _success(request, data)
 
@@ -594,7 +615,9 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         runtime = _runtime(request)
         from_, to = resolve_time_range(query, now=datetime.now(UTC))
         with runtime.postgres() as connection:
-            data = _summary_service(runtime, connection).ingest_summary(from_=from_, to=to)
+            data = _summary_service(runtime, connection).ingest_summary(
+                from_=from_, to=to, endpoint_id=query.endpoint_id
+            )
         return _success(request, data)
 
     @app.get(

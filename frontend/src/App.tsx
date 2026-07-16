@@ -1,19 +1,21 @@
+import { lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { RequireAuth } from "./auth/AuthContext";
 import { AppShell } from "./components/AppShell";
-import { AlertDetailPage } from "./pages/AlertDetailPage";
-import { AlertsPage } from "./pages/AlertsPage";
-import { ArchivesPage } from "./pages/ArchivesPage";
-import { EndpointDetailPage } from "./pages/EndpointDetailPage";
-import { EndpointsPage } from "./pages/EndpointsPage";
-import { EventDetailPage } from "./pages/EventDetailPage";
-import { EventsPage } from "./pages/EventsPage";
-import { IncidentDetailPage } from "./pages/IncidentDetailPage";
-import { IncidentsPage } from "./pages/IncidentsPage";
-import { IntelligencePage } from "./pages/IntelligencePage";
 import { LoginPage } from "./pages/LoginPage";
-import { OperationsPage } from "./pages/OperationsPage";
-import { OverviewPage } from "./pages/OverviewPage";
+
+const AlertDetailPage = lazy(async () => ({ default: (await import("./pages/AlertDetailPage")).AlertDetailPage }));
+const AlertsPage = lazy(async () => ({ default: (await import("./pages/AlertsPage")).AlertsPage }));
+const ArchivesPage = lazy(async () => ({ default: (await import("./pages/ArchivesPage")).ArchivesPage }));
+const EndpointDetailPage = lazy(async () => ({ default: (await import("./pages/EndpointDetailPage")).EndpointDetailPage }));
+const EndpointsPage = lazy(async () => ({ default: (await import("./pages/EndpointsPage")).EndpointsPage }));
+const EventDetailPage = lazy(async () => ({ default: (await import("./pages/EventDetailPage")).EventDetailPage }));
+const EventsPage = lazy(async () => ({ default: (await import("./pages/EventsPage")).EventsPage }));
+const IncidentDetailPage = lazy(async () => ({ default: (await import("./pages/IncidentDetailPage")).IncidentDetailPage }));
+const IncidentsPage = lazy(async () => ({ default: (await import("./pages/IncidentsPage")).IncidentsPage }));
+const IntelligencePage = lazy(async () => ({ default: (await import("./pages/IntelligencePage")).IntelligencePage }));
+const OperationsPage = lazy(async () => ({ default: (await import("./pages/OperationsPage")).OperationsPage }));
+const OverviewPage = lazy(async () => ({ default: (await import("./pages/OverviewPage")).OverviewPage }));
 
 export function App() {
   return <Routes>

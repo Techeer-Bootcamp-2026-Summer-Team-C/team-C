@@ -10,6 +10,7 @@ from psycopg.types.json import Jsonb
 from backend.contracts.auth import normalize_login_id
 from backend.contracts.collector import AgentHeartbeatRequest, AgentRegisterRequest
 from backend.contracts.enums import (
+    AlertSortBy,
     AlertStatus,
     EndpointStatus,
     IncidentStatus,
@@ -36,6 +37,29 @@ from .models import (
     StoredAlert,
     StoredIncident,
 )
+
+
+def _escape_like_prefix(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+
+
+def _alert_order_by(sort_by: AlertSortBy, sort_order: str) -> str:
+    sort_by = AlertSortBy(sort_by)
+    if sort_by is AlertSortBy.PRIORITY:
+        return (
+            "CASE status WHEN 'OPEN' THEN 0 WHEN 'IN_PROGRESS' THEN 1 ELSE 2 END ASC, "
+            "CASE severity WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END ASC, "
+            "risk_score DESC, detected_at DESC, alert_id ASC"
+        )
+
+    direction = "ASC" if sort_order == "asc" else "DESC"
+    expression = {
+        AlertSortBy.DETECTED_AT: "detected_at",
+        AlertSortBy.SEVERITY: ("CASE severity WHEN 'LOW' THEN 0 WHEN 'MEDIUM' THEN 1 WHEN 'HIGH' THEN 2 ELSE 3 END"),
+        AlertSortBy.RISK_SCORE: "risk_score",
+        AlertSortBy.STATUS: ("CASE status WHEN 'RESOLVED' THEN 0 WHEN 'IN_PROGRESS' THEN 1 ELSE 2 END"),
+    }[sort_by]
+    return f"{expression} {direction}, alert_id ASC"
 
 
 class UserRepository:
@@ -536,9 +560,17 @@ class EndpointRepository:
         self,
         *,
         endpoint_ids: Sequence[int] | None = None,
+        q: str | None = None,
         status: str | None = None,
         os_type: OsType | None = None,
     ) -> list[dict[str, Any]]:
+        query_endpoint_id: int | None = None
+        query_prefix: str | None = None
+        if q is not None:
+            if q.isdecimal():
+                query_endpoint_id = int(q)
+            else:
+                query_prefix = _escape_like_prefix(q.lower())
         with self.connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute(
                 """
@@ -571,6 +603,17 @@ class EndpointRepository:
                   AND (%s::bigint[] IS NULL OR e.endpoint_id = ANY(%s::bigint[]))
                   AND (%s::text IS NULL OR e.status = %s::text)
                   AND (%s::text IS NULL OR e.os_type = %s::text)
+                  AND (
+                      %s::text IS NULL
+                      OR (%s::bigint IS NOT NULL AND e.endpoint_id = %s::bigint)
+                      OR (
+                          %s::text IS NOT NULL
+                          AND (
+                              LOWER(e.hostname) LIKE %s::text ESCAPE E'\\\\'
+                              OR LOWER(e.agent_id) LIKE %s::text ESCAPE E'\\\\'
+                          )
+                      )
+                  )
                 """,
                 (
                     list(endpoint_ids) if endpoint_ids else None,
@@ -579,6 +622,12 @@ class EndpointRepository:
                     status,
                     os_type.value if os_type else None,
                     os_type.value if os_type else None,
+                    q,
+                    query_endpoint_id,
+                    query_endpoint_id,
+                    query_prefix,
+                    query_prefix,
+                    query_prefix,
                 ),
             )
             return [dict(row) for row in cursor.fetchall()]
@@ -706,9 +755,10 @@ class AlertRepository:
         status: AlertStatus | None = None,
         severity: str | None = None,
         rule_code: str | None = None,
+        sort_by: AlertSortBy = AlertSortBy.PRIORITY,
         sort_order: str = "desc",
     ) -> list[dict[str, Any]]:
-        direction = "ASC" if sort_order == "asc" else "DESC"
+        order_by = _alert_order_by(sort_by, sort_order)
         query = f"""
             SELECT * FROM alerts
             WHERE is_delete = FALSE AND detected_at >= %s AND detected_at < %s
@@ -716,7 +766,7 @@ class AlertRepository:
               AND (%s::text IS NULL OR status = %s::text)
               AND (%s::text IS NULL OR severity = %s::text)
               AND (%s::text IS NULL OR rule_code = %s::text)
-            ORDER BY detected_at {direction}, alert_id {direction}
+            ORDER BY {order_by}
         """
         values = (
             from_,

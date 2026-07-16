@@ -1,15 +1,46 @@
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Globe2, Network, Radar } from "lucide-react";
+import { Activity, Globe2, Network, Radar, Search } from "lucide-react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/endpoints";
 import { CountBars } from "../components/charts";
 import { readTimeFilter, TimeFilterFields } from "../components/filters";
-import { DataTable, EmptyState, ErrorState, Field, GlobalFilterBar, KpiCard, PageHeader, Panel, Skeleton, StaleWarning, StatusPill } from "../components/ui";
-import type { EgressTopologyDto } from "../contracts";
+import { Badge } from "../components/primitives";
+import {
+  DataTable,
+  DefinitionGrid,
+  EmptyState,
+  ErrorState,
+  Field,
+  GlobalFilterBar,
+  Inspector,
+  KpiCard,
+  PageHeader,
+  Panel,
+  PartialFailureWarning,
+  Skeleton,
+  StaleWarning,
+  StatusPill,
+} from "../components/ui";
+import type { DashboardSummaryDto, EgressTopologyDto } from "../contracts";
+import {
+  endpointNodeId,
+  filterTopology,
+  selectedTopologyEdge,
+  targetNodeId,
+  topologyEdgeId,
+  topologyGraphEnabled,
+  type TopologySelection,
+} from "../features/intelligenceOperations";
 import { useI18n } from "../i18n/LocaleContext";
 import { parseEndpointIds } from "../lib/endpointIds";
 import { formatDateTime } from "../lib/format";
 import { updateParams } from "../lib/url";
+
+const LazyTopologyGraph = lazy(async () => {
+  const module = await import("../components/TopologyGraph");
+  return { default: module.TopologyGraph };
+});
 
 export function IntelligencePage() {
   const { t } = useI18n();
@@ -20,46 +51,172 @@ export function IntelligencePage() {
   const topologyQuery = { ...time.query, ...(endpointIds.length ? { endpointIds } : {}) };
   const summary = useQuery({ queryKey: ["intelligence-summary", summaryQuery], queryFn: ({ signal }) => api.dashboard(summaryQuery, signal), enabled: time.valid });
   const topology = useQuery({ queryKey: ["egress-topology", topologyQuery], queryFn: ({ signal }) => api.topology(topologyQuery, signal), enabled: time.valid });
+  const summaryUnavailable = Boolean(summary.error && !summary.data);
+  const topologyUnavailable = Boolean(topology.error && !topology.data);
   const error = summary.error ?? topology.error;
-  return <div className="page-stack">
+
+  return <div className="page-stack intelligence-page">
     <PageHeader eyebrow="THREAT INTELLIGENCE" title={t("intelligence.title")} description={t("intelligence.description")} />
     <GlobalFilterBar hasFilters={params.size > 0} onClear={() => setParams({})}>
       <TimeFilterFields params={params} setParams={setParams} />
       <Field label={t("filter.endpointIds")}><input onChange={(event) => setParams(updateParams(params, { endpointIds: event.target.value }))} placeholder="1, 2, 7" value={params.get("endpointIds") ?? ""} /></Field>
     </GlobalFilterBar>
     {!time.valid ? <ErrorState error={new Error(t("filter.invalidRange"))} /> : null}
-    {(summary.isPending || topology.isPending) && time.valid ? <Skeleton rows={10} /> : null}
-    {error && !summary.data && !topology.data ? <ErrorState error={error} onRetry={() => void Promise.all([summary.refetch(), topology.refetch()])} /> : null}
-    {(summary.isRefetchError || topology.isRefetchError) && summary.data && topology.data ? <StaleWarning error={error} onRetry={() => void Promise.all([summary.refetch(), topology.refetch()])} /> : null}
-    {summary.data && topology.data ? <IntelligenceContent dashboard={summary.data.data} topology={topology.data.data} /> : null}
+    {time.valid && !summary.data && !topology.data && (summary.isPending || topology.isPending) ? <Skeleton rows={10} /> : null}
+    {summaryUnavailable && topologyUnavailable ? <ErrorState error={error} onRetry={() => void Promise.all([summary.refetch(), topology.refetch()])} /> : null}
+    {(summaryUnavailable !== topologyUnavailable) ? <PartialFailureWarning message={summaryUnavailable ? t("intelligence.summaryUnavailable") : t("intelligence.topologyUnavailable")} /> : null}
+    {(summary.isRefetchError || topology.isRefetchError) && (summary.data || topology.data) ? <StaleWarning error={error} onRetry={() => void Promise.all([summary.refetch(), topology.refetch()])} /> : null}
+    {(summary.data || topology.data) ? <IntelligenceContent dashboard={summary.data?.data ?? null} topology={topology.data?.data ?? null} /> : null}
   </div>;
 }
 
-function IntelligenceContent({ dashboard, topology }: { dashboard: import("../contracts").DashboardSummaryDto; topology: EgressTopologyDto }) {
+export function IntelligenceContent({
+  dashboard,
+  topology,
+  graphEnabled = topologyGraphEnabled(),
+}: {
+  dashboard: DashboardSummaryDto | null;
+  topology: EgressTopologyDto | null;
+  graphEnabled?: boolean;
+}) {
   const { t } = useI18n();
   return <>
     <section className="kpi-grid intelligence-kpis">
-      <KpiCard detail={t("intelligence.mappedTactics")} icon={<Radar size={18} />} label={t("intelligence.mitreTactics")} value={dashboard.alerts.mitreTactics.length} />
-      <KpiCard detail={t("intelligence.mappedTechniques")} icon={<Activity size={18} />} label={t("intelligence.mitreTechniques")} value={dashboard.alerts.mitreTechniques.length} />
-      <KpiCard detail={t("intelligence.observedEgress")} icon={<Network size={18} />} label={t("intelligence.topologyNodes")} value={topology.nodes.length} />
-      <KpiCard detail={t("intelligence.uniqueRelationships")} icon={<Globe2 size={18} />} label={t("intelligence.egressEdges")} value={topology.edges.length} />
+      {dashboard ? <>
+        <KpiCard detail={t("intelligence.mappedTactics")} icon={<Radar size={18} />} label={t("intelligence.mitreTactics")} value={dashboard.alerts.mitreTactics.length} />
+        <KpiCard detail={t("intelligence.mappedTechniques")} icon={<Activity size={18} />} label={t("intelligence.mitreTechniques")} value={dashboard.alerts.mitreTechniques.length} />
+      </> : null}
+      {topology ? <>
+        <KpiCard detail={t("intelligence.observedEgress")} icon={<Network size={18} />} label={t("intelligence.topologyNodes")} value={topology.nodes.length} />
+        <KpiCard detail={t("intelligence.uniqueRelationships")} icon={<Globe2 size={18} />} label={t("intelligence.egressEdges")} value={topology.edges.length} />
+      </> : null}
     </section>
-    <section className="overview-grid">
-      <Panel title={t("intelligence.mitreTactics")} subtitle={t("intelligence.alertDistribution")}><CountBars rows={dashboard.alerts.mitreTactics.map((row) => ({ label: `${row.mitreTacticCode} · ${row.mitreTacticName}`, count: row.count }))} /></Panel>
-      <Panel title={t("intelligence.mitreTechniques")} subtitle={t("intelligence.alertDistribution")}><CountBars rows={dashboard.alerts.mitreTechniques.map((row) => ({ label: `${row.mitreTechniqueCode} · ${row.mitreTechniqueName}`, count: row.count }))} /></Panel>
-      <Panel title={t("intelligence.topDomains")} subtitle={t("intelligence.normalizedValues")}><CountBars rows={dashboard.events.topDomains.map((row) => ({ label: row.domain, count: row.count }))} /></Panel>
-      <Panel title={t("intelligence.topRemoteIps")} subtitle={t("intelligence.normalizedValues")}><CountBars rows={dashboard.events.topRemoteIps.map((row) => ({ label: row.remoteIp, count: row.count }))} /></Panel>
-      <Panel title={t("intelligence.topProcesses")} subtitle={t("intelligence.normalizedValues")}><CountBars rows={dashboard.events.topProcesses.map((row) => ({ label: row.processName, count: row.count }))} /></Panel>
-      <Panel className="wide" title={t("intelligence.egressTopology")} subtitle={t("intelligence.egressSubtitle")} meta={<StatusPill value="READ ONLY" />}><TopologyView topology={topology} /></Panel>
-    </section>
+    {dashboard ? <MitreAndSignals dashboard={dashboard} /> : null}
+    {topology ? <TopologyWorkspace graphEnabled={graphEnabled} topology={topology} /> : null}
   </>;
 }
 
-function TopologyView({ topology }: { topology: EgressTopologyDto }) {
+type MitreSelection = { type: "TACTIC" | "TECHNIQUE"; code: string; name: string; count: number };
+
+function MitreAndSignals({ dashboard }: { dashboard: DashboardSummaryDto }) {
   const { t } = useI18n();
-  if (!topology.edges.length) return <EmptyState title={t("intelligence.noRelationships")} message={t("intelligence.noRelationshipsDescription")} />;
-  return <div className="topology-stack">
-    <div className="topology-nodes">{topology.nodes.map((node) => <Link className="topology-node" key={node.endpointId} to={`/endpoints/${node.endpointId}`}><span><strong>{node.hostname}</strong><small>Endpoint {node.endpointId}</small></span><span><StatusPill value={node.status} /><StatusPill value={node.riskLevel} /></span></Link>)}</div>
-    <DataTable label={t("intelligence.relationships")}><thead><tr><th scope="col">{t("intelligence.source")}</th><th scope="col">{t("intelligence.target")}</th><th scope="col">Protocol</th><th scope="col">Events</th><th scope="col">Alerts</th><th scope="col">{t("endpoints.lastSeen")}</th></tr></thead><tbody>{topology.edges.map((edge) => <tr key={`${edge.endpointId}-${edge.target}-${edge.protocol}`}><td><Link to={`/endpoints/${edge.endpointId}`}>{edge.sourceLabel}</Link></td><td><code>{edge.target}</code></td><td>{edge.protocol}</td><td>{edge.eventCount}</td><td>{edge.alertCount}</td><td>{formatDateTime(edge.lastSeenAt)}</td></tr>)}</tbody></DataTable>
-  </div>;
+  const [selection, setSelection] = useState<MitreSelection | null>(null);
+  const [topTab, setTopTab] = useState<"RULES" | "SIGNALS">("RULES");
+  const tactics = dashboard.alerts.mitreTactics.slice(0, 10);
+  const techniques = dashboard.alerts.mitreTechniques.slice(0, 10);
+  const signalRows = [
+    ...dashboard.events.topDomains.map((row) => ({ label: `Domain · ${row.domain}`, count: row.count })),
+    ...dashboard.events.topRemoteIps.map((row) => ({ label: `IP · ${row.remoteIp}`, count: row.count })),
+    ...dashboard.events.topProcesses.map((row) => ({ label: `Process · ${row.processName}`, count: row.count })),
+  ].sort((left, right) => right.count - left.count).slice(0, 10);
+
+  return <section className="intelligence-analysis-grid">
+    <Panel className="mitre-workspace" title={t("intelligence.mitreMatrix")} subtitle={t("intelligence.mitreMatrixSubtitle")} meta={<Badge tone="info">{t("intelligence.currentAlertSnapshot")}</Badge>}>
+      <div className="mitre-layout">
+        <div className="mitre-matrix" aria-label={t("intelligence.mitreMatrix")}>
+          <MitreGroup label={t("intelligence.mitreTactics")} rows={tactics.map((row) => ({ type: "TACTIC" as const, code: row.mitreTacticCode, name: row.mitreTacticName, count: row.count }))} selection={selection} onSelect={setSelection} />
+          <MitreGroup label={t("intelligence.mitreTechniques")} rows={techniques.map((row) => ({ type: "TECHNIQUE" as const, code: row.mitreTechniqueCode, name: row.mitreTechniqueName, count: row.count }))} selection={selection} onSelect={setSelection} />
+        </div>
+        <Inspector description={selection ? `${selection.code} · ${selection.type}` : t("intelligence.mitreSelectPrompt")} title={selection?.name ?? t("intelligence.selectedContext")}>
+          {selection ? <DefinitionGrid items={[
+            { label: t("intelligence.mappingType"), value: selection.type },
+            { label: t("intelligence.mappingCode"), value: selection.code },
+            { label: t("intelligence.alertCount"), value: selection.count },
+            { label: t("intelligence.timeRange"), value: `${formatDateTime(dashboard.timeRange.from)} — ${formatDateTime(dashboard.timeRange.to)}` },
+          ]} /> : <EmptyState title={t("intelligence.nothingSelected")} message={t("intelligence.mitreSelectPrompt")} />}
+        </Inspector>
+      </div>
+      <details className="table-fallback"><summary>{t("intelligence.openTableFallback")}</summary>
+        <DataTable label={t("intelligence.mitreTableFallback")}><thead><tr><th scope="col">Type</th><th scope="col">Code</th><th scope="col">Name</th><th scope="col">Alerts</th></tr></thead><tbody>
+          {[...tactics.map((row) => ({ type: "TACTIC", code: row.mitreTacticCode, name: row.mitreTacticName, count: row.count })), ...techniques.map((row) => ({ type: "TECHNIQUE", code: row.mitreTechniqueCode, name: row.mitreTechniqueName, count: row.count }))].map((row) => <tr key={`${row.type}-${row.code}`}><td>{row.type}</td><td><code>{row.code}</code></td><td>{row.name}</td><td>{row.count}</td></tr>)}
+        </tbody></DataTable>
+      </details>
+    </Panel>
+    <Panel title={t("intelligence.rulesSignals")} subtitle={t("intelligence.topNSubtitle")}>
+      <div aria-label={t("intelligence.rulesSignals")} className="tabs" role="tablist">
+        {(["RULES", "SIGNALS"] as const).map((tab) => <button aria-selected={topTab === tab} className={topTab === tab ? "active" : undefined} key={tab} onClick={() => setTopTab(tab)} role="tab" type="button">{tab === "RULES" ? t("intelligence.rules") : t("intelligence.signals")}</button>)}
+      </div>
+      <div aria-label={topTab === "RULES" ? t("intelligence.rules") : t("intelligence.signals")} className="tab-panel" role="tabpanel">
+        {topTab === "RULES" ? <CountBars rows={dashboard.alerts.topRules.slice(0, 10).map((row) => ({ label: `${row.ruleCode} · ${row.ruleName}`, count: row.count }))} /> : <CountBars rows={signalRows} />}
+      </div>
+    </Panel>
+  </section>;
+}
+
+function MitreGroup({
+  label,
+  rows,
+  selection,
+  onSelect,
+}: {
+  label: string;
+  rows: MitreSelection[];
+  selection: MitreSelection | null;
+  onSelect: (selection: MitreSelection) => void;
+}) {
+  const { t } = useI18n();
+  return <section><h3>{label}</h3>{rows.length ? <div className="mitre-cells">{rows.map((row) => <button aria-pressed={selection?.type === row.type && selection.code === row.code} className={selection?.type === row.type && selection.code === row.code ? "selected" : undefined} key={`${row.type}-${row.code}`} onClick={() => onSelect(row)} type="button"><code>{row.code}</code><strong>{row.name}</strong><span>{t("intelligence.alertsCount", { count: row.count })}</span></button>)}</div> : <EmptyState title={t("intelligence.noMappings")} message={t("intelligence.noMappingsDescription")} />}</section>;
+}
+
+export function TopologyWorkspace({ topology, graphEnabled }: { topology: EgressTopologyDto; graphEnabled: boolean }) {
+  const { t } = useI18n();
+  const [search, setSearch] = useState("");
+  const [limit, setLimit] = useState(10);
+  const [selection, setSelection] = useState<TopologySelection | null>(null);
+  const filtered = useMemo(() => filterTopology(topology, search, limit), [topology, search, limit]);
+  if (!topology.edges.length) return <Panel title={t("intelligence.egressTopology")} subtitle={t("intelligence.egressSubtitle")}><EmptyState title={t("intelligence.noRelationships")} message={t("intelligence.noRelationshipsDescription")} /></Panel>;
+
+  return <Panel className="topology-workspace-panel" title={t("intelligence.egressTopology")} subtitle={t("intelligence.egressSubtitle")} meta={<StatusPill value="READ ONLY" />}>
+    <div className="topology-toolbar">
+      <Field label={t("intelligence.searchTopology")}><span className="search-field"><Search aria-hidden="true" size={15} /><input onChange={(event) => setSearch(event.target.value)} type="search" value={search} /></span></Field>
+      <Field label={t("intelligence.topN")}><select onChange={(event) => setLimit(Number(event.target.value))} value={limit}><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option></select></Field>
+      <span className="topology-range">{formatDateTime(topology.from)} — {formatDateTime(topology.to)}</span>
+    </div>
+    {!filtered.edges.length ? <EmptyState title={t("intelligence.noFilteredRelationships")} message={t("intelligence.noFilteredRelationshipsDescription")} /> : <>
+      <div className="topology-stage">
+        <aside aria-label={t("intelligence.legend")} className="topology-legend"><strong>{t("intelligence.legend")}</strong><ul><li><i className="endpoint" />Endpoint</li><li><i className="target" />Target</li><li><i className="observed" />{t("intelligence.observedEdge")}</li></ul><small>{t("intelligence.countsNotTraffic")}</small></aside>
+        {graphEnabled ? <Suspense fallback={<Skeleton rows={8} />}><LazyTopologyGraph label={t("intelligence.graphAria")} onSelect={setSelection} selection={selection} topology={filtered} /></Suspense> : <div className="topology-fallback" role="status"><Badge tone="neutral">{t("intelligence.tableFallback")}</Badge><strong>{t("intelligence.graphDisabled")}</strong><p>{t("intelligence.graphDisabledDescription")}</p></div>}
+        <TopologyInspector selection={selection} topology={filtered} />
+      </div>
+      <TopologyEvidenceTable onSelect={setSelection} selection={selection} topology={filtered} />
+    </>}
+  </Panel>;
+}
+
+function TopologyInspector({ topology, selection }: { topology: EgressTopologyDto; selection: TopologySelection | null }) {
+  const { t } = useI18n();
+  const edge = selectedTopologyEdge(topology, selection);
+  if (edge) return <Inspector actions={<Badge tone={edge.alertCount ? "warning" : "success"}>{t("intelligence.observedOnly")}</Badge>} description={`${edge.sourceLabel} → ${edge.target}`} title={`${edge.protocol} ${t("intelligence.relationship")}`}>
+    <DefinitionGrid items={[
+      { label: "Protocol", value: edge.protocol },
+      { label: t("intelligence.eventCount"), value: edge.eventCount },
+      { label: t("intelligence.alertCount"), value: edge.alertCount },
+      { label: t("intelligence.lastObserved"), value: formatDateTime(edge.lastSeenAt) },
+    ]} />
+    <div className="context-links"><Link to={evidenceListUrl("events", edge, topology)}>Events</Link><Link to={evidenceListUrl("alerts", edge, topology)}>Alerts</Link></div>
+  </Inspector>;
+  if (selection?.kind === "NODE") {
+    const endpoint = topology.nodes.find((node) => endpointNodeId(node.endpointId) === selection.id);
+    if (endpoint) return <Inspector actions={<StatusPill value={endpoint.riskLevel} />} description={`Endpoint ${endpoint.endpointId}`} title={endpoint.hostname}>
+      <DefinitionGrid items={[{ label: "Risk", value: endpoint.riskScore }, { label: t("filter.status"), value: endpoint.status }, { label: t("intelligence.alertCount"), value: endpoint.alertCount }]} />
+      <div className="context-links"><Link to={`/endpoints/${endpoint.endpointId}`}>{t("intelligence.openEndpoint")}</Link></div>
+    </Inspector>;
+    if (selection.id.startsWith("target:")) return <Inspector description={t("intelligence.observedTargetDescription")} title={selection.id.slice(7)}><DefinitionGrid items={[{ label: t("intelligence.nodeType"), value: "TARGET" }, { label: t("intelligence.relationships"), value: topology.edges.filter((item) => targetNodeId(item.target) === selection.id).length }]} /></Inspector>;
+  }
+  return <Inspector description={t("intelligence.topologySelectPrompt")} title={t("intelligence.selectedContext")}><EmptyState title={t("intelligence.nothingSelected")} message={t("intelligence.topologySelectPrompt")} /></Inspector>;
+}
+
+function TopologyEvidenceTable({ topology, selection, onSelect }: { topology: EgressTopologyDto; selection: TopologySelection | null; onSelect: (selection: TopologySelection) => void }) {
+  const { t } = useI18n();
+  return <DataTable label={t("intelligence.relationships")}><thead><tr><th scope="col">{t("intelligence.source")}</th><th scope="col">{t("intelligence.target")}</th><th scope="col">Protocol</th><th scope="col">Events</th><th scope="col">Alerts</th><th scope="col">{t("intelligence.lastObserved")}</th></tr></thead><tbody>{topology.edges.map((edge) => {
+    const id = topologyEdgeId(edge.endpointId, edge.target, edge.protocol);
+    const selected = selection?.kind === "EDGE" && selection.id === id;
+    return <tr className={selected ? "selected-row" : undefined} key={id}><td><button aria-pressed={selected} className="evidence-select" onClick={() => onSelect({ kind: "EDGE", id })} type="button">{edge.sourceLabel}</button></td><td><code>{edge.target}</code></td><td>{edge.protocol}</td><td><Link to={evidenceListUrl("events", edge, topology)}>{edge.eventCount}</Link></td><td><Link to={evidenceListUrl("alerts", edge, topology)}>{edge.alertCount}</Link></td><td>{formatDateTime(edge.lastSeenAt)}</td></tr>;
+  })}</tbody></DataTable>;
+}
+
+function evidenceListUrl(route: "events" | "alerts", edge: EgressTopologyDto["edges"][number], topology: EgressTopologyDto): string {
+  const query = new URLSearchParams({ from: topology.from, to: topology.to });
+  query.set(route === "events" ? "endpointIds" : "endpointId", String(edge.endpointId));
+  return `/${route}?${query.toString()}`;
 }

@@ -12,9 +12,9 @@ Agent는 Process, Network, File, DNS, L7 5종 metadata를 전송한다. Npcap/tc
 
 | 구분 | 개수 |
 | --- | ---: |
-| Dashboard Backend REST API | 25 |
+| Dashboard Backend REST API | 26 |
 | Collector REST API | 3 |
-| **제품 REST API 합계** | **28** |
+| **제품 REST API 합계** | **29** |
 
 `/health/live`, `/health/ready`, `/metrics`, Swagger/OpenAPI 경로는 운영 endpoint이므로 제품 API 개수에서 제외한다. Failure 재처리는 공개 REST API가 아니라 관리자용 Python CLI로 수행한다.
 
@@ -220,14 +220,15 @@ FastAPI/Pydantic response model을 최종 응답 계약으로 사용한다.
 | 15 | GET | `/incidents` | Incident 목록 | `PagedData<IncidentDto>` |
 | 16 | GET | `/incidents/{incidentId}` | Incident 상세 | `IncidentDetailDto` |
 | 17 | GET | `/incidents/{incidentId}/timeline` | Event→Alert→Incident 타임라인 | `AttackTimelineDto` |
-| 18 | GET | `/dashboard/summary` | 전체 요약 | `DashboardSummaryDto` |
-| 19 | GET | `/dashboard/endpoints/summary` | Endpoint 요약 | `EndpointSummaryDto` |
-| 20 | GET | `/dashboard/ingest/summary` | 수집·저장·failure 요약 | `IngestSummaryDto` |
-| 21 | GET | `/dashboard/topology` | Endpoint egress 관계 요약 | `EgressTopologyDto` |
-| 22 | GET | `/dashboard/layouts/{dashboardKey}` | 본인 저장 layout 또는 기본 layout 조회 | `DashboardLayoutDto` |
-| 23 | PUT | `/dashboard/layouts/{dashboardKey}` | 본인 전체 layout revision upsert | `DashboardLayoutDto` |
-| 24 | DELETE | `/dashboard/layouts/{dashboardKey}` | 본인 저장 layout 삭제·기본값 복귀 | `DashboardLayoutDto` |
-| 25 | GET | `/operations/health` | 실시간 의존 서비스·Kafka Worker 상태 | `OperationsHealthDto` |
+| 18 | GET | `/incidents/{incidentId}/investigation` | 관측 근거 기반 Incident graph read model | `IncidentInvestigationDto` |
+| 19 | GET | `/dashboard/summary` | 전체 요약 | `DashboardSummaryDto` |
+| 20 | GET | `/dashboard/endpoints/summary` | Endpoint 요약 | `EndpointSummaryDto` |
+| 21 | GET | `/dashboard/ingest/summary` | 수집·저장·failure 요약 | `IngestSummaryDto` |
+| 22 | GET | `/dashboard/topology` | Endpoint egress 관계 요약 | `EgressTopologyDto` |
+| 23 | GET | `/dashboard/layouts/{dashboardKey}` | 본인 저장 layout 또는 기본 layout 조회 | `DashboardLayoutDto` |
+| 24 | PUT | `/dashboard/layouts/{dashboardKey}` | 본인 전체 layout revision upsert | `DashboardLayoutDto` |
+| 25 | DELETE | `/dashboard/layouts/{dashboardKey}` | 본인 저장 layout 삭제·기본값 복귀 | `DashboardLayoutDto` |
+| 26 | GET | `/operations/health` | 실시간 의존 서비스·Kafka Worker 상태 | `OperationsHealthDto` |
 
 ### 5.2 Collector REST API
 
@@ -509,7 +510,7 @@ Collector validation 실패는 Kafka offset이 없으므로 server `event_failur
 ### 8.1 목록
 
 ```http
-GET /api/v1/endpoints?status=ONLINE&osType=WINDOWS&page=1&size=50
+GET /api/v1/endpoints?q=SOC-WIN&status=ONLINE&osType=WINDOWS&page=1&size=50
 ```
 
 목록에는 Endpoint ID, agent ID, hostname, OS, IP, Agent version/build/arch, status, lastSeenAt, isStale, sensor health와 Backend가 계산한 Endpoint Risk를 반환한다.
@@ -521,6 +522,7 @@ GET /api/v1/endpoints?status=ONLINE&osType=WINDOWS&page=1&size=50
 | Query | 타입 | 기본 | 설명 |
 | --- | --- | --- | --- |
 | `endpointIds` | repeated integer | - | Endpoint ID exact match, 여러 값은 OR |
+| `q` | trimmed string, 1~128자 | - | 숫자는 Endpoint ID exact, 문자열은 hostname/agent ID의 case-insensitive exact 또는 prefix |
 | `status` | EndpointStatus | - | exact match |
 | `osType` | `WINDOWS / MACOS` | - | exact match |
 | `riskLevel` | RiskLevel | - | 현재 Endpoint Risk level exact match |
@@ -529,6 +531,8 @@ GET /api/v1/endpoints?status=ONLINE&osType=WINDOWS&page=1&size=50
 | `sortOrder` | `asc / desc` | `desc` | sort direction |
 
 `riskScore`는 `risk.score`를 의미한다. 동일 sort 값의 tie-break는 `endpointId ASC`다.
+
+`q`와 다른 filter는 AND로 결합한다. 숫자만 있는 `q`는 양의 정수 Endpoint ID exact match이며 wildcard로 해석하지 않는다. 문자열 `q`는 `%`, `_`, `\\`를 wildcard로 해석하지 않고 literal prefix로 처리한다. 검색 결과는 case-insensitive exact match 우선, `ONLINE → OFFLINE → RETIRED`, `riskScore DESC`, `hostname ASC`, `endpointId ASC` 순으로 안정 정렬하며 이때 `sortBy`와 `sortOrder`는 적용하지 않는다. 전체 Endpoint를 client로 prefetch하거나 contains scan을 제공하지 않는다.
 
 `SensorHealthDto`:
 
@@ -753,7 +757,7 @@ Archive 논리 bucket은 Endpoint별 UTC DAY이며 Endpoint 한 대의 하루치
 ### 11.1 목록
 
 ```http
-GET /api/v1/alerts?status=OPEN&severity=HIGH&timePreset=LATEST_24H&page=1&size=50
+GET /api/v1/alerts?status=OPEN&severity=HIGH&sortBy=priority&timePreset=LATEST_24H&page=1&size=50
 ```
 
 목록 응답 model은 `PagedData<AlertDto>`다.
@@ -769,9 +773,12 @@ GET /api/v1/alerts?status=OPEN&severity=HIGH&timePreset=LATEST_24H&page=1&size=5
 | `timePreset` | TimePreset | `LATEST_24H` | `detectedAt` 기준 |
 | `from`, `to` | timestamp | - | CUSTOM일 때 필수 |
 | `page`, `size` | integer | 1, 50 | 공통 pagination |
-| `sortOrder` | `asc / desc` | `desc` | `detectedAt` 정렬 |
+| `sortBy` | `priority / detectedAt / severity / riskScore / status` | `priority` | server sort field |
+| `sortOrder` | `asc / desc` | `desc` | `priority` 이외 field의 방향 |
 
-기본 정렬은 `(detectedAt DESC, alertId DESC)`이고 `sortOrder=asc`이면 두 field를 모두 ASC로 바꾼다.
+기본 `priority`는 `OPEN → IN_PROGRESS → RESOLVED`, `CRITICAL → HIGH → MEDIUM → LOW`, `riskScore DESC`, `detectedAt DESC`, `alertId ASC`의 고정 순서다. `priority`에서는 `sortOrder`를 적용하지 않는다. 다른 `sortBy`는 요청 방향을 적용한 뒤 `alertId ASC`를 최종 tie-break로 사용한다. 현재 page만 client-side sort해 전체 dataset 순서처럼 표시하지 않는다.
+
+개별 enum field 정렬의 ordinal은 `severity: LOW < MEDIUM < HIGH < CRITICAL`, `status: RESOLVED < IN_PROGRESS < OPEN`이다. 따라서 `sortOrder=desc`는 더 높은 Severity와 더 긴급한 status를 먼저 반환한다.
 
 `AlertDto`:
 
@@ -889,6 +896,37 @@ GET /api/v1/incidents/{incidentId}/timeline
 
 기존 `incidents`, `incident_alerts`, `alerts`와 Event detail을 결합해 `AttackTimelineDto`를 반환한다. 항목 타입은 `INCIDENT`, `EVENT`, `ALERT`이며 발생 시각 순으로 정렬한다. 별도 timeline table이나 ERD 변경은 없다.
 
+### 12.4 Incident Investigation
+
+```http
+GET /api/v1/incidents/{incidentId}/investigation
+```
+
+응답 model은 `IncidentInvestigationDto`다. Incident correlation window를 `timeRange`로 사용하고 최대 250 node, 500 edge를 반환한다. `nodeCount`와 `edgeCount`는 실제 반환 배열 길이이며 제한으로 일부를 제외하면 `truncated=true`다. 동일 입력은 `nodeType`, 관측 시각, 원본 ID 순의 결정적 순서를 사용한다.
+
+`InvestigationNodeDto`는 `nodeId`, `nodeType`, `label`과 아래 nullable context key를 모두 required로 반환한다.
+
+| 필드 | 타입 |
+| --- | --- |
+| `nodeType` | `INCIDENT / ALERT / EVENT / PROCESS / DESTINATION` |
+| `endpointId`, `incidentId`, `alertId`, `pid` | nullable integer |
+| `eventId`, `processName`, `destination`, `protocol` | nullable string |
+| `occurredAt` | nullable timestamp |
+| `severity` | nullable Severity |
+| `eventType` | nullable EventType |
+| `riskScore` | nullable 0~100 number |
+
+`InvestigationEdgeDto`는 `edgeId`, `sourceNodeId`, `targetNodeId`, `relation`, `evidence`와 원본 추적용 nullable `incidentId`, `alertId`, `eventId`, `observedAt`을 required key로 반환한다. `evidence`는 현재 `OBSERVED`만 허용한다.
+
+| relation | 방향 | 허용 근거 |
+| --- | --- | --- |
+| `CONTAINS` | Incident → Alert | `incident_alerts` FK |
+| `TRIGGERED_BY` | Alert → Event, Event → Process | Alert `event_id` 또는 Event의 수집된 process field |
+| `PARENT_OF` | parent Process → child Process | 같은 Endpoint Event의 PID/PPID field |
+| `CONNECTED_TO` | Process → Destination | Network/DNS/L7 Event의 process·destination field |
+
+시간상 인접하다는 이유만으로 edge를 만들지 않는다. Event가 HOT/RESTORED에서 조회되지 않으면 해당 Event/Process/Destination relation을 만들지 않고 `partial=true`와 `warnings[]`의 `EVENT_NOT_FOUND` 또는 `ARCHIVE_NOT_READY`를 반환한다. `warnings`가 없으면 `[]`다. `fallback`은 기존 Timeline, Incident Alert table과 Event table 사용 가능 여부를 required boolean으로 제공하며 graph flag off, error 또는 truncation에서도 기존 API로 동일 근거를 탐색할 수 있게 한다. Incident가 없으면 `404 NOT_FOUND`다.
+
 ## 13. Dashboard API
 
 ### 13.1 전체 요약
@@ -896,6 +934,8 @@ GET /api/v1/incidents/{incidentId}/timeline
 ```http
 GET /api/v1/dashboard/summary?timePreset=LATEST_24H&interval=5m
 ```
+
+선택 query `endpointId: positive integer`를 전달하면 Endpoint snapshot, Alert, Incident, Event, failure, storage, EDR state를 모두 해당 Endpoint 범위로 제한한다. 생략하면 전체 Endpoint 집계를 반환한다.
 
 응답 model은 `DashboardSummaryDto`다. `TimeRangeDto`는 `from: timestamp`, `to: timestamp` required field를 가진다.
 
@@ -984,6 +1024,8 @@ Dashboard metric item model은 다음 required field를 사용한다.
 GET /api/v1/dashboard/endpoints/summary?timePreset=LATEST_24H
 ```
 
+선택 query `endpointId: positive integer`를 전달하면 현재 Endpoint snapshot과 지정 시간 범위의 Alert·Incident 집계를 해당 Endpoint로 제한한다. 생략하면 전체 Endpoint 집계를 반환한다.
+
 응답 model `EndpointSummaryDto`:
 
 | 필드 | 타입/하위 필드 |
@@ -1003,6 +1045,8 @@ Endpoint 상태·OS·sensor와 `risk`는 요청 시점의 현재 snapshot이다.
 ```http
 GET /api/v1/dashboard/ingest/summary?timePreset=LATEST_24H
 ```
+
+선택 query `endpointId: positive integer`를 전달하면 Event ingest, failure, storage 집계를 해당 Endpoint로 제한한다. 생략하면 전체 Endpoint 집계를 반환한다.
 
 ```json
 {
@@ -1056,17 +1100,17 @@ GET /api/v1/dashboard/topology?timePreset=LATEST_24H&endpointIds=1001&endpointId
 GET /api/v1/dashboard/layouts/overview
 ```
 
-저장 row가 없으면 registry 기본 layout을 `isDefault=true`, `revision=0`으로 반환한다. 저장 row가 있으면 삭제된 widget ID와 중복 ID를 제거하고, 신규 widget을 기본 위치에 추가하며, 변경된 min/max와 12열 bounds에 맞게 보정한 결과를 반환한다. JSON이 손상되었거나 지원 버전보다 새로우면 기본 layout으로 복구하되 기존 row revision은 유지한다.
+`layoutVersion`은 1 또는 2다. 저장 row가 없으면 version 2 registry 기본 layout을 `isDefault=true`, `revision=0`으로 반환한다. 저장 row가 있으면 저장된 version 1 또는 2를 그대로 반환하며 Backend가 version을 임의 변경하지 않는다. 삭제된 widget ID와 중복 ID를 제거하고, 신규 widget을 기본 위치에 추가하며, 변경된 min/max와 12열 bounds에 맞게 보정한다. JSON이 손상되었으면 해당 version의 기본 layout으로 복구하되 기존 row revision은 유지한다. 지원하지 않는 version은 `400 VALIDATION_ERROR`다.
 
 ```json
 {
   "data": {
     "dashboardKey": "overview",
-    "layoutVersion": 1,
+    "layoutVersion": 2,
     "revision": 3,
     "isDefault": false,
     "widgets": [
-      {"id": "event-volume", "x": 0, "y": 4, "w": 8, "h": 5, "hidden": false}
+      {"id": "detection-activity", "x": 0, "y": 4, "w": 8, "h": 5, "hidden": false}
     ]
   },
   "meta": {"requestId": "req_01HZX..."}
@@ -1079,17 +1123,17 @@ PUT /api/v1/dashboard/layouts/overview
 
 ```json
 {
-  "layoutVersion": 1,
+  "layoutVersion": 2,
   "revision": 3,
   "widgets": [
-    {"id": "event-volume", "x": 0, "y": 4, "w": 8, "h": 5, "hidden": false}
+    {"id": "detection-activity", "x": 0, "y": 4, "w": 8, "h": 5, "hidden": false}
   ]
 }
 ```
 
-PUT은 전체 layout을 upsert하고 성공할 때 revision을 1 증가시킨다. 알려지지 않은 widget ID, 중복 ID, widget별 min/max 위반, `x + w > 12`, 겹치는 visible widget, 숨김 불가 widget은 `400 INVALID_DASHBOARD_LAYOUT`이다. 현재 저장 revision과 request revision이 다르면 변경하지 않고 `409 DASHBOARD_LAYOUT_REVISION_CONFLICT`를 반환한다.
+PUT은 version 1과 2 전체 layout을 upsert하고 성공할 때 revision을 1 증가시킨다. Frontend의 v1→v2 migration도 같은 revision 계약으로 version 2 전체 layout을 저장한다. 알려지지 않은 widget ID, 중복 ID, widget별 min/max 위반, `x + w > 12`, 겹치는 visible widget, 숨김 불가 widget은 `400 INVALID_DASHBOARD_LAYOUT`이다. 현재 저장 revision과 request revision이 다르면 변경하지 않고 `409 DASHBOARD_LAYOUT_REVISION_CONFLICT`를 반환한다.
 
-위 JSON은 item 모양을 보여주기 위해 한 개만 줄여 적었다. 실제 current client는 registry의 23개 widget 전체를 `widgets`에 전송하며 서버는 이전 client가 누락한 신규 widget만 registry 기본값으로 병합한다. `y + h`는 최대 256 row를 넘을 수 없다.
+위 JSON은 item 모양을 보여주기 위해 한 개만 줄여 적었다. current client는 version 2 registry의 10개 widget 전체를 `widgets`에 전송한다. version 1 호환 registry는 기존 23개 widget을 유지하며, GET 정규화는 저장 row의 version registry를 사용한다. version 2 registry ID는 `edr-state`, `kpi-alerts`, `kpi-open-incidents`, `kpi-high-risk-endpoints`, `kpi-event-failures`, `detection-activity`, `alert-severity`, `endpoint-risk`, `highest-risk-endpoints`, `incident-queue`다. 서버는 해당 version에서 누락한 신규 widget만 registry 기본값으로 병합한다. `y + h`는 최대 256 row를 넘을 수 없다.
 
 ```http
 DELETE /api/v1/dashboard/layouts/overview

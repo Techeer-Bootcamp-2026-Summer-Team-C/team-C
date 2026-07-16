@@ -4,8 +4,9 @@ import type { ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/endpoints";
 import { readTimeFilter, TimeFilterFields } from "../components/filters";
-import { DataTable, EmptyState, ErrorState, Field, GlobalFilterBar, KpiCard, PageHeader, Pagination, Panel, Skeleton, StaleWarning, StatusPill } from "../components/ui";
+import { DataTable, EmptyState, ErrorState, Field, GlobalFilterBar, KpiCard, PageHeader, Pagination, Panel, PartialFailureWarning, Skeleton, StaleWarning, StatusPill } from "../components/ui";
 import type { FailureListQuery, IngestSummaryDto, OperationsHealthDto, ServiceHealthDto } from "../contracts";
+import { buildPipelineSnapshot, type PipelineStageId } from "../features/intelligenceOperations";
 import { useI18n } from "../i18n/LocaleContext";
 import { formatDateTime, humanize } from "../lib/format";
 import { allowedValue } from "../lib/params";
@@ -42,6 +43,8 @@ export function OperationsPage() {
     {health.isPending ? <Skeleton rows={5} /> : null}
     {health.error && !health.data ? <ErrorState error={health.error} onRetry={() => void health.refetch()} /> : null}
     {health.isRefetchError && health.data ? <StaleWarning error={health.error} onRetry={() => void health.refetch()} /> : null}
+    {Boolean(health.error && !health.data) !== Boolean(ingest.error && !ingest.data) ? <PartialFailureWarning message={health.data ? t("operations.ingestPartial") : t("operations.healthPartial")} /> : null}
+    {health.data && ingest.data ? <PipelineSnapshot health={health.data.data} ingest={ingest.data.data} /> : null}
     {health.data ? <LiveHealth data={health.data.data} /> : null}
 
     {ingest.isPending ? <Skeleton rows={8} /> : null}
@@ -54,6 +57,36 @@ export function OperationsPage() {
       {failures.data.data.items.length ? <><DataTable label={t("operations.eventFailureQueue")}><thead><tr><th scope="col">{t("operations.failure")}</th><th scope="col">{t("operations.stage")}</th><th scope="col">{t("filter.status")}</th><th scope="col">{t("operations.retry")}</th><th scope="col">{t("operations.error")}</th><th scope="col">{t("operations.failedAt")}</th></tr></thead><tbody>{failures.data.data.items.map((failure) => <tr key={failure.failureId}><td><code className="table-code">{failure.failureId}</code><small>Endpoint {failure.endpointId} · offset {failure.sourcePartition}:{failure.sourceOffset}</small></td><td>{humanize(failure.failureStage)}<small>{failure.consumerName}</small></td><td><StatusPill value={failure.status} /></td><td>{failure.retryable ? t("operations.retryable") : t("operations.no")}<small>{t("operations.attempts", { count: failure.retryCount })}</small></td><td><strong>{failure.failureCode ?? t("operations.uncoded")}</strong><small>{failure.errorMessage}</small></td><td>{formatDateTime(failure.failedAt)}</td></tr>)}</tbody></DataTable><Pagination page={failures.data.data} /></> : <EmptyState title={t("operations.noFailureRows")} message={t("operations.noFailureRowsDescription")} />}
     </Panel> : null}
   </div>;
+}
+
+export function PipelineSnapshot({ health, ingest }: { health: OperationsHealthDto; ingest: IngestSummaryDto }) {
+  const { t } = useI18n();
+  const stages = buildPipelineSnapshot(health, ingest);
+  const totalLag = health.workers.reduce((sum, worker) => sum + (worker.lag ?? 0), 0);
+  const details: Record<PipelineStageId, { primary: string; secondary: string }> = {
+    COLLECTION: {
+      primary: t("operations.collectionEvents", { count: ingest.events.ingestedCount }),
+      secondary: ingest.events.latestIngestedAt ? t("operations.collectionLatest", { time: formatDateTime(ingest.events.latestIngestedAt) }) : t("operations.noIngestedInRange"),
+    },
+    DETECTION: {
+      primary: t("operations.detectionWorkers", { count: health.workers.length, lag: totalLag }),
+      secondary: t("operations.detectionFailures", { count: ingest.eventFailures.failedCount + ingest.eventFailures.reprocessFailedCount }),
+    },
+    STORAGE: {
+      primary: t("operations.storageBuckets", { count: ingest.storage.clickhouseHotBucketCount + ingest.storage.glacierArchivedBucketCount + ingest.storage.restoredBucketCount }),
+      secondary: t("operations.storageExceptions", { restoring: ingest.storage.restoringBucketCount, failed: ingest.storage.failedBucketCount }),
+    },
+  };
+  return <Panel className="pipeline-snapshot-panel" title={t("operations.currentPipelineSnapshot")} subtitle={t("operations.currentPipelineSnapshotSubtitle")} meta={<StatusPill value={health.status} />}>
+    <ol aria-label={t("operations.currentPipelineSnapshot")} className="pipeline-snapshot">
+      {stages.map((stage) => <li className={`tone-${stage.status.toLowerCase()}`} key={stage.id}>
+        <div><span>{t(`operations.stage${stage.id}` as "operations.stageCOLLECTION" | "operations.stageDETECTION" | "operations.stageSTORAGE")}</span><StatusPill value={stage.status} /></div>
+        <strong>{details[stage.id].primary}</strong>
+        <small>{details[stage.id].secondary}</small>
+      </li>)}
+    </ol>
+    <p className="snapshot-caveat">{t("operations.snapshotCaveat", { time: formatDateTime(health.checkedAt) })}</p>
+  </Panel>;
 }
 
 function LiveHealth({ data }: { data: OperationsHealthDto }) {

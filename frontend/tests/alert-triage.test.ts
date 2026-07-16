@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AlertDto } from "../src/contracts";
-import { alertDetailUrl, nextActionableAlert } from "../src/features/alertTriage";
+import { alertDetailUrl, alertTriageQueueQuery, nextActionableAlert } from "../src/features/alertTriage";
 
 function alert(alertId: number, status: AlertDto["status"]): AlertDto {
   return { alertId, status } as AlertDto;
@@ -16,8 +16,22 @@ describe("alert triage navigation", () => {
   });
 
   it("preserves queue filters in detail navigation", () => {
-    expect(alertDetailUrl(42, new URLSearchParams("severity=CRITICAL&sortOrder=asc"))).toBe(
-      "/alerts/42?severity=CRITICAL&sortOrder=asc",
+    expect(alertDetailUrl(42, new URLSearchParams("severity=CRITICAL&sortOrder=asc&selected=7"))).toBe(
+      "/alerts/42?severity=CRITICAL&sortOrder=asc&selected=42",
     );
+  });
+
+  it("preserves the complete list scope and user ordering in the active queue query", () => {
+    expect(alertTriageQueueQuery(new URLSearchParams("timePreset=LATEST_7D&status=IN_PROGRESS&severity=HIGH&endpointId=1001&ruleCode=PROC-001&sortBy=riskScore&sortOrder=asc&page=4"))).toEqual({
+      timePreset: "LATEST_7D",
+      status: "IN_PROGRESS",
+      severity: "HIGH",
+      endpointId: 1001,
+      ruleCode: "PROC-001",
+      sortBy: "riskScore",
+      sortOrder: "asc",
+      page: 1,
+      size: 500,
+    });
   });
 });

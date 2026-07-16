@@ -98,6 +98,8 @@ def initialize_postgres(settings: Settings) -> None:
         if not locale_exists:
             apply_postgres_file(connection, ROOT / "migrations/postgresql/0003_user_locale.up.sql")
 
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0005_query_search_sort_indexes.up.sql")
+
         login_id_length = connection.execute(
             """
             SELECT character_maximum_length

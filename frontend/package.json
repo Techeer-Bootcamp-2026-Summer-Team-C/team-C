@@ -16,7 +16,9 @@
     "openapi:check": "cd .. && uv run python -m tools.export_openapi --check && cd frontend && openapi-typescript ../openapi/openapi.json -o src/api/generated/schema.ts --default-non-nullable false --check"
   },
   "dependencies": {
+    "@dagrejs/dagre": "3.0.0",
     "@tanstack/react-query": "5.90.21",
+    "@xyflow/react": "12.11.2",
     "lucide-react": "0.468.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",

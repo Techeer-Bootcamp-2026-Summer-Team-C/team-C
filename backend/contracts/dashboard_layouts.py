@@ -1,8 +1,10 @@
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field
 
 from .common import ContractModel, NonNegativeInt
+
+DashboardLayoutVersion = Literal[1, 2]
 
 
 class DashboardWidgetLayoutDto(ContractModel):
@@ -15,14 +17,14 @@ class DashboardWidgetLayoutDto(ContractModel):
 
 
 class DashboardLayoutPutRequest(ContractModel):
-    layout_version: Annotated[int, Field(ge=1)]
+    layout_version: DashboardLayoutVersion
     revision: NonNegativeInt
     widgets: list[DashboardWidgetLayoutDto]
 
 
 class DashboardLayoutDto(ContractModel):
     dashboard_key: str
-    layout_version: Annotated[int, Field(ge=1)]
+    layout_version: DashboardLayoutVersion
     revision: NonNegativeInt
     is_default: bool
     widgets: list[DashboardWidgetLayoutDto]

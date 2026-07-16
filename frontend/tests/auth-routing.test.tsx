@@ -60,6 +60,7 @@ it("does not retain the previous route after an explicit logout", async () => {
     await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
     if (credentials === 1) {
       expect(await screen.findByRole("heading", { name: "Alert destination" })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Open account menu" }));
       await userEvent.click(screen.getByRole("button", { name: "Log out" }));
       expect(sessionStorage.getItem("edr.authSession")).toBeNull();
     }
