@@ -1,11 +1,11 @@
-import { BellRing, ShieldAlert, ShieldCheck, Siren } from "lucide-react";
+import { BellRing, CircleAlert, ShieldAlert, Siren } from "lucide-react";
 import { lazy, Suspense } from "react";
 import { DetectionActivityTable } from "../../components/charts";
 import { ChartFrame, EdrStateSummary, ErrorState, KpiCard, Panel, Skeleton, StaleWarning } from "../../components/ui";
 import type { DashboardSummaryDto, EndpointDto, EndpointSummaryDto, IncidentDto, TimeRangeQuery } from "../../contracts";
 import { useI18n } from "../../i18n/LocaleContext";
-import { DistributionBars, severityDistributionRows } from "./DistributionBars";
-import { IncidentQueueTable, RiskEndpointTable } from "./InvestigationQueues";
+import { AlertSeverityDonut } from "./AlertSeverityDonut";
+import { IncidentQueueList, RiskEndpointRanking } from "./InvestigationQueues";
 
 const DetectionActivityPanel = lazy(() => import("./DetectionActivityPanel"));
 
@@ -17,7 +17,6 @@ export const OVERVIEW_BLOCK_IDS = [
   "kpi-open-incidents",
   "detection-activity",
   "alert-severity",
-  "endpoint-risk",
   "highest-risk-endpoints",
   "incident-queue",
 ] as const;
@@ -48,27 +47,28 @@ export function OverviewDashboard({ data, queueState = { endpoints: IDLE_PANEL_S
 }) {
   const { t } = useI18n();
   return <section aria-label={t("overview.dashboardAria")} className="overview-dashboard">
-    <div className="overview-summary-row">
+    <div className="overview-posture-row">
       <OverviewBlock id="edr-state"><ResourceFeedback data={data.dashboard} render={(dashboard) => <EdrStateSummary state={dashboard.edrState} />} rows={3} state={summaryState.dashboard} /></OverviewBlock>
-      <OverviewBlock id="kpi-alerts"><ResourceFeedback data={data.dashboard} render={(dashboard) => <KpiCard detail={t("overview.alertsDetail")} icon={<BellRing size={18} />} label={t("overview.totalAlerts")} to={timeScopedPath("/alerts", data.timeRange, data.selectedEndpointId)} tone="critical" value={dashboard.alerts.totalCount} />} rows={2} state={summaryState.dashboard} /></OverviewBlock>
+    </div>
+    <div aria-label={t("overview.kpiAria")} className="overview-kpi-row">
+      <OverviewBlock id="kpi-alerts"><ResourceFeedback data={data.dashboard} render={(dashboard) => <KpiCard detail={t("overview.alertsDetail")} icon={<BellRing size={18} />} label={t("overview.totalAlerts")} to={timeScopedPath("/alerts", data.timeRange, data.selectedEndpointId)} tone="accent" value={dashboard.alerts.totalCount} />} rows={2} state={summaryState.dashboard} /></OverviewBlock>
       <OverviewBlock id="kpi-critical-alerts"><ResourceFeedback data={data.dashboard} render={(dashboard) => {
         const criticalAlerts = dashboard.alerts.bySeverity.find((row) => row.severity === "CRITICAL")?.count ?? 0;
         return <KpiCard detail={t("overview.criticalAlertsDetail")} icon={<Siren size={18} />} label={t("overview.criticalAlerts")} to={timeScopedPath("/alerts?severity=CRITICAL", data.timeRange, data.selectedEndpointId)} tone={criticalAlerts ? "critical" : "neutral"} value={criticalAlerts} />;
       }} rows={2} state={summaryState.dashboard} /></OverviewBlock>
-      <OverviewBlock id="kpi-high-risk-endpoints"><ResourceFeedback data={data.endpoints} render={(endpoints) => <KpiCard detail={t("overview.highRiskEndpointsDetail")} icon={<ShieldAlert size={18} />} label={t("overview.highRiskEndpoints")} to={scopedPath("/endpoints?riskLevel=HIGH&sortBy=riskScore&sortOrder=desc", data.selectedEndpointId, "endpointIds")} tone={endpoints.risk.highRiskEndpointCount ? "warning" : "neutral"} value={endpoints.risk.highRiskEndpointCount} />} rows={2} state={summaryState.endpoints} /></OverviewBlock>
-      <OverviewBlock id="kpi-open-incidents"><ResourceFeedback data={data.dashboard} render={(dashboard) => <KpiCard detail={t("overview.currentlyOpen")} icon={<ShieldCheck size={18} />} label={t("overview.openIncidents")} to={timeScopedPath("/incidents?status=OPEN", data.timeRange, data.selectedEndpointId)} tone={dashboard.incidents.openCount ? "critical" : "neutral"} value={dashboard.incidents.openCount} />} rows={2} state={summaryState.dashboard} /></OverviewBlock>
+      <OverviewBlock id="kpi-high-risk-endpoints"><ResourceFeedback data={data.endpoints} render={(endpoints) => <KpiCard detail={t("overview.highRiskEndpointsDetail")} icon={<ShieldAlert size={18} />} label={t("overview.highRiskEndpoints")} to={scopedPath("/endpoints?riskLevel=HIGH&sortBy=riskScore&sortOrder=desc", data.selectedEndpointId, "endpointIds")} tone={endpoints.risk.highRiskEndpointCount ? "high" : "neutral"} value={endpoints.risk.highRiskEndpointCount} />} rows={2} state={summaryState.endpoints} /></OverviewBlock>
+      <OverviewBlock id="kpi-open-incidents"><ResourceFeedback data={data.dashboard} render={(dashboard) => <KpiCard detail={t("overview.currentlyOpen")} icon={<CircleAlert size={18} />} label={t("overview.openIncidents")} to={timeScopedPath("/incidents?status=OPEN", data.timeRange, data.selectedEndpointId)} tone={dashboard.incidents.openCount ? "info" : "neutral"} value={dashboard.incidents.openCount} />} rows={2} state={summaryState.dashboard} /></OverviewBlock>
     </div>
     <div className="overview-analysis-row">
       <OverviewBlock id="detection-activity"><ResourceFeedback data={data.dashboard} render={(dashboard) => <ChartFrame description={t("overview.detectionActivityDescription")} fallback={<DetectionActivityTable alerts={dashboard.alerts.timeSeries} events={dashboard.events.timeSeries} incidents={dashboard.incidents.timeSeries} />} title={t("overview.detectionActivity")}><Suspense fallback={<Skeleton rows={4} />}><DetectionActivityPanel alerts={dashboard.alerts.timeSeries} events={dashboard.events.timeSeries} incidents={dashboard.incidents.timeSeries} /></Suspense></ChartFrame>} rows={5} state={summaryState.dashboard} /></OverviewBlock>
-      <OverviewBlock id="alert-severity"><ResourceFeedback data={data.dashboard} render={(dashboard) => <Panel title={t("overview.alertSeverity")} subtitle={t("overview.serverDistribution")}><DistributionBars label={t("overview.alertSeverity")} rows={severityDistributionRows(dashboard.alerts.bySeverity)} total={dashboard.alerts.totalCount} /></Panel>} rows={5} state={summaryState.dashboard} /></OverviewBlock>
-      <OverviewBlock id="endpoint-risk"><ResourceFeedback data={data.endpoints} render={(endpoints) => <Panel title={t("overview.endpointRisk")} subtitle={t("overview.querySnapshot")} meta={<span>{t("overview.highest", { value: endpoints.risk.highestScore ?? t("common.none") })}</span>}><DistributionBars label={t("overview.endpointRisk")} rows={endpoints.risk.byLevel.map((row) => ({ category: row.level, count: row.count }))} total={endpoints.totalCount} /></Panel>} rows={5} state={summaryState.endpoints} /></OverviewBlock>
+      <OverviewBlock id="alert-severity"><ResourceFeedback data={data.dashboard} render={(dashboard) => <Panel title={t("overview.alertSeverity")} subtitle={t("overview.serverDistribution")}><AlertSeverityDonut label={t("overview.totalAlerts")} rows={dashboard.alerts.bySeverity} total={dashboard.alerts.totalCount} /></Panel>} rows={5} state={summaryState.dashboard} /></OverviewBlock>
     </div>
     <div className="overview-queue-row">
       <OverviewBlock id="highest-risk-endpoints"><Panel title={t("overview.highestRiskEndpoints")} subtitle={t("overview.currentRiskSnapshot")}>
-        <QueueFeedback items={data.topEndpoints} render={(items) => <RiskEndpointTable endpoints={items} />} state={queueState.endpoints} />
+        <QueueFeedback items={data.topEndpoints} render={(items) => <RiskEndpointRanking endpoints={items} />} state={queueState.endpoints} />
       </Panel></OverviewBlock>
       <OverviewBlock id="incident-queue"><Panel title={t("overview.incidentQueueWidget")} subtitle={t("overview.recentOpenIncidents")}>
-        <QueueFeedback items={data.incidentQueue} render={(items) => <IncidentQueueTable incidents={items} />} state={queueState.incidents} />
+        <QueueFeedback items={data.incidentQueue} render={(items) => <IncidentQueueList incidents={items} />} state={queueState.incidents} />
       </Panel></OverviewBlock>
     </div>
   </section>;

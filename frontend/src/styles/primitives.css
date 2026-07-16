@@ -39,14 +39,15 @@
 }
 
 .button.primary {
-  color: var(--surface-shell);
+  color: var(--text-inverse);
   background: var(--accent-primary);
   border-color: var(--accent-primary);
 }
 
-.button.primary:hover { background: color-mix(in srgb, var(--accent-primary) 84%, white); }
+.button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.button.primary:active { background: var(--accent-active); border-color: var(--accent-active); }
 .button.ghost { background: transparent; border-color: transparent; }
-.button.danger { color: var(--text-primary); background: color-mix(in srgb, var(--status-critical) 18%, var(--surface-raised)); border-color: var(--status-critical); }
+.button.danger { color: var(--text-primary); background: var(--status-error-surface); border-color: var(--status-critical); }
 .button:disabled,
 .icon-button:disabled { opacity: .48; cursor: not-allowed; }
 .button[aria-busy="true"] { cursor: progress; }
@@ -122,7 +123,7 @@
   background: var(--surface-raised);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-control);
-  box-shadow: var(--elevation-raised);
+  box-shadow: var(--elevation-tooltip);
   font-size: var(--type-meta);
   font-weight: 700;
   opacity: 0;
@@ -155,7 +156,7 @@
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(4, 7, 11, .78);
+  background: var(--overlay-scrim);
   backdrop-filter: blur(3px);
 }
 .modal-layer { display: grid; place-items: center; padding: var(--space-12); }

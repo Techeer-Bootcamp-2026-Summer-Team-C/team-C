@@ -7,7 +7,7 @@ import { EdrStateSummary } from "../src/components/ui";
 import { AuthProvider } from "../src/auth/AuthContext";
 import { api } from "../src/api/endpoints";
 import { OverviewDashboard, OVERVIEW_BLOCK_IDS, type OverviewDashboardData } from "../src/features/overview/OverviewDashboard";
-import { DistributionBars } from "../src/features/overview/DistributionBars";
+import { AlertSeverityDonut } from "../src/features/overview/AlertSeverityDonut";
 import { EndpointScopePicker } from "../src/features/overview/EndpointScopePicker";
 import DetectionActivityPanel from "../src/features/overview/DetectionActivityPanel";
 import { buildDetectionActivityModel } from "../src/features/overview/overviewChartModel";
@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 describe("overview fixed dashboard", () => {
-  it("renders exactly the ten approved dashboard blocks in DOM order", () => {
+  it("renders exactly the nine refined dashboard blocks in DOM order", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const { container } = render(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider><MemoryRouter><OverviewDashboard data={overviewData()} /></MemoryRouter></LocaleProvider></AuthProvider></QueryClientProvider>);
     expect([...container.querySelectorAll("[data-overview-block]")].map((block) => block.getAttribute("data-overview-block"))).toEqual([
@@ -43,16 +43,19 @@ describe("overview fixed dashboard", () => {
       "kpi-open-incidents",
       "detection-activity",
       "alert-severity",
-      "endpoint-risk",
       "highest-risk-endpoints",
       "incident-queue",
     ]);
-    expect(OVERVIEW_BLOCK_IDS).toHaveLength(10);
+    expect(OVERVIEW_BLOCK_IDS).toHaveLength(9);
     expect(screen.queryByRole("button", { name: /edit dashboard|reset default|save dashboard/i })).not.toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: /Threat level: 78 \/ 100, Red/i })).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: /Collection health: 61 \/ 100, Yellow/i })).toBeInTheDocument();
     expect(screen.getByText("High Endpoint Risk")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Critical alerts1/i })).toHaveAttribute("href", "/alerts?severity=CRITICAL&timePreset=LATEST_24H");
+    expect(screen.getByRole("link", { name: /Total alerts3/i })).toHaveClass("accent");
+    expect(screen.getByRole("link", { name: /Critical alerts1/i })).toHaveClass("critical");
+    expect(screen.getByRole("link", { name: /High-risk endpoints1/i })).toHaveClass("high");
+    expect(screen.getByRole("link", { name: /Open incidents1/i })).toHaveClass("info");
   });
 
   it("preserves preset and custom time scope only on time-scoped KPI drilldowns", () => {
@@ -147,10 +150,10 @@ describe("overview fixed dashboard", () => {
     </LocaleProvider></AuthProvider></QueryClientProvider>);
 
     expect(screen.getByText("Latest server buckets: Events None, Alerts 4, Open incidents 2.")).toBeInTheDocument();
-    const bucketGroup = screen.getByRole("group", { name: "Detection activity time buckets" });
-    const firstBucket = within(bucketGroup).getAllByRole("button")[0];
+    const bucketSelect = screen.getByRole("combobox", { name: "Detection activity time buckets" });
+    const firstBucket = within(bucketSelect).getAllByRole("option")[1];
     expect(firstBucket).toBeDefined();
-    fireEvent.focus(firstBucket as HTMLButtonElement);
+    fireEvent.change(bucketSelect, { target: { value: (firstBucket as HTMLOptionElement).value } });
     expect(container.querySelector(".chart-selected-value")).not.toBeNull();
 
     rerender(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider>
@@ -162,22 +165,23 @@ describe("overview fixed dashboard", () => {
     </LocaleProvider></AuthProvider></QueryClientProvider>);
 
     await waitFor(() => expect(container.querySelector(".chart-selected-value")).toBeNull());
-    expect(within(screen.getByRole("group", { name: "Detection activity time buckets" })).getAllByRole("button").every((button) => button.getAttribute("aria-pressed") === "false")).toBe(true);
+    expect(screen.getByRole("combobox", { name: "Detection activity time buckets" })).toHaveValue("");
   });
 
-  it("renders fixed-order distributions with count, percentage, and safe zero totals", () => {
+  it("renders a fixed-order severity donut with count, percentage, and safe zero totals", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const { rerender } = render(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider>
-      <DistributionBars label="Alert severity" rows={[{ category: "HIGH", count: 25 }, { category: "CRITICAL", count: 5 }]} total={100} />
+      <AlertSeverityDonut label="Total alerts" rows={[{ severity: "HIGH", count: 25 }, { severity: "CRITICAL", count: 5 }]} total={100} />
     </LocaleProvider></AuthProvider></QueryClientProvider>);
+    expect(screen.getByRole("figure", { name: "Total alerts" })).toBeInTheDocument();
     expect(screen.getAllByRole("listitem").map((row) => row.textContent)).toEqual(["Critical55%", "High2525%", "Medium00%", "Low00%"]);
-    expect(screen.getByRole("progressbar", { name: "High: 25, 25%" })).toHaveAttribute("aria-valuenow", "25");
+    expect(document.querySelectorAll(".severity-donut-segment")).toHaveLength(2);
 
     rerender(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider>
-      <DistributionBars label="Endpoint risk" rows={[]} total={0} />
+      <AlertSeverityDonut label="Total alerts" rows={[]} total={0} />
     </LocaleProvider></AuthProvider></QueryClientProvider>);
-    expect(screen.getAllByRole("progressbar")).toHaveLength(4);
     expect(screen.getAllByText("0%")).toHaveLength(4);
+    expect(document.querySelectorAll(".severity-donut-segment")).toHaveLength(0);
   });
 
   it("searches Endpoint scope in 20-row pages and emits the selected id", async () => {
@@ -254,9 +258,38 @@ describe("overview fixed dashboard", () => {
     </MemoryRouter></LocaleProvider></AuthProvider></QueryClientProvider>);
 
     expect(screen.getByRole("alert")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Incident queue table" })).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Incident queue" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Suspicious PowerShell" })).toHaveAttribute("href", "/incidents/9");
     expect(container.querySelector(".selected-row")).toBeNull();
+  });
+
+  it("renders compact investigation lists without redundant risk progress or table overflow", () => {
+    const data = overviewData();
+    data.topEndpoints = [{
+      endpointId: 7,
+      agentId: "agent-with-a-long-readable-identifier",
+      hostname: "RETIRED-LAB-ENDPOINT-WITH-A-LONG-HOSTNAME",
+      risk: { score: 91, level: "CRITICAL", activeAlertCount: 18, openIncidentCount: 3 },
+    } as EndpointDto];
+    data.incidentQueue = [{
+      incidentId: 9,
+      title: "ENCODED POWERSHELL WITH A LONG INVESTIGATION TITLE",
+      severity: "HIGH",
+      status: "OPEN",
+      alertCount: 3,
+      lastDetectedAt: "2026-07-15T03:00:00Z",
+    } as IncidentDto];
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider><MemoryRouter>
+      <OverviewDashboard data={data} />
+    </MemoryRouter></LocaleProvider></AuthProvider></QueryClientProvider>);
+
+    const riskList = screen.getByRole("list", { name: "Highest-risk endpoints" });
+    expect(within(riskList).queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(within(riskList).queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "RETIRED-LAB-ENDPOINT-WITH-A-LONG-HOSTNAME" })).toHaveAttribute("title", "RETIRED-LAB-ENDPOINT-WITH-A-LONG-HOSTNAME");
+    expect(screen.getByRole("list", { name: "Incident queue" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "ENCODED POWERSHELL WITH A LONG INVESTIGATION TITLE" })).toHaveAttribute("title", "ENCODED POWERSHELL WITH A LONG INVESTIGATION TITLE");
   });
 
   it("keeps Dashboard Summary panels visible when Endpoint Summary initially fails", async () => {
@@ -278,10 +311,10 @@ describe("overview fixed dashboard", () => {
     expect(screen.getByRole("link", { name: /Total alerts3/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Open incidents1/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Alert severity" })).toBeInTheDocument();
-    const endpointRiskBlock = container.querySelector<HTMLElement>('[data-overview-block="endpoint-risk"]');
-    expect(endpointRiskBlock).not.toBeNull();
-    expect(within(endpointRiskBlock as HTMLElement).getByRole("alert")).toBeInTheDocument();
-    expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(10);
+    const endpointKpiBlock = container.querySelector<HTMLElement>('[data-overview-block="kpi-high-risk-endpoints"]');
+    expect(endpointKpiBlock).not.toBeNull();
+    expect(within(endpointKpiBlock as HTMLElement).getByRole("alert")).toBeInTheDocument();
+    expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(9);
     expect(screen.getByText(/Successful dashboard sections remain available/i)).toBeInTheDocument();
   });
 
@@ -302,11 +335,10 @@ describe("overview fixed dashboard", () => {
     await waitFor(() => expect(queryClient.getQueryData(["endpoint-summary", { timePreset: "LATEST_24H" }])).toEqual(success(data.endpoints!)));
     expect(await screen.findByRole("region", { name: "Fixed Overview dashboard" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /High-risk endpoints1/i })).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "Endpoint risk" })).toBeInTheDocument();
     const alertKpiBlock = container.querySelector<HTMLElement>('[data-overview-block="kpi-alerts"]');
     expect(alertKpiBlock).not.toBeNull();
     expect(within(alertKpiBlock as HTMLElement).getByRole("alert")).toBeInTheDocument();
-    expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(10);
+    expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(9);
     expect(screen.getByText(/Successful dashboard sections remain available/i)).toBeInTheDocument();
   });
 

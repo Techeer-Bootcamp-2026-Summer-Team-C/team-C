@@ -1,10 +1,10 @@
 # Overview Dashboard Redesign Plan
 
-- 상태: 완료
-- 기준일: 2026-07-16
-- 작업 브랜치: `overview-dashboard-redesign`
+- 상태: 후속 시각 개선 완료
+- 기준일: 2026-07-17
+- 작업 브랜치: `overview-visual-refinement`
 - 적용 범위: `frontend/`와 관련 Frontend 문서·테스트
-- 다음 작업: `작업 완료`
+- 다음 작업: 없음
 - 구현 작업지시서: [OVERVIEW_DASHBOARD_IMPLEMENTATION_WORK_ORDER.md](./OVERVIEW_DASHBOARD_IMPLEMENTATION_WORK_ORDER.md)
 - 승인 시안: [overview-dashboard-target.png](./assets/references/overview-dashboard-target.png)
 
@@ -30,7 +30,7 @@
 4. `react-grid-layout`을 제거한다.
 5. Backend의 dashboard layout API·DB schema는 다른 client와 이전 데이터 호환을 위해 이번 작업에서 삭제하지 않는다. Frontend만 호출을 중단한다.
 6. 현재 DTO에 없는 delta, previous value, 담당자, SLA, 인과관계와 임의 집계를 만들지 않는다.
-7. Detection Activity만 ECharts PoC 대상으로 삼고, 분포·순위는 semantic HTML과 CSS bar로 구현한다.
+7. Detection Activity만 ECharts 대상으로 삼고, Alert Severity는 semantic SVG donut과 visible text list, 순위·queue는 semantic HTML과 CSS grid로 구현한다.
 8. 모바일용 별도 시안은 만들지 않는다. 1440px을 정확도 기준으로 삼되 1024px·768px·360px에서 기존 핵심 흐름과 overflow 방지 조건은 유지한다.
 
 ## 3. 페이지의 단일 목적
@@ -48,19 +48,22 @@ SOC 운영자가 Overview에서 15초 안에 다음을 판단하게 한다.
 DOM 순서와 시각 순서는 아래와 같다.
 
 ```text
-Page title / description                  Endpoint · Time · Refresh
+Service identity                         Endpoint · Time · Refresh
 
-[ EDR state 1.25fr ][ KPI ][ KPI ][ KPI ][ KPI ]
+[ EDR state command strip ]
 
-[ Detection Activity 2fr ][ Alert Severity 1fr ][ Endpoint Risk 1fr ]
+[ KPI ][ KPI ][ KPI ][ KPI ]
+
+[ Detection Activity 2fr ][ Alert Severity 1fr ]
 
 [ Highest-risk Endpoints 1fr ][ Incident Queue 1fr ]
 ```
 
 ### Wide desktop: 1280px 이상
 
-- 상태·KPI: `grid-template-columns: 1.25fr repeat(4, minmax(0, 1fr))`
-- 분석: `grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr))`
+- EDR state: full-width command strip
+- KPI: `grid-template-columns: repeat(4, minmax(0, 1fr))`
+- 분석: `grid-template-columns: minmax(0, 2fr) minmax(0, 1fr)`
 - 조사 대기열: `grid-template-columns: repeat(2, minmax(0, 1fr))`
 - panel gap: 12px
 - page, toolbar와 grid의 좌우 edge를 일치시킨다.
@@ -69,7 +72,7 @@ Page title / description                  Endpoint · Time · Refresh
 
 - EDR state는 첫 행 전체 또는 2열 폭을 사용한다.
 - KPI는 2열로 재배치한다.
-- Detection Activity는 전체 폭, 두 분포 panel은 2열로 배치한다.
+- Detection Activity와 Alert Severity는 각각 전체 폭으로 재배치한다.
 - 조사 대기열은 공간이 부족하면 세로로 배치한다.
 
 ### 1023px 이하
@@ -77,7 +80,7 @@ Page title / description                  Endpoint · Time · Refresh
 - DOM 순서를 유지해 1–2열로 재배치한다.
 - 별도 모바일 미학을 만들지 않지만 기능, focus, text와 overflow를 손상시키지 않는다.
 
-## 5. 10개 Block과 데이터 계약
+## 5. 9개 Block과 데이터 계약
 
 | 순서 | Block | 데이터 | 표현 |
 | ---: | --- | --- | --- |
@@ -87,10 +90,9 @@ Page title / description                  Endpoint · Time · Refresh
 | 4 | High-risk Endpoints | `endpointSummary.risk` | KPI |
 | 5 | Open Incidents | `dashboard.incidents.open` | KPI |
 | 6 | Detection Activity | Event·Alert time series와 Incident `openCount` | 공통 X축 small multiples |
-| 7 | Alert Severity | 서버 `bySeverity` | Critical/High/Medium/Low horizontal bars |
-| 8 | Endpoint Risk | 서버 `risk.byLevel` | Critical/High/Medium/Low horizontal bars |
-| 9 | Highest-risk Endpoints | `GET /endpoints` 위험도 정렬 결과 | 점수 bar, Alert·Incident count, 상세 link |
-| 10 | Incident Queue | `GET /incidents?status=OPEN` | Severity, status, alert count, last detected |
+| 7 | Alert Severity | 서버 `bySeverity` | donut과 Critical/High/Medium/Low count·percentage 목록 |
+| 8 | Highest-risk Endpoints | `GET /endpoints` 위험도 정렬 결과 | rank, 점수·level, Alert·Incident count, 상세 link |
+| 9 | Incident Queue | `GET /incidents?status=OPEN` | Severity, status, alert count, last detected |
 
 표시 비율은 서버 count와 서버 total로 계산하는 presentation 값이다. Endpoint Risk, EDR score, time bucket과 severity count를 원본 record에서 다시 집계하지 않는다.
 
@@ -127,12 +129,13 @@ Endpoint scope 선택기는 기존 paged `q` search를 사용하며 전체 fleet
 - point가 충분하지 않으면 오해를 만드는 선 대신 값·empty 설명과 table fallback을 표시한다.
 - ECharts는 필요한 module만 등록하고 Overview route에서 lazy load한다.
 
-### Alert Severity와 Endpoint Risk
+### Alert Severity
 
-- donut을 사용하지 않고 고정 순서 `CRITICAL → HIGH → MEDIUM → LOW`의 horizontal bar를 사용한다.
-- 각 row에 label, count와 percentage를 함께 표시한다.
+- 서버 aggregate를 사용하는 donut과 고정 순서 `CRITICAL → HIGH → MEDIUM → LOW`의 visible 목록을 함께 제공한다.
+- 각 category의 label, count와 percentage를 hover 없이 표시한다.
 - total이 0이면 `0%`로 안전하게 표시하고 빈 분모 계산을 하지 않는다.
 - semantic status color와 text를 함께 사용한다.
+- Endpoint Risk 분포 panel은 제거하지만 High-risk Endpoint KPI용 서버 aggregate는 유지한다.
 
 ### 조사 대기열
 
@@ -167,11 +170,10 @@ Endpoint scope 선택기는 기존 paged `q` search를 사용하며 전체 fleet
 ```text
 frontend/src/features/overview/
   OverviewDashboard.tsx
-  EdrStatePanel.tsx
   DetectionActivityPanel.tsx
-  DistributionBars.tsx
-  RiskEndpointList.tsx
-  IncidentQueue.tsx
+  EndpointScopePicker.tsx
+  AlertSeverityDonut.tsx
+  InvestigationQueues.tsx
   overviewChartModel.ts
 ```
 
@@ -286,11 +288,11 @@ frontend/src/features/overview/
 
 자동 테스트:
 
-- 10개 block의 DOM 순서와 필수 label
+- 9개 block의 DOM 순서와 필수 label
 - layout edit, drag, resize, hide control 부재
 - layout API가 호출되지 않음
 - EDR 두 진단 축과 reason 표시
-- severity·risk count/percentage의 정상·0 처리
+- severity donut count/percentage의 정상·0 처리
 - time series 정렬과 누락 bucket 보존
 - 위험 Endpoint 최대 5개와 상세 link
 - Incident 필수 field와 상세 link
@@ -315,7 +317,7 @@ npm run build
 
 Browser QA:
 
-- 1440px: 상태+KPI 한 행, 분석 `2:1:1`, 대기열 `1:1`
+- 1440px: EDR strip, KPI 4열, 분석 `2:1`, 대기열 `1:1`
 - 1280px: label 충돌·horizontal overflow 없음
 - 1024px·768px: DOM 순서와 주요 action 유지
 - 360px: 기능 손실과 page-level horizontal overflow 없음
@@ -416,3 +418,139 @@ Bundle 변화:
 - Bundle 변화: final `OverviewPage` 17.11 kB / 5.41 kB gzip, lazy `DetectionActivityPanel` 499.50 kB / 170.83 kB gzip, 공통 index 355.19 kB / 110.98 kB gzip. 기존 OVR-05 기록 대비 OverviewPage는 +0.65 kB / +0.22 kB gzip, DetectionActivityPanel은 +0.15 kB / +0.03 kB gzip이며 공통 index는 동일하다. `react-grid-layout`은 계속 0건이다.
 - 남은 위험: ECharts lazy chunk 170.83 kB gzip은 route 격리는 유지하지만 여전히 크다. 브라우저 상태 matrix는 현재 API 계약 모양의 mock으로 검증했으며 이 세션에서 live Backend integration은 검증하지 않았다. partial·stale QA의 의도된 400 응답은 browser network console에 오류를 남기지만 final normal 상태는 clean하다.
 - 다음 Package: 없음
+
+## 14. Post-merge visual refinement
+
+2026-07-17 팀 피드백을 반영하되 색상값과 font family는 다음 수정에서 팀이 별도로 확정한다. 이번 후속 작업은 현재 semantic token을 임시값으로 재사용하며 새 raw color나 외부 font를 추가하지 않는다. 팀 token이 전달되면 component selector를 다시 수정하지 않고 `frontend/src/styles/tokens.css`의 역할 token만 교체할 수 있어야 한다.
+
+확정 범위:
+
+- 상단 EDR 상태를 full-width command strip으로 분리하고 4개 KPI의 불필요한 높이를 줄인다.
+- red는 Critical/RED/error에만 사용하고 Total Alert와 일반 OPEN Incident에는 사용하지 않는다.
+- Alert Severity를 실제 서버 count/total 기반 donut으로 변경한다.
+- Endpoint Risk 분포 block을 Overview에서 제거하고 전체를 9-block으로 재구성한다.
+- Detection Activity의 세로 series label과 timestamp button 군집을 제거하고 명시적 legend, compact bucket inspector와 table fallback을 유지한다.
+- Highest-risk Endpoint는 progress bar와 badge가 반복하는 위험 표현을 제거하고 compact ranked ledger로 변경한다.
+- Incident Queue는 title, severity, status, Alert count와 last detected를 compact queue row로 제공한다.
+- Overview의 중복 breadcrumb/page heading을 제거하고 AppShell에 service name을 표시한다. 미확정 service name은 `VITE_SERVICE_NAME`으로 주입하며 fallback은 기존 `EDR Console`이다.
+
+계약 경계:
+
+- Backend, API, DTO, enum, OpenAPI와 Risk 계산 정책을 변경하지 않는다.
+- 누락 bucket은 `0`으로 바꾸지 않고 `None`/`없음` 의미를 유지한다.
+- 담당자, SLA, delta, previous value, sparkline과 원본 record client 집계를 추가하지 않는다.
+- 다른 page의 breadcrumb와 page header는 유지한다.
+
+### REF-01. 디자인 계약과 service identity 구조
+
+- 상태: 완료
+- 색상·font token의 임시값 정책을 기록한다.
+- `VITE_SERVICE_NAME`과 fallback을 AppShell brand/top bar에 연결한다.
+- Overview에서만 중복 breadcrumb와 visible PageHeader를 제거하되 document heading은 유지한다.
+
+완료 조건: 기존 route breadcrumb 회귀 없이 Overview 상단에 service name 하나와 screen-reader heading이 존재하고 targeted test·typecheck가 통과한다.
+
+- 변경 파일: `frontend/src/config/branding.ts`, `frontend/src/components/AppShell.tsx`, `frontend/src/pages/OverviewPage.tsx`, `frontend/src/styles/shell.css`, `frontend/tests/app-shell-foundation.test.tsx`, 이 실행계획.
+- 설계 판단: service name은 build-time `VITE_SERVICE_NAME`을 source로 사용하고 미지정 시 기존 `EDR Console`로 fallback한다. Overview route에서만 top bar breadcrumb와 visible PageHeader를 제거하고 service name 하나를 표시했으며, 접근성 heading은 visually hidden `h1`으로 유지했다. 다른 route breadcrumb와 page title은 변경하지 않았다.
+- 삭제한 코드: Overview의 visible `CURRENT POSTURE / Overview / description` PageHeader와 root route의 `EDR / Overview` breadcrumb 중복을 제거했다.
+- 실행한 검증: `npm run test -- app-shell-foundation.test.tsx overview-redesign.test.tsx` → 2 files / 16 tests passed. `npm run typecheck` → passed. `git diff --check` → passed.
+- 브라우저 QA: 1440×1100에서 top bar service name `EDR Console`, Overview breadcrumb 0건, visible `h1` 0건, page-level overflow `false`를 확인했다. accessibility snapshot에는 Overview heading이 유지된다. 증거: `frontend/output/playwright/overview-redesign/ref-01-1440.png`, `ref-01-snapshot.md`.
+- Bundle 변화: runtime dependency 없음. 작은 build-time config module만 추가했으며 production 수치는 REF-05에서 측정한다.
+- 남은 위험: 실제 service name과 팀 color/font token은 아직 미확정이며 다음 수정에서 `VITE_SERVICE_NAME`과 token 값으로 교체해야 한다.
+- 다음 Package: REF-02
+
+### REF-02. EDR Command Strip과 compact KPI
+
+- 상태: 완료
+- EDR State를 full-width command strip으로 옮긴다.
+- KPI 4개를 별도 compact row로 구성하고 single-value dead space와 red 피로도를 줄인다.
+
+완료 조건: 1440px에서 EDR strip과 KPI row의 정보 위계가 명확하고 normal·zero·partial state가 유지된다.
+
+- 변경 파일: `frontend/src/features/overview/OverviewDashboard.tsx`, `frontend/src/components/ui.tsx`, `frontend/src/styles/pages/overview.css`, 이 실행계획.
+- 설계 판단: EDR state를 KPI와 같은 높이에 묶지 않고 `overall / Threat·Collection axes / reason·calculated time` 3구역의 full-width command strip으로 분리했다. KPI는 4열 124px row로 줄였다. Total Alerts는 neutral, Critical Alerts만 critical, HIGH snapshot과 일반 OPEN Incident는 warning tone을 사용해 red가 모든 문제 지표를 장식하지 않게 했다.
+- 삭제한 코드: EDR state와 KPI 4개를 억지로 같은 180px 높이에 맞추던 5열 summary row, Total Alerts와 OPEN Incident의 critical tone을 제거했다.
+- 실행한 검증: `npm run test -- overview-redesign.test.tsx components.test.tsx locale.test.tsx` → 3 files / 24 tests passed. normal·zero EDR와 independent partial failure를 포함한다. `npm run typecheck` → passed. `git diff --check` → passed.
+- 브라우저 QA: 1440×1100에서 EDR strip 124px, KPI 4개 각 124px, critical KPI 1개, DOM 10-block, page overflow `false`를 확인했다. 증거: `frontend/output/playwright/overview-redesign/ref-02-1440.png`.
+- Bundle 변화: dependency와 lazy chunk 경계 변화 없음. CSS grid와 icon 교체만 포함하며 production 수치는 REF-05에서 측정한다.
+- 남은 위험: Alert Severity와 Endpoint Risk는 아직 기존 bar이고 Detection Activity의 Y-axis label·bucket buttons도 남아 있다.
+- 다음 Package: REF-03
+
+### REF-03. Detection Activity와 Alert Severity donut
+
+- 상태: 완료
+- Detection Activity의 rotated Y-axis label과 timestamp button 군집을 제거한다.
+- chart series legend와 keyboard bucket inspector를 제공한다.
+- Alert Severity를 server aggregate 기반 donut과 visible category list로 구현한다.
+
+완료 조건: missing bucket 보존, exact value inspection, reduced motion, resize, print와 table fallback이 통과한다.
+
+- 변경 파일: `frontend/src/features/overview/AlertSeverityDonut.tsx`, `frontend/src/features/overview/OverviewDashboard.tsx`, `frontend/src/features/overview/DetectionActivityPanel.tsx`, `frontend/src/styles/tokens.css`, `frontend/src/styles/pages/overview.css`, `frontend/src/i18n/translations.ts`, `frontend/tests/overview-redesign.test.tsx`, 이 실행계획. `frontend/src/features/overview/DistributionBars.tsx`는 삭제했다.
+- 설계 판단: Alert Severity donut은 새 chart dependency 없이 semantic SVG와 항상 보이는 `Critical → High → Medium → Low` count/percentage list로 구현했다. 원호는 서버 `bySeverity / totalCount` presentation 비율만 사용하고 0 total은 중립 track으로 유지한다. Detection Activity는 series label을 horizontal legend로 옮기고 모든 timestamp button 대신 전체 server bucket을 가진 keyboard select 한 개를 제공한다. Alert series는 semantic critical red가 아닌 chart accent, Open Incident는 warning chart token을 사용한다.
+- 삭제한 코드: Endpoint Risk Overview block, horizontal distribution bar component, Detection Activity rotated Y-axis series label과 timestamp button 군집을 제거했다. Backend Endpoint Summary query와 Risk 정책은 KPI를 위해 유지한다.
+- 실행한 검증: `npm run test -- overview-redesign.test.tsx locale.test.tsx components.test.tsx` → 3 files / 24 tests passed. 9-block 순서, donut normal·zero, missing bucket `None`, invalid selection reset과 table fallback을 확인했다. `npm run typecheck` → passed. `git diff --check` → passed.
+- 브라우저 QA: 1440×1100에서 9 blocks, Endpoint Risk block 0건, donut segment 4개, bucket button 0건, select option 5개와 exact selected summary를 확인했다. 분석 grid는 약 `2:1`, overflow `false`다. 1024×900 resize 후 분석 panel은 1열 912px, chart와 donut content width 886px, overflow `false`였다. 증거: `frontend/output/playwright/overview-redesign/ref-03-1440.png`, `ref-03-1024.png`.
+- Bundle 변화: dependency와 ECharts module registration 변화 없음. CSS/SVG donut만 추가하고 제거된 HTML bar component를 대체했다. production 수치는 REF-05에서 측정한다.
+- 남은 위험: queue는 아직 `min-width: 620px` table과 중복 risk progress/badge를 사용한다. 최종 reduced-motion·print·clean console은 REF-05에서 다시 검증한다.
+- 다음 Package: REF-04
+
+### REF-04. Investigation queue 시각화
+
+- 상태: 완료
+- Highest-risk Endpoint를 progress bar 없는 ranked ledger로 변경한다.
+- Incident Queue를 responsive compact rows로 변경하고 긴 text, 숫자 정렬, compact date와 empty height를 보정한다.
+
+완료 조건: 360px까지 page-level·panel-level horizontal scroll 없이 full value 접근 경로와 primary link가 유지된다.
+
+- 변경 파일: `frontend/src/features/overview/InvestigationQueues.tsx`, `frontend/src/features/overview/OverviewDashboard.tsx`, `frontend/src/lib/format.ts`, `frontend/src/styles/pages/overview.css`, `frontend/tests/overview-redesign.test.tsx`, 이 실행계획.
+- 설계 판단: Highest-risk Endpoint는 순위, hostname·agent ID, score·level, Alert·Incident count의 ranked ledger로 바꿨다. score는 숫자와 level text로만 강조하고 같은 값을 반복하던 progress bar와 pill을 제거했다. Incident Queue는 title link, severity pill, plain status, Alert count와 `MM-DD HH:mm` last detected를 compact metadata로 배치했다. 두 list는 content 양에 따라 높이가 결정되며 긴 primary text는 ellipsis와 `title` 전체값을 함께 제공한다.
+- 삭제한 코드: 두 queue의 semantic table와 `min-width: 620px`, risk progressbar, level badge 중복, 두 severity/status pill 조합, 강제 280px queue 높이를 제거했다.
+- 실행한 검증: `npm run test -- overview-redesign.test.tsx locale.test.tsx components.test.tsx` → 3 files / 25 tests passed. sibling partial failure, primary links, long text title, list semantics와 progress/table 부재를 확인했다. `npm run typecheck` → passed. `git diff --check` → passed.
+- 브라우저 QA: 1440×1100에서 Endpoint 5개와 Incident 2개, progress 0건, queue table 0건, panel overflow `false`, page overflow `false`, 모든 metric label과 `07-16 21:00` compact time을 확인했다. 360×900에서 두 queue panel overflow `false`, main scrollLeft `0`, hostname title 접근 경로를 확인했다. 증거: `frontend/output/playwright/overview-redesign/ref-04-1440.png`, `ref-04-360-queues.png`.
+- Bundle 변화: dependency 없음. 공통 table wrapper 대신 route-local ordered list와 CSS grid를 사용했다. production 수치는 REF-05에서 측정한다.
+- 남은 위험: 전체 viewport matrix와 상태·locale·accessibility·build 검증, 장기 문서의 10-block drift 정리가 남아 있다.
+- 다음 Package: REF-05
+
+### REF-05. 통합 Release Gate
+
+- 상태: 완료
+- 전체 test, lint, typecheck, build, OpenAPI check를 한 번 실행한다.
+- 1440, 1280, 1024, 768, 360px, KO/EN, keyboard-only, 200% zoom, reduced motion을 검증한다.
+- normal, zero, empty, partial failure, stale와 final screenshot을 확인하고 bundle 변화를 기록한다.
+
+완료 조건: DESIGN.md 14.7 Hard Pre-flight와 이 문서 Release Gate를 실제 증거로 다시 통과한다.
+
+- 변경 파일: REF-01~04에 기록된 Frontend source·test 파일, `docs/frontend/DESIGN.md`, `docs/frontend/FRONTEND_SPEC.md`, 이 실행계획. Backend runtime, OpenAPI artifact, DB migration과 dashboard layout 저장 row는 변경하지 않았다.
+- 설계 판단: 2026-07-17 visual refinement를 현재 9-block 계약으로 장기 문서에 동기화했다. color와 typography는 semantic 역할·접근성 규칙만 확정하고 실제 palette, font family, size와 weight는 팀 지정 전 임시 token 값으로 명시했다. final 비교는 과거 10-block 시안의 정보 우선순위를 기준으로 하되, 후속 요구인 full-width EDR strip, compact KPI, severity donut, Endpoint Risk 제거와 compact queue를 현재 목표로 판정했다.
+- 삭제한 코드: Overview의 중복 breadcrumb·visible PageHeader, 5열 EDR+KPI 강제 높이, `DistributionBars.tsx`, Endpoint Risk block, Detection Activity의 rotated series label·timestamp button 군집, queue table·risk progressbar·강제 높이를 최종 확인했다. Backend layout API와 generated schema는 보존했다.
+- 실행한 검증: 전체 `npm run test` → 21 files / 96 tests passed. `npm run typecheck` → passed. `npm run lint`는 최초 donut offset의 render 후 mutation 1건을 발견했고 순수 누적 계산으로 수정한 뒤 passed. 수정 후 `overview-redesign.test.tsx` → 1 file / 14 tests passed. final `npm run build` → passed. `npm run openapi:check`는 최초 sandbox의 `~/.cache/uv` 접근 제한으로 실패했으나 허용된 동일 명령에서 `OpenAPI artifact is current`와 generated schema check가 passed. `git diff --check` → passed. `npm ls react-grid-layout --depth=0` → empty.
+- 브라우저 QA: API 계약 모양 mock과 기존 Vite를 사용했다. 1440, 1280, 1024, 768, 360px 모두 9 blocks rendered, 순차 intersection 9/9, document와 `.main-content` overflow `false`, Endpoint Risk·queue table·risk progress 0건이었다. 1440/1280의 초기 viewport에는 9/9, 1024/768은 6/9, 360은 5/9가 실제 fold 안에 있어 아래 block을 보이는 것으로 과장하지 않았다. KO/EN, Endpoint search focus, bucket select exact summary, queue link focus, CDP 200% zoom(scale 2, overflow `false`), reduced motion(`animation=disabled`)을 확인했다. print에서는 canvas `display:none`과 fallback table 3개를 확인했다. normal, zero(0% 4개), empty(activity·Endpoint·Incident), partial failure(Endpoint error·Incident list 유지), stale(마지막 dashboard 유지)가 통과했고 final normal console warning/error와 page error는 0건이다.
+- 승인 시안 비교: `docs/frontend/assets/references/overview-dashboard-target.png`와 `frontend/output/playwright/overview-redesign/ref-05-final-1440-full.png`를 직접 열었다. dark-neutral panel 계층, 상태 → 정량 활동 → 조사 queue 흐름은 유지한다. 후속 피드백에 따라 시안의 EDR+KPI 5열은 strip+KPI 행으로, severity bar는 donut으로 바뀌었고 Endpoint Risk panel은 의도적으로 제거됐다. 현재 DTO에 없는 delta·담당자·SLA·sparkline은 추가하지 않았다. 화면 크기와 목표 구조가 달라 자동 pixel diff 수치는 사용하지 않았다.
+- Bundle 변화: final `OverviewPage` 17.13 kB / 5.52 kB gzip, lazy `DetectionActivityPanel` 499.67 kB / 170.84 kB gzip, 공통 index 359.33 kB / 112.84 kB gzip. REF 시작 기준 대비 각각 +0.02/+0.11, +0.17/+0.01, +4.14/+1.86 kB이고 새 runtime dependency는 없다. `react-grid-layout`은 계속 0건이다.
+- 남은 위험: 실제 service name, color palette와 typography 값은 팀 지정 전이라 `EDR Console` fallback과 기존 token baseline을 사용한다. ECharts lazy chunk는 170.84 kB gzip으로 route 격리는 유지하지만 크다. 브라우저 상태 matrix는 API 계약 모양 mock으로 검증했으며 이번 후속 작업에서 live Backend integration은 재검증하지 않았다.
+- 다음 Package: 없음
+
+### Live preview handoff
+
+- 상태: 완료
+- 이유: 사용자가 현재 변경을 일반 브라우저에서 직접 사용하도록 요청했지만 host Vite의 proxy 대상 Backend `127.0.0.1:8000`과 통합 접속점 `127.0.0.1:8080`이 모두 중지되어 있다. Frontend test와 Playwright route mock만으로는 사용자 직접 조작과 실제 API session을 제공할 수 없으므로 Docker 예외 조건을 충족한다.
+- 실행 경로: repository가 지원하는 `docker compose up -d --build --wait`로 현재 Frontend source와 Backend·infra를 함께 띄운다. 기존 volume과 runtime credential은 보존하고 down/reset은 수행하지 않는다.
+- 예상 비용: 11개 service의 image 확인·필요 시 Backend/Frontend rebuild와 health wait가 발생해 수 분이 걸릴 수 있고, PostgreSQL·ClickHouse·Kafka·MinIO·Worker를 포함해 수 GB 메모리를 사용할 수 있다.
+- 검증 예정: `docker compose ps`, `http://127.0.0.1:8080/nginx-health`, Dashboard 응답과 일반 Chrome 접속.
+- 실행 메모: 첫 `--build`는 Docker Hub에서 `node:24.12.0-alpine`과 Dockerfile frontend metadata를 조회하다 `DeadlineExceeded`로 중단됐고 container는 생성되지 않았다. 기존 `edr-c-local-*` service image와 모든 infra image는 local cache에 있으므로, 재빌드 없이 Compose를 기동하고 현재 host Vite를 `EDR_BACKEND_PROXY_TARGET=http://127.0.0.1:8080`으로 연결하는 fallback을 사용한다. 이 경로는 현재 working tree Frontend를 유지하면서 cached Backend API를 사용한다.
+- 실제 결과: `docker compose up -d --wait`가 local cache image로 완료됐고 Backend, Frontend, Nginx, PostgreSQL, ClickHouse, Kafka와 MinIO health가 모두 정상이다. Nginx health는 `ok`, host Vite `/login`은 HTTP 200이며 `runtime/demo/credentials.json` 생성도 확인했다. 현재 working tree Vite는 5173에서 Compose 8080 API로 proxy하고, 사용자가 직접 조작할 수 있는 visible browser tab을 `http://127.0.0.1:5173/login`에 열어 두었다.
+- Demo data handoff: 공식 `tools.seed_dashboard_long_range`를 `7 days / 20 Endpoints / 100 Events per Endpoint-day / seed 20260715`로 실행해 기존 local QA DB를 초기화했다. 생성 결과는 Event 14,000건, Alert 280건, Incident 40건, Event failure 35건과 HOT bucket 160개이며 base QA fixture의 Alert 2건과 Incident 1건도 함께 유지된다. `frontend-admin`으로 로그인하고 `LATEST_7D`를 선택한 실제 Overview에서 Total Alerts 282, Critical Alerts 71, Open Incidents 21, 8개 daily bucket과 Endpoint·Incident queue가 응답하는 것을 확인했으며 visible browser tab을 `http://127.0.0.1:5173/?timePreset=LATEST_7D`에 열어 두었다.
+
+### REF-06. Case 1 color token 적용
+
+- 상태: 완료
+- 입력: `case-1-design-tokens.yaml`의 color, status mapping, KPI alias, chart series와 color implementation policy. 같은 파일의 font·typography는 이번 변경에서 제외한다.
+- 범위: 전역 dark surface·border·text·interaction token, Overview KPI·EDR·severity donut·risk ledger·Detection Activity와 queue의 semantic color를 교체한다.
+- 설계 판단: red는 Critical/RED/error의 수치·icon·작은 signal에만 사용하고 card fill·장식 border에는 사용하지 않는다. High/Medium/Low와 warning/health/info를 서로 다른 token으로 분리하며 chart series는 status color와 독립시킨다. Case 1에서는 gradient를 사용하지 않는다.
+- 변경 파일: `frontend/src/styles/tokens.css`, `frontend/src/styles.css`, `frontend/src/styles/reset.css`, `frontend/src/styles/primitives.css`, `frontend/src/styles/pages/overview.css`, `frontend/src/components/ui.tsx`, `frontend/src/features/overview/OverviewDashboard.tsx`, `frontend/src/features/overview/DetectionActivityPanel.tsx`, `frontend/tests/overview-redesign.test.tsx`, `docs/frontend/DESIGN.md`, `docs/frontend/FRONTEND_SPEC.md`, 이 실행계획.
+- 삭제한 코드: 이전 cyan 중심 palette 값, High/Warning·Medium/Info·Low/Success의 중복 mapping, color-mix로 파생하던 primary hover, accent·chart gradient, KPI와 EDR status의 장식 border color를 제거했다. Backend, API, DTO와 data 계산은 변경하지 않았다.
+- 실행한 검증: `npm test -- overview-redesign.test.tsx components.test.tsx app-shell-foundation.test.tsx` → 3 files / 20 tests passed. `npm run typecheck` → passed. `npm run lint` → passed. `npm run build` → passed. `git diff --check` → passed. 이전 palette hex를 Frontend source와 장기 문서에서 검색한 결과 0건이다.
+- 브라우저 QA: 기존 live Backend seed와 로그인 session을 재사용했다. 현재 visible browser의 403×853 viewport에서 9 blocks, KO 전환, document overflow `false`를 확인했다. computed token은 canvas `#121318`, panel `#27282e`, accent `#8296ff`, Critical `#ff5968`, High `#ff8a4c`, Medium `#f4b942`, Low `#8db5ff`, Warning `#e5d36c`, Success `#6ad7a3`, Info `#4bc8e8`, chart `#4bc8e8/#8b7cff/#f06db2`, gradient `none`이었다. Total 282는 accent, Critical 71은 critical, Open Incident 21은 info, High-risk Endpoint 0은 neutral로 렌더링됐고 KPI border는 모두 neutral이었다. severity donut 4개 segment도 새 status mapping과 일치했다. console은 Vite HMR debug와 React DevTools info만 있고 warning/error는 없었다. 현재 browser viewport 제약 때문에 별도 1440px color screenshot은 이번 Package에서 검증하지 않았다.
+- Bundle 변화: REF-05 대비 `OverviewPage` 17.14 kB / 5.53 kB gzip으로 +0.01 / +0.01 kB, lazy `DetectionActivityPanel` 499.66 kB / 170.84 kB gzip으로 -0.01 / ±0.00 kB, 공통 index 359.33 kB / 112.84 kB로 동일하다. 새 dependency는 없다.
+- 남은 위험: service name과 font·typography token은 아직 팀 확정 전이다. 전달 palette의 border default가 기존보다 밝아졌으므로 큰 화면의 전체 border 밀도는 팀 시각 검토에서 추가 조정될 수 있다. 1440px 색상 전용 screenshot 비교는 미검증이다.
+- 다음 Package: 팀 font·typography 전달 또는 다음 시각 피드백.

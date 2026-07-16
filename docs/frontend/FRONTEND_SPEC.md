@@ -297,10 +297,9 @@ Endpoint scope 선택기는 사용자가 열거나 검색할 때 `GET /endpoints
 - EDR State: overall status·score·reason code와 Threat Level·Collection Health 진단 bar
 - KPI: Total Alert, Critical Alert, High-risk Endpoint, OPEN Incident
 - Detection Activity: Backend가 제공한 Event, Alert, Incident `openCount` time bucket의 공통 X축 small multiples
-- Alert severity horizontal bars
-- Endpoint Risk horizontal bars와 highest score
+- Alert severity donut과 항상 보이는 Critical/High/Medium/Low count·percentage 목록
 - Highest-risk Endpoint와 OPEN Incident queue
-- EDR state를 포함한 승인된 10개 block을 고정 DOM 순서로 표시한다.
+- EDR state를 포함한 9개 block을 고정 DOM 순서로 표시한다. Endpoint Risk 분포 panel은 표시하지 않지만 High-risk Endpoint KPI를 위한 서버 Endpoint summary query는 유지한다.
 - Endpoint scope는 `All endpoints`와 paged search로 선택한 실제 Endpoint만 표시하며 client-side 가상 filter를 만들지 않는다.
 - `lastRefreshedAt`
 
@@ -308,8 +307,8 @@ KPI와 chart 선택은 관련 목록 route로 이동하며 가능한 경우 URL 
 
 고정 레이아웃:
 
-- 1280px 이상: `EDR State + KPI 4개`, `Detection 2fr + 분포 1fr + 분포 1fr`, `Endpoint 1fr + Incident 1fr`의 세 행이다.
-- 1024–1279px: EDR·KPI와 분석 panel을 1–2열로 재배치한다.
+- 1280px 이상: full-width `EDR State` strip, `KPI 4개`, `Detection 2fr + Alert Severity 1fr`, `Endpoint 1fr + Incident 1fr` 순서로 배치한다.
+- 1024–1279px: KPI와 분석 panel을 1–2열로 재배치한다.
 - 1023px 이하: DOM reading order를 유지하며 1–2열로 줄인다.
 - panel은 drag, drop, resize, hide, restore와 edit mode를 제공하지 않는다.
 - Frontend는 dashboard layout GET/PUT/DELETE를 호출하지 않고 저장 layout을 화면과 병합하지 않는다.
@@ -461,7 +460,7 @@ Archive:
 ## 10. Responsive와 접근성
 
 - 승인 시안과 시각 회귀의 주 기준은 1440px이다.
-- 1280px 이상 Overview는 고정 3행 desktop grid를 사용한다.
+- 1280px 이상 Overview는 `EDR strip → KPI → analysis → queue`의 고정 4단 desktop grid를 사용한다.
 - 1024–1279px은 1–2열, 360–1023px은 DOM reading order 기반 1–2열로 재배치한다.
 - `html`, `body`, `#root`에 viewport를 강제하는 고정 최소 폭을 두지 않는다.
 - 모든 interactive element는 visible focus와 accessible name을 가진다.
@@ -569,56 +568,62 @@ Legacy `DashboardResult`, `EndpointRisk`, `EDR state`, `decision`, `source`, `ge
 - 한 화면에서 가능한 모든 데이터를 보여주지 않고 Overview에서 상세 화면으로 drill-down한다.
 - 저장 Report API, 웹 replay, 실시간 Process Snapshot, Agent command처럼 계약에 없는 기능을 시각적으로 암시하지 않는다.
 
-## 17. Color
+## 17. Color — 값 확정 / Case 1
 
 Dark theme만 MVP 범위에 포함한다.
 
+2026-07-17 전달된 `case-1-design-tokens.yaml`의 color 값을 구현 기준으로 사용한다. component에는 raw color를 추가하지 않고 semantic token만 참조한다. 같은 파일의 font와 typography 값은 이번 범위에서 적용하지 않는다.
+
 | 역할 | Token | 값 | 사용 |
 | --- | --- | --- | --- |
-| Page background | `--color-bg` | `#101215` | 전체 배경 |
-| Shell background | `--color-shell` | `#0d0f12` | rail, top chrome |
-| Surface primary | `--color-panel` | `#171c22` | 기본 panel |
-| Surface secondary | `--color-panel-2` | `#202733` | row, control |
-| Surface inset | `--color-panel-3` | `#11161c` | chart, inspector inset |
-| Surface hover | `--color-panel-hover` | `#1b222c` | interactive hover |
-| Border default | `--color-line` | `#323a46` | panel border |
-| Border subtle | `--color-line-soft` | `#272e38` | divider, table row |
-| Text primary | `--color-text` | `#eef2f7` | heading, primary value |
-| Text secondary | `--color-muted` | `#9aa8ba` | description, metadata |
-| Text tertiary | `--color-muted-2` | `#748296` | disabled, quiet label |
-| Danger | `--color-red` | `#f2495c` | CRITICAL, RED, unavailable |
-| Warning | `--color-amber` | `#ffb357` | HIGH, YELLOW, degraded |
-| Success | `--color-green` | `#73bf69` | LOW, GREEN, online, healthy |
-| Info | `--color-blue` | `#5794f2` | MEDIUM, neutral data series |
-| Focus/accent | `--color-cyan` | `#56d0e6` | focus, active navigation, chart focus |
+| Page background | `--surface-canvas` | `#121318` | 전체 배경 |
+| Shell background | `--surface-shell` | `#17181D` | rail, top chrome |
+| Surface primary | `--surface-panel` | `#27282E` | 기본 panel |
+| Surface raised | `--surface-raised` | `#32333B` | popover, tooltip |
+| Surface inset | `--surface-inset` | `#1D1E24` | chart, inspector inset |
+| Surface hover | `--surface-hover` | `#34353D` | interactive hover |
+| Border default | `--border-default` | `#707381` | panel, control border |
+| Border subtle | `--border-subtle` | `#3A3C46` | divider, table row, chart grid |
+| Text primary | `--text-primary` | `#F2F3F7` | heading, primary value |
+| Text secondary | `--text-secondary` | `#C7C9D2` | description, metadata |
+| Text tertiary | `--text-tertiary` | `#9A9DAA` | quiet label |
+| Focus | `--focus-ring-color` | `#8EA2FF` | keyboard focus ring |
+| Accent | `--accent-primary` | `#8296FF` | primary action, active navigation |
+| Critical | `--status-critical` | `#FF5968` | CRITICAL, RED, unavailable |
+| High | `--status-high` | `#FF8A4C` | HIGH severity/risk |
+| Medium | `--status-medium` | `#F4B942` | MEDIUM severity/risk |
+| Low | `--status-low` | `#8DB5FF` | LOW severity/risk |
+| Warning | `--status-warning` | `#E5D36C` | YELLOW, offline, degraded |
+| Success | `--status-success` | `#6AD7A3` | GREEN, online, healthy |
+| Info | `--status-info` | `#4BC8E8` | OPEN, IN_PROGRESS |
+| Neutral | `--status-neutral` | `#A6A9B6` | CLOSED, RETIRED, UNKNOWN |
 
 ### 상태 mapping
 
 | Domain | 값 | Color token |
 | --- | --- | --- |
-| Risk/Severity | `CRITICAL` | `--color-red` |
-| Risk/Severity | `HIGH` | `--color-amber` |
-| Risk/Severity | `MEDIUM` | `--color-blue` |
-| Risk/Severity | `LOW` | `--color-green` |
-| EDR state | `RED` | `--color-red` |
-| EDR state | `YELLOW` | `--color-amber` |
-| EDR state | `GREEN` | `--color-green` |
-| Endpoint | `ONLINE` | `--color-green` |
-| Endpoint | `OFFLINE` | `--color-amber` |
-| Endpoint | `RETIRED` | `--color-muted-2` |
-| Sensor | `HEALTHY` | `--color-green` |
-| Sensor | `DEGRADED` | `--color-amber` |
-| Sensor | `UNAVAILABLE` | `--color-red` |
+| Risk/Severity | `CRITICAL / HIGH / MEDIUM / LOW` | `--status-critical / --status-high / --status-medium / --status-low` |
+| EDR state | `RED / YELLOW / GREEN` | `--status-critical / --status-warning / --status-success` |
+| Endpoint/Sensor | `ONLINE / HEALTHY` | `--status-success` |
+| Endpoint/Sensor | `OFFLINE / DEGRADED` | `--status-warning` |
+| Endpoint/Sensor | `UNAVAILABLE` | `--status-critical` |
+| Incident | `OPEN / IN_PROGRESS` | `--status-info` |
+| Lifecycle | `CLOSED / RETIRED / UNKNOWN` | `--status-neutral` |
 
 ### Color rules
 
-- Cyan은 focus, selection, active navigation과 interactive chart affordance에만 사용한다.
+- Blue-violet accent는 action과 active navigation에만 사용하고 focus ring은 별도 periwinkle token을 사용한다.
 - Red는 CRITICAL/RED 또는 실제 오류에만 사용한다.
-- Background에 상태 색상을 넓게 채우지 않고 border, icon, text, 작은 fill로 제한한다.
+- Red는 화면 면적의 5% 미만으로 제한하고 card fill 또는 장식 border에 사용하지 않는다.
+- Background에 상태 색상을 넓게 채우지 않고 icon, 수치 text와 작은 signal에 제한한다.
 - 모든 상태는 visible text를 함께 제공한다.
+- Detection Activity는 Events `#4BC8E8`, Alerts `#8B7CFF`, Open Incidents `#F06DB2`로 상태색과 분리한다.
+- Case 1 dark theme에서는 gradient를 사용하지 않는다.
 - 새 raw hex는 이 문서에 token을 먼저 추가한 뒤 사용한다.
 
-## 18. Typography
+## 18. Typography — 역할 확정 / 값 임시
+
+본문·제목·수치·metadata·code의 위계와 최소 가독성 규칙은 확정한다. 아래 font family, size, weight와 scale은 팀이 최종 typography를 지정하기 전까지의 구현 baseline이다.
 
 ### Font stack
 
@@ -681,14 +686,14 @@ Dark theme만 MVP 범위에 포함한다.
 - Main shell: `min-height:100dvh`
 - Main content는 viewport 내부에서 독립 scroll한다.
 - Overview desktop: 목적별 고정 CSS grid, 12px gap
-- KPI 기본 배치: EDR State와 4개 KPI의 한 행
+- Overview 기본 배치: full-width EDR State strip 다음에 4개 KPI 행
 - Panel은 고정 높이가 필요할 때 내부만 scroll하며 page 전체와 중첩 scroll을 최소화한다.
 
 ### Responsive
 
 | Width | Layout |
 | --- | --- |
-| 1280px 이상 | 고정 3행 Overview, left icon rail |
+| 1280px 이상 | 고정 4단 Overview, left icon rail |
 | 1024~1279px | 1–2열 Overview, 필요 시 compact navigation |
 | 360~1023px | DOM 순서 기반 1–2열, drawer navigation |
 
@@ -699,6 +704,7 @@ Dark theme만 MVP 범위에 포함한다.
 ### AppShell
 
 - **Structure**: navigation rail/top navigation, global bar, optional filter bar, scrollable main.
+- **Identity**: Overview root top bar는 breadcrumb와 visible page title을 반복하지 않고 `VITE_SERVICE_NAME`을 표시한다. 값이 없으면 임시 fallback `EDR Console`을 사용한다. 다른 route는 breadcrumb와 page title을 유지한다.
 - **States**: route active, compact responsive, loading auth.
 - **Accessibility**: `nav` landmark, current route는 `aria-current="page"`, icon button에는 visible tooltip과 accessible name.
 - **Motion**: responsive reflow에는 animation을 넣지 않는다.
@@ -739,12 +745,13 @@ Dark theme만 MVP 범위에 포함한다.
 - **Variants**: severity, risk, endpoint, sensor, alert, incident, storage.
 - **Accessibility**: 색상만으로 상태를 전달하지 않는다.
 
-### SeverityBars
+### SeverityDonut
 
 - **Input**: Dashboard API의 `SeverityCountDto[]`.
 - **Rule**: 원시 Alert를 집계하지 않는다.
-- **States**: zero/disabled, keyboard focus, empty.
-- **Accessibility**: total과 각 category count를 text list로도 제공한다.
+- **Rule**: `CRITICAL → HIGH → MEDIUM → LOW` 순서를 유지하고 서버 total을 분모로 presentation percentage만 계산한다.
+- **States**: normal, total zero, empty.
+- **Accessibility**: donut만으로 값을 전달하지 않고 total과 각 category count·percentage를 visible text list로 제공한다.
 
 ### TimeSeriesChart
 

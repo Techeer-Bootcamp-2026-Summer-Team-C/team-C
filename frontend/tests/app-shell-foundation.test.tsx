@@ -22,6 +22,14 @@ afterEach(() => {
 });
 
 describe("application shell foundation", () => {
+  it("shows the service name instead of duplicate Overview breadcrumbs on the root route", async () => {
+    renderRootShell();
+    expect(await screen.findByRole("heading", { name: "Overview destination" })).toBeInTheDocument();
+    expect(screen.getAllByLabelText("EDR Console")).not.toHaveLength(0);
+    expect(screen.getByText("EDR Console", { selector: ".top-title > strong" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Breadcrumb" })).not.toBeInTheDocument();
+  });
+
   it("renders approved navigation groups, child hierarchy, and route breadcrumbs", async () => {
     renderShell();
     expect(await screen.findByRole("heading", { name: "Archive destination" })).toBeInTheDocument();
@@ -77,6 +85,25 @@ function renderShell() {
                   <Route index element={<h1>Operations destination</h1>} />
                   <Route path="archives" element={<h1>Archive destination</h1>} />
                 </Route>
+              </Route>
+            </Routes>
+          </MemoryRouter>
+        </LocaleProvider>
+      </AuthProvider>
+    </QueryClientProvider>,
+  );
+}
+
+function renderRootShell() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <LocaleProvider>
+          <MemoryRouter initialEntries={["/"]}>
+            <Routes>
+              <Route element={<RequireAuth><AppShell /></RequireAuth>}>
+                <Route index element={<h1>Overview destination</h1>} />
               </Route>
             </Routes>
           </MemoryRouter>

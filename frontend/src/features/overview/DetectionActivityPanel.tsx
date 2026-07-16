@@ -40,22 +40,22 @@ export default function DetectionActivityPanel({ events, alerts, incidents }: {
     container.dataset.animation = animate ? "enabled" : "disabled";
     const styles = getComputedStyle(document.documentElement);
     const color = (name: string, fallback: string) => styles.getPropertyValue(name).trim() || fallback;
-    const colors = [color("--status-info", "#4ea1ff"), color("--status-warning", "#ffb44a"), color("--status-critical", "#ff5470")];
+    const colors = [color("--chart-events", "#4bc8e8"), color("--chart-alerts", "#8b7cff"), color("--chart-incidents", "#f06db2")];
     chart.setOption({
       animation: animate,
       animationDuration: 280,
       axisPointer: { link: [{ xAxisIndex: "all" }] },
       grid: [
-        { left: 70, right: 16, top: 14, height: 58 },
-        { left: 70, right: 16, top: 100, height: 58 },
-        { left: 70, right: 16, top: 186, height: 58 },
+        { left: 44, right: 16, top: 14, height: 58 },
+        { left: 44, right: 16, top: 100, height: 58 },
+        { left: 44, right: 16, top: 186, height: 58 },
       ],
       tooltip: {
         trigger: "axis",
         axisPointer: { type: "cross" },
-        backgroundColor: color("--surface-raised", "#18212b"),
-        borderColor: color("--border-default", "#354252"),
-        textStyle: { color: color("--text-primary", "#eef4fb"), fontSize: 12 },
+        backgroundColor: color("--surface-raised", "#32333b"),
+        borderColor: color("--border-default", "#707381"),
+        textStyle: { color: color("--text-primary", "#f2f3f7"), fontSize: 12 },
         formatter: (raw: unknown) => formatTooltip(raw, labels),
       },
       xAxis: model.series.map((_series, index) => ({
@@ -63,22 +63,18 @@ export default function DetectionActivityPanel({ events, alerts, incidents }: {
         gridIndex: index,
         min: model.domain?.[0],
         max: model.domain?.[1],
-        axisLabel: { color: color("--text-tertiary", "#7f8da0"), hideOverlap: true, show: index === 2 },
-        axisLine: { lineStyle: { color: color("--border-subtle", "#27313d") } },
+        axisLabel: { color: color("--chart-axis", "#9a9daa"), hideOverlap: true, show: index === 2 },
+        axisLine: { lineStyle: { color: color("--chart-grid", "#3a3c46") } },
         axisTick: { show: false },
         splitLine: { show: false },
       })),
       yAxis: model.series.map((_series, index) => ({
         type: "value",
         gridIndex: index,
-        name: labels[index],
-        nameLocation: "middle",
-        nameGap: 48,
-        nameTextStyle: { color: color("--text-secondary", "#aab7c7"), fontWeight: 700 },
-        axisLabel: { color: color("--text-tertiary", "#7f8da0"), fontSize: 10 },
+        axisLabel: { color: color("--chart-axis", "#9a9daa"), fontSize: 10 },
         axisLine: { show: false },
         axisTick: { show: false },
-        splitLine: { lineStyle: { color: color("--border-subtle", "#27313d") } },
+        splitLine: { lineStyle: { color: color("--chart-grid", "#3a3c46") } },
       })),
       series: model.series.map((series, index) => ({
         name: labels[index],
@@ -119,7 +115,7 @@ export default function DetectionActivityPanel({ events, alerts, incidents }: {
   return <div className="detection-activity-echarts">
     <p className="sr-only">{t("charts.detectionSummary", { events: latest[0] ?? t("common.none"), alerts: latest[1] ?? t("common.none"), incidents: latest[2] ?? t("common.none") })}</p>
     <ul aria-label={t("charts.currentValues")} className="activity-current-values">
-      {labels.map((label, index) => <li key={label}><span>{label}</span><strong>{latest[index] ?? t("common.none")}</strong></li>)}
+      {labels.map((label, index) => <li className={`series-${["events", "alerts", "incidents"][index]}`} key={label}><span><i aria-hidden="true" />{label}</span><strong>{latest[index] ?? t("common.none")}</strong></li>)}
     </ul>
     <p className="activity-time-context">{t("charts.timeContext", {
       from: formatCompactDate(new Date(model.domain[0]).toISOString()),
@@ -127,15 +123,15 @@ export default function DetectionActivityPanel({ events, alerts, incidents }: {
       timezone,
     })}</p>
     <div aria-hidden="true" className="detection-echarts-canvas" ref={containerRef} />
-    <div aria-label={t("charts.bucketSelection")} className="chart-point-controls" role="group">
-      {model.timestamps.map((timestamp) => <button
-        aria-pressed={selectedTimestamp === timestamp}
-        key={timestamp}
-        onClick={() => selectTimestamp(timestamp)}
-        onFocus={() => selectTimestamp(timestamp)}
-        type="button"
-      >{formatCompactDate(new Date(timestamp).toISOString())}</button>)}
-    </div>
+    <label className="activity-bucket-inspector"><span>{t("charts.bucketSelection")}</span><select
+      aria-label={t("charts.bucketSelection")}
+      onChange={(event) => {
+        const timestamp = Number(event.target.value);
+        if (Number.isFinite(timestamp) && event.target.value) selectTimestamp(timestamp);
+        else setSelectedTimestamp(null);
+      }}
+      value={selectedTimestamp ?? ""}
+    ><option value="">{t("charts.selectBucket")}</option>{model.timestamps.map((timestamp) => <option key={timestamp} value={timestamp}>{formatCompactDate(new Date(timestamp).toISOString())}</option>)}</select></label>
     {selectedTimestamp === null ? null : <p aria-live="polite" className="chart-selected-value">{selectionSummary(selectedTimestamp)}</p>}
   </div>;
 

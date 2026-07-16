@@ -4,27 +4,69 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 
-  --surface-canvas: #101215;
-  --surface-shell: #0d0f12;
-  --surface-panel: #171c22;
-  --surface-raised: #202733;
-  --surface-inset: #11161c;
-  --surface-hover: #1b222c;
-  --border-default: #323a46;
-  --border-subtle: #272e38;
-  --text-primary: #eef2f7;
-  --text-secondary: #9aa8ba;
-  --text-tertiary: #768498;
-  --accent-primary: #56d0e6;
-  --status-critical: #f2495c;
-  --status-warning: #ffb357;
-  --status-success: #73bf69;
-  --status-info: #5794f2;
+  /* Case 1 dark security operations palette. Typography remains provisional. */
+  --surface-canvas: #121318;
+  --surface-shell: #17181d;
+  --surface-panel: #27282e;
+  --surface-raised: #32333b;
+  --surface-inset: #1d1e24;
+  --surface-hover: #34353d;
+  --surface-selected: rgba(130, 150, 255, .18);
+  --surface-disabled: rgba(255, 255, 255, .06);
+  --overlay-scrim: rgba(5, 6, 9, .72);
+  --shadow-color: rgba(0, 0, 0, .48);
 
-  --gradient-accent-surface: linear-gradient(110deg, color-mix(in srgb, var(--accent-primary) 13%, transparent), color-mix(in srgb, var(--status-info) 7%, transparent) 42%, transparent 78%);
-  --gradient-chart-fill: linear-gradient(180deg, color-mix(in srgb, var(--accent-primary) 28%, transparent), transparent 88%);
-  --elevation-raised: 0 10px 30px rgba(0, 0, 0, .38);
-  --elevation-modal: 0 22px 64px rgba(0, 0, 0, .56);
+  --border-default: #707381;
+  --border-subtle: #3a3c46;
+  --border-strong: #8b8e9c;
+  --chart-grid: #3a3c46;
+  --chart-axis: #9a9daa;
+  --focus-ring-color: #8ea2ff;
+  --focus-ring: 0 0 0 2px var(--focus-ring-color);
+
+  --text-primary: #f2f3f7;
+  --text-secondary: #c7c9d2;
+  --text-tertiary: #9a9daa;
+  --text-disabled: #747784;
+  --text-placeholder: #8b8e9c;
+  --text-inverse: #121318;
+  --text-link: #b8c6ff;
+  --text-link-hover: #d7deff;
+  --text-code: #c8d3ff;
+
+  --accent-primary: #8296ff;
+  --accent-hover: #98a9ff;
+  --accent-active: #6d80e8;
+  --accent-muted: rgba(130, 150, 255, .16);
+  --selection-background: rgba(130, 150, 255, .24);
+
+  --status-critical: #ff5968;
+  --status-high: #ff8a4c;
+  --status-medium: #f4b942;
+  --status-low: #8db5ff;
+  --status-success: #6ad7a3;
+  --status-warning: #e5d36c;
+  --status-info: #4bc8e8;
+  --status-neutral: #a6a9b6;
+  --status-error-surface: rgba(255, 89, 104, .12);
+  --status-warning-surface: rgba(229, 211, 108, .12);
+  --status-success-surface: rgba(106, 215, 163, .12);
+
+  --kpi-total-alerts: var(--accent-primary);
+  --kpi-critical-alerts: var(--status-critical);
+  --kpi-high-risk-endpoints: var(--status-high);
+  --kpi-open-incidents: var(--status-info);
+  --chart-events: #4bc8e8;
+  --chart-alerts: #8b7cff;
+  --chart-incidents: #f06db2;
+  --chart-missing: #8b8e9c;
+  --donut-track: #3a3c46;
+
+  --gradient-accent-surface: none;
+  --gradient-chart-fill: none;
+  --elevation-tooltip: 0 6px 18px rgba(0, 0, 0, .32);
+  --elevation-raised: 0 8px 24px rgba(0, 0, 0, .36);
+  --elevation-modal: 0 20px 56px var(--shadow-color);
 
   --space-1: 2px;
   --space-2: 4px;
@@ -64,10 +106,14 @@
   --color-muted: var(--text-secondary);
   --color-muted-2: var(--text-tertiary);
   --color-red: var(--status-critical);
+  --color-orange: var(--status-high);
+  --color-yellow: var(--status-medium);
   --color-amber: var(--status-warning);
+  --color-low: var(--status-low);
   --color-green: var(--status-success);
   --color-blue: var(--status-info);
   --color-cyan: var(--accent-primary);
+  --color-neutral: var(--status-neutral);
   --font-micro: 11px;
   --font-caption: var(--type-meta);
   --font-body-sm: var(--type-label);

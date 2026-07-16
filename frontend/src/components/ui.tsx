@@ -55,7 +55,7 @@ export function KpiCard({ label, value, detail, icon, to, tone = "neutral" }: {
   detail: string;
   icon: ReactNode;
   to?: string;
-  tone?: string;
+  tone?: "neutral" | "accent" | "critical" | "high" | "info" | "warning" | "success";
 }) {
   const content = <><span className="kpi-icon">{icon}</span><span>{label}</span><strong>{value}</strong><small>{detail}</small>{to ? <ArrowRight aria-hidden="true" className="kpi-arrow" size={15} /> : null}</>;
   return to ? <Link className={`kpi-card ${tone}`} to={to}>{content}</Link> : <article className={`kpi-card ${tone}`}>{content}</article>;
@@ -81,8 +81,8 @@ export function EdrStateSummary({ state }: { state: EdrStateDto }) {
       <div className="edr-reason-block">
         <h3>{t("edrState.reasonCodes")}</h3>
         {state.reasonCodes.length ? <ul>{state.reasonCodes.map((reason) => <li key={reason}>{humanize(reason)}</li>)}</ul> : <p>{t("edrState.noReasons")}</p>}
+        <footer>{t("edrState.calculated", { time: formatDateTime(state.calculatedAt) })}</footer>
       </div>
-      <footer>{t("edrState.calculated", { time: formatDateTime(state.calculatedAt) })}</footer>
     </section>
   );
 }
