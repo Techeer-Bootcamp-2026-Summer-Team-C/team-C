@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { Activity, Globe2, Network, Radar, Search } from "lucide-react";
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/endpoints";
 import { CountBars } from "../components/charts";
 import { readTimeFilter, TimeFilterFields } from "../components/filters";
-import { Badge } from "../components/primitives";
+import { Badge, Button } from "../components/primitives";
 import {
   DataTable,
   DefinitionGrid,
@@ -22,14 +22,18 @@ import {
   StaleWarning,
   StatusPill,
 } from "../components/ui";
-import type { DashboardSummaryDto, EgressTopologyDto } from "../contracts";
+import type { CorrelationDto, DashboardSummaryDto, EgressTopologyDto } from "../contracts";
 import {
+  correlationEdgeId,
+  correlationNodeId,
   endpointNodeId,
   filterTopology,
+  selectedCorrelationRelationship,
   selectedTopologyEdge,
   targetNodeId,
   topologyEdgeId,
   topologyGraphEnabled,
+  type CorrelationSelection,
   type TopologySelection,
 } from "../features/intelligenceOperations";
 import { useI18n } from "../i18n/LocaleContext";
@@ -42,6 +46,11 @@ const LazyTopologyGraph = lazy(async () => {
   return { default: module.TopologyGraph };
 });
 
+const LazyCorrelationGraph = lazy(async () => {
+  const module = await import("../components/CorrelationGraph");
+  return { default: module.CorrelationGraph };
+});
+
 export function IntelligencePage() {
   const { t } = useI18n();
   const [params, setParams] = useSearchParams();
@@ -49,8 +58,11 @@ export function IntelligencePage() {
   const endpointIds = parseEndpointIds(params.get("endpointIds"));
   const summaryQuery = { ...time.query, interval: time.interval };
   const topologyQuery = { ...time.query, ...(endpointIds.length ? { endpointIds } : {}) };
+  const correlationValue = params.get("value")?.trim() ?? "";
+  const correlationRequest = { ...time.query, value: correlationValue, ...(endpointIds.length ? { endpointIds } : {}) };
   const summary = useQuery({ queryKey: ["intelligence-summary", summaryQuery], queryFn: ({ signal }) => api.dashboard(summaryQuery, signal), enabled: time.valid });
   const topology = useQuery({ queryKey: ["egress-topology", topologyQuery], queryFn: ({ signal }) => api.topology(topologyQuery, signal), enabled: time.valid });
+  const correlation = useQuery({ queryKey: ["dns-correlation", correlationRequest], queryFn: ({ signal }) => api.correlation(correlationRequest, signal), enabled: time.valid && Boolean(correlationValue) });
   const summaryUnavailable = Boolean(summary.error && !summary.data);
   const topologyUnavailable = Boolean(topology.error && !topology.data);
   const error = summary.error ?? topology.error;
@@ -66,8 +78,122 @@ export function IntelligencePage() {
     {summaryUnavailable && topologyUnavailable ? <ErrorState error={error} onRetry={() => void Promise.all([summary.refetch(), topology.refetch()])} /> : null}
     {(summaryUnavailable !== topologyUnavailable) ? <PartialFailureWarning message={summaryUnavailable ? t("intelligence.summaryUnavailable") : t("intelligence.topologyUnavailable")} /> : null}
     {(summary.isRefetchError || topology.isRefetchError) && (summary.data || topology.data) ? <StaleWarning error={error} onRetry={() => void Promise.all([summary.refetch(), topology.refetch()])} /> : null}
+    {time.valid ? <CorrelationWorkspace
+      correlation={correlation.data?.data ?? null}
+      error={correlation.error}
+      graphEnabled={topologyGraphEnabled()}
+      isPending={correlation.isPending && Boolean(correlationValue)}
+      isRefetchError={correlation.isRefetchError}
+      onRetry={() => void correlation.refetch()}
+      onSearch={(value) => {
+        const nextValue = value.trim();
+        if (nextValue && nextValue === correlationValue) void correlation.refetch();
+        else setParams(updateParams(params, { value: nextValue }));
+      }}
+      suggestions={summary.data ? [
+        ...summary.data.data.events.topDomains.slice(0, 3).map((row) => row.domain),
+        ...summary.data.data.events.topRemoteIps.slice(0, 3).map((row) => row.remoteIp),
+      ] : []}
+      value={correlationValue}
+      key={correlationValue}
+    /> : null}
     {(summary.data || topology.data) ? <IntelligenceContent dashboard={summary.data?.data ?? null} topology={topology.data?.data ?? null} /> : null}
   </div>;
+}
+
+export function CorrelationWorkspace({
+  value,
+  correlation,
+  suggestions,
+  graphEnabled,
+  isPending,
+  isRefetchError,
+  error,
+  onSearch,
+  onRetry,
+}: {
+  value: string;
+  correlation: CorrelationDto | null;
+  suggestions: string[];
+  graphEnabled: boolean;
+  isPending: boolean;
+  isRefetchError: boolean;
+  error: Error | null;
+  onSearch: (value: string) => void;
+  onRetry: () => void;
+}) {
+  const { t } = useI18n();
+  const [draft, setDraft] = useState(value);
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onSearch(draft.trim());
+  };
+
+  return <Panel className="correlation-workspace-panel" title={t("intelligence.correlationTitle")} subtitle={t("intelligence.correlationSubtitle")} meta={<StatusPill value="READ ONLY" />}>
+    <form className="correlation-toolbar" onSubmit={submit}>
+      <Field label={t("intelligence.correlationValue")}><span className="search-field"><Search aria-hidden="true" size={15} /><input aria-label={t("intelligence.correlationValue")} onChange={(event) => setDraft(event.target.value)} placeholder={t("intelligence.correlationPlaceholder")} type="search" value={draft} /></span></Field>
+      <Button disabled={!draft.trim()} type="submit" variant="primary">{t("intelligence.lookup")}</Button>
+    </form>
+    {suggestions.length ? <div className="correlation-suggestions"><span>{t("intelligence.tryObservedSignal")}</span>{[...new Set(suggestions)].map((suggestion) => <button key={suggestion} onClick={() => { setDraft(suggestion); onSearch(suggestion); }} type="button"><code>{suggestion}</code></button>)}</div> : null}
+    {!value ? <EmptyState title={t("intelligence.correlationReady")} message={t("intelligence.correlationReadyDescription")} /> : null}
+    {value && isPending ? <Skeleton rows={8} /> : null}
+    {value && error && !correlation ? <ErrorState error={error} onRetry={onRetry} /> : null}
+    {correlation && isRefetchError ? <StaleWarning error={error} onRetry={onRetry} /> : null}
+    {correlation ? <CorrelationResult correlation={correlation} graphEnabled={graphEnabled} key={`${correlation.inputType}:${correlation.inputValue}`} /> : null}
+  </Panel>;
+}
+
+export function CorrelationResult({ correlation, graphEnabled }: { correlation: CorrelationDto; graphEnabled: boolean }) {
+  const { t } = useI18n();
+  const [selection, setSelection] = useState<CorrelationSelection | null>(null);
+  if (!correlation.relationships.length) return <EmptyState title={t("intelligence.noCorrelation")} message={t("intelligence.noCorrelationDescription")} />;
+
+  return <>
+    <div className="correlation-summary" role="status">
+      <span><strong>{correlation.inputType}</strong><code>{correlation.inputValue}</code></span>
+      <span>{t("intelligence.relatedCount", { count: correlation.related.length })}</span>
+      <span>{formatDateTime(correlation.from)} — {formatDateTime(correlation.to)}</span>
+    </div>
+    <div className="topology-stage correlation-stage">
+      <aside aria-label={t("intelligence.correlationLegend")} className="topology-legend"><strong>{t("intelligence.correlationLegend")}</strong><ul><li><i className="correlation-input" />{t("intelligence.inputNode")}</li><li><i className="domain" />Domain</li><li><i className="ip" />IP</li><li><i className="live" />LIVE_DNS</li><li><i className="observed" />OBSERVED_EVENTS</li></ul><small>{t("intelligence.ptrCaveat")}</small></aside>
+      {graphEnabled ? <Suspense fallback={<Skeleton rows={8} />}><LazyCorrelationGraph correlation={correlation} label={t("intelligence.correlationGraphAria")} onSelect={setSelection} selection={selection} /></Suspense> : <div className="topology-fallback" role="status"><Badge tone="neutral">{t("intelligence.tableFallback")}</Badge><strong>{t("intelligence.correlationGraphDisabled")}</strong><p>{t("intelligence.correlationGraphDisabledDescription")}</p></div>}
+      <CorrelationInspector correlation={correlation} selection={selection} />
+    </div>
+    <CorrelationEvidenceTable correlation={correlation} onSelect={setSelection} selection={selection} />
+  </>;
+}
+
+function CorrelationInspector({ correlation, selection }: { correlation: CorrelationDto; selection: CorrelationSelection | null }) {
+  const { t } = useI18n();
+  const edge = selectedCorrelationRelationship(correlation, selection);
+  if (edge) return <Inspector actions={<Badge tone={edge.sources.includes("LIVE_DNS") ? "info" : "neutral"}>{edge.sources.join(" + ")}</Badge>} description={`${edge.sourceValue} → ${edge.targetValue}`} title={edge.relation.replaceAll("_", " ")}>
+    <DefinitionGrid items={[
+      { label: t("intelligence.source"), value: `${edge.sourceType} · ${edge.sourceValue}` },
+      { label: t("intelligence.target"), value: `${edge.targetType} · ${edge.targetValue}` },
+      { label: t("intelligence.evidenceSource"), value: edge.sources.join(", ") },
+    ]} />
+  </Inspector>;
+  if (selection?.kind === "NODE") {
+    const node = correlation.related.find((item) => correlationNodeId(item.valueType, item.value) === selection.id)
+      ?? (correlationNodeId(correlation.inputType, correlation.inputValue) === selection.id ? { value: correlation.inputValue, valueType: correlation.inputType, sources: [] } : null);
+    if (node) return <Inspector description={node.valueType === "IP" ? t("intelligence.ipNodeDescription") : t("intelligence.domainNodeDescription")} title={node.value}>
+      <DefinitionGrid items={[
+        { label: t("intelligence.nodeType"), value: node.valueType },
+        { label: t("intelligence.evidenceSource"), value: node.sources.length ? node.sources.join(", ") : t("intelligence.inputNode") },
+        { label: t("intelligence.relationships"), value: correlation.relationships.filter((edgeItem) => correlationNodeId(edgeItem.sourceType, edgeItem.sourceValue) === selection.id || correlationNodeId(edgeItem.targetType, edgeItem.targetValue) === selection.id).length },
+      ]} />
+    </Inspector>;
+  }
+  return <Inspector description={t("intelligence.correlationSelectPrompt")} title={t("intelligence.selectedContext")}><EmptyState title={t("intelligence.nothingSelected")} message={t("intelligence.correlationSelectPrompt")} /></Inspector>;
+}
+
+function CorrelationEvidenceTable({ correlation, selection, onSelect }: { correlation: CorrelationDto; selection: CorrelationSelection | null; onSelect: (selection: CorrelationSelection) => void }) {
+  const { t } = useI18n();
+  return <DataTable label={t("intelligence.correlationTable")}><thead><tr><th scope="col">{t("intelligence.source")}</th><th scope="col">{t("intelligence.relationship")}</th><th scope="col">{t("intelligence.target")}</th><th scope="col">{t("intelligence.evidenceSource")}</th></tr></thead><tbody>{correlation.relationships.map((edge) => {
+    const id = correlationEdgeId(edge);
+    const selected = selection?.kind === "EDGE" && selection.id === id;
+    return <tr className={selected ? "selected-row" : undefined} key={id}><td><button aria-pressed={selected} className="evidence-select" onClick={() => onSelect({ kind: "EDGE", id })} type="button"><code>{edge.sourceValue}</code></button></td><td>{edge.relation}</td><td><code>{edge.targetValue}</code></td><td>{edge.sources.map((source) => <Badge key={source} tone={source === "LIVE_DNS" ? "info" : "neutral"}>{source}</Badge>)}</td></tr>;
+  })}</tbody></DataTable>;
 }
 
 export function IntelligenceContent({

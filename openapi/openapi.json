@@ -935,6 +935,13 @@
             "title": "Related",
             "type": "array"
           },
+          "relationships": {
+            "items": {
+              "$ref": "#/components/schemas/CorrelationRelationshipDto"
+            },
+            "title": "Relationships",
+            "type": "array"
+          },
           "to": {
             "title": "To",
             "type": "string"
@@ -945,9 +952,69 @@
           "inputType",
           "from",
           "to",
-          "related"
+          "related",
+          "relationships"
         ],
         "title": "CorrelationDto",
+        "type": "object"
+      },
+      "CorrelationRelationshipDto": {
+        "additionalProperties": false,
+        "properties": {
+          "relation": {
+            "enum": [
+              "RESOLVES_TO",
+              "PTR_CANDIDATE",
+              "SUBDOMAIN_OF"
+            ],
+            "title": "Relation",
+            "type": "string"
+          },
+          "sourceType": {
+            "enum": [
+              "IP",
+              "DOMAIN"
+            ],
+            "title": "Sourcetype",
+            "type": "string"
+          },
+          "sourceValue": {
+            "title": "Sourcevalue",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "enum": [
+                "LIVE_DNS",
+                "OBSERVED_EVENTS"
+              ],
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "targetType": {
+            "enum": [
+              "IP",
+              "DOMAIN"
+            ],
+            "title": "Targettype",
+            "type": "string"
+          },
+          "targetValue": {
+            "title": "Targetvalue",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceValue",
+          "sourceType",
+          "targetValue",
+          "targetType",
+          "relation",
+          "sources"
+        ],
+        "title": "CorrelationRelationshipDto",
         "type": "object"
       },
       "DashboardAlertsDto": {

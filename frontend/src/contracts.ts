@@ -46,6 +46,7 @@ export type IncidentListQuery = QueryOf<"incidentsList">;
 export type DashboardSummaryQuery = QueryOf<"dashboardGetSummary">;
 export type DashboardTimeQuery = QueryOf<"dashboardGetEndpointSummary">;
 export type TopologyQuery = QueryOf<"dashboardGetTopology">;
+export type CorrelationQuery = QueryOf<"intelligenceCorrelate">;
 export type PaginationQuery = Pick<EndpointListQuery, "page" | "size">;
 export type TimeRangeQuery = Pick<DashboardTimeQuery, "timePreset" | "from" | "to">;
 
@@ -141,6 +142,9 @@ export type ResponseGuidanceSummaryDto = Schemas["ResponseGuidanceSummaryDto"];
 export type TopologyNodeDto = Schemas["TopologyNodeDto"];
 export type TopologyEdgeDto = Schemas["TopologyEdgeDto"];
 export type EgressTopologyDto = Schemas["EgressTopologyDto"];
+export type RelatedValueDto = Schemas["RelatedValueDto"];
+export type CorrelationRelationshipDto = Schemas["CorrelationRelationshipDto"];
+export type CorrelationDto = Schemas["CorrelationDto"];
 export type EndpointSummaryDto = Schemas["EndpointSummaryDto"];
 export type IngestSummaryDto = Schemas["IngestSummaryDto"];
 export type ServiceHealthDto = Schemas["ServiceHealthDto"];

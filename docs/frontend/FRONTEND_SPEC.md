@@ -434,6 +434,10 @@ Archive:
 - MITRE tactic/technique, top process/domain/IP를 Dashboard 응답으로 표시한다.
 - `/dashboard/topology`의 Endpoint node와 egress edge를 읽기 전용으로 표시한다.
 - Endpoint ID repeated filter를 지원한다.
+- IP 또는 Domain을 URL query `value`로 조회하고 `/intelligence/correlate`의 Live DNS와 관찰 Event 관계를 함께 표시한다.
+- Top Domain과 Remote IP는 correlation 검색 시작점으로 사용할 수 있다.
+- correlation은 `Legend | Graph | Selected context`와 semantic table fallback을 함께 제공한다. IP는 PTR 후보 Domain으로 대체하지 않고 함께 표시한다.
+- 관계 source는 `LIVE_DNS`, `OBSERVED_EVENTS`를 구분하며 현재 DNS와 과거 관찰 근거를 같은 확정 사실로 표현하지 않는다.
 - top bar Report action은 현재 화면을 browser print dialog로 보내고 저장·공유 API는 호출하지 않는다.
 
 ## 9. Loading, empty, error와 stale data

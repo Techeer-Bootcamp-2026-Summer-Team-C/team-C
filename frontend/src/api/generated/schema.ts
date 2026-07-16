@@ -828,8 +828,34 @@ export interface components {
             inputValue: string;
             /** Related */
             related: components["schemas"]["RelatedValueDto"][];
+            /** Relationships */
+            relationships: components["schemas"]["CorrelationRelationshipDto"][];
             /** To */
             to: string;
+        };
+        /** CorrelationRelationshipDto */
+        CorrelationRelationshipDto: {
+            /**
+             * Relation
+             * @enum {string}
+             */
+            relation: "RESOLVES_TO" | "PTR_CANDIDATE" | "SUBDOMAIN_OF";
+            /**
+             * Sourcetype
+             * @enum {string}
+             */
+            sourceType: "IP" | "DOMAIN";
+            /** Sourcevalue */
+            sourceValue: string;
+            /** Sources */
+            sources: ("LIVE_DNS" | "OBSERVED_EVENTS")[];
+            /**
+             * Targettype
+             * @enum {string}
+             */
+            targetType: "IP" | "DOMAIN";
+            /** Targetvalue */
+            targetValue: string;
         };
         /** DashboardAlertsDto */
         DashboardAlertsDto: {

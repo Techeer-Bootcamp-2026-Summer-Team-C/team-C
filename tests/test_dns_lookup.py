@@ -222,6 +222,14 @@ def test_correlate_by_ip_combines_live_dns_and_observed_events(monkeypatch: pyte
     assert sources_by_value["dns.google"] == ["LIVE_DNS"]
     assert sources_by_value["observed.example.com"] == ["OBSERVED_EVENTS"]
     assert sources_by_value["resolved-from-answers.example.com"] == ["OBSERVED_EVENTS"]
+    assert {
+        (edge.source_value, edge.target_value, edge.relation, tuple(edge.sources))
+        for edge in result.relationships
+    } == {
+        ("8.8.8.8", "dns.google", "PTR_CANDIDATE", ("LIVE_DNS",)),
+        ("observed.example.com", "8.8.8.8", "RESOLVES_TO", ("OBSERVED_EVENTS",)),
+        ("resolved-from-answers.example.com", "8.8.8.8", "RESOLVES_TO", ("OBSERVED_EVENTS",)),
+    }
 
 
 def test_correlate_by_domain_combines_forward_dns_and_observed_events(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -229,7 +237,13 @@ def test_correlate_by_domain_combines_forward_dns_and_observed_events(monkeypatc
     events = FakeEventRepository(
         {
             "related_domain": [
-                {"endpoint_id": 1, "remote_ip": "203.0.113.10", "dns_answers_json": '["203.0.113.10", "203.0.113.11"]'},
+                {
+                    "endpoint_id": 1,
+                    "remote_domain": "mail.example.com",
+                    "dns_query": "example.com",
+                    "remote_ip": "203.0.113.10",
+                    "dns_answers_json": '["203.0.113.10", "203.0.113.11"]',
+                },
             ]
         }
     )
@@ -239,6 +253,12 @@ def test_correlate_by_domain_combines_forward_dns_and_observed_events(monkeypatc
     assert sources_by_value["198.51.100.5"] == ["LIVE_DNS"]
     assert sources_by_value["203.0.113.10"] == ["OBSERVED_EVENTS"]
     assert sources_by_value["203.0.113.11"] == ["OBSERVED_EVENTS"]
+    assert sources_by_value["mail.example.com"] == ["OBSERVED_EVENTS"]
+    relationships = {(edge.source_value, edge.target_value, edge.relation) for edge in result.relationships}
+    assert ("example.com", "198.51.100.5", "RESOLVES_TO") in relationships
+    assert ("mail.example.com", "example.com", "SUBDOMAIN_OF") in relationships
+    assert ("mail.example.com", "203.0.113.10", "RESOLVES_TO") in relationships
+    assert ("example.com", "203.0.113.11", "RESOLVES_TO") in relationships
 
 
 def test_correlate_keeps_observed_events_when_live_dns_fails(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -251,6 +271,9 @@ def test_correlate_keeps_observed_events_when_live_dns_fails(monkeypatch: pytest
     assert result.input_type == "IP"
     assert [item.value for item in result.related] == ["observed-only.example.com"]
     assert result.related[0].sources == ["OBSERVED_EVENTS"]
+    assert [(edge.source_value, edge.target_value, edge.relation) for edge in result.relationships] == [
+        ("observed-only.example.com", "203.0.113.99", "RESOLVES_TO")
+    ]
 
 
 def test_correlate_normalizes_domain_input(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -277,6 +300,7 @@ def test_correlate_dedupes_equivalent_ipv6_notations(monkeypatch: pytest.MonkeyP
             "related_domain": [
                 {
                     "endpoint_id": 1,
+                    "dns_query": "example.com",
                     "remote_ip": "2001:db8::1",
                     "dns_answers_json": '["2001:0db8:0000:0000:0000:0000:0000:0001"]',
                 }
@@ -285,6 +309,52 @@ def test_correlate_dedupes_equivalent_ipv6_notations(monkeypatch: pytest.MonkeyP
     )
     result = DnsIntelligenceService(events=events).correlate("example.com", from_=FROM, to=TO)
     assert [item.value for item in result.related] == ["2001:db8::1"]
+
+
+def test_correlate_merges_live_and_observed_sources_on_same_relationship(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("backend.dns_service.forward_lookup", lambda domain: ["203.0.113.10"])
+    events = FakeEventRepository(
+        {
+            "related_domain": [
+                {
+                    "endpoint_id": 1,
+                    "remote_domain": "example.com",
+                    "remote_ip": "203.0.113.10",
+                }
+            ]
+        }
+    )
+    result = DnsIntelligenceService(events=events).correlate("example.com", from_=FROM, to=TO)
+    assert len(result.relationships) == 1
+    assert result.relationships[0].relation == "RESOLVES_TO"
+    assert result.relationships[0].sources == ["LIVE_DNS", "OBSERVED_EVENTS"]
+
+
+def test_correlate_only_builds_subdomain_edges_inside_requested_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("backend.dns_service.forward_lookup", lambda domain: [])
+    events = FakeEventRepository(
+        {
+            "related_domain": [
+                {
+                    "endpoint_id": 1,
+                    "remote_domain": "mail.yahoo.com",
+                    "http_host": "yahoo.com.evil.example",
+                    "tls_sni": "notyahoo.com",
+                    "remote_ip": "203.0.113.10",
+                }
+            ]
+        }
+    )
+    result = DnsIntelligenceService(events=events).correlate("yahoo.com", from_=FROM, to=TO)
+    assert [item.value for item in result.related] == ["203.0.113.10", "mail.yahoo.com"]
+    assert {(edge.source_value, edge.target_value, edge.relation) for edge in result.relationships} == {
+        ("mail.yahoo.com", "203.0.113.10", "RESOLVES_TO"),
+        ("mail.yahoo.com", "yahoo.com", "SUBDOMAIN_OF"),
+    }
 
 
 def test_correlate_filters_by_endpoint_ids(monkeypatch: pytest.MonkeyPatch) -> None:
