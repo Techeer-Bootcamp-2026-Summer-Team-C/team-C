@@ -19,10 +19,10 @@
     "@dagrejs/dagre": "3.0.0",
     "@tanstack/react-query": "5.90.21",
     "@xyflow/react": "12.11.2",
+    "echarts": "^6.1.0",
     "lucide-react": "0.468.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "react-grid-layout": "^2.2.3",
     "react-router-dom": "7.18.1"
   },
   "devDependencies": {

@@ -1,24 +1,11 @@
-import type { IncidentTimeSeriesPointDto, SeverityCountDto, TimeSeriesPointDto } from "../contracts";
+import type { IncidentTimeSeriesPointDto, TimeSeriesPointDto } from "../contracts";
 import { useI18n } from "../i18n/LocaleContext";
-import type { WidgetDisplayMode } from "../features/dashboardLayout";
-import { formatCompactDate, humanize } from "../lib/format";
+import { formatCompactDate } from "../lib/format";
 import { EmptyState } from "./ui";
 
-const SEVERITY_COLORS: Record<string, string> = {
-  CRITICAL: "var(--color-red)",
-  HIGH: "var(--color-amber)",
-  MEDIUM: "var(--color-blue)",
-  LOW: "var(--color-green)",
-};
+type ChartDensity = "compact" | "standard" | "expanded";
 
-export function SeverityDonut({ rows, total, mode = "standard" }: { rows: SeverityCountDto[]; total: number; mode?: WidgetDisplayMode }) {
-  const { t } = useI18n();
-  if (!rows.length || total === 0) return <EmptyState title={t("charts.noSeverityTitle")} message={t("charts.noSeverityDescription")} />;
-  const stops = severityStops(rows, total);
-  return <div className={`donut-layout ${mode}`}><div className="donut" style={{ background: `conic-gradient(${stops.join(",")})` }} role="img" aria-label={t("charts.severityAria", { total })}><span><strong>{total}</strong><small>{t("navigation.alerts")}</small></span></div><ul className="chart-legend">{rows.map((row) => <li key={row.severity}><i style={{ background: SEVERITY_COLORS[row.severity] }} /><span>{humanize(row.severity)}</span><strong>{row.count}</strong></li>)}</ul></div>;
-}
-
-export function CountBars({ rows, mode = "standard" }: { rows: readonly { label: string; count: number; tone?: string }[]; mode?: WidgetDisplayMode }) {
+export function CountBars({ rows, mode = "standard" }: { rows: readonly { label: string; count: number; tone?: string }[]; mode?: ChartDensity }) {
   const { t } = useI18n();
   if (!rows.length) return <EmptyState title={t("charts.noDistributionTitle")} message={t("charts.noDistributionDescription")} />;
   const maximum = Math.max(...rows.map((row) => row.count), 1);
@@ -26,7 +13,7 @@ export function CountBars({ rows, mode = "standard" }: { rows: readonly { label:
   return <div className="count-bars"><DistributionRows maximum={maximum} rows={visibleRows} />{visibleRows.length < rows.length ? <details className="distribution-details"><summary>{t("charts.viewMore", { count: rows.length - visibleRows.length })}</summary><div className="count-bars"><DistributionRows maximum={maximum} rows={rows} /></div></details> : null}</div>;
 }
 
-export function TimeSeriesChart({ rows, label, mode = "standard" }: { rows: TimeSeriesPointDto[]; label: string; mode?: WidgetDisplayMode }) {
+export function TimeSeriesChart({ rows, label, mode = "standard" }: { rows: TimeSeriesPointDto[]; label: string; mode?: ChartDensity }) {
   const { locale, t } = useI18n();
   const copyLabel = locale === "KO" ? label : label.toLowerCase();
   if (!rows.length) return <EmptyState title={t("charts.noSeriesTitle", { label: copyLabel })} message={t("charts.noSeriesDescription")} />;
@@ -37,29 +24,13 @@ export function TimeSeriesChart({ rows, label, mode = "standard" }: { rows: Time
   return <div className={`time-chart ${mode}`}><svg role="img" aria-label={t("charts.seriesAria", { label })} viewBox="0 0 520 180"><path className="chart-grid" d="M20 30H500 M20 90H500 M20 150H500" /><path className="chart-line" d={path} />{points.map((point, index) => <circle cx={point.x} cy={point.y} key={chartRows[index]?.bucketStartAt} r={mode === "compact" ? "3" : "4"}><title>{chartRows[index] ? `${formatCompactDate(chartRows[index].bucketStartAt)}: ${chartRows[index].count}` : ""}</title></circle>)}</svg>{mode === "expanded" ? <dl className="chart-stats"><div><dt>{t("charts.minimum")}</dt><dd>{Math.min(...counts)}</dd></div><div><dt>{t("charts.average")}</dt><dd>{Math.round(counts.reduce((sum, count) => sum + count, 0) / counts.length)}</dd></div><div><dt>{t("charts.maximum")}</dt><dd>{Math.max(...counts)}</dd></div></dl> : null}<details><summary>{t("charts.viewData", { label: copyLabel })}</summary><table><thead><tr><th scope="col">{t("charts.bucket")}</th><th scope="col">{t("charts.count")}</th></tr></thead><tbody>{rows.map((row) => <tr key={row.bucketStartAt}><td>{formatCompactDate(row.bucketStartAt)}</td><td>{row.count}</td></tr>)}</tbody></table></details></div>;
 }
 
-export function IncidentSeriesChart({ rows, mode = "standard" }: { rows: IncidentTimeSeriesPointDto[]; mode?: WidgetDisplayMode }) {
+export function IncidentSeriesChart({ rows, mode = "standard" }: { rows: IncidentTimeSeriesPointDto[]; mode?: ChartDensity }) {
   const { t } = useI18n();
   if (!rows.length) return <EmptyState title={t("charts.noIncidentSeries")} message={t("charts.noIncidentSeriesDescription")} />;
   const chartRows = mode === "compact" ? sampleRows(rows, 8) : rows;
   const open = coordinates(chartRows.map((row) => row.openCount));
   const closed = coordinates(chartRows.map((row) => row.closedCount));
   return <div className={`time-chart ${mode}`}><svg role="img" aria-label={t("charts.incidentSeriesAria")} viewBox="0 0 520 180"><path className="chart-grid" d="M20 30H500 M20 90H500 M20 150H500" /><path className="chart-line alert" d={linePath(open)} /><path className="chart-line closed" d={linePath(closed)} /></svg><div className="inline-legend"><span><i className="open" />{t("charts.open")}</span><span><i className="closed" />{t("charts.closed")}</span></div><details><summary>{t("charts.viewIncidentData")}</summary><table><thead><tr><th scope="col">{t("charts.bucket")}</th><th scope="col">{t("charts.open")}</th><th scope="col">{t("charts.closed")}</th></tr></thead><tbody>{rows.map((row) => <tr key={row.bucketStartAt}><td>{formatCompactDate(row.bucketStartAt)}</td><td>{row.openCount}</td><td>{row.closedCount}</td></tr>)}</tbody></table></details></div>;
-}
-
-export function DetectionActivityChart({ events, alerts, incidents }: {
-  events: TimeSeriesPointDto[];
-  alerts: TimeSeriesPointDto[];
-  incidents: IncidentTimeSeriesPointDto[];
-}) {
-  const { t } = useI18n();
-  if (!events.length && !alerts.length && !incidents.length) {
-    return <EmptyState title={t("charts.noDetectionActivity")} message={t("charts.noSeriesDescription")} />;
-  }
-  return <div className="detection-activity-grid">
-    <ActivitySeries label={t("overview.events")} rows={events} tone="event" />
-    <ActivitySeries label={t("overview.alerts")} rows={alerts} tone="alert" />
-    <IncidentActivitySeries label={t("overview.incidents")} rows={incidents} />
-  </div>;
 }
 
 export function DetectionActivityTable({ events, alerts, incidents }: {
@@ -69,27 +40,10 @@ export function DetectionActivityTable({ events, alerts, incidents }: {
 }) {
   const { t } = useI18n();
   return <div className="detection-activity-tables">
-    <ActivityDataTable label={t("overview.events")} rows={events} />
-    <ActivityDataTable label={t("overview.alerts")} rows={alerts} />
-    <table><caption>{t("overview.incidents")}</caption><thead><tr><th scope="col">{t("charts.bucket")}</th><th scope="col">{t("charts.open")}</th><th scope="col">{t("charts.closed")}</th></tr></thead><tbody>{incidents.map((row) => <tr key={row.bucketStartAt}><td>{formatCompactDate(row.bucketStartAt)}</td><td>{row.openCount}</td><td>{row.closedCount}</td></tr>)}</tbody></table>
+    <ActivityDataTable label={t("overview.events")} rows={sortByBucket(events)} />
+    <ActivityDataTable label={t("overview.alerts")} rows={sortByBucket(alerts)} />
+    <table><caption>{t("overview.incidents")}</caption><thead><tr><th scope="col">{t("charts.bucket")}</th><th scope="col">{t("charts.open")}</th><th scope="col">{t("charts.closed")}</th></tr></thead><tbody>{sortByBucket(incidents).map((row) => <tr key={row.bucketStartAt}><td>{formatCompactDate(row.bucketStartAt)}</td><td>{row.openCount}</td><td>{row.closedCount}</td></tr>)}</tbody></table>
   </div>;
-}
-
-function ActivitySeries({ label, rows, tone }: { label: string; rows: TimeSeriesPointDto[]; tone: "event" | "alert" }) {
-  const { t } = useI18n();
-  const sampled = sampleRows(rows, 12);
-  const points = miniCoordinates(sampled.map((row) => row.count));
-  const latest = rows.at(-1)?.count ?? 0;
-  return <section className="activity-series" aria-label={label}><header><span>{label}</span><strong>{latest}</strong></header>{rows.length ? <svg aria-label={t("charts.seriesAria", { label })} role="img" viewBox="0 0 240 90"><path className="chart-grid" d="M10 20H230 M10 45H230 M10 70H230" /><path className={`chart-line ${tone}`} d={linePath(points)} />{points.map((point, index) => <circle cx={point.x} cy={point.y} key={sampled[index]?.bucketStartAt} r="3"><title>{sampled[index] ? `${formatCompactDate(sampled[index].bucketStartAt)}: ${sampled[index].count}` : ""}</title></circle>)}</svg> : <span className="activity-empty">{t("common.none")}</span>}</section>;
-}
-
-function IncidentActivitySeries({ label, rows }: { label: string; rows: IncidentTimeSeriesPointDto[] }) {
-  const { t } = useI18n();
-  const sampled = sampleRows(rows, 12);
-  const open = miniCoordinates(sampled.map((row) => row.openCount));
-  const closed = miniCoordinates(sampled.map((row) => row.closedCount));
-  const latest = rows.at(-1);
-  return <section className="activity-series" aria-label={label}><header><span>{label}</span><strong>{latest?.openCount ?? 0} / {latest?.closedCount ?? 0}</strong></header>{rows.length ? <svg aria-label={t("charts.incidentSeriesAria")} role="img" viewBox="0 0 240 90"><path className="chart-grid" d="M10 20H230 M10 45H230 M10 70H230" /><path className="chart-line alert" d={linePath(open)} /><path className="chart-line closed" d={linePath(closed)} /></svg> : <span className="activity-empty">{t("common.none")}</span>}</section>;
 }
 
 function ActivityDataTable({ label, rows }: { label: string; rows: TimeSeriesPointDto[] }) {
@@ -118,25 +72,10 @@ function coordinates(values: number[]): { x: number; y: number }[] {
   }));
 }
 
-function miniCoordinates(values: number[]): { x: number; y: number }[] {
-  const maximum = Math.max(...values, 1);
-  return values.map((value, index) => ({
-    x: values.length === 1 ? 120 : 10 + (index * 220) / Math.max(values.length - 1, 1),
-    y: 70 - (value / maximum) * 50,
-  }));
-}
-
-function severityStops(rows: SeverityCountDto[], total: number): string[] {
-  let cursor = 0;
-  const stops: string[] = [];
-  for (const row of rows) {
-    const start = cursor;
-    cursor += (row.count / total) * 360;
-    stops.push(`${SEVERITY_COLORS[row.severity]} ${start}deg ${cursor}deg`);
-  }
-  return stops;
-}
-
 function linePath(points: { x: number; y: number }[]): string {
   return points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x},${point.y}`).join(" ");
+}
+
+function sortByBucket<Row extends { bucketStartAt: string }>(rows: readonly Row[]): Row[] {
+  return [...rows].sort((left, right) => Date.parse(left.bucketStartAt) - Date.parse(right.bucketStartAt));
 }

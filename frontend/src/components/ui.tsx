@@ -4,6 +4,7 @@ import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { ApiError } from "../api/client";
 import type {
   AlertDetailDto,
+  EdrStateDto,
   EndpointRiskDto,
   PagedData,
   ResponseGuidanceStepDto,
@@ -64,24 +65,33 @@ export function StatusPill({ value }: { value: string }) {
   return <Badge className={`status-pill tone-${value.toLowerCase().replaceAll(" ", "-")}`}><i aria-hidden="true" />{humanize(value)}</Badge>;
 }
 
-export function EdrStatePill({ state, score, reasons, calculatedAt }: {
-  state: string;
-  score: number;
-  reasons: readonly string[];
-  calculatedAt: string;
-}) {
+export function EdrStateSummary({ state }: { state: EdrStateDto }) {
   const { t } = useI18n();
-  const reasonSummary = reasons.length ? reasons.map(humanize).join(" · ") : t("edrState.noReasons");
+  const titleId = useId();
   return (
-    <section className={`edr-state tone-${state.toLowerCase()}`} aria-label={t("edrState.aria", { state, score })} title={reasonSummary}>
-      <div><span>{t("edrState.current")}</span><strong>{state}</strong></div>
-      <div className="edr-score"><strong>{score}</strong><span>/ 100</span></div>
-      <div className="edr-reasons">
-        <span>{reasonSummary}</span>
-        <small>{t("edrState.calculated", { time: formatDateTime(calculatedAt) })}</small>
+    <section aria-labelledby={titleId} className={`edr-state-summary tone-${state.status.toLowerCase()}`}>
+      <header>
+        <div><h2 className="eyebrow" id={titleId}>{t("edrState.current")}</h2><div className="edr-overall"><strong>{state.score}</strong><span>/ 100</span></div></div>
+        <StatusPill value={state.status} />
+      </header>
+      <div aria-label={t("edrState.diagnostics")} className="edr-diagnostics">
+        <EdrDiagnosticAxis label={t("edrState.threatLevel")} score={state.threatLevel.score} status={state.threatLevel.status} />
+        <EdrDiagnosticAxis label={t("edrState.collectionHealth")} score={state.collectionHealth.score} status={state.collectionHealth.status} />
       </div>
+      <div className="edr-reason-block">
+        <h3>{t("edrState.reasonCodes")}</h3>
+        {state.reasonCodes.length ? <ul>{state.reasonCodes.map((reason) => <li key={reason}>{humanize(reason)}</li>)}</ul> : <p>{t("edrState.noReasons")}</p>}
+      </div>
+      <footer>{t("edrState.calculated", { time: formatDateTime(state.calculatedAt) })}</footer>
     </section>
   );
+}
+
+function EdrDiagnosticAxis({ label, score, status }: { label: string; score: number; status: string }) {
+  return <div className={`edr-axis tone-${status.toLowerCase()}`}>
+    <div><span>{label}</span><strong>{score}</strong><small>{humanize(status)}</small></div>
+    <div aria-label={`${label}: ${score} / 100, ${humanize(status)}`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={score} className="edr-axis-track" role="progressbar"><i style={{ width: `${score}%` }} /></div>
+  </div>;
 }
 
 export function GlobalFilterBar({ children, onClear, hasFilters }: {
