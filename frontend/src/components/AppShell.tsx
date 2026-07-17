@@ -14,6 +14,8 @@ import {
   Search,
   Server,
   ShieldCheck,
+  Moon,
+  Sun,
   type LucideIcon,
 } from "lucide-react";
 import { Suspense, type FormEvent, useEffect, useRef, useState } from "react";
@@ -23,6 +25,7 @@ import type { UserLocale } from "../contracts";
 import { SERVICE_MARK, SERVICE_NAME } from "../config/branding";
 import { useI18n } from "../i18n/LocaleContext";
 import type { TranslationKey } from "../i18n/translations";
+import { useTheme } from "../theme/ThemeProvider";
 import { Badge, Button, Dialog, Drawer, Popover, SelectField, Tooltip } from "./primitives";
 
 interface NavigationItem {
@@ -73,13 +76,30 @@ const NAVIGATION_GROUPS: readonly NavigationGroup[] = [
 const NAVIGATION_ITEMS = NAVIGATION_GROUPS.flatMap((group) => group.items);
 const COMPACT_KEY = "edr.compactNavigation";
 
+function readCompactNavigation(): boolean {
+  try {
+    return window.localStorage.getItem(COMPACT_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function writeCompactNavigation(compact: boolean): void {
+  try {
+    window.localStorage.setItem(COMPACT_KEY, String(compact));
+  } catch {
+    // The shell remains usable when browser storage is unavailable.
+  }
+}
+
 export function AppShell() {
   const auth = useAuth();
   const { dateLocale, locale, t } = useI18n();
+  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
-  const [compact, setCompact] = useState(() => localStorage.getItem(COMPACT_KEY) === "true");
+  const [compact, setCompact] = useState(readCompactNavigation);
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [localeSaving, setLocaleSaving] = useState(false);
   const [localeError, setLocaleError] = useState(false);
@@ -88,13 +108,14 @@ export function AppShell() {
   const breadcrumbs = buildBreadcrumbs(location.pathname, t);
   const pageTitleText = breadcrumbs.at(-1)?.label ?? t("navigation.console");
   const overviewRoute = location.pathname === "/";
+  const themeToggleLabel = theme === "dark" ? t("theme.switchToLight") : t("theme.switchToDark");
 
   useEffect(() => { setMobileNavigationOpen(false); }, [location.pathname]);
 
   function toggleCompact(): void {
     setCompact((current) => {
       const next = !current;
-      localStorage.setItem(COMPACT_KEY, String(next));
+      writeCompactNavigation(next);
       return next;
     });
   }
@@ -168,6 +189,11 @@ export function AppShell() {
             <input aria-label={t("search.aria")} onChange={(event) => setSearch(event.target.value)} placeholder={t("search.placeholder")} value={search} />
           </form>
           <div className="session-summary">
+            <Tooltip label={themeToggleLabel}>
+              <button aria-label={themeToggleLabel} className="icon-button theme-toggle" onClick={toggleTheme} title={themeToggleLabel} type="button">
+                {theme === "dark" ? <Sun aria-hidden="true" size={18} /> : <Moon aria-hidden="true" size={18} />}
+              </button>
+            </Tooltip>
             <div className="locale-control">
               <SelectField
                 className="locale-selector"
@@ -283,6 +309,7 @@ interface BreadcrumbItem {
 
 function buildBreadcrumbs(pathname: string, t: ReturnType<typeof useI18n>["t"]): BreadcrumbItem[] {
   if (pathname === "/") return [{ label: t("navigation.overview") }];
+  if (pathname === "/dashboards") return [{ label: t("navigation.dashboards") }];
   if (pathname === "/operations/archives") {
     return [
       { label: t("navigation.operations"), to: "/operations" },

@@ -161,4 +161,71 @@
   --font-display-lg: var(--type-kpi-primary);
 }
 
+:root.light {
+  color-scheme: light;
+
+  --surface-canvas: #f4f6f8;
+  --surface-shell: #ffffff;
+  --surface-panel: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-inset: #eef2f6;
+  --surface-hover: #e7edf4;
+  --surface-selected: #dbe7ff;
+  --surface-disabled: rgba(16, 24, 40, .06);
+  --overlay-scrim: rgba(16, 24, 40, .48);
+  --shadow-color: rgba(16, 24, 40, .18);
+
+  --border-default: #98a2b3;
+  --border-panel: #d0d5dd;
+  --border-subtle: #e4e7ec;
+  --border-strong: #667085;
+  --chart-grid: #d0d5dd;
+  --chart-axis: #667085;
+  --focus-ring-color: #175cd3;
+
+  --text-primary: #101828;
+  --text-secondary: #344054;
+  --text-tertiary: #667085;
+  --text-disabled: #98a2b3;
+  --text-placeholder: #667085;
+  --text-inverse: #ffffff;
+  --text-link: #175cd3;
+  --text-link-hover: #004eeb;
+  --text-code: #1849a9;
+
+  --accent-primary: #175cd3;
+  --accent-hover: #004eeb;
+  --accent-active: #0040c1;
+  --accent-muted: rgba(23, 92, 211, .12);
+  --selection-background: #dbe7ff;
+  --selection-text: #101828;
+
+  --status-critical: #b42318;
+  --status-high: #b54708;
+  --status-medium: #7a5b00;
+  --status-low: #175cd3;
+  --status-success: #067647;
+  --status-warning: #7a5b00;
+  --status-info: #026aa2;
+  --status-neutral: #475467;
+  --status-error-surface: rgba(180, 35, 24, .08);
+  --status-warning-surface: rgba(122, 91, 0, .09);
+  --status-success-surface: rgba(6, 118, 71, .08);
+
+  --chart-events: #175cd3;
+  --chart-alerts: #6941c6;
+  --chart-incidents: #067647;
+  --chart-events-fill: rgba(23, 92, 211, .14);
+  --chart-alerts-fill: rgba(105, 65, 198, .1);
+  --chart-incidents-fill: rgba(6, 118, 71, .09);
+  --chart-missing: #98a2b3;
+  --chart-zero: var(--text-secondary);
+  --donut-track: #e4e7ec;
+  --donut-gap: var(--surface-panel);
+
+  --elevation-tooltip: 0 6px 18px rgba(16, 24, 40, .14);
+  --elevation-raised: 0 10px 28px rgba(16, 24, 40, .14);
+  --elevation-modal: 0 24px 64px var(--shadow-color);
+}
+
 ::selection { color: var(--selection-text); background: var(--selection-background); }

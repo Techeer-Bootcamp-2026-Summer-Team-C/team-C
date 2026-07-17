@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider, RequireAuth } from "../src/auth/AuthContext";
 import { AppShell } from "../src/components/AppShell";
 import { LocaleProvider } from "../src/i18n/LocaleContext";
+import { ThemeProvider } from "../src/theme/ThemeProvider";
 
 const USER = { userId: 1, loginId: "admin", name: "Administrator", role: "ADMIN", status: "ACTIVE", locale: "EN" } as const;
 
@@ -38,6 +39,7 @@ describe("application shell foundation", () => {
     expect(screen.getByRole("heading", { name: "Evidence" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Analysis" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Platform" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Dashboards" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Archives" })).toHaveClass("nav-child", "active");
 
     const breadcrumb = screen.getByRole("navigation", { name: "Breadcrumb" });
@@ -46,6 +48,14 @@ describe("application shell foundation", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Compact navigation" }));
     expect(screen.getByRole("button", { name: "Expand navigation" })).toBeInTheDocument();
+  });
+
+  it("keeps the dashboard workbench out of primary navigation while exposing its route breadcrumb", async () => {
+    renderDashboardShell();
+    expect(await screen.findByRole("heading", { name: "Dashboard workbench destination" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Dashboards" })).not.toBeInTheDocument();
+    const breadcrumb = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(within(breadcrumb).getByText("Dashboards")).toHaveAttribute("aria-current", "page");
   });
 
   it("operates the mobile Drawer and account/report surfaces by keyboard", async () => {
@@ -71,12 +81,36 @@ describe("application shell foundation", () => {
     expect(screen.queryByRole("dialog", { name: "Archives snapshot" })).not.toBeInTheDocument();
   });
 
-  it("keeps the Case 2 shell dark-only without a theme switch", async () => {
+  it("switches the Case 2 shell between dark and light themes", async () => {
     renderRootShell();
     await screen.findByRole("heading", { name: "Overview destination" });
-    expect(document.documentElement).not.toHaveAttribute("data-theme");
+    expect(document.documentElement).not.toHaveClass("light");
     expect(localStorage.getItem("edr.theme")).toBeNull();
-    expect(screen.queryByRole("button", { name: /theme/i })).not.toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: "Switch to light theme" });
+    await userEvent.click(toggle);
+    expect(document.documentElement).toHaveClass("light");
+    expect(localStorage.getItem("edr.theme")).toBe("light");
+    expect(screen.getByRole("button", { name: "Switch to dark theme" })).toBeInTheDocument();
+  });
+
+  it("keeps the authenticated shell usable when the localStorage getter throws", async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
+    expect(descriptor).toBeDefined();
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get: () => { throw new DOMException("blocked", "SecurityError"); },
+    });
+
+    try {
+      const user = userEvent.setup();
+      const view = renderRootShell();
+      expect(await screen.findByRole("heading", { name: "Overview destination" })).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Compact navigation" }));
+      expect(screen.getByRole("button", { name: "Expand navigation" })).toBeInTheDocument();
+      view.unmount();
+    } finally {
+      if (descriptor) Object.defineProperty(window, "localStorage", descriptor);
+    }
   });
 });
 
@@ -84,20 +118,22 @@ function renderShell() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <LocaleProvider>
-          <MemoryRouter initialEntries={["/operations/archives"]}>
-            <Routes>
-              <Route element={<RequireAuth><AppShell /></RequireAuth>}>
-                <Route path="operations">
-                  <Route index element={<h1>Operations destination</h1>} />
-                  <Route path="archives" element={<h1>Archive destination</h1>} />
+      <ThemeProvider>
+        <AuthProvider>
+          <LocaleProvider>
+            <MemoryRouter initialEntries={["/operations/archives"]}>
+              <Routes>
+                <Route element={<RequireAuth><AppShell /></RequireAuth>}>
+                  <Route path="operations">
+                    <Route index element={<h1>Operations destination</h1>} />
+                    <Route path="archives" element={<h1>Archive destination</h1>} />
+                  </Route>
                 </Route>
-              </Route>
-            </Routes>
-          </MemoryRouter>
-        </LocaleProvider>
-      </AuthProvider>
+              </Routes>
+            </MemoryRouter>
+          </LocaleProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>,
   );
 }
@@ -106,17 +142,40 @@ function renderRootShell() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <LocaleProvider>
-          <MemoryRouter initialEntries={["/"]}>
-            <Routes>
-              <Route element={<RequireAuth><AppShell /></RequireAuth>}>
-                <Route index element={<h1>Overview destination</h1>} />
-              </Route>
-            </Routes>
-          </MemoryRouter>
-        </LocaleProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <LocaleProvider>
+            <MemoryRouter initialEntries={["/"]}>
+              <Routes>
+                <Route element={<RequireAuth><AppShell /></RequireAuth>}>
+                  <Route index element={<h1>Overview destination</h1>} />
+                </Route>
+              </Routes>
+            </MemoryRouter>
+          </LocaleProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>,
+  );
+}
+
+function renderDashboardShell() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <AuthProvider>
+          <LocaleProvider>
+            <MemoryRouter initialEntries={["/dashboards"]}>
+              <Routes>
+                <Route element={<RequireAuth><AppShell /></RequireAuth>}>
+                  <Route path="dashboards" element={<h1>Dashboard workbench destination</h1>} />
+                </Route>
+              </Routes>
+            </MemoryRouter>
+          </LocaleProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>,
   );
 }

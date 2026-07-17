@@ -10,6 +10,7 @@ import { LocaleProvider, useI18n } from "../src/i18n/LocaleContext";
 import { translate } from "../src/i18n/translations";
 import { formatDateTime } from "../src/lib/format";
 import { LoginPage } from "../src/pages/LoginPage";
+import { ThemeProvider } from "../src/theme/ThemeProvider";
 
 const EN_USER = { userId: 1, loginId: "analyst", name: "Analyst", role: "ANALYST", status: "ACTIVE", locale: "EN" } as const;
 const KO_USER = { ...EN_USER, locale: "KO" } as const;
@@ -18,6 +19,7 @@ afterEach(() => {
   cleanup();
   sessionStorage.clear();
   localStorage.clear();
+  document.documentElement.classList.remove("light");
   document.documentElement.lang = "en";
   vi.unstubAllGlobals();
 });
@@ -95,6 +97,7 @@ describe("authenticated locale lifecycle", () => {
   });
 
   it("keeps LoginPage English, applies login KO after authentication, and resets to English on logout", async () => {
+    localStorage.setItem("edr.theme", "light");
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
       const path = String(input);
       if (path.endsWith("/auth/login")) {
@@ -107,16 +110,19 @@ describe("authenticated locale lifecycle", () => {
     renderShell("/login");
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
     expect(screen.getByText("EDR / SINGLE TENANT")).toBeInTheDocument();
+    expect(document.documentElement).toHaveClass("light");
     await userEvent.type(screen.getByLabelText("Login ID"), "analyst");
     await userEvent.type(screen.getByLabelText("Password"), "password");
     await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
     expect(await screen.findByRole("button", { name: "계정 메뉴 열기" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "다크 테마로 전환" })).toBeInTheDocument();
     expect(document.documentElement.lang).toBe("ko");
 
     await userEvent.click(screen.getByRole("button", { name: "계정 메뉴 열기" }));
     await userEvent.click(screen.getByRole("button", { name: "로그아웃" }));
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
     expect(screen.getByText("Move from signal to evidence.")).toBeInTheDocument();
+    expect(document.documentElement).toHaveClass("light");
     await waitFor(() => expect(document.documentElement.lang).toBe("en"));
   });
 
@@ -167,12 +173,14 @@ it("preserves Event capitalization in Korean time-series copy", async () => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <LocaleProvider>
-          <TimeSeriesChart label="Event" rows={[]} />
-          <TimeSeriesChart label="Event" rows={[{ bucketStartAt: "2026-07-15T03:00:00Z", count: 1 }]} />
-        </LocaleProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <LocaleProvider>
+            <TimeSeriesChart label="Event" rows={[]} />
+            <TimeSeriesChart label="Event" rows={[{ bucketStartAt: "2026-07-15T03:00:00Z", count: 1 }]} />
+          </LocaleProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>,
   );
 
@@ -184,19 +192,21 @@ function renderShell(initialEntry = "/alerts?status=OPEN") {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <LocaleProvider>
-          <MemoryRouter initialEntries={[initialEntry]}>
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route element={<RequireAuth><AppShell /></RequireAuth>}>
-                <Route index element={<LocaleProbe />} />
-                <Route path="alerts" element={<LocaleProbe />} />
-              </Route>
-            </Routes>
-          </MemoryRouter>
-        </LocaleProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <LocaleProvider>
+            <MemoryRouter initialEntries={[initialEntry]}>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route element={<RequireAuth><AppShell /></RequireAuth>}>
+                  <Route index element={<LocaleProbe />} />
+                  <Route path="alerts" element={<LocaleProbe />} />
+                </Route>
+              </Routes>
+            </MemoryRouter>
+          </LocaleProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>,
   );
 }

@@ -215,6 +215,8 @@
 
 .session-summary { min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); }
 .session-summary > .tooltip { flex: 0 0 auto; }
+.theme-toggle { color: var(--text-secondary); background: var(--surface-inset); }
+.theme-toggle:hover { color: var(--accent-primary); }
 .locale-control { position: relative; }
 .locale-selector { min-width: 0; flex-direction: row; align-items: center; gap: var(--space-3); color: var(--text-secondary); font-size: var(--type-meta); }
 .locale-selector > span,

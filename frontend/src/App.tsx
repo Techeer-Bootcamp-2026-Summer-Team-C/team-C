@@ -16,12 +16,14 @@ const IncidentsPage = lazy(async () => ({ default: (await import("./pages/Incide
 const IntelligencePage = lazy(async () => ({ default: (await import("./pages/IntelligencePage")).IntelligencePage }));
 const OperationsPage = lazy(async () => ({ default: (await import("./pages/OperationsPage")).OperationsPage }));
 const OverviewPage = lazy(async () => ({ default: (await import("./pages/OverviewPage")).OverviewPage }));
+const DashboardManagementPage = lazy(async () => ({ default: (await import("./pages/OverviewPage")).DashboardManagementPage }));
 
 export function App() {
   return <Routes>
     <Route path="/login" element={<LoginPage />} />
     <Route element={<RequireAuth><AppShell /></RequireAuth>}>
       <Route index element={<OverviewPage />} />
+      <Route path="dashboards" element={<DashboardManagementPage />} />
       <Route path="alerts" element={<AlertsPage />} />
       <Route path="alerts/:alertId" element={<AlertDetailPage />} />
       <Route path="incidents" element={<IncidentsPage />} />
