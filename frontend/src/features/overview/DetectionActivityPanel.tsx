@@ -7,6 +7,7 @@ import type { IncidentTimeSeriesPointDto, TimeSeriesPointDto } from "../../contr
 import { useI18n } from "../../i18n/LocaleContext";
 import { formatCompactDate } from "../../lib/format";
 import { EmptyState } from "../../components/ui";
+import { useTheme } from "../../theme/ThemeProvider";
 import { buildDetectionActivityModel, valueAt } from "./overviewChartModel";
 
 registerECharts([LineChart, GridComponent, TooltipComponent, AxisPointerComponent, CanvasRenderer]);
@@ -17,6 +18,7 @@ export default function DetectionActivityPanel({ events, alerts, incidents }: {
   incidents: IncidentTimeSeriesPointDto[];
 }) {
   const { t } = useI18n();
+  const { theme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<EChartsType | null>(null);
   const renderedRef = useRef(false);
@@ -123,7 +125,7 @@ export default function DetectionActivityPanel({ events, alerts, incidents }: {
       chart.dispose();
       chartRef.current = null;
     };
-  }, [labels, model]);
+  }, [labels, model, theme]);
 
   if (!model.domain) return <EmptyState title={t("charts.noDetectionActivity")} message={t("charts.noSeriesDescription")} />;
 

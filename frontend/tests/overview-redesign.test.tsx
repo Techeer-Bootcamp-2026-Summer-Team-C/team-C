@@ -14,6 +14,9 @@ import { buildDetectionActivityModel } from "../src/features/overview/overviewCh
 import { LocaleProvider } from "../src/i18n/LocaleContext";
 import type { EndpointDto, IncidentDto } from "../src/contracts";
 import { OverviewPage, readOverviewEndpointId } from "../src/pages/OverviewPage";
+import { ThemeProvider } from "../src/theme/ThemeProvider";
+import { useTheme } from "../src/theme/ThemeProvider";
+import { init as initECharts } from "echarts/core";
 
 vi.mock("echarts/core", () => ({
   init: vi.fn(() => ({
@@ -34,7 +37,7 @@ afterEach(() => {
 describe("overview fixed dashboard", () => {
   it("renders exactly the nine refined dashboard blocks in DOM order", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const { container } = render(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider><MemoryRouter><OverviewDashboard data={overviewData()} /></MemoryRouter></LocaleProvider></AuthProvider></QueryClientProvider>);
+    const { container } = render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider><MemoryRouter><OverviewDashboard data={overviewData()} /></MemoryRouter></LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
     expect([...container.querySelectorAll("[data-overview-block]")].map((block) => block.getAttribute("data-overview-block"))).toEqual([
       "edr-state",
       "kpi-alerts",
@@ -63,7 +66,7 @@ describe("overview fixed dashboard", () => {
     data.selectedEndpointId = 2;
     data.timeRange = { timePreset: "LATEST_15M" };
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const { rerender } = render(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider><MemoryRouter><OverviewDashboard data={data} /></MemoryRouter></LocaleProvider></AuthProvider></QueryClientProvider>);
+    const { rerender } = render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider><MemoryRouter><OverviewDashboard data={data} /></MemoryRouter></LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
 
     expectDrilldownQuery(/Total alerts3/i, { endpointId: "2", timePreset: "LATEST_15M" });
     expectDrilldownQuery(/Critical alerts1/i, { endpointId: "2", severity: "CRITICAL", timePreset: "LATEST_15M" });
@@ -75,7 +78,7 @@ describe("overview fixed dashboard", () => {
     expect(endpointUrl.searchParams.has("to")).toBe(false);
 
     data.timeRange = { timePreset: "CUSTOM", from: "2026-07-15T00:00:00Z", to: "2026-07-15T06:30:00Z" };
-    rerender(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider><MemoryRouter><OverviewDashboard data={data} /></MemoryRouter></LocaleProvider></AuthProvider></QueryClientProvider>);
+    rerender(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider><MemoryRouter><OverviewDashboard data={data} /></MemoryRouter></LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
     expectDrilldownQuery(/Total alerts3/i, {
       endpointId: "2",
       from: "2026-07-15T00:00:00Z",
@@ -92,7 +95,7 @@ describe("overview fixed dashboard", () => {
 
   it("keeps zero and empty EDR diagnostics truthful", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider><MemoryRouter>
+    render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider><MemoryRouter>
       <EdrStateSummary state={{
         status: "GREEN",
         score: 0,
@@ -104,7 +107,7 @@ describe("overview fixed dashboard", () => {
         highestEndpointRiskScore: null,
         calculatedAt: "2026-07-15T00:00:00Z",
       }} />
-    </MemoryRouter></LocaleProvider></AuthProvider></QueryClientProvider>);
+    </MemoryRouter></LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
 
     expect(screen.getByRole("region", { name: "Current EDR state" })).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Threat level: 0 / 100, Green" })).toHaveAttribute("aria-valuenow", "0");
@@ -122,7 +125,7 @@ describe("overview fixed dashboard", () => {
       expiresAt: Date.now() + 60_000,
     }));
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider><DetectionActivityTable alerts={alerts} events={events} incidents={incidents} /></LocaleProvider></AuthProvider></QueryClientProvider>);
+    render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider><DetectionActivityTable alerts={alerts} events={events} incidents={incidents} /></LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
 
     expect(screen.getByRole("table", { name: "Events" })).toBeInTheDocument();
     expect(screen.getByRole("table", { name: "Alerts" })).toBeInTheDocument();
@@ -141,13 +144,13 @@ describe("overview fixed dashboard", () => {
   it("announces missing latest buckets without fabricating zero and clears an invalid chart selection", async () => {
     setAuthSession();
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const { container, rerender } = render(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider>
+    const { container, rerender } = render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider>
       <DetectionActivityPanel
         alerts={[{ bucketStartAt: "2026-07-15T01:00:00Z", count: 4 }]}
         events={[{ bucketStartAt: "2026-07-15T00:00:00Z", count: 8 }]}
         incidents={[{ bucketStartAt: "2026-07-15T01:00:00Z", openCount: 2, closedCount: 1 }]}
       />
-    </LocaleProvider></AuthProvider></QueryClientProvider>);
+    </LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
 
     expect(screen.getByText("Latest server buckets: Events None, Alerts 4, Open incidents 2.")).toBeInTheDocument();
     const bucketSelect = screen.getByRole("combobox", { name: "Detection activity time buckets" });
@@ -156,30 +159,45 @@ describe("overview fixed dashboard", () => {
     fireEvent.change(bucketSelect, { target: { value: (firstBucket as HTMLOptionElement).value } });
     expect(container.querySelector(".chart-selected-value")).not.toBeNull();
 
-    rerender(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider>
+    rerender(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider>
       <DetectionActivityPanel
         alerts={[]}
         events={[{ bucketStartAt: "2026-07-15T03:00:00Z", count: 11 }]}
         incidents={[]}
       />
-    </LocaleProvider></AuthProvider></QueryClientProvider>);
+    </LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
 
     await waitFor(() => expect(container.querySelector(".chart-selected-value")).toBeNull());
     expect(screen.getByRole("combobox", { name: "Detection activity time buckets" })).toHaveValue("");
   });
 
+  it("recreates ECharts options from semantic tokens when the theme changes", async () => {
+    setAuthSession();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const initMock = vi.mocked(initECharts);
+    const callsBeforeRender = initMock.mock.calls.length;
+    render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider>
+      <ThemeChartHarness />
+    </LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
+
+    await waitFor(() => expect(initMock.mock.calls.length).toBeGreaterThan(callsBeforeRender));
+    const callsAfterMount = initMock.mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "change chart theme" }));
+    await waitFor(() => expect(initMock.mock.calls.length).toBeGreaterThan(callsAfterMount));
+  });
+
   it("renders a fixed-order severity donut with count, percentage, and safe zero totals", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const { rerender } = render(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider>
+    const { rerender } = render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider>
       <AlertSeverityDonut label="Total alerts" rows={[{ severity: "HIGH", count: 25 }, { severity: "CRITICAL", count: 5 }]} total={100} />
-    </LocaleProvider></AuthProvider></QueryClientProvider>);
+    </LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
     expect(screen.getByRole("figure", { name: "Total alerts" })).toBeInTheDocument();
     expect(screen.getAllByRole("listitem").map((row) => row.textContent)).toEqual(["Critical55%", "High2525%", "Medium00%", "Low00%"]);
     expect(document.querySelectorAll(".severity-donut-segment")).toHaveLength(2);
 
-    rerender(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider>
+    rerender(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider>
       <AlertSeverityDonut label="Total alerts" rows={[]} total={0} />
-    </LocaleProvider></AuthProvider></QueryClientProvider>);
+    </LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
     expect(screen.getAllByText("0%")).toHaveLength(4);
     expect(document.querySelectorAll(".severity-donut-segment")).toHaveLength(0);
   });
@@ -197,9 +215,9 @@ describe("overview fixed dashboard", () => {
     ];
     const endpointsSpy = vi.spyOn(api, "endpoints").mockResolvedValue({ data: { items: endpointOptions, page: 1, size: 20, total: 42 }, meta: { requestId: "req_overview_scope" } });
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider>
+    render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider>
       <EndpointScopePicker onChange={onChange} selectedEndpointId={undefined} />
-    </LocaleProvider></AuthProvider></QueryClientProvider>);
+    </LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
 
     fireEvent.click(screen.getByRole("button", { name: "Endpoint scope" }));
     expect(await screen.findByRole("option", { name: /FINANCE-MAC-02/ })).toBeInTheDocument();
@@ -218,10 +236,10 @@ describe("overview fixed dashboard", () => {
     setAuthSession();
     vi.spyOn(api, "endpoints").mockResolvedValue(success({ items: [], page: 1, size: 20, total: 0 }));
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider>
+    render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider>
       <button type="button">Outside action</button>
       <EndpointScopePicker onChange={vi.fn()} selectedEndpointId={undefined} />
-    </LocaleProvider></AuthProvider></QueryClientProvider>);
+    </LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
 
     const trigger = screen.getByRole("button", { name: "Endpoint scope" });
     const outside = screen.getByRole("button", { name: "Outside action" });
@@ -250,12 +268,12 @@ describe("overview fixed dashboard", () => {
       lastDetectedAt: "2026-07-15T03:00:00Z",
     } as IncidentDto];
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const { container } = render(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider><MemoryRouter>
+    const { container } = render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider><MemoryRouter>
       <OverviewDashboard data={data} queueState={{
         endpoints: { pending: false, error: new Error("endpoint queue failed"), stale: false, onRetry: vi.fn() },
         incidents: { pending: false, error: null, stale: false, onRetry: vi.fn() },
       }} />
-    </MemoryRouter></LocaleProvider></AuthProvider></QueryClientProvider>);
+    </MemoryRouter></LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
 
     expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Incident queue" })).toBeInTheDocument();
@@ -280,9 +298,9 @@ describe("overview fixed dashboard", () => {
       lastDetectedAt: "2026-07-15T03:00:00Z",
     } as IncidentDto];
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider><MemoryRouter>
+    render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider><MemoryRouter>
       <OverviewDashboard data={data} />
-    </MemoryRouter></LocaleProvider></AuthProvider></QueryClientProvider>);
+    </MemoryRouter></LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
 
     const riskList = screen.getByRole("list", { name: "Highest-risk endpoints" });
     expect(within(riskList).queryByRole("progressbar")).not.toBeInTheDocument();
@@ -301,13 +319,15 @@ describe("overview fixed dashboard", () => {
     vi.spyOn(api, "endpoints").mockResolvedValue(success({ items: [], page: 1, size: 5, total: 0 }));
     vi.spyOn(api, "incidents").mockResolvedValue(success({ items: [], page: 1, size: 5, total: 0 }));
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const { container } = render(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider><MemoryRouter>
+    const { container } = render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider><MemoryRouter>
       <OverviewPage />
-    </MemoryRouter></LocaleProvider></AuthProvider></QueryClientProvider>);
+    </MemoryRouter></LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
 
     await waitFor(() => expect(dashboardSpy).toHaveBeenCalled());
     await waitFor(() => expect(queryClient.getQueryData(["dashboard", { timePreset: "LATEST_24H", interval: "1h" }])).toEqual(success(data.dashboard!)));
     expect(await screen.findByRole("region", { name: "Fixed Overview dashboard" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Dashboard settings" })).toHaveAttribute("href", "/dashboards");
+    expect(screen.queryByText("ACTIVE LAYOUT")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Total alerts3/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Open incidents1/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Alert severity" })).toBeInTheDocument();
@@ -327,9 +347,9 @@ describe("overview fixed dashboard", () => {
     vi.spyOn(api, "endpoints").mockResolvedValue(success({ items: [], page: 1, size: 5, total: 0 }));
     vi.spyOn(api, "incidents").mockResolvedValue(success({ items: [], page: 1, size: 5, total: 0 }));
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const { container } = render(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider><MemoryRouter>
+    const { container } = render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider><MemoryRouter>
       <OverviewPage />
-    </MemoryRouter></LocaleProvider></AuthProvider></QueryClientProvider>);
+    </MemoryRouter></LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
 
     await waitFor(() => expect(endpointSummarySpy).toHaveBeenCalled());
     await waitFor(() => expect(queryClient.getQueryData(["endpoint-summary", { timePreset: "LATEST_24H" }])).toEqual(success(data.endpoints!)));
@@ -400,4 +420,16 @@ function ingestSummary() {
     eventFailures: { failedCount: 0, ratePerMinute: 0, reprocessedCount: 0, reprocessFailedCount: 0, oldestFailedAt: null },
     storage: { clickhouseHotBucketCount: 1, restoredBucketCount: 0, glacierArchivedBucketCount: 0, restoringBucketCount: 0, failedBucketCount: 0, expiredBucketCount: 0 },
   };
+}
+
+function ThemeChartHarness() {
+  const { toggleTheme } = useTheme();
+  return <>
+    <button onClick={toggleTheme} type="button">change chart theme</button>
+    <DetectionActivityPanel
+      alerts={[{ bucketStartAt: "2026-07-15T01:00:00Z", count: 4 }]}
+      events={[{ bucketStartAt: "2026-07-15T01:00:00Z", count: 8 }]}
+      incidents={[{ bucketStartAt: "2026-07-15T01:00:00Z", openCount: 2, closedCount: 0 }]}
+    />
+  </>;
 }

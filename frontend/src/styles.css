@@ -388,6 +388,7 @@ td small, td code, .table-primary code { display: block; margin-top: var(--space
 
 @media print {
   :root { color-scheme: dark; }
+  :root.light { color-scheme: light; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .nav-rail, .top-bar, .filter-bar, .modal-backdrop, .page-actions, .skip-link { display: none !important; }
   .app-shell, .app-shell.compact { display: block; min-height: auto; }

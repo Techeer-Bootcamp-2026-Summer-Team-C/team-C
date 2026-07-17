@@ -7,6 +7,7 @@ import { App } from "./App";
 import { AuthProvider } from "./auth/AuthContext";
 import { LocaleProvider } from "./i18n/LocaleContext";
 import { retryDelay, shouldRetry } from "./query/policy";
+import { ThemeProvider } from "./theme/ThemeProvider";
 import "./styles/fonts.css";
 import "./styles.css";
 import "./styles/tokens.css";
@@ -17,6 +18,7 @@ import "./styles/patterns.css";
 import "./styles/visualizations.css";
 import "./styles/pages/login.css";
 import "./styles/pages/overview.css";
+import "./styles/pages/overview-layout.css";
 import "./styles/pages/alerts.css";
 import "./styles/pages/incidents.css";
 import "./styles/pages/endpoints-events.css";
@@ -40,13 +42,15 @@ if (!root) throw new Error("Root element is missing");
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <LocaleProvider>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-        </LocaleProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <LocaleProvider>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </LocaleProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

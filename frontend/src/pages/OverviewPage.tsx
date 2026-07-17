@@ -1,11 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, Clock3, RefreshCw } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { ChevronDown, Clock3, RefreshCw, Settings2 } from "lucide-react";
+import { useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/endpoints";
 import { readTimeFilter, TimeFilterFields } from "../components/filters";
-import { Popover } from "../components/primitives";
-import { ErrorState, PartialFailureWarning, StaleWarning } from "../components/ui";
-import { OverviewDashboard } from "../features/overview/OverviewDashboard";
+import { Button, Popover } from "../components/primitives";
+import { ErrorState, PageHeader, PartialFailureWarning, StaleWarning } from "../components/ui";
+import { useAuth } from "../auth/AuthContext";
+import { OverviewLayoutProvider } from "../features/overviewLayout/OverviewLayoutContext";
+import { OverviewDashboardWorkspace } from "../features/overviewLayout/OverviewDashboardWorkspace";
 import { EndpointScopePicker } from "../features/overview/EndpointScopePicker";
 import { useI18n } from "../i18n/LocaleContext";
 import { formatDateTime } from "../lib/format";
@@ -20,7 +23,22 @@ export function readOverviewEndpointId(params: URLSearchParams): number | undefi
 }
 
 export function OverviewPage() {
+  return <AuthenticatedOverviewRoute mode="overview" />;
+}
+
+export function DashboardManagementPage() {
+  return <AuthenticatedOverviewRoute mode="manage" />;
+}
+
+function AuthenticatedOverviewRoute({ mode }: { mode: "overview" | "manage" }) {
+  const auth = useAuth();
+  if (!auth.user) return null;
+  return <OverviewLayoutProvider key={`${auth.user.userId}-${mode}`} userId={auth.user.userId}><OverviewPageContent mode={mode} /></OverviewLayoutProvider>;
+}
+
+function OverviewPageContent({ mode }: { mode: "overview" | "manage" }) {
   const { t } = useI18n();
+  const [dashboardSettingsOpen, setDashboardSettingsOpen] = useState(false);
   const [params, setParams] = useSearchParams();
   const time = readTimeFilter(params);
   const selectedEndpointId = readOverviewEndpointId(params);
@@ -56,10 +74,19 @@ export function OverviewPage() {
   };
 
   return (
-    <div className="page-stack overview-page">
-      <h1 className="sr-only">{t("overview.title")}</h1>
+    <div className={`page-stack overview-page${mode === "manage" ? " dashboard-workbench-page" : ""}`}>
+      {mode === "manage" ? <PageHeader
+        actions={<>
+          <Link className="button ghost" to={{ pathname: "/", search: params.toString() ? `?${params.toString()}` : "" }}>{t("dashboard.openOverview")}</Link>
+          <Button onClick={() => setDashboardSettingsOpen(true)} type="button" variant="ghost"><Settings2 aria-hidden="true" size={16} />{t("dashboard.settings")}</Button>
+        </>}
+        description={t("dashboard.workbenchDescription")}
+        eyebrow={t("dashboard.workbenchEyebrow")}
+        title={t("dashboard.workbenchTitle")}
+      /> : <h1 className="sr-only">{t("overview.title")}</h1>}
       {!time.valid ? <ErrorState error={new Error(t("filter.invalidRange"))} /> : null}
       {time.valid ? <OverviewToolbar
+        dashboardSettingsTo={mode === "overview" ? `/dashboards${params.toString() ? `?${params.toString()}` : ""}` : undefined}
         lastRefreshedAt={lastRefreshedAt}
         onEndpointChange={(endpointId) => setParams(updateParams(params, { endpointId }))}
         onRefresh={refreshData}
@@ -72,10 +99,10 @@ export function OverviewPage() {
       {partialFailure ? <PartialFailureWarning message={t("overview.partialFailure")} /> : null}
       {staleError && hasPanelData ? <StaleWarning error={staleError} onRetry={() => void refreshData()} /> : null}
       {initialError ? <ErrorState error={initialError} onRetry={() => void refreshData()} /> : null}
-      {time.valid && !totalFailure ? <OverviewDashboard data={dashboardData} queueState={{
+      {time.valid && !totalFailure ? <OverviewDashboardWorkspace data={dashboardData} mode={mode} onSettingsClose={() => setDashboardSettingsOpen(false)} queueState={{
         endpoints: { pending: endpointRanking.isPending, error: endpointRanking.error, stale: endpointRanking.isRefetchError, onRetry: () => void endpointRanking.refetch() },
         incidents: { pending: incidentQueue.isPending, error: incidentQueue.error, stale: incidentQueue.isRefetchError, onRetry: () => void incidentQueue.refetch() },
-      }} summaryState={{
+      }} settingsOpen={dashboardSettingsOpen} summaryState={{
         dashboard: { pending: dashboard.isPending, error: dashboard.error, stale: dashboard.isRefetchError, onRetry: () => void dashboard.refetch() },
         endpoints: { pending: endpoints.isPending, error: endpoints.error, stale: endpoints.isRefetchError, onRetry: () => void endpoints.refetch() },
       }} /> : null}
@@ -83,7 +110,8 @@ export function OverviewPage() {
   );
 }
 
-function OverviewToolbar({ lastRefreshedAt, onEndpointChange, onRefresh, params, refreshing, selectedEndpointId, setParams, timePreset }: {
+function OverviewToolbar({ dashboardSettingsTo, lastRefreshedAt, onEndpointChange, onRefresh, params, refreshing, selectedEndpointId, setParams, timePreset }: {
+  dashboardSettingsTo?: string | undefined;
   lastRefreshedAt: number;
   onEndpointChange: (endpointId: number | undefined) => void;
   onRefresh: () => Promise<unknown>;
@@ -101,6 +129,7 @@ function OverviewToolbar({ lastRefreshedAt, onEndpointChange, onRefresh, params,
         <div className="overview-time-fields"><TimeFilterFields params={params} setParams={setParams} /></div>
       </Popover>
       <button aria-busy={refreshing} className="button ghost overview-refresh" disabled={refreshing} onClick={() => void onRefresh()} type="button"><RefreshCw aria-hidden="true" className={refreshing ? "spin" : ""} size={15} />{refreshing ? t("overview.refreshing") : t("overview.refresh")}</button>
+      {dashboardSettingsTo ? <Link className="button ghost overview-refresh" to={dashboardSettingsTo}><Settings2 aria-hidden="true" size={15} />{t("dashboard.settings")}</Link> : null}
     </div>
     <span className="overview-refresh-meta">{t("overview.lastRefreshed", { time: lastRefreshedAt ? formatDateTime(new Date(lastRefreshedAt).toISOString()) : t("overview.notYet") })}<small>{t("overview.autoRefresh")}</small></span>
   </section>;

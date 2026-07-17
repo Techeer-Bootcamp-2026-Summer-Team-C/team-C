@@ -12,8 +12,13 @@ describe("Frontend responsibility boundaries", () => {
       const name = relative(SOURCE, file).replace(/\\/g, "/");
       if (/\bfetch\s*\(/.test(content)) expect(name).toBe("api/client.ts");
       if (content.includes("localStorage")) {
-        expect(name).toBe("components/AppShell.tsx");
-        expect(content).toContain("edr.compactNavigation");
+        expect(["components/AppShell.tsx", "theme/ThemeProvider.tsx", "features/overviewLayout/overviewLayoutStorage.ts"]).toContain(name);
+        if (name === "components/AppShell.tsx") expect(content).toContain("edr.compactNavigation");
+        if (name === "theme/ThemeProvider.tsx") expect(content).toContain("edr.theme");
+        if (name === "features/overviewLayout/overviewLayoutStorage.ts") {
+          expect(content).toContain("edr.overviewDashboards.v1.user.");
+          expect(content).toContain("edr.overviewActiveDashboard.v1.user.");
+        }
         expect(content).not.toMatch(/token|accessToken|lastPrimaryRoute/);
       }
       if (content.includes("sessionStorage")) {
