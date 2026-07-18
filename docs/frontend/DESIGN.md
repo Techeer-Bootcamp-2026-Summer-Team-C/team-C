@@ -366,7 +366,8 @@ Overview toolbar 기본 구조:
 - filter와 time range는 URL query를 source of truth로 유지한다.
 - `/` Overview는 active custom dashboard와 무관하게 Default 9-block을 고정 DOM 순서로 항상 전부 표시하며 drag, drop, resize, hide, restore와 사용자 layout 저장을 제공하지 않는다. `/dashboards` workbench의 명시적 Draft 편집기에서만 현재 9개 widget의 drag/drop, resize와 삭제를 제공하고 Save 시 사용자별 browser-local layout을 한 번 저장한다.
 - Custom Dashboard Widget은 정상 상태에서 nested scrollbar를 만들지 않는다. 외부 Widget header가 title을 소유하고 내부 surface는 중복 title을 accessible text로만 유지하며 값·설명·차트·최대 5개 queue를 한 surface에서 읽을 수 있게 한다. Registry의 min width/height는 콘텐츠 안전 크기보다 작게 resize되지 않도록 제한한다.
-- Custom Dashboard의 click 추가는 상단 행의 왼쪽부터 빈 공간을 채운다. Pointer drag·resize가 다른 Widget과 충돌하면 조작 중인 Widget을 기존 위치로 되돌리고 주변 Widget은 이동시키지 않는다. Palette drop도 기존 geometry를 보존하고 신규 Widget만 drop 지점과 가장 가까운 비중첩 cell에 배치한다.
+- Custom Dashboard의 click 추가는 상단 행의 왼쪽부터 빈 공간을 채운다. Pointer drag·resize가 다른 Widget과 충돌하면 조작 중인 Widget을 기존 위치로 되돌리고 주변 Widget은 이동시키지 않는다. Palette drop도 기존 geometry를 보존하고 신규 Widget만 drop 지점과 가장 가까운 비중첩 cell에 배치한다. 빈 Draft도 실제 Grid drop surface를 유지하고 안내 layer는 pointer event를 가로채지 않는다.
+- Widget palette는 현재 9개 Widget의 의미를 구분하는 작은 semantic glyph와 이름·기본 크기를 함께 표시한다. 한 Dashboard에는 각 Widget type을 하나만 둘 수 있으며, 이미 배치한 type은 palette에서 숨기고 Canvas에서 제거하면 다시 표시한다. 추가 후 새 Widget handle, 제거 후 복귀한 palette item으로 keyboard focus를 이어 간다. Context create/update와 저장 복원 모두 type 중복을 차단하며 복원 시에는 첫 번째로 유효하게 배치된 instance만 유지한다.
 - mobile에서는 주요 control을 첫 줄에 유지하고 나머지는 `More filters` Drawer로 이동한다.
 
 ## 8. Component Model
@@ -891,6 +892,7 @@ Update only the assigned Work Package status and evidence in OVERVIEW_DASHBOARD_
 | D-027 | 2026-07-18 | `/` Overview는 active custom dashboard를 표시하지 않고 기존 immutable Default 9-block을 항상 전부 표시한다. `/dashboards`는 Sidebar에서 제거하고 Overview toolbar의 톱니바퀴 `Dashboard 설정`으로만 진입한다 | SOC 기본 현황의 정보 위계를 사용자 layout과 무관하게 일관되게 유지하고 Dashboard 편집을 운영 화면이 아닌 보조 설정 작업으로 분류한다 | `frontend/src/components/AppShell.tsx`, `frontend/src/pages/OverviewPage.tsx`, `frontend/src/features/overviewLayout/OverviewDashboardWorkspace.tsx` |
 | D-028 | 2026-07-18 | Custom Dashboard Widget의 내부 scrollbar를 제거하고 콘텐츠 유형별 안전 최소 geometry와 compact 중복 heading 규칙을 적용한다 | 작은 KPI에서 제목·값이 분리되어 스크롤되는 문제를 없애고, chart·severity·queue도 같은 surface 안에서 핵심 정보를 한눈에 판독하게 한다 | `frontend/src/features/overviewLayout/overviewLayoutModel.ts`, `frontend/src/styles/pages/overview-layout.css` |
 | D-029 | 2026-07-18 | Custom Dashboard의 자동 추가는 상단 행부터 빈칸을 채우고 pointer 충돌과 palette drop이 기존 Widget geometry를 이동시키지 않게 한다 | 12열에 두 6열 Widget이 들어가는데도 두 번째가 다음 행으로 내려가고, 빈 오른쪽 칸으로 이동하는 경로에서 기존 Widget이 15행으로 밀리는 실제 동작을 제거해 공간 활용과 위치 기억을 보존한다 | `frontend/src/features/overviewLayout/overviewLayoutModel.ts`, `frontend/src/features/overviewLayout/OverviewDashboardWorkspace.tsx` |
+| D-030 | 2026-07-18 | Custom Dashboard palette에 Widget별 semantic glyph를 표시하고 한 Dashboard에서 각 Widget type은 하나만 허용한다 | 배치 전 Widget 의미를 빠르게 구분하고 동일 데이터를 중복 배치해 조사 화면의 신호 밀도를 낮추는 상태를 방지한다. 기존 중복 저장값은 첫 번째 유효 instance만 보존해 안전하게 복구한다 | `frontend/src/features/overviewLayout/OverviewDashboardWorkspace.tsx`, `frontend/src/features/overviewLayout/overviewLayoutStorage.ts` |
 
 ## 17. 관련 문서와 코드
 

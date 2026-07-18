@@ -10,6 +10,7 @@ import {
   type CustomDashboardWidget,
   type CustomOverviewDashboard,
   type OverviewDashboardStoreV1,
+  type OverviewWidgetType,
 } from "./overviewLayoutModel";
 
 export const DASHBOARDS_STORAGE_PREFIX = "edr.overviewDashboards.v1.user.";
@@ -90,10 +91,12 @@ function normalizeDashboard(value: unknown, dashboardIds: Set<string>): CustomOv
   if (!id || !name || dashboardIds.has(id) || !Array.isArray(value.widgets)) return null;
 
   const widgetIds = new Set<string>();
+  const widgetTypes = new Set<OverviewWidgetType>();
   const widgets: CustomDashboardWidget[] = [];
   const occupancy = createOverviewGridOccupancy();
   const unplaceableSizes = new Set<string>();
   for (const candidate of value.widgets) {
+    if (isRecord(candidate) && isOverviewWidgetType(candidate.type) && widgetTypes.has(candidate.type)) continue;
     const widget = normalizeWidget(candidate, widgetIds);
     if (!widget) continue;
     const sizeKey = `${widget.w}x${widget.h}`;
@@ -105,6 +108,7 @@ function normalizeDashboard(value: unknown, dashboardIds: Set<string>): CustomOv
     }
     const placedWidget = { ...widget, ...position };
     widgets.push(placedWidget);
+    widgetTypes.add(placedWidget.type);
     occupyOverviewGridRegion(occupancy, placedWidget);
   }
   if (!widgets.length) return null;
