@@ -131,6 +131,7 @@ def test_nginx_uses_a_fixed_existing_ec2_certificate_directory() -> None:
 
 def test_production_images_are_built_for_ec2_and_tagged_with_the_commit() -> None:
     workflow = (ROOT / ".github/workflows/build-prod-images.yml").read_text(encoding="utf-8")
+    parsed_workflow = yaml.safe_load(workflow)
     nginx_dockerfile = (ROOT / "deploy/docker/nginx.Dockerfile").read_text(encoding="utf-8")
 
     assert "platforms: linux/amd64" in workflow
@@ -140,6 +141,35 @@ def test_production_images_are_built_for_ec2_and_tagged_with_the_commit() -> Non
     assert "team-c-nginx" in workflow
     assert ":latest" not in workflow
     assert "COPY deploy/nginx/nginx.prod.conf /etc/nginx/nginx.conf" in nginx_dockerfile
+    assert parsed_workflow["permissions"] == {"contents": "read"}
+    assert parsed_workflow["jobs"]["build-and-push"]["needs"] == "validate"
+    assert parsed_workflow["jobs"]["build-and-push"]["permissions"] == {
+        "contents": "read",
+        "packages": "write",
+    }
+    validation = parsed_workflow["jobs"]["validate"]
+    validation_commands = "\n".join(step.get("run", "") for step in validation["steps"])
+    assert "uv run ruff check ." in validation_commands
+    assert 'uv run pytest -m "not integration"' in validation_commands
+    assert "compose.prod.yaml config --quiet" in validation_commands
+
+
+def test_pull_request_ci_covers_backend_frontend_and_compose_gates() -> None:
+    workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    parsed_workflow = yaml.safe_load(workflow)
+
+    assert set(parsed_workflow["jobs"]) == {"validate"}
+    assert "pull_request:" in workflow
+    assert "uv run ruff check ." in workflow
+    assert 'uv run pytest -m "not integration"' in workflow
+    assert "npm run openapi:check" in workflow
+    assert "npm run typecheck" in workflow
+    assert "npm run lint" in workflow
+    assert "npm test" in workflow
+    assert "npm run build" in workflow
+    assert "compose.prod.yaml config --quiet" in workflow
+    assert "compose.infra.yaml config --quiet" in workflow
+    assert "compose.service.yaml config --quiet" in workflow
 
 
 def test_nginx_resolves_recreated_backend_containers_through_docker_dns() -> None:

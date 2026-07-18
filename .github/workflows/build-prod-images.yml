@@ -23,7 +23,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: production-images-${{ github.ref }}
@@ -34,8 +33,39 @@ env:
   IMAGE_NAMESPACE: techeer-bootcamp-2026-summer-team-c
 
 jobs:
-  build-and-push:
+  validate:
     runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install uv and dependencies
+        run: |
+          pip install uv==0.11.11
+          uv sync --locked --dev
+
+      - name: Backend lint and tests
+        run: |
+          uv run ruff check .
+          uv run pytest -m "not integration"
+
+      - name: Production Compose checks
+        run: |
+          docker compose --env-file .env.production.example -f compose.prod.yaml config --quiet
+          docker compose --env-file deploy/portainer/env.infra.example -f deploy/portainer/compose.infra.yaml config --quiet
+          docker compose --env-file deploy/portainer/env.service.example -f deploy/portainer/compose.service.yaml config --quiet
+
+  build-and-push:
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:

@@ -1,4 +1,6 @@
 from collections.abc import Callable
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -7,6 +9,12 @@ from tools import prod_init
 
 class TransientError(Exception):
     pass
+
+
+def query_result(value: object) -> MagicMock:
+    result = MagicMock()
+    result.fetchone.return_value = (value,)
+    return result
 
 
 def test_retry_dependency_retries_selected_transient_errors() -> None:
@@ -72,6 +80,54 @@ def test_retry_dependency_stops_after_the_configured_attempts() -> None:
         )
 
     assert calls == 3
+
+
+@pytest.mark.parametrize(
+    ("query_values", "expected_migrations"),
+    [
+        (
+            [None, False, False, None, 64],
+            [
+                "0001_initial.up.sql",
+                "0002_user_login_id.up.sql",
+                "0003_user_locale.up.sql",
+                "0004_user_dashboard_layouts.up.sql",
+                "0005_query_search_sort_indexes.up.sql",
+            ],
+        ),
+        (
+            ["users", True, True, "user_dashboard_layouts", 64],
+            ["0005_query_search_sort_indexes.up.sql"],
+        ),
+    ],
+    ids=("fresh-database", "existing-database"),
+)
+def test_initialize_postgres_applies_only_missing_migrations(
+    monkeypatch: pytest.MonkeyPatch,
+    query_values: list[object],
+    expected_migrations: list[str],
+) -> None:
+    connection = MagicMock()
+    connection.execute.side_effect = [query_result(value) for value in query_values]
+    connection_context = MagicMock()
+    connection_context.__enter__.return_value = connection
+    applied: list[str] = []
+    settings = SimpleNamespace(
+        postgres_dsn=SimpleNamespace(get_secret_value=lambda: "postgresql://example")
+    )
+
+    monkeypatch.setattr(prod_init.psycopg, "connect", lambda _dsn: connection_context)
+    monkeypatch.setattr(
+        prod_init,
+        "apply_postgres_file",
+        lambda _connection, path: applied.append(path.name),
+    )
+
+    prod_init.initialize_postgres(settings)
+
+    assert applied == expected_migrations
+    executed_queries = [call.args[0] for call in connection.execute.call_args_list]
+    assert "SELECT to_regclass('public.user_dashboard_layouts')" in executed_queries
 
 
 def test_main_checks_dependencies_before_running_initializers(monkeypatch: pytest.MonkeyPatch) -> None:

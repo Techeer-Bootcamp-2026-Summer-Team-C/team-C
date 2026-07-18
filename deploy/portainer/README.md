@@ -129,16 +129,20 @@ NGINX_MTLS_HOST_PORT=8443
 
 ## 6. 배포 확인
 
-EC2에서 다음을 확인한다.
+아래 최소 체크리스트를 순서대로 확인한다.
+
+1. GitHub Actions의 `Build production images`에서 `validate`, backend/Nginx build, `promote`가 모두 성공했는지 확인한다.
+2. `production` 브랜치의 `compose.service.yaml`에 고정된 backend/Nginx 이미지 SHA가 성공한 `Build production images` 실행의 source commit SHA와 같은지 확인한다. 프런트엔드 전용 `main` 커밋은 이 워크플로를 실행하지 않으므로 최신 `main` SHA와 직접 비교하지 않는다.
+3. Portainer에서 `app-init=Exited (0)`, backend/Nginx=`healthy`, worker 2개=`running`이고 재시작을 반복하지 않는지 확인한다.
+
+EC2에서는 Nginx health를 확인한다.
 
 ```bash
 docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
 curl --fail http://127.0.0.1:8080/nginx-health
 ```
 
-Portainer에서 `app-init` 로그에 마이그레이션 오류가 없는지, backend가 `healthy`인지, 두 worker가 재시작을 반복하지 않는지 확인한다.
-
-저장소 checkout이 있는 관리 PC에서 Mac mini를 경유하면 Nginx, 애플리케이션 readiness, OpenAPI의 핵심 계약을 한 번에 확인할 수 있다.
+4. 저장소 checkout이 있는 관리 PC에서 Mac mini를 경유해 Nginx, 애플리케이션 readiness, OpenAPI의 핵심 계약을 확인한다.
 
 ```powershell
 powershell -File tools/verify_production_deployment.ps1 `
@@ -147,6 +151,8 @@ powershell -File tools/verify_production_deployment.ps1 `
 ```
 
 EC2에 저장소 checkout과 PowerShell이 실제로 설치된 경우에만 `-SshHost` 없이 `http://127.0.0.1:8080`을 사용한다. Portainer Git 스택을 사용한다고 해서 저장소 파일이 Agent 호스트에 존재한다고 가정하면 안 된다.
+
+5. Frontend 변경이 포함됐다면 GitHub 커밋의 Vercel 상태가 `success`인지 확인하고, `https://tukproject.dev/login`에서 로그인 후 Overview API 데이터가 표시되는지 확인한다. 모든 확인이 끝난 뒤에만 이전 이미지를 정리한다.
 
 ## 7. 이후 서비스 업데이트
 

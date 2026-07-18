@@ -98,6 +98,12 @@ def initialize_postgres(settings: Settings) -> None:
         if not locale_exists:
             apply_postgres_file(connection, ROOT / "migrations/postgresql/0003_user_locale.up.sql")
 
+        dashboard_layouts_table = connection.execute(
+            "SELECT to_regclass('public.user_dashboard_layouts')"
+        ).fetchone()[0]
+        if dashboard_layouts_table is None:
+            apply_postgres_file(connection, ROOT / "migrations/postgresql/0004_user_dashboard_layouts.up.sql")
+
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0005_query_search_sort_indexes.up.sql")
 
         login_id_length = connection.execute(

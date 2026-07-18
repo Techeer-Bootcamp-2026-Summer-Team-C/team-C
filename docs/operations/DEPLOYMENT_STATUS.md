@@ -97,6 +97,6 @@ powershell -File tools/verify_production_deployment.ps1 `
 ### 다음 정리
 
 - archive된 volume이 실제로 필요할 때만 개별 복원 훈련을 한다. 현재 운영 volume 6개는 유지한다.
-- 배포 게이트(테스트·린트 CI, Portainer webhook, GitHub Environment 승인)는 추후 도입을 검토한다. 현재는 polling 기반 자동 배포만 적용돼 있다.
+- PR 테스트·린트 CI는 저장소 workflow로 관리한다. `main` 보호 규칙에서 이 CI를 required check로 지정하는 운영 설정은 별도로 확인한다. Portainer webhook과 GitHub Environment 승인은 현재 규모에서는 추가하지 않고 polling 기반 자동 배포를 유지한다.
 - Grafana Cloud 체험/과금 상태가 끝나기 전에 계속 사용할지 또는 대체할지 결정한다.
 - Vercel은 실제 소유 계정에서 프로젝트·도메인·환경 변수·배포 이력을 별도로 점검한다. 현재 Portainer 운영과 섞어 관리하지 않는다.
