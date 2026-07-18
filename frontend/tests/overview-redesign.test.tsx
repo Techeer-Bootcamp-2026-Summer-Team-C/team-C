@@ -35,7 +35,7 @@ afterEach(() => {
 });
 
 describe("overview fixed dashboard", () => {
-  it("renders exactly the nine refined dashboard blocks in DOM order", () => {
+  it("renders the ten large-screen monitoring blocks in DOM order", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const { container } = render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider><MemoryRouter><OverviewDashboard data={overviewData()} /></MemoryRouter></LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
     expect([...container.querySelectorAll("[data-overview-block]")].map((block) => block.getAttribute("data-overview-block"))).toEqual([
@@ -46,10 +46,11 @@ describe("overview fixed dashboard", () => {
       "kpi-open-incidents",
       "detection-activity",
       "alert-severity",
+      "fleet-distribution",
       "highest-risk-endpoints",
       "incident-queue",
     ]);
-    expect(OVERVIEW_BLOCK_IDS).toHaveLength(9);
+    expect(OVERVIEW_BLOCK_IDS).toHaveLength(10);
     expect(screen.queryByRole("button", { name: /edit dashboard|reset default|save dashboard/i })).not.toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: /Threat level: 78 \/ 100, Red/i })).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: /Collection health: 61 \/ 100, Yellow/i })).toBeInTheDocument();
@@ -57,8 +58,37 @@ describe("overview fixed dashboard", () => {
     expect(screen.getByRole("link", { name: /Critical alerts1/i })).toHaveAttribute("href", "/alerts?severity=CRITICAL&timePreset=LATEST_24H");
     expect(screen.getByRole("link", { name: /Total alerts3/i })).toHaveClass("accent");
     expect(screen.getByRole("link", { name: /Critical alerts1/i })).toHaveClass("critical");
-    expect(screen.getByRole("link", { name: /High-risk endpoints1/i })).toHaveClass("high");
+    expect(screen.getByRole("link", { name: /HIGH-level endpoints1/i })).toHaveClass("high");
     expect(screen.getByRole("link", { name: /Open incidents1/i })).toHaveClass("info");
+    expect(screen.getByRole("heading", { name: "Fleet distribution" })).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "High: 1 / 1" })).toHaveAttribute("aria-valuenow", "1");
+    expect(screen.getByRole("img", { name: /All sensors: 1 healthy, 0 degraded, 0 unavailable, 1 total/i })).toBeInTheDocument();
+    const processSensor = screen.getByRole("list", { name: /Process: 1 healthy, 0 degraded, 0 unavailable, 1 total/i });
+    expect(within(processSensor).getByText("Healthy")).toBeInTheDocument();
+    expect(within(processSensor).getByText("Degraded")).toBeInTheDocument();
+    expect(within(processSensor).getByText("Unavailable")).toBeInTheDocument();
+    expect(within(processSensor).getByText("1")).toBeInTheDocument();
+    expect(within(processSensor).getAllByText("0")).toHaveLength(2);
+  });
+
+  it("shows explicit Fleet distribution empty states without inventing zero snapshots", () => {
+    const data = overviewData();
+    data.endpoints = {
+      ...data.endpoints!,
+      risk: { ...data.endpoints!.risk, byLevel: [] },
+      sensorHealth: [],
+    };
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { container } = render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider><MemoryRouter>
+      <OverviewDashboard data={data} />
+    </MemoryRouter></LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
+
+    const fleetBlock = container.querySelector<HTMLElement>('[data-overview-block="fleet-distribution"]');
+    expect(fleetBlock).not.toBeNull();
+    expect(within(fleetBlock as HTMLElement).getByText("No Endpoint risk snapshot is available.")).toBeInTheDocument();
+    expect(within(fleetBlock as HTMLElement).getByText("No Sensor Health snapshots are available.")).toBeInTheDocument();
+    expect(within(fleetBlock as HTMLElement).queryByRole("progressbar", { name: /Critical:/i })).not.toBeInTheDocument();
+    expect(within(fleetBlock as HTMLElement).queryByRole("img")).not.toBeInTheDocument();
   });
 
   it("preserves preset and custom time scope only on time-scoped KPI drilldowns", () => {
@@ -71,7 +101,7 @@ describe("overview fixed dashboard", () => {
     expectDrilldownQuery(/Total alerts3/i, { endpointId: "2", timePreset: "LATEST_15M" });
     expectDrilldownQuery(/Critical alerts1/i, { endpointId: "2", severity: "CRITICAL", timePreset: "LATEST_15M" });
     expectDrilldownQuery(/Open incidents1/i, { endpointId: "2", status: "OPEN", timePreset: "LATEST_15M" });
-    const endpointUrl = linkUrl(/High-risk endpoints1/i);
+    const endpointUrl = linkUrl(/HIGH-level endpoints1/i);
     expect(endpointUrl.searchParams.get("endpointIds")).toBe("2");
     expect(endpointUrl.searchParams.has("timePreset")).toBe(false);
     expect(endpointUrl.searchParams.has("from")).toBe(false);
@@ -334,7 +364,7 @@ describe("overview fixed dashboard", () => {
     const endpointKpiBlock = container.querySelector<HTMLElement>('[data-overview-block="kpi-high-risk-endpoints"]');
     expect(endpointKpiBlock).not.toBeNull();
     expect(within(endpointKpiBlock as HTMLElement).getByRole("alert")).toBeInTheDocument();
-    expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(9);
+    expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(10);
     expect(screen.getByText(/Successful dashboard sections remain available/i)).toBeInTheDocument();
   });
 
@@ -354,11 +384,12 @@ describe("overview fixed dashboard", () => {
     await waitFor(() => expect(endpointSummarySpy).toHaveBeenCalled());
     await waitFor(() => expect(queryClient.getQueryData(["endpoint-summary", { timePreset: "LATEST_24H" }])).toEqual(success(data.endpoints!)));
     expect(await screen.findByRole("region", { name: "Fixed Overview dashboard" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /High-risk endpoints1/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /HIGH-level endpoints1/i })).toBeInTheDocument();
     const alertKpiBlock = container.querySelector<HTMLElement>('[data-overview-block="kpi-alerts"]');
     expect(alertKpiBlock).not.toBeNull();
     expect(within(alertKpiBlock as HTMLElement).getByRole("alert")).toBeInTheDocument();
-    expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(9);
+    expect(screen.getByRole("heading", { name: "Fleet distribution" })).toBeInTheDocument();
+    expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(10);
     expect(screen.getByText(/Successful dashboard sections remain available/i)).toBeInTheDocument();
   });
 
@@ -382,7 +413,11 @@ function overviewData(): OverviewDashboardData {
       events: { timeSeries: [] },
       incidents: { openCount: 1, timeSeries: [] },
     } as unknown as OverviewDashboardData["dashboard"],
-    endpoints: { totalCount: 1, risk: { highRiskEndpointCount: 1, highestScore: 72, byLevel: [{ level: "HIGH", count: 1 }] } } as unknown as OverviewDashboardData["endpoints"],
+    endpoints: {
+      totalCount: 1,
+      risk: { highRiskEndpointCount: 1, criticalRiskEndpointCount: 0, highestScore: 72, calculatedAt: "2026-07-15T00:00:00Z", byLevel: [{ level: "HIGH", count: 1 }] },
+      sensorHealth: [{ sensor: "PROCESS", status: "HEALTHY", count: 1 }],
+    } as unknown as OverviewDashboardData["endpoints"],
     topEndpoints: [],
     incidentQueue: [],
     selectedEndpointId: undefined,

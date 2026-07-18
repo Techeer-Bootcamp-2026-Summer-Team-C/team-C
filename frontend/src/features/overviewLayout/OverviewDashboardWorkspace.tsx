@@ -1,5 +1,6 @@
 import { GripVertical, LayoutDashboard, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useId, useMemo, useState, useSyncExternalStore, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { Link } from "react-router-dom";
 import {
   ResponsiveGridLayout,
   getCompactor,
@@ -89,7 +90,17 @@ export function OverviewDashboardWorkspace({ mode = "overview", onSettingsClose 
         setBuilder(null);
       }}
       props={props}
-    /> : managementMode && activeDashboard ? <CustomDashboardView dashboard={activeDashboard} desktopLayout={editingAvailable} props={props} /> : <OverviewDashboard {...props} />}
+    /> : managementMode ? <DashboardManagementHome
+      activeDashboard={activeDashboard}
+      activeDashboardId={layout.activeDashboardId}
+      dashboards={layout.dashboards}
+      editingAvailable={editingAvailable}
+      hideActions={settingsOpen}
+      onEdit={openExistingDashboard}
+      onNew={openNewDashboard}
+      onSelect={layout.selectDashboard}
+      props={props}
+    /> : <OverviewDashboard {...props} />}
 
     {managementMode ? <Dialog
       closeLabel={t("dashboard.closeSettings")}
@@ -148,6 +159,36 @@ export function OverviewDashboardWorkspace({ mode = "overview", onSettingsClose 
       <p>{t("dashboard.deleteDescription", { name: deleteTarget?.name ?? "" })}</p>
     </Dialog> : null}
   </div>;
+}
+
+function DashboardManagementHome({ activeDashboard, activeDashboardId, dashboards, editingAvailable, hideActions, onEdit, onNew, onSelect, props }: {
+  activeDashboard: CustomOverviewDashboard | null;
+  activeDashboardId: string;
+  dashboards: CustomOverviewDashboard[];
+  editingAvailable: boolean;
+  hideActions: boolean;
+  onEdit: () => void;
+  onNew: () => void;
+  onSelect: (dashboardId: string) => void;
+  props: OverviewDashboardProps;
+}) {
+  const { t } = useI18n();
+  const widgetCount = activeDashboard?.widgets.length ?? OVERVIEW_WIDGET_DEFINITIONS.length;
+  return <section aria-label={t("dashboard.managerAria")} className="dashboard-management-home">
+    <aside className="dashboard-management-catalog">
+      <header><span>{t("dashboard.selectorLabel")}</span><strong>{t("dashboard.layoutCatalog")}</strong></header>
+      <button aria-pressed={activeDashboardId === DEFAULT_DASHBOARD_ID} className={activeDashboardId === DEFAULT_DASHBOARD_ID ? "active" : undefined} onClick={() => onSelect(DEFAULT_DASHBOARD_ID)} type="button"><span><strong>{t("dashboard.defaultName")}</strong><small>{t("dashboard.defaultFixed")}</small></span><small>{OVERVIEW_WIDGET_DEFINITIONS.length}</small></button>
+      {dashboards.map((dashboard) => <button aria-pressed={activeDashboardId === dashboard.id} className={activeDashboardId === dashboard.id ? "active" : undefined} key={dashboard.id} onClick={() => onSelect(dashboard.id)} type="button"><span><strong>{dashboard.name}</strong><small>{t("dashboard.browserLocal")}</small></span><small>{dashboard.widgets.length}</small></button>)}
+    </aside>
+    <div className="dashboard-management-summary">
+      <header><div><span className="eyebrow">{activeDashboard ? t("dashboard.workbenchContext") : t("dashboard.overviewContext")}</span><h3>{activeDashboard?.name ?? t("dashboard.defaultName")}</h3></div>{!hideActions ? <div className="dashboard-management-actions"><Button disabled={!editingAvailable} onClick={onNew} type="button"><Plus aria-hidden="true" size={16} />{t("dashboard.new")}</Button>{activeDashboard ? <Button disabled={!editingAvailable} onClick={onEdit} type="button" variant="ghost"><Pencil aria-hidden="true" size={16} />{t("dashboard.edit")}</Button> : null}</div> : null}</header>
+      <p>{activeDashboard ? t("dashboard.builderDescription") : t("dashboard.readOnlyHint")}</p>
+      <dl><div><dt>{t("dashboard.layoutState")}</dt><dd>{activeDashboard ? t("dashboard.savedLayout") : t("dashboard.defaultFixed")}</dd></div><div><dt>{t("dashboard.widgetCount")}</dt><dd>{widgetCount}</dd></div><div><dt>{t("dashboard.storage")}</dt><dd>{activeDashboard ? t("dashboard.browserLocal") : t("dashboard.productDefault")}</dd></div></dl>
+      <div className="dashboard-management-next"><div><strong>{activeDashboard ? t("dashboard.editTitle") : t("dashboard.defaultName")}</strong><span>{activeDashboard ? t("dashboard.managementHint") : t("dashboard.defaultRouteHint")}</span></div>{activeDashboard ? <Button disabled={!editingAvailable || hideActions} onClick={onEdit} type="button" variant="primary">{t("dashboard.openDraft")}</Button> : <Link className="button primary" to="/">{t("dashboard.openOverview")}</Link>}</div>
+      {!editingAvailable && !hideActions ? <p className="dashboard-edit-unavailable">{t("dashboard.editUnavailable")}</p> : null}
+    </div>
+    {activeDashboard ? <div className="dashboard-management-preview"><CustomDashboardView dashboard={activeDashboard} desktopLayout={editingAvailable} props={props} /></div> : null}
+  </section>;
 }
 
 function DashboardBuilder({ builder, editingAvailable, onCancel, onChange, onSave, props }: {

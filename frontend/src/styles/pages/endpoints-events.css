@@ -23,9 +23,12 @@
 .process-tree-entry { margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--color-line-soft); }
 .process-tree-entry p { margin: var(--space-2) 0 var(--space-4); color: var(--color-muted); }
 .certificate-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); }
-.certificate-card { border-left: 3px solid var(--color-green); }
+.certificate-card { border-color: var(--border-panel); }
 .certificate-card.anomalous { border-left-color: var(--status-critical); background: var(--status-error-surface); }
 .certificate-warning { display: block; margin: var(--space-4) 0; color: var(--color-red); }
+.risk-cell { align-items: baseline; font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; }
+.risk-cell strong { min-width: 2.5ch; flex: 0 0 auto; color: var(--text-primary); font-size: var(--type-panel-title); text-align: right; }
+.risk-level-text { font-size: var(--type-meta); font-weight: var(--weight-semibold); letter-spacing: .015em; }
 
 .event-detail-grid > .panel:first-child { grid-column: 1 / -1; }
 .raw-payload-panel { overflow: hidden; background: var(--color-panel); border: 1px solid var(--color-line-panel); border-radius: var(--radius-panel); }

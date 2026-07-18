@@ -1,4 +1,5 @@
-import { lazy, Suspense } from "react";
+import { Maximize2 } from "lucide-react";
+import { lazy, Suspense, useState } from "react";
 import { Link } from "react-router-dom";
 import type {
   IncidentInvestigationDto,
@@ -15,7 +16,7 @@ import {
 } from "../features/incidentInvestigation";
 import { useI18n } from "../i18n/LocaleContext";
 import { displayNullable, formatDateTime, humanize } from "../lib/format";
-import { Badge } from "./primitives";
+import { Badge, Dialog } from "./primitives";
 import { DataTable, DefinitionGrid, EmptyState, Inspector, Panel, PartialFailureWarning, Skeleton, StatusPill } from "./ui";
 
 const LazyIncidentGraph = lazy(async () => {
@@ -37,6 +38,7 @@ export function IncidentInvestigation({
   graphEnabled?: boolean;
 }) {
   const { t } = useI18n();
+  const [expanded, setExpanded] = useState(false);
   const fallback = graphRequiresFallback(investigation);
   const showGraph = graphEnabled && !fallback;
   const counts = new Map(NODE_TYPES.map((type) => [type, investigation.nodes.filter((node) => node.nodeType === type).length]));
@@ -47,18 +49,35 @@ export function IncidentInvestigation({
       <StatusPill value={warning.code} /><span>{warning.message}</span>{warning.code === "ARCHIVE_NOT_READY" ? <Link to="/operations/archives">{t("error.archiveAction")}</Link> : null}
     </li>)}</ul> : null}
     <Panel className="investigation-panel" title={t("incident.investigation")} subtitle={t("incident.investigationSubtitle")} meta={<Badge tone="info">{t("incident.observedOnly")}</Badge>}>
-      <div className="investigation-stage">
-        <aside aria-label={t("incident.legend")} className="investigation-legend">
-          <strong>{t("incident.legend")}</strong>
-          <ul>{NODE_TYPES.map((type) => <li key={type}><i className={`legend-${type.toLowerCase()}`} /><span>{humanize(type)}</span><b>{counts.get(type)}</b></li>)}</ul>
-          <div><span>{t("incident.edges")}</span><b>{investigation.edgeCount}</b></div>
-        </aside>
-        {showGraph ? <Suspense fallback={<Skeleton rows={8} />}><LazyIncidentGraph investigation={investigation} onSelect={onSelect} selection={selection} /></Suspense>
-          : <GraphFallback enabled={graphEnabled} investigation={investigation} />}
-        <SelectedContext investigation={investigation} selection={selection} />
-      </div>
+      <InvestigationStage counts={counts} graphEnabled={graphEnabled} investigation={investigation} onExpand={() => setExpanded(true)} onSelect={onSelect} selection={selection} showGraph={showGraph} />
     </Panel>
+    <Dialog className="investigation-dialog" closeLabel={t("incident.closeExpandedInvestigation")} eyebrow={t("incident.observedOnly")} onClose={() => setExpanded(false)} open={expanded} title={t("incident.expandedInvestigation")}>
+      <InvestigationStage counts={counts} expanded graphEnabled={graphEnabled} investigation={investigation} onSelect={onSelect} selection={selection} showGraph={showGraph} />
+    </Dialog>
     <EvidenceTable investigation={investigation} onSelect={onSelect} selection={selection} />
+  </div>;
+}
+
+function InvestigationStage({ counts, expanded = false, graphEnabled, investigation, onExpand, onSelect, selection, showGraph }: {
+  counts: ReadonlyMap<(typeof NODE_TYPES)[number], number>;
+  expanded?: boolean;
+  graphEnabled: boolean;
+  investigation: IncidentInvestigationDto;
+  onExpand?: () => void;
+  onSelect: (selection: InvestigationSelection) => void;
+  selection: InvestigationSelection | null;
+  showGraph: boolean;
+}) {
+  const { t } = useI18n();
+  return <div className={expanded ? "investigation-stage expanded" : "investigation-stage"}>
+    <aside aria-label={t("incident.observedNodes")} className="investigation-legend">
+      {onExpand ? <button aria-haspopup="dialog" aria-label={t("incident.expandObservedNodes")} className="investigation-expand" onClick={onExpand} type="button"><span>{t("incident.observedNodes")}</span><Maximize2 aria-hidden="true" size={15} /></button> : <strong>{t("incident.observedNodes")}</strong>}
+      <ul>{NODE_TYPES.map((type) => <li key={type}><i className={`legend-${type.toLowerCase()}`} /><span>{humanize(type)}</span><b>{counts.get(type)}</b></li>)}</ul>
+      <div><span>{t("incident.edges")}</span><b>{investigation.edgeCount}</b></div>
+    </aside>
+    {showGraph ? <Suspense fallback={<Skeleton rows={8} />}><LazyIncidentGraph investigation={investigation} onSelect={onSelect} selection={selection} /></Suspense>
+      : <GraphFallback enabled={graphEnabled} investigation={investigation} />}
+    <SelectedContext investigation={investigation} selection={selection} />
   </div>;
 }
 

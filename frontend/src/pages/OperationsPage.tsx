@@ -1,11 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Archive, Cloud, Cpu, Database, HardDrive, MonitorDot, Radio, RefreshCcw, Server, ShieldCheck } from "lucide-react";
-import type { ReactNode } from "react";
+import { Archive, Cpu, Database, HardDrive, MonitorDot, Radio, RefreshCcw, Server, ShieldCheck } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/endpoints";
 import { readTimeFilter, TimeFilterFields } from "../components/filters";
 import { DataTable, EmptyState, ErrorState, Field, GlobalFilterBar, KpiCard, PageHeader, Pagination, Panel, PartialFailureWarning, Skeleton, StaleWarning, StatusPill } from "../components/ui";
-import type { FailureListQuery, IngestSummaryDto, OperationsHealthDto, ServiceHealthDto } from "../contracts";
+import type { FailureListQuery, IngestSummaryDto, OperationsHealthDto } from "../contracts";
 import { buildPipelineSnapshot, type PipelineStageId } from "../features/intelligenceOperations";
 import { useI18n } from "../i18n/LocaleContext";
 import { formatDateTime, humanize } from "../lib/format";
@@ -82,7 +81,8 @@ export function PipelineSnapshot({ health, ingest }: { health: OperationsHealthD
     <div className="pipeline-section-label"><span>{t("operations.problemSummary")}</span><small>{t("operations.problemSummaryDescription")}</small></div>
     <ol aria-label={t("operations.currentPipelineSnapshot")} className="pipeline-snapshot">
       {stages.map((stage) => <li className={`tone-${stage.status.toLowerCase()}`} key={stage.id}>
-        <div><span>{t(`operations.stage${stage.id}` as "operations.stageCOLLECTION" | "operations.stageDETECTION" | "operations.stageSTORAGE")}</span><StatusPill value={stage.status} /></div>
+        <span className="pipeline-stage-name">{t(`operations.stage${stage.id}` as "operations.stageCOLLECTION" | "operations.stageDETECTION" | "operations.stageSTORAGE")}</span>
+        <strong className={`pipeline-stage-state tone-${stage.status.toLowerCase()}`}>{humanize(stage.status)}</strong>
         <strong>{details[stage.id].primary}</strong>
         <small>{details[stage.id].secondary}</small>
       </li>)}
@@ -114,12 +114,12 @@ export function CollectionPath({ health }: { health: OperationsHealthDto }) {
   ];
   return <section aria-label={t("operations.collectionPath")} className="collection-path-board">
     <header><div><span>{t("operations.collectionPath")}</span><strong>{t("operations.collectionPathSubtitle")}</strong></div><StatusPill value={health.status} /></header>
-    <ol>{nodes.map((node, index) => <li className={`tone-${node.status.toLowerCase().replaceAll(" ", "-")}`} key={node.label}>
-      <span className="collection-path-index">{String(index + 1).padStart(2, "0")}</span>
-      <span className="collection-path-icon" aria-hidden="true">{node.icon}</span>
-      <div><strong>{node.label}</strong><small>{node.detail}</small></div>
-      <StatusPill value={node.status} />
-    </li>)}</ol>
+    <DataTable label={t("operations.collectionPath")}><thead><tr><th scope="col">#</th><th scope="col">{t("operations.stage")}</th><th scope="col">{t("filter.status")}</th><th scope="col">{t("operations.brokerState")}</th></tr></thead><tbody>{nodes.map((node, index) => <tr key={node.label}>
+      <td className="collection-path-index">{String(index + 1).padStart(2, "0")}</td>
+      <td><span className="collection-path-stage"><i aria-hidden="true">{node.icon}</i><strong>{node.label}</strong></span></td>
+      <td><span className={`collection-path-state tone-${node.status.toLowerCase().replaceAll(" ", "-")}`}>{humanize(node.status)}</span></td>
+      <td>{node.detail}</td>
+    </tr>)}</tbody></DataTable>
     <p>{t("operations.collectionPathCaveat")}</p>
   </section>;
 }
@@ -137,9 +137,7 @@ function LiveHealth({ data }: { data: OperationsHealthDto }) {
       <small>{t("operations.checked", { time: formatDateTime(data.checkedAt) })}</small>
     </section>
     <Panel title={t("operations.serviceHealth")} subtitle={t("operations.serviceHealthSubtitle")}>
-      <section className="service-health-grid">
-        {data.services.map((service) => <ServiceCard key={service.service} service={service} />)}
-      </section>
+      <DataTable label={t("operations.serviceHealth")}><thead><tr><th scope="col">Service</th><th scope="col">{t("filter.status")}</th><th scope="col">Latency</th><th scope="col">{t("operations.brokerState")}</th></tr></thead><tbody>{data.services.map((service) => <tr key={service.service}><td><strong>{service.service}</strong></td><td><span className={`service-state-text tone-${service.status.toLowerCase()}`}>{humanize(service.status)}</span></td><td>{service.latencyMs} ms</td><td>{service.detail}</td></tr>)}</tbody></DataTable>
     </Panel>
     <Panel title={t("operations.pipelineWorkers")} subtitle={t("operations.pipelineWorkersSubtitle")}>
       <DataTable label={t("operations.pipelineWorkerHealth")}><thead><tr><th scope="col">Worker</th><th scope="col">Topic</th><th scope="col">{t("filter.status")}</th><th scope="col">{t("operations.members")}</th><th scope="col">Lag</th><th scope="col">{t("operations.brokerState")}</th></tr></thead><tbody>
@@ -147,19 +145,6 @@ function LiveHealth({ data }: { data: OperationsHealthDto }) {
       </tbody></DataTable>
     </Panel>
   </>;
-}
-
-function ServiceCard({ service }: { service: ServiceHealthDto }) {
-  const icons: Record<string, ReactNode> = {
-    "Backend API": <Server size={18} />, PostgreSQL: <Database size={18} />, ClickHouse: <Activity size={18} />,
-    Kafka: <Radio size={18} />, S3: <Cloud size={18} />,
-  };
-  return <article className={`service-card tone-${service.status.toLowerCase()}`}>
-    <div><span className="service-icon">{icons[service.service] ?? <Server size={18} />}</span><StatusPill value={service.status} /></div>
-    <strong>{service.service}</strong>
-    <span>{service.latencyMs} ms</span>
-    <small>{service.detail}</small>
-  </article>;
 }
 
 function IngestContent({ data }: { data: IngestSummaryDto }) {

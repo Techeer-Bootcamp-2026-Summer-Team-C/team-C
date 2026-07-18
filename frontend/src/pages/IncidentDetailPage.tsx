@@ -6,7 +6,7 @@ import { api } from "../api/endpoints";
 import { IncidentInvestigation } from "../components/IncidentInvestigation";
 import { ProcessTree } from "../components/ProcessTree";
 import { Badge } from "../components/primitives";
-import { DataTable, DefinitionGrid, EmptyState, ErrorState, PageHeader, Panel, PartialFailureWarning, Skeleton, StatusPill } from "../components/ui";
+import { DataTable, DetailLedger, DetailLedgerSection, EmptyState, ErrorState, PageHeader, Panel, PartialFailureWarning, Skeleton, StatusPill } from "../components/ui";
 import type { AttackTimelineDto, IncidentDetailDto, IncidentDto, IncidentInvestigationDto } from "../contracts";
 import {
   incidentDetailUrl,
@@ -44,14 +44,17 @@ export function IncidentDetailPage() {
     }, signal),
     enabled: Boolean(result.data && investigationData && processPid !== null),
   });
+  const queueItems = queue.data?.data.items ?? [];
+  const showQueue = queue.isPending || Boolean(queue.error) || queueItems.length > 0;
   if (!valid) return <ErrorState error={new Error("The Incident ID is invalid.")} />;
   return <div className="page-stack">
     <Link className="back-link" to={`/incidents${params.size ? `?${params}` : ""}`}><ArrowLeft aria-hidden="true" size={15} />{t("incident.queue")}</Link>
     {result.isPending ? <Skeleton rows={10} /> : null}
     {result.error ? <ErrorState error={result.error} onRetry={() => void result.refetch()} /> : null}
     {result.data ? <>
-      <section aria-label={t("incident.workbench")} className="incident-workbench">
-        <IncidentQueue currentIncidentId={incidentId} incidents={queue.data?.data.items ?? []} loading={queue.isPending} params={params} />
+      {!queue.isPending && !queue.error && !queueItems.length ? <div className="incident-queue-cleared" role="status"><span><strong>{t("incident.noActiveQueue")}</strong>{t("incident.noActiveQueueDescription")}</span><Link to={`/incidents${params.size ? `?${params}` : ""}`}>{t("incident.queue")}</Link></div> : null}
+      <section aria-label={t("incident.workbench")} className={showQueue ? "incident-workbench" : "incident-workbench queue-empty"}>
+        {showQueue ? <IncidentQueue currentIncidentId={incidentId} error={queue.error} incidents={queueItems} loading={queue.isPending} params={params} /> : null}
         <main className="incident-detail"><IncidentDetail incident={result.data.data} /></main>
       </section>
       <section aria-label={t("incident.investigation")} className="incident-evidence-workspace">
@@ -77,10 +80,10 @@ export function IncidentDetailPage() {
   </div>;
 }
 
-function IncidentQueue({ currentIncidentId, incidents, loading, params }: { currentIncidentId: number; incidents: IncidentDto[]; loading: boolean; params: URLSearchParams }) {
+function IncidentQueue({ currentIncidentId, error, incidents, loading, params }: { currentIncidentId: number; error: unknown; incidents: IncidentDto[]; loading: boolean; params: URLSearchParams }) {
   const { t } = useI18n();
   return <Panel className="incident-queue-panel" title={t("incident.activeQueue")} subtitle={t("incident.activeQueueDescription")} meta={<Badge tone="info">{incidents.length}</Badge>}>
-    {loading ? <Skeleton rows={7} /> : incidents.length ? <nav aria-label={t("incident.activeQueue")} className="incident-queue">
+    {loading ? <Skeleton rows={7} /> : error ? <ErrorState error={error} /> : incidents.length ? <nav aria-label={t("incident.activeQueue")} className="incident-queue">
       {incidents.map((incident) => <Link aria-current={incident.incidentId === currentIncidentId ? "page" : undefined} className={incident.incidentId === currentIncidentId ? "incident-queue-row selected" : "incident-queue-row"} key={incident.incidentId} to={incidentDetailUrl(incident.incidentId, params)}>
         <span><StatusPill value={incident.severity} /><StatusPill value={incident.status} /></span>
         <strong>{incident.title}</strong>
@@ -95,8 +98,8 @@ function IncidentDetail({ incident }: { incident: IncidentDetailDto }) {
   const { t } = useI18n();
   return <>
     <PageHeader eyebrow={`INCIDENT ${incident.incidentId}`} title={incident.title} description={incident.description ?? t("incident.noDescription")} actions={<><StatusPill value={incident.severity} /><StatusPill value={incident.status} /></>} />
-    <section className="detail-grid">
-      <Panel title={t("incident.context")} subtitle={t("incident.contextSubtitle")}><DefinitionGrid items={[
+    <DetailLedger className="incident-summary-ledger">
+      <DetailLedgerSection title={t("incident.context")} subtitle={t("incident.contextSubtitle")} items={[
         { label: t("incident.correlationKey"), value: <code>{incident.correlationKey}</code> },
         { label: "Endpoint", value: <Link to={`/endpoints/${incident.endpointId}`}>Endpoint {incident.endpointId}</Link> },
         { label: t("incident.alertCount"), value: incident.alertCount },
@@ -105,10 +108,10 @@ function IncidentDetail({ incident }: { incident: IncidentDetailDto }) {
         { label: t("incident.firstDetected"), value: formatDateTime(incident.firstDetectedAt) },
         { label: t("incident.lastDetected"), value: formatDateTime(incident.lastDetectedAt) },
         { label: t("incident.closed"), value: formatDateTime(incident.closedAt) },
-      ]} /></Panel>
-      <Panel title={t("incident.lifecycle")} subtitle={t("incident.noManualControls")}><div className="read-only-note"><StatusPill value={incident.status} /><span>{t("incident.backendLifecycle")}</span></div></Panel>
-      <Panel className="wide" title={t("incident.connectedAlerts")} subtitle={t("incident.connectedSubtitle")}>{incident.alerts.length ? <DataTable label={t("incident.connectedAlerts")}><thead><tr><th scope="col">Alert</th><th scope="col">{t("filter.severity")}</th><th scope="col">{t("filter.status")}</th><th scope="col">{t("alerts.detected")}</th></tr></thead><tbody>{incident.alerts.map((alert) => <tr key={alert.alertId}><td><Link className="table-primary" to={`/alerts/${alert.alertId}`}><strong>{alert.title}</strong><code>{alert.ruleCode} · v{alert.ruleVersion}</code></Link></td><td><StatusPill value={alert.severity} /></td><td><StatusPill value={alert.status} /></td><td>{formatDateTime(alert.detectedAt)}</td></tr>)}</tbody></DataTable> : <EmptyState title={t("incident.noConnectedAlerts")} message={t("incident.noConnectedAlertsDescription")} />}</Panel>
-    </section>
+      ]} />
+      <DetailLedgerSection title={t("incident.lifecycle")} subtitle={t("incident.noManualControls")}><div className="read-only-note"><StatusPill value={incident.status} /><span>{t("incident.backendLifecycle")}</span></div></DetailLedgerSection>
+      <DetailLedgerSection title={t("incident.connectedAlerts")} subtitle={t("incident.connectedSubtitle")}>{incident.alerts.length ? <DataTable label={t("incident.connectedAlerts")}><thead><tr><th scope="col">Alert</th><th scope="col">{t("filter.severity")}</th><th scope="col">{t("filter.status")}</th><th scope="col">{t("alerts.detected")}</th></tr></thead><tbody>{incident.alerts.map((alert) => <tr key={alert.alertId}><td><Link className="table-primary" to={`/alerts/${alert.alertId}`}><strong>{alert.title}</strong><code>{alert.ruleCode} · v{alert.ruleVersion}</code></Link></td><td><StatusPill value={alert.severity} /></td><td><StatusPill value={alert.status} /></td><td>{formatDateTime(alert.detectedAt)}</td></tr>)}</tbody></DataTable> : <EmptyState title={t("incident.noConnectedAlerts")} message={t("incident.noConnectedAlertsDescription")} />}</DetailLedgerSection>
+    </DetailLedger>
   </>;
 }
 

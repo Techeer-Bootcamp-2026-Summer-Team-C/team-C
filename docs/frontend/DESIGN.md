@@ -352,6 +352,7 @@ Overview 고정 grid:
 [ EDR state command strip ]
 [ KPI ][ KPI ][ KPI ][ KPI ]
 [ Detection Activity 2fr ][ Alert Severity 1fr ]
+[ Detection Activity 2fr ][ Fleet Distribution 1fr ]
 [ Highest-risk Endpoints 1fr ][ Incident Queue 1fr ]
 ```
 
@@ -364,7 +365,7 @@ Overview toolbar 기본 구조:
 - Time range와 Endpoint scope는 항상 펼쳐진 큰 bar가 아니라 button + Popover 또는 Drawer로 제공한다.
 - 현재 time range와 Endpoint scope는 button label과 applied filter chip으로 확인할 수 있어야 한다.
 - filter와 time range는 URL query를 source of truth로 유지한다.
-- `/` Overview는 active custom dashboard와 무관하게 Default 9-block을 고정 DOM 순서로 항상 전부 표시하며 drag, drop, resize, hide, restore와 사용자 layout 저장을 제공하지 않는다. `/dashboards` workbench의 명시적 Draft 편집기에서만 현재 9개 widget의 drag/drop, resize와 삭제를 제공하고 Save 시 사용자별 browser-local layout을 한 번 저장한다.
+- `/` Overview는 active custom dashboard와 무관하게 Default 10-block을 고정 DOM 순서로 항상 전부 표시하며 drag, drop, resize, hide, restore와 사용자 layout 저장을 제공하지 않는다. Fleet Distribution은 대형 관제 화면의 고정 context이며 `/dashboards` widget catalog에는 추가하지 않는다. `/dashboards` workbench의 명시적 Draft 편집기에서는 기존 9개 widget의 drag/drop, resize와 삭제를 제공하고 Save 시 사용자별 browser-local layout을 한 번 저장한다.
 - Custom Dashboard Widget은 정상 상태에서 nested scrollbar를 만들지 않는다. 외부 Widget header가 title을 소유하고 내부 surface는 중복 title을 accessible text로만 유지하며 값·설명·차트·최대 5개 queue를 한 surface에서 읽을 수 있게 한다. Registry의 min width/height는 콘텐츠 안전 크기보다 작게 resize되지 않도록 제한한다.
 - Custom Dashboard의 click 추가는 상단 행의 왼쪽부터 빈 공간을 채운다. Pointer drag·resize가 다른 Widget과 충돌하면 조작 중인 Widget을 기존 위치로 되돌리고 주변 Widget은 이동시키지 않는다. Palette drop도 기존 geometry를 보존하고 신규 Widget만 drop 지점과 가장 가까운 비중첩 cell에 배치한다.
 - mobile에서는 주요 control을 첫 줄에 유지하고 나머지는 `More filters` Drawer로 이동한다.
@@ -526,38 +527,37 @@ Overview는 다음 세 질문만 답한다.
 기본 구조:
 
 - EDR state와 주요 원인
-- Total Alerts, Critical Alerts, High-risk Endpoints, Open Incidents KPI
+- Total Alerts, Critical Alerts, HIGH-level Endpoints, Open Incidents KPI. `highRiskEndpointCount`는 Critical 합산값이 아닌 정확한 `HIGH` 등급이므로 label에도 등급을 명시한다.
 - Detection activity
 - Alert severity
+- Fleet distribution: Endpoint risk level과 현재 Sensor Health
 - Highest-risk Endpoints
 - Incident queue
 
-KPI card는 8.6의 anatomy를 따르며 API가 비교값을 제공하지 않으면 previous value와 delta를 만들지 않는다. Time range, Endpoint scope와 refresh는 7.3의 compact toolbar에 둔다.
+KPI card는 8.6의 anatomy를 따르며 API가 비교값을 제공하지 않으면 previous value와 delta를 만들지 않는다. Fleet distribution은 `EndpointSummaryDto.risk.byLevel`과 `sensorHealth`의 현재 집계만 사용하고 시간 추세처럼 표현하지 않는다. Time range, Endpoint scope와 refresh는 7.3의 compact toolbar에 둔다.
 
-신규 기본 Overview에서 제거할 8개:
+신규 기본 Overview에서 제거할 7개:
 
 1. Endpoint operating systems
-2. Sensor health
-3. Top rules
-4. MITRE detection distribution
-5. Process and network signals
-6. File, DNS, and L7 signals
-7. Failure distribution
-8. Storage distribution
+2. Top rules
+3. MITRE detection distribution
+4. Process and network signals
+5. File, DNS, and L7 signals
+6. Failure distribution
+7. Storage distribution
 
 소유 화면:
 
 | 제외 후보 | 소유 화면 |
 | --- | --- |
 | Endpoint operating systems | Endpoints inventory와 filter |
-| Sensor health | Endpoint Detail의 개별 상태, Operations의 전체 Collection Health |
 | Top rules | Alerts filter와 Intelligence 분석 |
 | MITRE detection distribution | Intelligence |
 | Process, Network, File, DNS, L7 signals | Intelligence 집계와 Events 원본 근거 |
 | Failure distribution | Operations |
 | Storage distribution | Operations와 Archives |
 
-기본 Overview는 위 9개 block으로 제한하며 immutable `Default` dashboard로 유지한다. Endpoint risk distribution은 중복 위계와 공간 낭비를 줄이기 위해 Default에서 제거하지만 High-risk Endpoints KPI와 서버 Endpoint summary query는 유지한다. 별도 custom dashboard는 이 9개 block만 widget catalog로 재사용하며 사용자별 browser localStorage에 저장한다. Backend layout API와 저장 데이터는 호환성을 위해 유지하되 Frontend에서 호출하거나 migration하지 않는다. Events·Online Endpoints·Storage·Guidance 요약은 각각 Detection Activity·Collection Health·Archives·Alert Detail로 이동하거나 통합한다. 팀 이미지의 realtime event stream은 Overview 기본 block으로 직접 복제하지 않는다.
+기본 Overview는 위 10개 block을 immutable `Default` dashboard로 유지한다. 1440px에서는 Detection Activity 왼쪽과 Alert Severity·Fleet Distribution 오른쪽 stack으로, 1720px 이상에서는 세 분석 panel을 한 행으로 표시한다. 별도 custom dashboard는 기존 9개 block만 widget catalog로 재사용하며 Fleet Distribution은 고정 Overview context로 제한한다. 사용자 layout은 browser localStorage에 저장한다. Backend layout API와 저장 데이터는 호환성을 위해 유지하되 Frontend에서 호출하거나 migration하지 않는다. Events·Online Endpoints·Storage·Guidance 요약은 각각 Detection Activity·Collection Health·Archives·Alert Detail로 이동하거나 통합한다. 팀 이미지의 realtime event stream은 Overview 기본 block으로 직접 복제하지 않는다.
 
 ### 9.3 Alerts — `확정`
 
@@ -891,6 +891,7 @@ Update only the assigned Work Package status and evidence in OVERVIEW_DASHBOARD_
 | D-027 | 2026-07-18 | `/` Overview는 active custom dashboard를 표시하지 않고 기존 immutable Default 9-block을 항상 전부 표시한다. `/dashboards`는 Sidebar에서 제거하고 Overview toolbar의 톱니바퀴 `Dashboard 설정`으로만 진입한다 | SOC 기본 현황의 정보 위계를 사용자 layout과 무관하게 일관되게 유지하고 Dashboard 편집을 운영 화면이 아닌 보조 설정 작업으로 분류한다 | `frontend/src/components/AppShell.tsx`, `frontend/src/pages/OverviewPage.tsx`, `frontend/src/features/overviewLayout/OverviewDashboardWorkspace.tsx` |
 | D-028 | 2026-07-18 | Custom Dashboard Widget의 내부 scrollbar를 제거하고 콘텐츠 유형별 안전 최소 geometry와 compact 중복 heading 규칙을 적용한다 | 작은 KPI에서 제목·값이 분리되어 스크롤되는 문제를 없애고, chart·severity·queue도 같은 surface 안에서 핵심 정보를 한눈에 판독하게 한다 | `frontend/src/features/overviewLayout/overviewLayoutModel.ts`, `frontend/src/styles/pages/overview-layout.css` |
 | D-029 | 2026-07-18 | Custom Dashboard의 자동 추가는 상단 행부터 빈칸을 채우고 pointer 충돌과 palette drop이 기존 Widget geometry를 이동시키지 않게 한다 | 12열에 두 6열 Widget이 들어가는데도 두 번째가 다음 행으로 내려가고, 빈 오른쪽 칸으로 이동하는 경로에서 기존 Widget이 15행으로 밀리는 실제 동작을 제거해 공간 활용과 위치 기억을 보존한다 | `frontend/src/features/overviewLayout/overviewLayoutModel.ts`, `frontend/src/features/overviewLayout/OverviewDashboardWorkspace.tsx` |
+| D-030 | 2026-07-18 | 대형 관제 Overview에 Endpoint Risk level과 Sensor Health의 현재 집계를 Fleet Distribution으로 복원해 Default를 10-block으로 확장하되 Custom Dashboard catalog는 기존 9개 widget으로 유지한다 | SOC Overview는 일반 요약 화면이 아니라 상시 표시되는 관제 화면이므로 추세·분포·Queue를 같은 시야에서 비교해야 한다. 서버 Endpoint Summary 집계만 사용해 가짜 추세와 원본 재집계를 피한다 | `frontend/src/features/overview/FleetDistributionPanel.tsx`, `frontend/src/features/overview/OverviewDashboard.tsx`, `frontend/src/styles/pages/overview.css` |
 
 ## 17. 관련 문서와 코드
 

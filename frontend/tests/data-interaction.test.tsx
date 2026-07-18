@@ -148,6 +148,17 @@ describe("list pages share the filter, table, state, and URL contract", () => {
     expect(vi.mocked(fetch).mock.calls.some(([input]) => String(input).includes("/api/v1/alerts"))).toBe(false);
   });
 
+  it("offers a compact empty-queue recovery without discarding non-time filters", async () => {
+    renderPage(<AlertsPage />, "/alerts?status=RESOLVED&ruleCode=NO_ROWS");
+    expect(await screen.findByText(/No alerts found/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Latest 7 days" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("status=RESOLVED");
+      expect(screen.getByTestId("location")).toHaveTextContent("ruleCode=NO_ROWS");
+      expect(screen.getByTestId("location")).toHaveTextContent("timePreset=LATEST_7D");
+    });
+  });
+
   it("uses the same three-primary-plus-advanced contract for Incidents, Endpoints, and Events", async () => {
     const cases = [
       { element: <IncidentsPage />, path: "/incidents", primary: ["Time range", "Status", "Severity"], advanced: "Endpoint ID" },
@@ -169,6 +180,16 @@ describe("list pages share the filter, table, state, and URL contract", () => {
     }
   });
 
+  it("keeps Endpoint status semantic while rendering risk as plain numeric text", async () => {
+    renderPage(<EndpointsPage />, "/endpoints");
+    const table = await screen.findByRole("region", { name: "Endpoint inventory table" });
+    const row = within(table).getByRole("link", { name: /WIN-01/ }).closest("tr");
+    expect(row).not.toBeNull();
+    expect(row?.querySelectorAll(".status-pill")).toHaveLength(1);
+    expect(row?.querySelector(".risk-level-text")).toHaveTextContent("High");
+    expect(row?.querySelector(".risk-cell strong")).toHaveTextContent("87");
+  });
+
   it("keeps Archives at three required filters and distinguishes incomplete from invalid", async () => {
     const view = renderPage(<ArchivesPage />, "/operations/archives");
     const filters = await screen.findByRole("region", { name: "Filters" });
@@ -178,6 +199,8 @@ describe("list pages share the filter, table, state, and URL contract", () => {
     expect(filters).toHaveTextContent("To");
     expect(within(filters).queryByRole("button", { name: "More filters" })).not.toBeInTheDocument();
     expect(screen.getByText("Choose an Archive range")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Archive query readiness" })).toHaveTextContent("Maximum 31 days");
+    expect(screen.getByRole("region", { name: "Archive query readiness" })).toHaveTextContent("Standard tier · 7 days");
     view.unmount();
 
     renderPage(<ArchivesPage />, "/operations/archives?endpointIds=bad&from=2026-07-15T00%3A00%3A00Z&to=2026-07-14T00%3A00%3A00Z");
@@ -214,7 +237,7 @@ function mockResponse(input: string): Promise<Response> {
   if (url.pathname.endsWith("/users/me")) return Promise.resolve(success(USER));
   const page = Number(url.searchParams.get("page") ?? 1);
   const size = Number(url.searchParams.get("size") ?? 50);
-  if (url.pathname.endsWith("/alerts")) return Promise.resolve(success({ items: [alertRow], page, size, total: 120 }));
+  if (url.pathname.endsWith("/alerts")) return Promise.resolve(success({ items: url.searchParams.get("ruleCode") === "NO_ROWS" ? [] : [alertRow], page, size, total: url.searchParams.get("ruleCode") === "NO_ROWS" ? 0 : 120 }));
   if (url.pathname.endsWith("/incidents")) return Promise.resolve(success({ items: [incidentRow], page, size, total: 1 }));
   if (url.pathname.endsWith("/endpoints")) return Promise.resolve(success({ items: [endpointRow], page, size, total: 1 }));
   if (url.pathname.endsWith("/events")) return Promise.resolve(success({ items: [eventRow], page, size, total: 1 }));

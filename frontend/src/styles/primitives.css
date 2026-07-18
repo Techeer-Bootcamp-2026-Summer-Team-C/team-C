@@ -37,9 +37,11 @@
   border-color: var(--border-strong);
   text-decoration: none;
 }
+.button:active:not(:disabled),
+.icon-button:active:not(:disabled) { background: var(--surface-inset); border-color: var(--border-strong); }
 
 .button.primary {
-  color: var(--text-inverse);
+  color: var(--color-accent-ink);
   background: var(--accent-primary);
   border-color: var(--accent-primary);
 }
@@ -76,6 +78,9 @@
   border-radius: var(--radius-control);
 }
 .field textarea { min-height: 88px; resize: vertical; }
+.field input:disabled,
+.field select:disabled,
+.field textarea:disabled { opacity: .55; cursor: not-allowed; background: var(--surface-disabled); }
 .field input:hover,
 .field select:hover,
 .field textarea:hover { border-color: var(--text-tertiary); }
@@ -129,11 +134,13 @@
   line-height: 1.45;
   opacity: 0;
   pointer-events: none;
-  transform: translate(4px, 50%);
-  transition: opacity 120ms ease-out, transform 120ms ease-out;
+  transform: translate(0, 50%);
+  transition: opacity 120ms ease-out;
 }
 .tooltip:hover .tooltip-content,
-.tooltip:focus-within .tooltip-content { opacity: 1; transform: translate(0, 50%); }
+.tooltip:focus-within .tooltip-content { opacity: 1; }
+.tooltip:hover .tooltip-content { transition-delay: 800ms; }
+.tooltip:focus-within .tooltip-content { transition-delay: 0ms; }
 
 .popover { position: relative; display: inline-flex; }
 .popover-trigger { color: var(--text-secondary); background: transparent; border-color: transparent; }

@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { api } from "../api/endpoints";
 import { useAuth } from "../auth/AuthContext";
 import { readTimeFilter } from "../components/filters";
-import { DefinitionGrid, EmptyState, ErrorState, Field, PageHeader, Panel, ResponseGuidance, Skeleton, SourceEvent, StatusPill } from "../components/ui";
+import { DetailLedger, DetailLedgerSection, EmptyState, ErrorState, Field, PageHeader, Panel, ResponseGuidance, Skeleton, SourceEvent, StatusPill } from "../components/ui";
 import type { AlertDto, AlertStatus, SuccessEnvelope } from "../contracts";
 import { useI18n } from "../i18n/LocaleContext";
 import { alertDetailUrl, alertTriageQueueQuery, nextActionableAlert } from "../features/alertTriage";
@@ -107,8 +107,8 @@ function AlertDetail({ alert, canUpdate, mutation, nextAlert, params, queue, que
       <AlertEvidenceChain alert={alert} />
       {mutation.error ? <ErrorState error={mutation.error} /> : null}
       {mutation.isSuccess ? <div className="mutation-success"><CheckCircle2 aria-hidden="true" size={16} />{t("alert.workflowSaved")}</div> : null}
-      <section className="detail-grid">
-        <Panel title={t("alert.evidence")} subtitle={t("alert.detectedAt", { time: formatDateTime(alert.detectedAt) })}><DefinitionGrid items={[
+      <DetailLedger className="alert-evidence-ledger">
+        <DetailLedgerSection title={t("alert.evidence")} subtitle={t("alert.detectedAt", { time: formatDateTime(alert.detectedAt) })} items={[
           { label: t("alert.id"), value: alert.alertId },
           { label: t("alert.riskScore"), value: `${alert.riskScore} / 100` },
           { label: "Rule", value: `${alert.ruleName} · ${alert.ruleCode}` },
@@ -118,8 +118,13 @@ function AlertDetail({ alert, canUpdate, mutation, nextAlert, params, queue, que
           { label: t("alert.mitreTactic"), value: `${alert.mitreTacticCode} · ${alert.mitreTacticName}` },
           { label: t("alert.mitreTechnique"), value: `${alert.mitreTechniqueCode} · ${alert.mitreTechniqueName}` },
           { label: t("alert.updated"), value: formatDateTime(alert.updatedAt) },
-        ]} /></Panel>
-        <Panel title={t("alert.workflowState")} subtitle={canUpdate ? t("alert.saveOrContinue") : t("alert.viewerReadOnly")}>{canUpdate ? <div className="workflow-controls">
+        ]} />
+        <DetailLedgerSection title={t("alert.sourceEvent")} subtitle={t("alert.sourceEventSubtitle")}><SourceEvent alert={alert} /></DetailLedgerSection>
+        <DetailLedgerSection title={t("alert.connectedIncidents")} subtitle={t("alert.correlationReferences")}>{alert.incidents.length ? <div className="link-list">{alert.incidents.map((incident) => <Link key={incident.incidentId} to={`/incidents/${incident.incidentId}`}><span><strong>{incident.title}</strong><small>{formatDateTime(incident.windowStartAt)} – {formatDateTime(incident.windowEndAt)}</small></span><span><StatusPill value={incident.severity} /><StatusPill value={incident.status} /></span></Link>)}</div> : <EmptyState title={t("alert.noConnectedIncidents")} message={t("alert.noConnectedDescription")} />}</DetailLedgerSection>
+      </DetailLedger>
+      <section className="alert-action-grid">
+        <Panel className="alert-guidance-panel" title={t("alert.responseGuidance")} subtitle={t("alert.guidanceRuleVersion", { ruleCode: alert.ruleCode, version: alert.ruleVersion })}><ResponseGuidance steps={alert.responseGuidance} /></Panel>
+        <Panel className="alert-decision-panel" title={t("alert.workflowState")} subtitle={canUpdate ? t("alert.saveOrContinue") : t("alert.viewerReadOnly")}>{canUpdate ? <div className="workflow-controls">
           <Field label={t("alert.status")}><select disabled={mutation.isPending} onChange={(event) => setDraftStatus(event.target.value as AlertStatus)} value={draftStatus}><option>OPEN</option><option>IN_PROGRESS</option><option>RESOLVED</option></select></Field>
           <div className="workflow-actions">
             <button className="button ghost" disabled={mutation.isPending || draftStatus === alert.status} onClick={() => mutation.mutate({ status: draftStatus })} type="button"><Save aria-hidden="true" size={15} />{t("alert.saveStatus")}</button>
@@ -127,9 +132,6 @@ function AlertDetail({ alert, canUpdate, mutation, nextAlert, params, queue, que
           </div>
           <small className="workflow-next">{nextAlert ? t("alert.nextItem", { ruleCode: nextAlert.ruleCode, title: nextAlert.title }) : t("alert.noNextItem")}</small>
         </div> : <div className="read-only-note"><StatusPill value={alert.status} /><span>{t("alert.viewerControlsHidden")}</span></div>}</Panel>
-        <Panel title={t("alert.sourceEvent")} subtitle={t("alert.sourceEventSubtitle")}><SourceEvent alert={alert} /></Panel>
-        <Panel title={t("alert.connectedIncidents")} subtitle={t("alert.correlationReferences")}>{alert.incidents.length ? <div className="link-list">{alert.incidents.map((incident) => <Link key={incident.incidentId} to={`/incidents/${incident.incidentId}`}><span><strong>{incident.title}</strong><small>{formatDateTime(incident.windowStartAt)} – {formatDateTime(incident.windowEndAt)}</small></span><span><StatusPill value={incident.severity} /><StatusPill value={incident.status} /></span></Link>)}</div> : <EmptyState title={t("alert.noConnectedIncidents")} message={t("alert.noConnectedDescription")} />}</Panel>
-        <Panel className="wide" title={t("alert.responseGuidance")} subtitle={t("alert.guidanceRuleVersion", { ruleCode: alert.ruleCode, version: alert.ruleVersion })}><ResponseGuidance steps={alert.responseGuidance} /></Panel>
       </section>
     </div>
   </section>;
@@ -151,7 +153,7 @@ function AlertEvidenceChain({ alert }: { alert: import("../contracts").AlertDeta
     <ol>{steps.map((step, index) => <li className={step.state} key={step.label}>
       <span className="evidence-chain-index">{String(index + 1).padStart(2, "0")}</span>
       <span className="evidence-chain-icon" aria-hidden="true">{step.icon}</span>
-      <div><span>{step.label}</span>{step.to ? <Link to={step.to}>{step.detail}</Link> : <strong>{step.detail}</strong>}</div>
+      <div><span>{step.label}</span>{step.to ? <Link title={step.detail} to={step.to}>{step.detail}</Link> : <strong title={step.detail}>{step.detail}</strong>}</div>
     </li>)}</ol>
   </section>;
 }

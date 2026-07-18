@@ -9,8 +9,8 @@ import { RawPayloadViewer } from "../src/components/RawPayloadViewer";
 import type { EventDetailDto } from "../src/contracts";
 import { eventDetailGroups, eventListSummary } from "../src/features/eventPresentation";
 import { LocaleProvider } from "../src/i18n/LocaleContext";
-import { CertificateCard } from "../src/pages/EndpointDetailPage";
-import { eventFixture } from "./contracts.fixture";
+import { CertificateCard, EndpointDetail } from "../src/pages/EndpointDetailPage";
+import { endpointFixture, eventFixture } from "./contracts.fixture";
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -68,6 +68,21 @@ describe("Endpoint switcher and Event evidence", () => {
     const card = screen.getByRole("article", { name: /expired/i });
     expect(card).toHaveClass("anomalous");
     expect(screen.getByText("Certificate requires review")).toBeInTheDocument();
+  });
+
+  it("keeps the Risk scale and complete certificate evidence in the actual Endpoint detail", () => {
+    renderWithProviders(<EndpointDetail endpoint={{
+      ...endpointFixture.data,
+      risk: { ...endpointFixture.data.risk, score: 94, level: "CRITICAL" },
+      certificates: [{ certFingerprint: "sha256:revoked", certSubject: "CN=endpoint", certSanAgentId: "agent-2", issuedAt: "2026-01-01T00:00:00Z", expiresAt: "2027-01-01T00:00:00Z", isExpired: false, isRevoked: true, revokedAt: "2026-06-15T00:00:00Z" }],
+    }} />);
+
+    expect(screen.getByText("94 / 100")).toBeInTheDocument();
+    const table = screen.getByRole("table", { name: "Certificate history" });
+    expect(table).toHaveTextContent("SAN agent ID: agent-2");
+    expect(table).toHaveTextContent("Certificate requires review");
+    expect(table).toHaveTextContent("Revoked");
+    expect(table).toHaveTextContent("Jun 15, 2026");
   });
 });
 

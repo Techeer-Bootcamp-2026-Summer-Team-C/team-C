@@ -32,6 +32,13 @@ it("renders ordered read-only response guidance with explicit manual action labe
   expect(within(list).queryByRole("button")).not.toBeInTheDocument();
 });
 
+it("renders a compact empty state with an explicit recovery action", () => {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider><MemoryRouter><EmptyState actions={<button type="button">View 7 days</button>} compact message="Widen the current time range." title="No activity" /></MemoryRouter></LocaleProvider></AuthProvider></QueryClientProvider>);
+  expect(screen.getByText("No activity").closest(".state-card")).toHaveClass("compact");
+  expect(screen.getByRole("button", { name: "View 7 days" })).toBeInTheDocument();
+});
+
 it("renders the explicit empty state when a RuleV1 version has no guidance", () => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(<QueryClientProvider client={queryClient}><AuthProvider><LocaleProvider><MemoryRouter><ResponseGuidance steps={[]} /></MemoryRouter></LocaleProvider></AuthProvider></QueryClientProvider>);

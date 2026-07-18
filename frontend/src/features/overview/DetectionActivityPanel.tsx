@@ -3,6 +3,7 @@ import { AxisPointerComponent, GridComponent, TooltipComponent } from "echarts/c
 import { init, use as registerECharts, type EChartsType } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import type { IncidentTimeSeriesPointDto, TimeSeriesPointDto } from "../../contracts";
 import { useI18n } from "../../i18n/LocaleContext";
 import { formatCompactDate } from "../../lib/format";
@@ -12,10 +13,11 @@ import { buildDetectionActivityModel, valueAt } from "./overviewChartModel";
 
 registerECharts([LineChart, GridComponent, TooltipComponent, AxisPointerComponent, CanvasRenderer]);
 
-export default function DetectionActivityPanel({ events, alerts, incidents }: {
+export default function DetectionActivityPanel({ events, alerts, incidents, recoveryTo }: {
   events: TimeSeriesPointDto[];
   alerts: TimeSeriesPointDto[];
   incidents: IncidentTimeSeriesPointDto[];
+  recoveryTo?: string;
 }) {
   const { t } = useI18n();
   const { theme } = useTheme();
@@ -40,28 +42,30 @@ export default function DetectionActivityPanel({ events, alerts, incidents }: {
     const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     const animate = !renderedRef.current && !reducedMotion;
     container.dataset.animation = animate ? "enabled" : "disabled";
-    const styles = getComputedStyle(document.documentElement);
+    const styles = getComputedStyle(container);
     const color = (name: string, fallback: string) => styles.getPropertyValue(name).trim() || fallback;
     const colors = [color("--chart-events", "#2563e9"), color("--chart-alerts", "#7c83fd"), color("--chart-incidents", "#16a249")];
     const fills = [color("--chart-events-fill", "rgba(37, 99, 233, .18)"), color("--chart-alerts-fill", "rgba(124, 131, 253, .12)"), color("--chart-incidents-fill", "rgba(22, 162, 73, .1)")];
     const transparentFills = ["rgba(37, 99, 233, 0)", "rgba(124, 131, 253, 0)", "rgba(22, 162, 73, 0)"];
     const chartFont = color("--font-ui", '"Inter Variable", "Pretendard Variable", sans-serif');
+    const chartMetaSize = Number.parseFloat(color("--type-meta", "11px")) || 11;
+    const compactChart = container.clientHeight < 220;
     chart.setOption({
       animation: animate,
       animationDuration: 280,
       textStyle: { fontFamily: chartFont },
       axisPointer: { link: [{ xAxisIndex: "all" }] },
       grid: [
-        { left: 44, right: 16, top: 14, height: 58 },
-        { left: 44, right: 16, top: 100, height: 58 },
-        { left: 44, right: 16, top: 186, height: 58 },
+        { left: Math.max(44, chartMetaSize * 4), right: 16, top: "4%", height: "22%" },
+        { left: Math.max(44, chartMetaSize * 4), right: 16, top: "35%", height: "22%" },
+        { left: Math.max(44, chartMetaSize * 4), right: 16, top: "66%", height: "22%" },
       ],
       tooltip: {
         trigger: "axis",
         axisPointer: { type: "cross" },
         backgroundColor: color("--surface-raised", "#1b1b20"),
         borderColor: color("--border-default", "#5d5e67"),
-        textStyle: { color: color("--text-primary", "#f5f5f6"), fontFamily: chartFont, fontSize: 12 },
+        textStyle: { color: color("--text-primary", "#f5f5f6"), fontFamily: chartFont, fontSize: chartMetaSize },
         formatter: (raw: unknown) => formatTooltip(raw, labels),
       },
       xAxis: model.series.map((_series, index) => ({
@@ -69,7 +73,7 @@ export default function DetectionActivityPanel({ events, alerts, incidents }: {
         gridIndex: index,
         min: model.domain?.[0],
         max: model.domain?.[1],
-        axisLabel: { color: color("--chart-axis", "#8d8f98"), hideOverlap: true, show: index === 2 },
+        axisLabel: { color: color("--chart-axis", "#8d8f98"), fontSize: chartMetaSize, hideOverlap: true, show: index === 2 },
         axisLine: { lineStyle: { color: color("--chart-grid", "#24252a") } },
         axisTick: { show: false },
         splitLine: { show: false },
@@ -77,7 +81,9 @@ export default function DetectionActivityPanel({ events, alerts, incidents }: {
       yAxis: model.series.map((_series, index) => ({
         type: "value",
         gridIndex: index,
-        axisLabel: { color: color("--chart-axis", "#8d8f98"), fontSize: 10 },
+        minInterval: 1,
+        splitNumber: compactChart ? 2 : 4,
+        axisLabel: { color: color("--chart-axis", "#8d8f98"), fontSize: chartMetaSize, hideOverlap: true },
         axisLine: { show: false },
         axisTick: { show: false },
         splitLine: { lineStyle: { color: color("--chart-grid", "#24252a") } },
@@ -127,7 +133,7 @@ export default function DetectionActivityPanel({ events, alerts, incidents }: {
     };
   }, [labels, model, theme]);
 
-  if (!model.domain) return <EmptyState title={t("charts.noDetectionActivity")} message={t("charts.noSeriesDescription")} />;
+  if (!model.domain) return <EmptyState actions={recoveryTo ? <Link className="button" to={recoveryTo}>{t("filter.latest7Days")}</Link> : undefined} compact title={t("charts.noDetectionActivity")} message={t("charts.noSeriesDescription")} />;
 
   const latest = model.series.map((series) => series.points.at(-1)?.[1]);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
