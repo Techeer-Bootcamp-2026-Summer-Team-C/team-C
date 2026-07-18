@@ -83,6 +83,9 @@ def test_postgresql_migration_repository_idempotency_and_rollback() -> None:
             assert [row["endpoint_id"] for row in endpoint_rows.risk_snapshot(q="test")] == [endpoint_id]
             assert [row["endpoint_id"] for row in endpoint_rows.risk_snapshot(q=str(endpoint_id))] == [endpoint_id]
             assert endpoint_rows.risk_snapshot(q="TEST%") == []
+            risk_page, risk_total = endpoint_rows.risk_page(q="test", limit=1, offset=0)
+            assert risk_total == 1
+            assert [row["endpoint_id"] for row in risk_page] == [endpoint_id]
             alert_insert = AlertInsert(
                 endpoint_id=endpoint_id,
                 event_id=UUID("018ff8f4-86de-7b25-9b8a-2d22f6a3e001"),

@@ -25,27 +25,34 @@ def main(argv: list[str] | None = None) -> int:
         allowed_topics=runtime.settings.kafka_topics,
     )
     try:
-        with runtime.postgres() as connection:
-            worker = EventStorageWorker(
-                consumer=consumer,
-                producer=runtime.producer,
-                events=EventRepository(runtime.clickhouse),
-                metadata=IngestMetadataRepository(connection),
-                failure_sink=FailureSink(
-                    s3_client=runtime.s3,
-                    bucket=runtime.settings.s3_bucket,
-                    repository=FailureRepository(runtime.clickhouse),
-                ),
-                validated_topic=runtime.settings.kafka_validated_topic,
-            )
-            if args.once:
+        if args.once:
+            with runtime.postgres() as connection:
+                worker = _worker(runtime, consumer, connection)
                 return 0 if worker.run_once(10) else 1
-            while True:
-                worker.run_once(1)
+        while True:
+            with runtime.postgres() as connection:
+                worker = _worker(runtime, consumer, connection)
+                while not worker.reset_requested:
+                    worker.run_once(1)
     except KeyboardInterrupt:
         return 0
     finally:
         consumer.close()
+
+
+def _worker(runtime, consumer, connection) -> EventStorageWorker:
+    return EventStorageWorker(
+        consumer=consumer,
+        producer=runtime.producer,
+        events=EventRepository(runtime.clickhouse),
+        metadata=IngestMetadataRepository(connection),
+        failure_sink=FailureSink(
+            s3_client=runtime.s3,
+            bucket=runtime.settings.s3_bucket,
+            repository=FailureRepository(runtime.clickhouse),
+        ),
+        validated_topic=runtime.settings.kafka_validated_topic,
+    )
 
 
 if __name__ == "__main__":

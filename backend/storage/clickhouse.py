@@ -1,6 +1,6 @@
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal, Protocol
 from uuid import UUID
 
@@ -92,6 +92,36 @@ FAILURE_COLUMNS = [
 DASHBOARD_TOP_LIMIT = 10
 
 
+def _failure_filters(
+    *,
+    from_: datetime | None = None,
+    to: datetime | None = None,
+    status: str | None = None,
+    failure_stage: str | None = None,
+    retryable: bool | None = None,
+    endpoint_id: int | None = None,
+) -> tuple[list[str], dict[str, Any]]:
+    conditions: list[str] = []
+    parameters: dict[str, Any] = {}
+    if from_ is not None:
+        conditions.append("failed_at >= {from:DateTime64(3)}")
+        parameters["from"] = from_
+    if to is not None:
+        conditions.append("failed_at < {to:DateTime64(3)}")
+        parameters["to"] = to
+    exact_filters = {
+        "status": (status, "String"),
+        "failure_stage": (failure_stage, "String"),
+        "retryable": (retryable, "Bool"),
+        "endpoint_id": (endpoint_id, "UInt64"),
+    }
+    for column, (value, type_name) in exact_filters.items():
+        if value is not None:
+            conditions.append(f"{column} = {{{column}:{type_name}}}")
+            parameters[column] = value
+    return conditions, parameters
+
+
 @dataclass(slots=True)
 class DashboardEventAggregate:
     total_count: int = 0
@@ -103,6 +133,72 @@ class DashboardEventAggregate:
     top_dns_queries: Counter[str] = field(default_factory=Counter)
     top_l7_protocols: Counter[str] = field(default_factory=Counter)
     time_series: Counter[datetime] = field(default_factory=Counter)
+
+
+def _event_search_filters(
+    *,
+    from_: datetime,
+    to: datetime,
+    endpoint_id: int | None = None,
+    endpoint_ids: list[int] | None = None,
+    event_type: str | None = None,
+    process_name: str | None = None,
+    file_path: str | None = None,
+    domain: str | None = None,
+    related_domain: str | None = None,
+    remote_ip: str | None = None,
+    dns_query: str | None = None,
+    dns_answer_ip: str | None = None,
+    l7_protocol: str | None = None,
+) -> tuple[list[str], dict[str, Any]]:
+    conditions = [
+        "occurred_at >= {from:DateTime64(3)}",
+        "occurred_at < {to:DateTime64(3)}",
+        "is_delete = 0",
+    ]
+    parameters: dict[str, Any] = {"from": from_, "to": to}
+    if endpoint_ids:
+        conditions.append("endpoint_id IN {endpoint_ids:Array(UInt64)}")
+        parameters["endpoint_ids"] = endpoint_ids
+    exact_filters = {
+        "endpoint_id": (endpoint_id, "UInt64"),
+        "event_type": (event_type, "String"),
+        "remote_ip": (remote_ip, "String"),
+    }
+    for column, (value, type_name) in exact_filters.items():
+        if value is not None:
+            conditions.append(f"{column} = {{{column}:{type_name}}}")
+            parameters[column] = value
+    contains_filters = {"process_name": process_name, "file_path": file_path, "dns_query": dns_query}
+    for column, value in contains_filters.items():
+        if value is not None:
+            conditions.append(f"positionCaseInsensitiveUTF8(ifNull({column}, ''), {{{column}:String}}) > 0")
+            parameters[column] = value
+    if domain is not None:
+        conditions.append(
+            "(positionCaseInsensitiveUTF8(ifNull(remote_domain, ''), {domain:String}) > 0 "
+            "OR positionCaseInsensitiveUTF8(ifNull(http_host, ''), {domain:String}) > 0)"
+        )
+        parameters["domain"] = domain
+    if related_domain is not None:
+        related_columns = ("remote_domain", "http_host", "tls_sni", "dns_query")
+        clauses = []
+        for column in related_columns:
+            clauses.append(f"lowerUTF8(ifNull({column}, '')) = lowerUTF8({{related_domain:String}})")
+            clauses.append(
+                f"endsWith(lowerUTF8(ifNull({column}, '')), lowerUTF8(concat('.', {{related_domain:String}})))"
+            )
+        conditions.append("(" + " OR ".join(clauses) + ")")
+        parameters["related_domain"] = related_domain
+    if dns_answer_ip is not None:
+        conditions.append(
+            "has(JSONExtract(ifNull(dns_answers_json, '[]'), 'Array(String)'), {dns_answer_ip:String})"
+        )
+        parameters["dns_answer_ip"] = dns_answer_ip
+    if l7_protocol is not None:
+        conditions.append("lowerUTF8(ifNull(l7_protocol, '')) = lowerUTF8({l7_protocol:String})")
+        parameters["l7_protocol"] = l7_protocol
+    return conditions, parameters
 
 
 class EventRepository:
@@ -131,6 +227,56 @@ class EventRepository:
         row = result.result_rows[0]
         payload_sha256 = row[3].decode("ascii") if isinstance(row[3], bytes) else str(row[3])
         return EventIdentity(UUID(str(row[0])), int(row[1]), str(row[2]), payload_sha256)
+
+    def archive_count(self, *, endpoint_id: int, bucket_start_at: datetime) -> int:
+        bucket_start_at = bucket_start_at.astimezone(UTC)
+        result = self.client.query(
+            """
+            SELECT uniqExact(event_id)
+            FROM edr_events FINAL
+            WHERE endpoint_id = {endpoint_id:UInt64}
+              AND occurred_at >= {from:DateTime64(3)}
+              AND occurred_at < {to:DateTime64(3)}
+              AND is_delete = 0
+            """,
+            parameters={
+                "endpoint_id": endpoint_id,
+                "from": bucket_start_at,
+                "to": bucket_start_at + timedelta(days=1),
+            },
+        )
+        return int(result.result_rows[0][0])
+
+    def archive_row_batches(
+        self,
+        *,
+        endpoint_id: int,
+        bucket_start_at: datetime,
+    ):
+        bucket_start_at = bucket_start_at.astimezone(UTC)
+        query = f"""
+            SELECT {", ".join(EVENT_COLUMNS)}
+            FROM edr_events FINAL
+            WHERE endpoint_id = {{endpoint_id:UInt64}}
+              AND occurred_at >= {{from:DateTime64(3)}}
+              AND occurred_at < {{to:DateTime64(3)}}
+              AND is_delete = 0
+            ORDER BY occurred_at ASC, event_id ASC
+        """
+        parameters = {
+            "endpoint_id": endpoint_id,
+            "from": bucket_start_at,
+            "to": bucket_start_at + timedelta(days=1),
+        }
+        with self.client.query_row_block_stream(query, parameters=parameters) as stream:
+            for block in stream:
+                yield [dict(zip(EVENT_COLUMNS, row, strict=True)) for row in block]
+
+    def drop_partition(self, bucket_date: date) -> None:
+        # ``bucket_date`` is already a typed ``date`` value, so formatting it here
+        # avoids relying on query parameters in ClickHouse DDL statements.
+        partition = bucket_date.isoformat()
+        self.client.command(f"ALTER TABLE edr_events DROP PARTITION '{partition}'")
 
     def list_for_endpoint(
         self,
@@ -195,72 +341,49 @@ class EventRepository:
         dns_query: str | None = None,
         dns_answer_ip: str | None = None,
         l7_protocol: str | None = None,
+        sort_order: Literal["asc", "desc"] | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+        columns: list[str] | None = None,
     ) -> list[JsonObject]:
-        conditions = [
-            "occurred_at >= {from:DateTime64(3)}",
-            "occurred_at < {to:DateTime64(3)}",
-            "is_delete = 0",
-        ]
-        parameters: dict[str, Any] = {"from": from_, "to": to}
-        if endpoint_ids:
-            # Push endpoint scoping into ClickHouse instead of filtering rows in Python.
-            conditions.append("endpoint_id IN {endpoint_ids:Array(UInt64)}")
-            parameters["endpoint_ids"] = endpoint_ids
-        exact_filters = {
-            "endpoint_id": (endpoint_id, "UInt64"),
-            "event_type": (event_type, "String"),
-            "remote_ip": (remote_ip, "String"),
-        }
-        for column, (value, type_name) in exact_filters.items():
-            if value is not None:
-                conditions.append(f"{column} = {{{column}:{type_name}}}")
-                parameters[column] = value
-        contains_filters = {
-            "process_name": process_name,
-            "file_path": file_path,
-            "dns_query": dns_query,
-        }
-        for column, value in contains_filters.items():
-            if value is not None:
-                conditions.append(f"positionCaseInsensitiveUTF8(ifNull({column}, ''), {{{column}:String}}) > 0")
-                parameters[column] = value
-        if domain is not None:
-            # Substring match. Intended for the Events UI free-text domain filter, where
-            # partial matches are acceptable. Do NOT use this for correlation (see related_domain).
-            conditions.append(
-                "(positionCaseInsensitiveUTF8(ifNull(remote_domain, ''), {domain:String}) > 0 "
-                "OR positionCaseInsensitiveUTF8(ifNull(http_host, ''), {domain:String}) > 0)"
-            )
-            parameters["domain"] = domain
-        if related_domain is not None:
-            # Precise domain-boundary match for correlation: the exact name OR a subdomain of it.
-            # "yahoo.com" matches "yahoo.com" and "mail.yahoo.com", but NOT "notyahoo.com" or
-            # "yahoo.com.evil.example". Substring matching (see `domain` above) would over-match.
-            related_columns = ("remote_domain", "http_host", "tls_sni", "dns_query")
-            clauses = []
-            for column in related_columns:
-                clauses.append(f"lowerUTF8(ifNull({column}, '')) = lowerUTF8({{related_domain:String}})")
-                clauses.append(
-                    f"endsWith(lowerUTF8(ifNull({column}, '')), lowerUTF8(concat('.', {{related_domain:String}})))"
-                )
-            conditions.append("(" + " OR ".join(clauses) + ")")
-            parameters["related_domain"] = related_domain
-        if dns_answer_ip is not None:
-            # dns_answers_json is a Nullable(String) holding a JSON array of resolved IPs
-            # (e.g. ["1.2.3.4","5.6.7.8"]). Parse it into an array and test exact element
-            # membership so "1.2.3.4" never matches "11.2.3.45".
-            conditions.append(
-                "has(JSONExtract(ifNull(dns_answers_json, '[]'), 'Array(String)'), {dns_answer_ip:String})"
-            )
-            parameters["dns_answer_ip"] = dns_answer_ip
-        if l7_protocol is not None:
-            conditions.append("lowerUTF8(ifNull(l7_protocol, '')) = lowerUTF8({l7_protocol:String})")
-            parameters["l7_protocol"] = l7_protocol
+        conditions, parameters = _event_search_filters(
+            from_=from_,
+            to=to,
+            endpoint_id=endpoint_id,
+            endpoint_ids=endpoint_ids,
+            event_type=event_type,
+            process_name=process_name,
+            file_path=file_path,
+            domain=domain,
+            related_domain=related_domain,
+            remote_ip=remote_ip,
+            dns_query=dns_query,
+            dns_answer_ip=dns_answer_ip,
+            l7_protocol=l7_protocol,
+        )
+        suffix = ""
+        if sort_order is not None:
+            direction = sort_order.upper()
+            suffix += f" ORDER BY occurred_at {direction}, event_id {direction}"
+        if limit is not None:
+            suffix += " LIMIT {limit:UInt64} OFFSET {offset:UInt64}"
+            parameters.update({"limit": limit, "offset": offset})
+        selected_columns = columns or EVENT_COLUMNS
+        if not selected_columns or any(column not in EVENT_COLUMNS for column in selected_columns):
+            raise ValueError("event search projection contains an unknown column")
         result = self.client.query(
-            f"SELECT {', '.join(EVENT_COLUMNS)} FROM edr_events FINAL WHERE {' AND '.join(conditions)}",
+            f"SELECT {', '.join(selected_columns)} FROM edr_events FINAL WHERE {' AND '.join(conditions)}{suffix}",
             parameters=parameters,
         )
-        return [dict(zip(EVENT_COLUMNS, row, strict=True)) for row in result.result_rows]
+        return [dict(zip(selected_columns, row, strict=True)) for row in result.result_rows]
+
+    def count_search(self, **filters: Any) -> int:
+        conditions, parameters = _event_search_filters(**filters)
+        result = self.client.query(
+            f"SELECT uniqExact(event_id) FROM edr_events FINAL WHERE {' AND '.join(conditions)}",
+            parameters=parameters,
+        )
+        return int(result.result_rows[0][0])
 
     def detail(self, *, event_id: UUID, endpoint_id: int, occurred_at: datetime) -> JsonObject | None:
         result = self.client.query(
@@ -275,6 +398,41 @@ class EventRepository:
         if not result.result_rows:
             return None
         return dict(zip(EVENT_COLUMNS, result.result_rows[0], strict=True))
+
+    def details(self, identities: list[tuple[UUID, int, datetime]]) -> list[JsonObject]:
+        if not identities:
+            return []
+        clauses: list[str] = []
+        parameters: dict[str, Any] = {}
+        for index, (event_id, endpoint_id, occurred_at) in enumerate(dict.fromkeys(identities)):
+            bucket_start = occurred_at.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+            clauses.append(
+                f"(event_id = {{event_id_{index}:UUID}} "
+                f"AND endpoint_id = {{endpoint_id_{index}:UInt64}} "
+                f"AND occurred_at >= {{from_{index}:DateTime64(3)}} "
+                f"AND occurred_at < {{to_{index}:DateTime64(3)}})"
+            )
+            parameters.update(
+                {
+                    f"event_id_{index}": str(event_id),
+                    f"endpoint_id_{index}": endpoint_id,
+                    f"from_{index}": bucket_start,
+                    f"to_{index}": bucket_start + timedelta(days=1),
+                }
+            )
+        result = self.client.query(
+            f"""
+            SELECT {", ".join(EVENT_COLUMNS)} FROM edr_events FINAL
+            WHERE is_delete = 0 AND ({" OR ".join(clauses)})
+            ORDER BY updated_at DESC
+            """,
+            parameters=parameters,
+        )
+        rows: dict[str, JsonObject] = {}
+        for result_row in result.result_rows:
+            row = dict(zip(EVENT_COLUMNS, result_row, strict=True))
+            rows.setdefault(str(row["event_id"]), row)
+        return list(rows.values())
 
     def ingest_summary(
         self,
@@ -366,7 +524,10 @@ class EventRepository:
             parameters=parameters,
         )
         aggregate.time_series.update(
-            {bucket_start_at: int(count) for bucket_start_at, count in time_series.result_rows}
+            {
+                _utc_datetime(bucket_start_at): int(count)
+                for bucket_start_at, count in time_series.result_rows
+            }
         )
 
         top_dimensions = (
@@ -399,6 +560,10 @@ class EventRepository:
             )
 
         return aggregate
+
+
+def _utc_datetime(value: datetime) -> datetime:
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
 class FailureRepository:
@@ -468,31 +633,83 @@ class FailureRepository:
         retryable: bool | None = None,
         endpoint_id: int | None = None,
         sort_order: Literal["asc", "desc"] = "desc",
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[JsonObject]:
-        conditions: list[str] = []
-        parameters: dict[str, Any] = {}
-        if from_ is not None:
-            conditions.append("failed_at >= {from:DateTime64(3)}")
-            parameters["from"] = from_
-        if to is not None:
-            conditions.append("failed_at < {to:DateTime64(3)}")
-            parameters["to"] = to
-        if status is not None:
-            conditions.append("status = {status:String}")
-            parameters["status"] = status
-        if failure_stage is not None:
-            conditions.append("failure_stage = {failure_stage:String}")
-            parameters["failure_stage"] = failure_stage
-        if retryable is not None:
-            conditions.append("retryable = {retryable:Bool}")
-            parameters["retryable"] = retryable
-        if endpoint_id is not None:
-            conditions.append("endpoint_id = {endpoint_id:UInt64}")
-            parameters["endpoint_id"] = endpoint_id
+        conditions, parameters = _failure_filters(
+            from_=from_,
+            to=to,
+            status=status,
+            failure_stage=failure_stage,
+            retryable=retryable,
+            endpoint_id=endpoint_id,
+        )
         where = " WHERE " + " AND ".join(conditions) if conditions else ""
+        pagination = ""
+        if limit is not None:
+            pagination = " LIMIT {limit:UInt64} OFFSET {offset:UInt64}"
+            parameters.update({"limit": limit, "offset": offset})
         result = self.client.query(
             f"SELECT {', '.join(FAILURE_COLUMNS)} FROM event_failures FINAL{where} "
-            f"ORDER BY failed_at {sort_order.upper()}, failure_id {sort_order.upper()}",
+            f"ORDER BY failed_at {sort_order.upper()}, failure_id {sort_order.upper()}{pagination}",
             parameters=parameters,
         )
         return [dict(zip(FAILURE_COLUMNS, row, strict=True)) for row in result.result_rows]
+
+    def count_current(self, **filters: Any) -> int:
+        conditions, parameters = _failure_filters(**filters)
+        where = " WHERE " + " AND ".join(conditions) if conditions else ""
+        result = self.client.query(
+            f"SELECT uniqExact(failure_id) FROM event_failures FINAL{where}",
+            parameters=parameters,
+        )
+        return int(result.result_rows[0][0])
+
+    def summary(
+        self,
+        *,
+        from_: datetime,
+        to: datetime,
+        endpoint_id: int | None = None,
+    ) -> dict[str, Any]:
+        conditions, parameters = _failure_filters(from_=from_, to=to, endpoint_id=endpoint_id)
+        where = " AND ".join(conditions)
+
+        def grouped(column: str) -> dict[str | None, int]:
+            result = self.client.query(
+                f"""
+                SELECT {column}, count()
+                FROM event_failures FINAL
+                WHERE {where}
+                GROUP BY {column}
+                """,
+                parameters=parameters,
+            )
+            return {
+                (None if value is None else str(value)): int(count)
+                for value, count in result.result_rows
+            }
+
+        total = self.client.query(
+            f"""
+            SELECT uniqExact(failure_id)
+            FROM event_failures FINAL
+            WHERE {where}
+            """,
+            parameters=parameters,
+        ).result_rows[0]
+        oldest_failed = self.client.query(
+            f"""
+            SELECT minOrNull(failed_at)
+            FROM event_failures FINAL
+            WHERE {where} AND status = 'FAILED'
+            """,
+            parameters=parameters,
+        ).result_rows[0][0]
+        return {
+            "total": int(total[0]),
+            "oldest_failed_at": oldest_failed,
+            "by_stage": grouped("failure_stage"),
+            "by_code": grouped("failure_code"),
+            "by_status": grouped("status"),
+        }

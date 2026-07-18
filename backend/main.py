@@ -1,7 +1,13 @@
+import logging
 from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID, uuid4
 
+import psycopg
+import pyarrow
+from botocore.exceptions import BotoCoreError
+from clickhouse_connect.driver.exceptions import ClickHouseError
+from confluent_kafka import KafkaException
 from fastapi import Depends, FastAPI, Query, Request, Response
 from fastapi.exceptions import RequestValidationError as FastApiRequestValidationError
 from fastapi.openapi.utils import get_openapi
@@ -107,6 +113,8 @@ BEARER = HTTPBearer(
     scheme_name="BearerJWT",
     description="JWT access token returned by POST /api/v1/auth/login.",
 )
+LOGGER = logging.getLogger(__name__)
+INFRASTRUCTURE_EXCEPTIONS = (psycopg.Error, ClickHouseError, BotoCoreError, KafkaException, pyarrow.ArrowException)
 
 
 def _error_responses(*statuses: int) -> dict[int, dict[str, object]]:
@@ -168,6 +176,21 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
             status_code=400,
             content=_error_envelope(request, error).model_dump(mode="json", by_alias=True),
         )
+
+    async def infrastructure_error_handler(request: Request, error: Exception) -> JSONResponse:
+        LOGGER.error(
+            "Required infrastructure dependency failed request_id=%s",
+            request.state.request_id,
+            exc_info=(type(error), error, error.__traceback__),
+        )
+        unavailable = ServiceUnavailableError("A required dependency is temporarily unavailable.")
+        return JSONResponse(
+            status_code=unavailable.status_code,
+            content=_error_envelope(request, unavailable).model_dump(mode="json", by_alias=True),
+        )
+
+    for exception_type in INFRASTRUCTURE_EXCEPTIONS:
+        app.add_exception_handler(exception_type, infrastructure_error_handler)
 
     @app.get("/health/live", include_in_schema=False)
     def live() -> dict[str, str]:
@@ -426,11 +449,17 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
     ) -> SuccessEnvelope[PagedData[ArchiveBucketDto]]:
         runtime = _runtime(request)
         with runtime.postgres() as connection:
-            rows = IngestMetadataRepository(connection).restore_buckets(query.endpoint_ids, query.from_, query.to)
-        total = len(rows)
-        start = (query.page - 1) * query.size
+            repository = IngestMetadataRepository(connection)
+            rows = repository.restore_buckets(
+                query.endpoint_ids,
+                query.from_,
+                query.to,
+                limit=query.size,
+                offset=(query.page - 1) * query.size,
+            )
+            total = repository.count_restore_buckets(query.endpoint_ids, query.from_, query.to)
         data = PagedData(
-            items=[archive_bucket(row) for row in rows[start : start + query.size]],
+            items=[archive_bucket(row) for row in rows],
             page=query.page,
             size=query.size,
             total=total,

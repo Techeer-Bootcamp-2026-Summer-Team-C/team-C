@@ -28,6 +28,7 @@ def test_portainer_stacks_split_infrastructure_from_services() -> None:
         "backend",
         "event-storage-worker",
         "detection-worker",
+        "storage-lifecycle-worker",
         "nginx",
     }
     assert "frontend" not in infra["services"] | service["services"]
@@ -112,7 +113,7 @@ def test_service_stack_uses_the_shared_data_network_and_waits_for_init() -> None
 
     assert service["networks"]["data"] == {"external": True, "name": "edr-c-data"}
     assert "depends_on" not in services["app-init"]
-    for name in ("backend", "event-storage-worker", "detection-worker"):
+    for name in ("backend", "event-storage-worker", "detection-worker", "storage-lifecycle-worker"):
         assert services[name]["depends_on"]["app-init"]["condition"] == "service_completed_successfully"
 
 

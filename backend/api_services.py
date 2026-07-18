@@ -26,49 +26,22 @@ class EndpointService:
         self.repository = repository
 
     def list(self, query: EndpointListQuery, *, calculated_at: datetime) -> PagedData[EndpointDto]:
-        rows = self.repository.risk_snapshot(
+        rows, total = self.repository.risk_page(
             endpoint_ids=query.endpoint_ids,
             q=query.q,
             status=query.status,
             os_type=query.os_type,
+            risk_level=query.risk_level,
+            sort_by=query.sort_by,
+            sort_order=query.sort_order,
+            limit=query.size,
+            offset=(query.page - 1) * query.size,
         )
         items = [endpoint_dto(row, calculated_at=calculated_at) for row in rows]
-        if query.risk_level is not None:
-            items = [item for item in items if item.risk.level is query.risk_level]
-        if query.q is not None:
-            normalized_query = query.q.casefold()
-            status_rank = {"ONLINE": 0, "OFFLINE": 1, "RETIRED": 2}
-            items.sort(
-                key=lambda item: (
-                    0 if normalized_query in {item.hostname.casefold(), item.agent_id.casefold()} else 1,
-                    status_rank[item.status.value],
-                    -item.risk.score,
-                    item.hostname.casefold(),
-                    item.endpoint_id,
-                )
-            )
-            total = len(items)
-            start = (query.page - 1) * query.size
-            return PagedData(
-                items=items[start : start + query.size],
-                page=query.page,
-                size=query.size,
-                total=total,
-            )
-        items.sort(key=lambda item: item.endpoint_id)
-        reverse = query.sort_order == "desc"
-        if query.sort_by == "riskScore":
-            items.sort(key=lambda item: item.risk.score, reverse=reverse)
-        elif query.sort_by == "lastSeenAt":
-            items.sort(key=lambda item: _nullable_sort(item.last_seen_at), reverse=reverse)
-        else:
-            items.sort(key=lambda item: item.registered_at, reverse=reverse)
-        total = len(items)
-        start = (query.page - 1) * query.size
-        return PagedData(items=items[start : start + query.size], page=query.page, size=query.size, total=total)
+        return PagedData(items=items, page=query.page, size=query.size, total=total)
 
     def detail(self, endpoint_id: int, *, calculated_at: datetime) -> EndpointDetailDto:
-        row = next((row for row in self.repository.risk_snapshot() if int(row["endpoint_id"]) == endpoint_id), None)
+        row = next(iter(self.repository.risk_snapshot(endpoint_ids=[endpoint_id])), None)
         if row is None:
             raise ApplicationError(404, "NOT_FOUND", "Endpoint was not found.")
         base = endpoint_dto(row, calculated_at=calculated_at).model_dump()
@@ -104,20 +77,24 @@ class AlertService:
         self.rules = {(item.rule.rule_code, item.rule.version): item for item in rules}
 
     def list(self, query: AlertListQuery, *, from_: datetime, to: datetime) -> PagedData[AlertDto]:
-        rows = self.repository.list_rows(
+        filters = dict(
             from_=from_,
             to=to,
             endpoint_id=query.endpoint_id,
             status=query.status,
             severity=query.severity.value if query.severity else None,
             rule_code=query.rule_code,
+        )
+        rows = self.repository.list_rows(
+            **filters,
             sort_by=query.sort_by,
             sort_order=query.sort_order,
+            limit=query.size,
+            offset=(query.page - 1) * query.size,
         )
-        total = len(rows)
-        start = (query.page - 1) * query.size
+        total = self.repository.count_rows(**filters)
         return PagedData(
-            items=[alert_dto(row) for row in rows[start : start + query.size]],
+            items=[alert_dto(row) for row in rows],
             page=query.page,
             size=query.size,
             total=total,
@@ -136,7 +113,9 @@ class AlertService:
             )
             if detail is not None:
                 source_event = detail.model_dump(exclude={"raw_payload", "payload_sha256", "schema_version"})
-        except ApplicationError:
+        except ApplicationError as error:
+            if error.code != "ARCHIVE_NOT_READY":
+                raise
             source_event = None
         incidents = [
             IncidentReferenceDto.model_validate(item) for item in self.repository.incidents_for_alert(alert_id)
@@ -184,18 +163,22 @@ class IncidentService:
         self.repository = repository
 
     def list(self, query: IncidentListQuery, *, from_: datetime, to: datetime) -> PagedData[IncidentDto]:
-        rows = self.repository.list_rows(
+        filters = dict(
             from_=from_,
             to=to,
             endpoint_id=query.endpoint_id,
             status=query.status,
             severity=query.severity.value if query.severity else None,
-            sort_order=query.sort_order,
         )
-        total = len(rows)
-        start = (query.page - 1) * query.size
+        rows = self.repository.list_rows(
+            **filters,
+            sort_order=query.sort_order,
+            limit=query.size,
+            offset=(query.page - 1) * query.size,
+        )
+        total = self.repository.count_rows(**filters)
         return PagedData(
-            items=[incident_dto(row) for row in rows[start : start + query.size]],
+            items=[incident_dto(row) for row in rows],
             page=query.page,
             size=query.size,
             total=total,
@@ -237,9 +220,9 @@ def endpoint_dto(row: dict[str, Any], *, calculated_at: datetime) -> EndpointDto
         {
             "score": risk.score,
             "level": risk.level,
-            "active_alert_count": risk.active_alert_count,
-            "open_incident_count": risk.open_incident_count,
-            "highest_alert_risk_score": risk.highest_alert_risk_score,
+            "active_alert_count": row.get("active_alert_count", risk.active_alert_count),
+            "open_incident_count": row.get("open_incident_count", risk.open_incident_count),
+            "highest_alert_risk_score": row.get("highest_alert_risk_score", risk.highest_alert_risk_score),
             "calculated_at": risk.calculated_at,
             "risk_factors": [
                 {
@@ -300,7 +283,3 @@ def _timestamp(value: Any) -> datetime:
     if isinstance(value, datetime):
         return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
     return datetime.fromisoformat(str(value).replace("Z", "+00:00")).astimezone(UTC)
-
-
-def _nullable_sort(value: datetime | None) -> tuple[bool, datetime]:
-    return value is not None, value or datetime.min.replace(tzinfo=UTC)

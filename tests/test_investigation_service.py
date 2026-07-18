@@ -2,9 +2,13 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
+import pytest
+
 from backend.contracts.enums import EventType
 from backend.contracts.requests import FailureListQuery
+from backend.errors import ApplicationError, ServiceUnavailableError
 from backend.investigation_service import FailureService, InvestigationService
+from backend.storage.clickhouse import FailureRepository
 from backend.summary_service import SummaryService
 
 NOW = datetime(2026, 7, 14, 3, tzinfo=UTC)
@@ -22,7 +26,11 @@ class EventServiceFake:
 
 
 class FailureRepositoryFake:
-    def current_rows(self, **_filters):
+    def __init__(self) -> None:
+        self.calls = []
+
+    def current_rows(self, **filters):
+        self.calls.append(("rows", filters))
         return [{
             "failure_id": uuid4(), "event_id": uuid4(), "endpoint_id": 1,
             "source_topic": "telemetry", "source_partition": 0, "source_offset": 7,
@@ -34,6 +42,10 @@ class FailureRepositoryFake:
             "retention_expires_at": NOW.replace(tzinfo=None),
             "created_at": NOW.replace(tzinfo=None), "updated_at": NOW.replace(tzinfo=None),
         }]
+
+    def count_current(self, **filters):
+        self.calls.append(("count", filters))
+        return 12
 
 
 def process_event(pid: int, ppid: int | None, minute: int):
@@ -56,11 +68,33 @@ def test_process_tree_groups_pid_rows_and_marks_selected_parent() -> None:
 
 
 def test_failure_service_converts_clickhouse_uuid_and_naive_timestamps() -> None:
-    query = FailureListQuery.model_validate({"timePreset": "LATEST_24H", "page": 1, "size": 50})
-    page = FailureService(FailureRepositoryFake()).list(query, from_=NOW, to=NOW.replace(hour=4))
-    assert page.total == 1
+    repository = FailureRepositoryFake()
+    query = FailureListQuery.model_validate({"timePreset": "LATEST_24H", "page": 2, "size": 5})
+    page = FailureService(repository).list(query, from_=NOW, to=NOW.replace(hour=4))
+    assert page.total == 12
     assert UUID(page.items[0].failure_id)
     assert page.items[0].failed_at.tzinfo is UTC
+    assert repository.calls[0][1]["limit"] == 5
+    assert repository.calls[0][1]["offset"] == 5
+    assert "limit" not in repository.calls[1][1]
+
+
+def test_failure_repository_pages_and_counts_current_rows_in_clickhouse() -> None:
+    calls = []
+
+    class Client:
+        def query(self, query, parameters=None):
+            normalized = " ".join(query.split())
+            calls.append((normalized, parameters))
+            return SimpleNamespace(result_rows=[(9,)] if normalized.startswith("SELECT uniqExact") else [])
+
+    repository = FailureRepository(Client())
+    assert repository.current_rows(status="FAILED", limit=10, offset=20) == []
+    assert repository.count_current(status="FAILED") == 9
+    assert "LIMIT {limit:UInt64} OFFSET {offset:UInt64}" in calls[0][0]
+    assert calls[0][1]["limit"] == 10
+    assert calls[0][1]["offset"] == 20
+    assert "uniqExact(failure_id)" in calls[1][0]
 
 
 def test_attack_timeline_orders_incident_event_and_alert() -> None:
@@ -75,7 +109,7 @@ def test_attack_timeline_orders_incident_event_and_alert() -> None:
             "endpoint_id": 1, "first_detected_at": NOW, "title": "Encoded command chain",
             "description": "Correlated detection", "severity": "HIGH",
         },
-        alerts_for_incident=lambda _incident_id: [{
+        alerts_for_incident=lambda _incident_id, **_filters: [{
             "event_id": event_id, "event_occurred_at": event.occurred_at,
             "detected_at": NOW.replace(minute=2), "title": "Encoded PowerShell",
             "summary": "Matched encoded command", "severity": "HIGH", "alert_id": 9,
@@ -87,6 +121,83 @@ def test_attack_timeline_orders_incident_event_and_alert() -> None:
     timeline = service.timeline(3)
     assert [item.item_type for item in timeline.items] == ["INCIDENT", "EVENT", "ALERT"]
     assert timeline.items[1].event_id == event_id
+
+
+def test_attack_timeline_does_not_hide_infrastructure_failure() -> None:
+    event_id = str(uuid4())
+    incidents = SimpleNamespace(
+        detail=lambda _incident_id: {
+            "endpoint_id": 1,
+            "first_detected_at": NOW,
+            "title": "Incident",
+            "description": None,
+            "severity": "HIGH",
+        },
+        alerts_for_incident=lambda _incident_id, **_filters: [
+            {
+                "event_id": event_id,
+                "event_occurred_at": NOW,
+                "detected_at": NOW,
+                "title": "Alert",
+                "summary": "Summary",
+                "severity": "HIGH",
+                "alert_id": 9,
+            }
+        ],
+    )
+    events = SimpleNamespace(
+        detail=lambda **_identity: (_ for _ in ()).throw(ServiceUnavailableError("archive unavailable"))
+    )
+    service = InvestigationService(
+        endpoints=SimpleNamespace(), alerts=SimpleNamespace(), incidents=incidents, events=events
+    )
+
+    with pytest.raises(ServiceUnavailableError):
+        service.timeline(3)
+
+
+def test_topology_rejects_oversized_event_range_and_pushes_single_endpoint_filter() -> None:
+    calls = []
+
+    class TooManyEvents:
+        def list_rows(self, query, *, from_, to):
+            calls.append(query.endpoint_id)
+            return [], 10_001
+
+    service = InvestigationService(
+        endpoints=SimpleNamespace(),
+        alerts=SimpleNamespace(),
+        incidents=SimpleNamespace(),
+        events=TooManyEvents(),
+    )
+
+    with pytest.raises(ApplicationError, match="narrow the time range") as caught:
+        service.topology(from_=NOW, to=NOW.replace(hour=4), endpoint_ids=[7], calculated_at=NOW)
+
+    assert caught.value.status_code == 400
+    assert calls == [7]
+
+
+def test_topology_queries_each_selected_endpoint_instead_of_loading_global_events() -> None:
+    calls = []
+
+    class EmptyEvents:
+        def list_rows(self, query, *, from_, to):
+            calls.append(query.endpoint_id)
+            return [], 0
+
+    service = InvestigationService(
+        endpoints=SimpleNamespace(risk_snapshot=lambda **_filters: []),
+        alerts=SimpleNamespace(list_rows=lambda **_filters: []),
+        incidents=SimpleNamespace(),
+        events=EmptyEvents(),
+    )
+
+    topology = service.topology(from_=NOW, to=NOW.replace(hour=4), endpoint_ids=[8, 7], calculated_at=NOW)
+
+    assert topology.nodes == []
+    assert topology.edges == []
+    assert calls == [7, 8]
 
 
 def test_ingest_summary_calculates_event_and_failure_rates() -> None:

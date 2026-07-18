@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+import backend.dns_service as dns_service_module
 from backend import dns_lookup
 from backend.dns_lookup import DnsLookupError, forward_lookup, normalize_domain, resolve_record, reverse_lookup
 from backend.dns_service import DnsIntelligenceService
@@ -39,6 +40,8 @@ class FakeEventRepository:
         dns_query: str | None = None,
         dns_answer_ip: str | None = None,
         l7_protocol: str | None = None,
+        columns: list[str] | None = None,
+        limit: int | None = None,
     ) -> list[dict[str, Any]]:
         if remote_ip is not None:
             rows = self.rows_by_filter.get("remote_ip", [])
@@ -51,7 +54,9 @@ class FakeEventRepository:
         if endpoint_ids:
             allowed = set(endpoint_ids)
             rows = [row for row in rows if row.get("endpoint_id") in allowed]
-        return rows
+        if columns is not None:
+            rows = [{column: row.get(column) for column in columns} for row in rows]
+        return rows[:limit] if limit is not None else rows
 
 
 class RecordingClient:
@@ -203,6 +208,48 @@ def test_events_ui_domain_filter_keeps_substring_matching() -> None:
     assert "positionCaseInsensitiveUTF8(ifNull(remote_domain, ''), {domain:String})" in query
 
 
+def test_event_search_applies_stable_database_pagination() -> None:
+    client = RecordingClient()
+
+    EventRepository(client).search(from_=FROM, to=TO, sort_order="desc", limit=50, offset=100)
+
+    query = client.last_query or ""
+    assert "ORDER BY occurred_at DESC, event_id DESC" in query
+    assert "LIMIT {limit:UInt64} OFFSET {offset:UInt64}" in query
+    assert client.last_parameters is not None
+    assert client.last_parameters["limit"] == 50
+    assert client.last_parameters["offset"] == 100
+
+
+def test_event_search_projection_does_not_fetch_raw_payload() -> None:
+    client = RecordingClient()
+
+    EventRepository(client).search(
+        from_=FROM,
+        to=TO,
+        related_domain="example.com",
+        columns=["remote_domain", "remote_ip"],
+        limit=10,
+    )
+
+    query = client.last_query or ""
+    assert query.startswith("SELECT remote_domain, remote_ip")
+    assert "raw_payload" not in query
+
+
+def test_event_count_uses_distinct_event_identity() -> None:
+    class CountClient(RecordingClient):
+        def query(self, query: str, parameters: dict[str, Any] | None = None) -> Any:
+            self.last_query = query
+            self.last_parameters = parameters
+            return SimpleNamespace(result_rows=[(17,)])
+
+    client = CountClient()
+
+    assert EventRepository(client).count_search(from_=FROM, to=TO, endpoint_id=7) == 17
+    assert "SELECT uniqExact(event_id)" in (client.last_query or "")
+
+
 # --- Correlation logic (resolver stubbed; deterministic, no network) -------
 
 
@@ -230,6 +277,22 @@ def test_correlate_by_ip_combines_live_dns_and_observed_events(monkeypatch: pyte
         ("observed.example.com", "8.8.8.8", "RESOLVES_TO", ("OBSERVED_EVENTS",)),
         ("resolved-from-answers.example.com", "8.8.8.8", "RESOLVES_TO", ("OBSERVED_EVENTS",)),
     }
+
+
+def test_correlate_rejects_event_volume_above_hard_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(dns_service_module, "MAX_CORRELATION_EVENTS", 2)
+    monkeypatch.setattr("backend.dns_service.forward_lookup", lambda _domain: [])
+    events = FakeEventRepository(
+        {
+            "related_domain": [
+                {"remote_domain": "example.com", "remote_ip": f"203.0.113.{index}"}
+                for index in range(1, 4)
+            ]
+        }
+    )
+
+    with pytest.raises(ApplicationError, match="narrow the time range"):
+        DnsIntelligenceService(events=events).correlate("example.com", from_=FROM, to=TO)
 
 
 def test_correlate_by_domain_combines_forward_dns_and_observed_events(monkeypatch: pytest.MonkeyPatch) -> None:

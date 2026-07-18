@@ -15,6 +15,7 @@ from backend.contracts.enums import (
     EndpointStatus,
     IncidentStatus,
     OsType,
+    RiskLevel,
     UserLocale,
     UserRole,
     UserStatus,
@@ -574,7 +575,24 @@ class EndpointRepository:
         with self.connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute(
                 """
-                WITH active_alerts AS (
+                WITH candidate_endpoints AS (
+                    SELECT e.* FROM endpoints e
+                    WHERE e.is_delete = FALSE
+                      AND (%s::bigint[] IS NULL OR e.endpoint_id = ANY(%s::bigint[]))
+                      AND (%s::text IS NULL OR e.status = %s::text)
+                      AND (%s::text IS NULL OR e.os_type = %s::text)
+                      AND (
+                          %s::text IS NULL
+                          OR (%s::bigint IS NOT NULL AND e.endpoint_id = %s::bigint)
+                          OR (
+                              %s::text IS NOT NULL
+                              AND (
+                                  LOWER(e.hostname) LIKE %s::text ESCAPE E'\\\\'
+                                  OR LOWER(e.agent_id) LIKE %s::text ESCAPE E'\\\\'
+                              )
+                          )
+                      )
+                ), active_alerts AS (
                     SELECT endpoint_id,
                            jsonb_agg(jsonb_build_object(
                                'alert_id', alert_id, 'rule_code', rule_code, 'rule_version', rule_version,
@@ -583,6 +601,7 @@ class EndpointRepository:
                            ) ORDER BY risk_score DESC, detected_at DESC, alert_id DESC) AS items
                     FROM alerts
                     WHERE is_delete = FALSE AND status IN ('OPEN', 'IN_PROGRESS')
+                      AND endpoint_id IN (SELECT endpoint_id FROM candidate_endpoints)
                     GROUP BY endpoint_id
                 ), open_incidents AS (
                     SELECT endpoint_id,
@@ -592,28 +611,14 @@ class EndpointRepository:
                            ) ORDER BY last_detected_at DESC, incident_id DESC) AS items
                     FROM incidents
                     WHERE is_delete = FALSE AND status = 'OPEN'
+                      AND endpoint_id IN (SELECT endpoint_id FROM candidate_endpoints)
                     GROUP BY endpoint_id
                 )
                 SELECT e.*, COALESCE(a.items, '[]'::jsonb) AS active_alerts,
                        COALESCE(i.items, '[]'::jsonb) AS open_incidents
-                FROM endpoints e
+                FROM candidate_endpoints e
                 LEFT JOIN active_alerts a ON a.endpoint_id = e.endpoint_id
                 LEFT JOIN open_incidents i ON i.endpoint_id = e.endpoint_id
-                WHERE e.is_delete = FALSE
-                  AND (%s::bigint[] IS NULL OR e.endpoint_id = ANY(%s::bigint[]))
-                  AND (%s::text IS NULL OR e.status = %s::text)
-                  AND (%s::text IS NULL OR e.os_type = %s::text)
-                  AND (
-                      %s::text IS NULL
-                      OR (%s::bigint IS NOT NULL AND e.endpoint_id = %s::bigint)
-                      OR (
-                          %s::text IS NOT NULL
-                          AND (
-                              LOWER(e.hostname) LIKE %s::text ESCAPE E'\\\\'
-                              OR LOWER(e.agent_id) LIKE %s::text ESCAPE E'\\\\'
-                          )
-                      )
-                  )
                 """,
                 (
                     list(endpoint_ids) if endpoint_ids else None,
@@ -631,6 +636,183 @@ class EndpointRepository:
                 ),
             )
             return [dict(row) for row in cursor.fetchall()]
+
+    def risk_page(
+        self,
+        *,
+        endpoint_ids: Sequence[int] | None = None,
+        q: str | None = None,
+        status: str | None = None,
+        os_type: OsType | None = None,
+        risk_level: RiskLevel | None = None,
+        sort_by: str = "riskScore",
+        sort_order: str = "desc",
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[dict[str, Any]], int]:
+        query_endpoint_id: int | None = None
+        query_prefix: str | None = None
+        if q is not None:
+            if q.isdecimal():
+                query_endpoint_id = int(q)
+            else:
+                query_prefix = _escape_like_prefix(q.lower())
+
+        direction = "ASC" if sort_order == "asc" else "DESC"
+        if q is not None:
+            order_by = (
+                "CASE WHEN LOWER(hostname) = %s OR LOWER(agent_id) = %s THEN 0 ELSE 1 END ASC, "
+                "CASE status WHEN 'ONLINE' THEN 0 WHEN 'OFFLINE' THEN 1 ELSE 2 END ASC, "
+                "calculated_risk_score DESC, LOWER(hostname) ASC, endpoint_id ASC"
+            )
+            order_parameters: tuple[Any, ...] = (q.lower(), q.lower())
+        elif sort_by == "lastSeenAt":
+            nulls = "FIRST" if direction == "ASC" else "LAST"
+            order_by = f"last_seen_at {direction} NULLS {nulls}, endpoint_id ASC"
+            order_parameters = ()
+        elif sort_by == "registeredAt":
+            order_by = f"registered_at {direction}, endpoint_id ASC"
+            order_parameters = ()
+        else:
+            order_by = f"calculated_risk_score {direction}, endpoint_id ASC"
+            order_parameters = ()
+
+        risk_condition = {
+            None: "TRUE",
+            RiskLevel.LOW: "calculated_risk_score < 25",
+            RiskLevel.MEDIUM: "calculated_risk_score BETWEEN 25 AND 49",
+            RiskLevel.HIGH: "calculated_risk_score BETWEEN 50 AND 79",
+            RiskLevel.CRITICAL: "calculated_risk_score >= 80",
+        }[risk_level]
+        sql = f"""
+            WITH candidate_endpoints AS (
+                SELECT e.* FROM endpoints e
+                WHERE e.is_delete = FALSE
+                  AND (%s::bigint[] IS NULL OR e.endpoint_id = ANY(%s::bigint[]))
+                  AND (%s::text IS NULL OR e.status = %s::text)
+                  AND (%s::text IS NULL OR e.os_type = %s::text)
+                  AND (
+                      %s::text IS NULL
+                      OR (%s::bigint IS NOT NULL AND e.endpoint_id = %s::bigint)
+                      OR (
+                          %s::text IS NOT NULL
+                          AND (
+                              LOWER(e.hostname) LIKE %s::text ESCAPE E'\\\\'
+                              OR LOWER(e.agent_id) LIKE %s::text ESCAPE E'\\\\'
+                          )
+                      )
+                  )
+            ), active_alert_candidates AS (
+                SELECT a.*,
+                       row_number() OVER (
+                           PARTITION BY endpoint_id, rule_code, rule_version
+                           ORDER BY risk_score DESC, detected_at DESC, alert_id DESC
+                       ) AS representative_rank
+                FROM alerts a
+                WHERE a.is_delete = FALSE AND a.status IN ('OPEN', 'IN_PROGRESS')
+                  AND a.endpoint_id IN (SELECT endpoint_id FROM candidate_endpoints)
+            ), representative_alerts AS (
+                SELECT candidates.*,
+                       row_number() OVER (
+                           PARTITION BY endpoint_id
+                           ORDER BY risk_score DESC, detected_at DESC, alert_id DESC
+                       ) AS risk_rank
+                FROM active_alert_candidates candidates
+                WHERE representative_rank = 1
+            ), alert_risk AS (
+                SELECT endpoint_id,
+                       jsonb_agg(jsonb_build_object(
+                           'alert_id', alert_id, 'rule_code', rule_code, 'rule_version', rule_version,
+                           'risk_score', risk_score, 'detected_at', detected_at, 'title', title,
+                           'severity', severity
+                       ) ORDER BY risk_rank) FILTER (WHERE risk_rank <= 3) AS items,
+                       SUM(CASE risk_rank
+                           WHEN 1 THEN ROUND(risk_score)
+                           WHEN 2 THEN ROUND(risk_score * 0.25)
+                           WHEN 3 THEN ROUND(risk_score * 0.10)
+                           ELSE 0
+                       END) AS contribution
+                FROM representative_alerts
+                GROUP BY endpoint_id
+            ), alert_counts AS (
+                SELECT a.endpoint_id, COUNT(*) AS active_alert_count,
+                       MAX(a.risk_score) AS highest_alert_risk_score
+                FROM alerts a
+                WHERE a.is_delete = FALSE AND a.status IN ('OPEN', 'IN_PROGRESS')
+                  AND a.endpoint_id IN (SELECT endpoint_id FROM candidate_endpoints)
+                GROUP BY a.endpoint_id
+            ), ranked_incidents AS (
+                SELECT i.*,
+                       row_number() OVER (
+                           PARTITION BY endpoint_id
+                           ORDER BY CASE severity
+                               WHEN 'CRITICAL' THEN 3 WHEN 'HIGH' THEN 2
+                               WHEN 'MEDIUM' THEN 1 ELSE 0
+                           END DESC, last_detected_at DESC, incident_id DESC
+                       ) AS risk_rank
+                FROM incidents i
+                WHERE i.is_delete = FALSE AND i.status = 'OPEN'
+                  AND i.endpoint_id IN (SELECT endpoint_id FROM candidate_endpoints)
+            ), incident_risk AS (
+                SELECT endpoint_id,
+                       jsonb_agg(jsonb_build_object(
+                           'incident_id', incident_id, 'title', title, 'severity', severity,
+                           'last_detected_at', last_detected_at
+                       ) ORDER BY risk_rank) FILTER (WHERE risk_rank <= 2) AS items,
+                       COUNT(*) AS open_incident_count
+                FROM ranked_incidents
+                GROUP BY endpoint_id
+            ), scored_endpoints AS (
+                SELECT e.*, COALESCE(ar.items, '[]'::jsonb) AS active_alerts,
+                       COALESCE(ir.items, '[]'::jsonb) AS open_incidents,
+                       COALESCE(ac.active_alert_count, 0) AS active_alert_count,
+                       COALESCE(ir.open_incident_count, 0) AS open_incident_count,
+                       ac.highest_alert_risk_score,
+                       LEAST(
+                           100,
+                           COALESCE(ar.contribution, 0) + LEAST(COALESCE(ir.open_incident_count, 0), 2) * 10
+                       )::integer AS calculated_risk_score
+                FROM candidate_endpoints e
+                LEFT JOIN alert_risk ar ON ar.endpoint_id = e.endpoint_id
+                LEFT JOIN alert_counts ac ON ac.endpoint_id = e.endpoint_id
+                LEFT JOIN incident_risk ir ON ir.endpoint_id = e.endpoint_id
+            )
+            SELECT *, COUNT(*) OVER() AS total_count
+            FROM scored_endpoints
+            WHERE {risk_condition}
+            ORDER BY {order_by}
+            LIMIT %s OFFSET %s
+        """
+        base_parameters: tuple[Any, ...] = (
+            list(endpoint_ids) if endpoint_ids else None,
+            list(endpoint_ids) if endpoint_ids else None,
+            status,
+            status,
+            os_type.value if os_type else None,
+            os_type.value if os_type else None,
+            q,
+            query_endpoint_id,
+            query_endpoint_id,
+            query_prefix,
+            query_prefix,
+            query_prefix,
+        )
+
+        def fetch(page_limit: int, page_offset: int) -> list[dict[str, Any]]:
+            with self.connection.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(sql, base_parameters + order_parameters + (page_limit, page_offset))
+                return [dict(row) for row in cursor.fetchall()]
+
+        rows = fetch(limit, offset)
+        if rows:
+            total = int(rows[0].pop("total_count"))
+            for row in rows[1:]:
+                row.pop("total_count", None)
+            return rows, total
+        if offset:
+            first = fetch(1, 0)
+            return [], int(first[0]["total_count"]) if first else 0
+        return [], 0
 
     def certificates(self, endpoint_id: int) -> list[dict[str, Any]]:
         with self.connection.cursor(row_factory=dict_row) as cursor:
@@ -757,8 +939,11 @@ class AlertRepository:
         rule_code: str | None = None,
         sort_by: AlertSortBy = AlertSortBy.PRIORITY,
         sort_order: str = "desc",
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         order_by = _alert_order_by(sort_by, sort_order)
+        pagination = " LIMIT %s OFFSET %s" if limit is not None else ""
         query = f"""
             SELECT * FROM alerts
             WHERE is_delete = FALSE AND detected_at >= %s AND detected_at < %s
@@ -766,9 +951,9 @@ class AlertRepository:
               AND (%s::text IS NULL OR status = %s::text)
               AND (%s::text IS NULL OR severity = %s::text)
               AND (%s::text IS NULL OR rule_code = %s::text)
-            ORDER BY {order_by}
+            ORDER BY {order_by}{pagination}
         """
-        values = (
+        values: tuple[Any, ...] = (
             from_,
             to,
             endpoint_id,
@@ -780,9 +965,146 @@ class AlertRepository:
             rule_code,
             rule_code,
         )
+        if limit is not None:
+            values += (limit, offset)
         with self.connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute(query, values)
             return [dict(row) for row in cursor.fetchall()]
+
+    def count_rows(
+        self,
+        *,
+        from_: datetime,
+        to: datetime,
+        endpoint_id: int | None = None,
+        status: AlertStatus | None = None,
+        severity: str | None = None,
+        rule_code: str | None = None,
+    ) -> int:
+        row = self.connection.execute(
+            """
+            SELECT count(*) FROM alerts
+            WHERE is_delete = FALSE AND detected_at >= %s AND detected_at < %s
+              AND (%s::bigint IS NULL OR endpoint_id = %s::bigint)
+              AND (%s::text IS NULL OR status = %s::text)
+              AND (%s::text IS NULL OR severity = %s::text)
+              AND (%s::text IS NULL OR rule_code = %s::text)
+            """,
+            (
+                from_,
+                to,
+                endpoint_id,
+                endpoint_id,
+                status.value if status else None,
+                status.value if status else None,
+                severity,
+                severity,
+                rule_code,
+                rule_code,
+            ),
+        ).fetchone()
+        return int(row[0])
+
+    def summary(
+        self,
+        *,
+        from_: datetime,
+        to: datetime,
+        endpoint_id: int | None,
+        interval_seconds: int,
+    ) -> dict[str, Any]:
+        filters = (from_, to, endpoint_id, endpoint_id)
+
+        def grouped(columns: str, order_by: str = "event_count DESC", limit: int | None = None):
+            pagination = " LIMIT %s" if limit is not None else ""
+            values = filters if limit is None else filters + (limit,)
+            with self.connection.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    f"""
+                    SELECT {columns}, count(*) AS event_count
+                    FROM alerts
+                    WHERE is_delete = FALSE AND detected_at >= %s AND detected_at < %s
+                      AND (%s::bigint IS NULL OR endpoint_id = %s::bigint)
+                    GROUP BY {columns}
+                    ORDER BY {order_by}{pagination}
+                    """,
+                    values,
+                )
+                return [dict(row) for row in cursor.fetchall()]
+
+        total = self.connection.execute(
+            """
+            SELECT count(*) FROM alerts
+            WHERE is_delete = FALSE AND detected_at >= %s AND detected_at < %s
+              AND (%s::bigint IS NULL OR endpoint_id = %s::bigint)
+            """,
+            filters,
+        ).fetchone()[0]
+        time_rows = self.connection.execute(
+            """
+            SELECT date_bin(%s * interval '1 second', detected_at, TIMESTAMPTZ '1970-01-01 00:00:00+00'),
+                   count(*)
+            FROM alerts
+            WHERE is_delete = FALSE AND detected_at >= %s AND detected_at < %s
+              AND (%s::bigint IS NULL OR endpoint_id = %s::bigint)
+            GROUP BY 1 ORDER BY 1
+            """,
+            (interval_seconds,) + filters,
+        ).fetchall()
+        active_rules = self.connection.execute(
+            """
+            SELECT rule_code, rule_version, severity, count(*)
+            FROM alerts
+            WHERE is_delete = FALSE AND detected_at >= %s AND detected_at < %s
+              AND (%s::bigint IS NULL OR endpoint_id = %s::bigint)
+              AND status IN ('OPEN', 'IN_PROGRESS')
+            GROUP BY rule_code, rule_version, severity
+            """,
+            filters,
+        ).fetchall()
+        return {
+            "total": int(total),
+            "by_severity": {
+                str(row["severity"]): int(row["event_count"])
+                for row in grouped("severity", "severity ASC")
+            },
+            "by_status": {
+                str(row["status"]): int(row["event_count"])
+                for row in grouped("status", "status ASC")
+            },
+            "top_rules": grouped("rule_code, rule_name", "event_count DESC, rule_code ASC", 100),
+            "mitre_tactics": grouped(
+                "mitre_tactic_code, mitre_tactic_name",
+                "event_count DESC, mitre_tactic_code ASC",
+                100,
+            ),
+            "mitre_techniques": grouped(
+                "mitre_technique_code, mitre_technique_name",
+                "event_count DESC, mitre_technique_code ASC",
+                100,
+            ),
+            "time_series": {row[0]: int(row[1]) for row in time_rows},
+            "active_rules": [
+                {
+                    "rule_code": str(row[0]),
+                    "rule_version": int(row[1]),
+                    "severity": str(row[2]),
+                    "count": int(row[3]),
+                }
+                for row in active_rules
+            ],
+        }
+
+    def active_severity_count(self, *, endpoint_id: int | None, severity: str) -> int:
+        row = self.connection.execute(
+            """
+            SELECT count(*) FROM alerts
+            WHERE is_delete = FALSE AND status IN ('OPEN', 'IN_PROGRESS')
+              AND severity = %s AND (%s::bigint IS NULL OR endpoint_id = %s::bigint)
+            """,
+            (severity, endpoint_id, endpoint_id),
+        ).fetchone()
+        return int(row[0])
 
     def detail(self, alert_id: int) -> dict[str, Any] | None:
         with self.connection.cursor(row_factory=dict_row) as cursor:
@@ -822,40 +1144,40 @@ class IncidentRepository:
 
     def upsert(self, incident: IncidentInsert) -> StoredIncident:
         now = incident.detected_at.astimezone(UTC)
-        row = self.connection.execute(
-            """
-            INSERT INTO incidents (
-                endpoint_id, correlation_key, window_start_at, window_end_at, title, description,
-                severity, status, first_detected_at, last_detected_at, closed_at, created_at, updated_at
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, 'OPEN', %s, %s, NULL, %s, %s)
-            ON CONFLICT (endpoint_id, correlation_key, window_start_at) DO UPDATE SET
-                last_detected_at = GREATEST(incidents.last_detected_at, EXCLUDED.last_detected_at),
-                window_end_at = GREATEST(incidents.window_end_at, EXCLUDED.window_end_at),
-                severity = CASE
-                    WHEN array_position(ARRAY['LOW','MEDIUM','HIGH','CRITICAL'], EXCLUDED.severity)
-                       > array_position(ARRAY['LOW','MEDIUM','HIGH','CRITICAL'], incidents.severity)
-                    THEN EXCLUDED.severity ELSE incidents.severity END,
-                updated_at = EXCLUDED.updated_at
-            RETURNING incident_id, status, (xmax = 0) AS created
-            """,
-            (
-                incident.endpoint_id,
-                incident.correlation_key,
-                incident.window_start_at,
-                incident.window_end_at,
-                incident.title,
-                incident.description,
-                incident.severity.value,
-                now,
-                now,
-                now,
-                now,
-            ),
-        ).fetchone()
-        self.connection.commit()
-        if row is None:
-            raise RuntimeError("incident upsert failed")
-        return StoredIncident(int(row[0]), bool(row[2]), IncidentStatus(row[1]))
+        with self.connection.transaction():
+            row = self.connection.execute(
+                """
+                INSERT INTO incidents (
+                    endpoint_id, correlation_key, window_start_at, window_end_at, title, description,
+                    severity, status, first_detected_at, last_detected_at, closed_at, created_at, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, 'OPEN', %s, %s, NULL, %s, %s)
+                ON CONFLICT (endpoint_id, correlation_key, window_start_at) DO UPDATE SET
+                    last_detected_at = GREATEST(incidents.last_detected_at, EXCLUDED.last_detected_at),
+                    window_end_at = GREATEST(incidents.window_end_at, EXCLUDED.window_end_at),
+                    severity = CASE
+                        WHEN array_position(ARRAY['LOW','MEDIUM','HIGH','CRITICAL'], EXCLUDED.severity)
+                           > array_position(ARRAY['LOW','MEDIUM','HIGH','CRITICAL'], incidents.severity)
+                        THEN EXCLUDED.severity ELSE incidents.severity END,
+                    updated_at = EXCLUDED.updated_at
+                RETURNING incident_id, status, (xmax = 0) AS created
+                """,
+                (
+                    incident.endpoint_id,
+                    incident.correlation_key,
+                    incident.window_start_at,
+                    incident.window_end_at,
+                    incident.title,
+                    incident.description,
+                    incident.severity.value,
+                    now,
+                    now,
+                    now,
+                    now,
+                ),
+            ).fetchone()
+            if row is None:
+                raise RuntimeError("incident upsert failed")
+            return StoredIncident(int(row[0]), bool(row[2]), IncidentStatus(row[1]))
 
     def link_alert(self, *, incident_id: int, alert_id: int, linked_at: datetime) -> None:
         with self.connection.transaction():
@@ -901,8 +1223,11 @@ class IncidentRepository:
         status: IncidentStatus | None = None,
         severity: str | None = None,
         sort_order: str = "desc",
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         direction = "ASC" if sort_order == "asc" else "DESC"
+        pagination = " LIMIT %s OFFSET %s" if limit is not None else ""
         query = f"""
             SELECT i.*, count(ia.incident_alert_id) FILTER (WHERE ia.is_delete = FALSE) AS alert_count
             FROM incidents i
@@ -912,9 +1237,9 @@ class IncidentRepository:
               AND (%s::text IS NULL OR i.status = %s::text)
               AND (%s::text IS NULL OR i.severity = %s::text)
             GROUP BY i.incident_id
-            ORDER BY i.last_detected_at {direction}, i.incident_id {direction}
+            ORDER BY i.last_detected_at {direction}, i.incident_id {direction}{pagination}
         """
-        values = (
+        values: tuple[Any, ...] = (
             from_,
             to,
             endpoint_id,
@@ -924,9 +1249,88 @@ class IncidentRepository:
             severity,
             severity,
         )
+        if limit is not None:
+            values += (limit, offset)
         with self.connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute(query, values)
             return [dict(row) for row in cursor.fetchall()]
+
+    def count_rows(
+        self,
+        *,
+        from_: datetime,
+        to: datetime,
+        endpoint_id: int | None = None,
+        status: IncidentStatus | None = None,
+        severity: str | None = None,
+    ) -> int:
+        row = self.connection.execute(
+            """
+            SELECT count(*) FROM incidents i
+            WHERE i.is_delete = FALSE AND i.last_detected_at >= %s AND i.last_detected_at < %s
+              AND (%s::bigint IS NULL OR i.endpoint_id = %s::bigint)
+              AND (%s::text IS NULL OR i.status = %s::text)
+              AND (%s::text IS NULL OR i.severity = %s::text)
+            """,
+            (
+                from_,
+                to,
+                endpoint_id,
+                endpoint_id,
+                status.value if status else None,
+                status.value if status else None,
+                severity,
+                severity,
+            ),
+        ).fetchone()
+        return int(row[0])
+
+    def summary(
+        self,
+        *,
+        from_: datetime,
+        to: datetime,
+        endpoint_id: int | None,
+        interval_seconds: int,
+    ) -> dict[str, Any]:
+        filters = (from_, to, endpoint_id, endpoint_id)
+        status_rows = self.connection.execute(
+            """
+            SELECT status, count(*) FROM incidents
+            WHERE is_delete = FALSE AND last_detected_at >= %s AND last_detected_at < %s
+              AND (%s::bigint IS NULL OR endpoint_id = %s::bigint)
+            GROUP BY status
+            """,
+            filters,
+        ).fetchall()
+        severity_rows = self.connection.execute(
+            """
+            SELECT severity, count(*) FROM incidents
+            WHERE is_delete = FALSE AND last_detected_at >= %s AND last_detected_at < %s
+              AND (%s::bigint IS NULL OR endpoint_id = %s::bigint)
+            GROUP BY severity
+            """,
+            filters,
+        ).fetchall()
+        time_rows = self.connection.execute(
+            """
+            SELECT date_bin(%s * interval '1 second', last_detected_at, TIMESTAMPTZ '1970-01-01 00:00:00+00'),
+                   status, count(*)
+            FROM incidents
+            WHERE is_delete = FALSE AND last_detected_at >= %s AND last_detected_at < %s
+              AND (%s::bigint IS NULL OR endpoint_id = %s::bigint)
+            GROUP BY 1, status ORDER BY 1, status
+            """,
+            (interval_seconds,) + filters,
+        ).fetchall()
+        return {
+            "by_status": {str(status): int(count) for status, count in status_rows},
+            "by_severity": {str(severity): int(count) for severity, count in severity_rows},
+            "time_series": [
+                {"bucket_start_at": row[0], "status": str(row[1]), "count": int(row[2])}
+                for row in time_rows
+            ],
+        }
 
     def detail(self, incident_id: int) -> dict[str, Any] | None:
         with self.connection.cursor(row_factory=dict_row) as cursor:
@@ -942,17 +1346,39 @@ class IncidentRepository:
             row = cursor.fetchone()
         return dict(row) if row is not None else None
 
-    def alerts_for_incident(self, incident_id: int) -> list[dict[str, Any]]:
+    def alerts_for_incident(self, incident_id: int, *, limit: int | None = None) -> list[dict[str, Any]]:
+        pagination = " LIMIT %s" if limit is not None else ""
         with self.connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute(
-                """
+                f"""
                 SELECT a.* FROM incident_alerts ia JOIN alerts a ON a.alert_id = ia.alert_id
                 WHERE ia.incident_id = %s AND ia.is_delete = FALSE AND a.is_delete = FALSE
-                ORDER BY a.detected_at DESC, a.alert_id DESC
+                ORDER BY a.detected_at DESC, a.alert_id DESC{pagination}
                 """,
-                (incident_id,),
+                (incident_id,) if limit is None else (incident_id, limit),
             )
             return [dict(row) for row in cursor.fetchall()]
+
+    def counts_by_event_ids(
+        self,
+        event_ids: Sequence[str],
+        *,
+        from_: datetime,
+        to: datetime,
+    ) -> dict[str, int]:
+        if not event_ids:
+            return {}
+        rows = self.connection.execute(
+            """
+            SELECT event_id, count(*)
+            FROM alerts
+            WHERE is_delete = FALSE AND detected_at >= %s AND detected_at < %s
+              AND event_id = ANY(%s::uuid[])
+            GROUP BY event_id
+            """,
+            (from_, to, list(event_ids)),
+        ).fetchall()
+        return {str(event_id): int(count) for event_id, count in rows}
 
 
 class IngestMetadataRepository:
@@ -1086,10 +1512,261 @@ class IngestMetadataRepository:
             cursor.execute("SELECT * FROM ingest_metadata WHERE is_delete = FALSE")
             return [dict(row) for row in cursor.fetchall()]
 
-    def restore_buckets(self, endpoint_ids: Sequence[int], from_: datetime, to: datetime) -> list[dict[str, Any]]:
+    def summary(self, *, endpoint_id: int | None = None) -> dict[str, Any]:
+        filters = (endpoint_id, endpoint_id)
+
+        def grouped(column: str) -> dict[str, int]:
+            rows = self.connection.execute(
+                f"""
+                SELECT {column}, count(*) FROM ingest_metadata
+                WHERE is_delete = FALSE AND (%s::bigint IS NULL OR endpoint_id = %s::bigint)
+                GROUP BY {column}
+                """,
+                filters,
+            ).fetchall()
+            return {str(value): int(count) for value, count in rows}
+
+        total = self.connection.execute(
+            """
+            SELECT count(*) FROM ingest_metadata
+            WHERE is_delete = FALSE AND (%s::bigint IS NULL OR endpoint_id = %s::bigint)
+            """,
+            filters,
+        ).fetchone()[0]
+        return {
+            "total": int(total),
+            "by_backend": grouped("storage_backend"),
+            "by_class": grouped("storage_class"),
+            "by_status": grouped("storage_status"),
+        }
+
+    def archive_candidates(self, *, completed_before: datetime, limit: int = 10) -> list[dict[str, Any]]:
         with self.connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute(
                 """
+                SELECT hot.*, archive.storage_path AS archive_storage_path
+                FROM ingest_metadata AS hot
+                LEFT JOIN ingest_metadata AS archive
+                  ON archive.endpoint_id = hot.endpoint_id
+                 AND archive.bucket_start_at = hot.bucket_start_at
+                 AND archive.storage_backend = 'S3'
+                 AND archive.storage_class = 'GLACIER_FLEXIBLE_RETRIEVAL'
+                 AND archive.is_delete = FALSE
+                WHERE hot.storage_backend = 'CLICKHOUSE'
+                  AND hot.storage_class = 'HOT'
+                  AND hot.storage_status = 'HOT'
+                  AND hot.is_delete = FALSE
+                  AND hot.bucket_end_at <= %s
+                  AND (
+                      archive.endpoint_id IS NULL
+                      OR archive.archive_verified_at IS NULL
+                      OR archive.checksum_sha256 IS NULL
+                      OR archive.event_count <> hot.event_count
+                  )
+                ORDER BY hot.bucket_start_at ASC, hot.endpoint_id ASC
+                LIMIT %s
+                """,
+                (completed_before, limit),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    @contextmanager
+    def archive_guard(self, *, endpoint_id: int, bucket_start_at: datetime) -> Iterator[dict[str, Any] | None]:
+        lock_name = f"edr_events:{bucket_start_at.astimezone(UTC).date().isoformat()}"
+        with self.connection.transaction():
+            self.connection.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (lock_name,))
+            with self.connection.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """
+                    SELECT * FROM ingest_metadata
+                    WHERE endpoint_id = %s AND bucket_start_at = %s
+                      AND storage_backend = 'CLICKHOUSE' AND storage_class = 'HOT'
+                      AND storage_status = 'HOT' AND is_delete = FALSE
+                    FOR UPDATE
+                    """,
+                    (endpoint_id, bucket_start_at),
+                )
+                row = cursor.fetchone()
+            yield dict(row) if row is not None else None
+
+    def record_verified_archive(
+        self,
+        *,
+        endpoint_id: int,
+        bucket_start_at: datetime,
+        bucket_end_at: datetime,
+        storage_path: str,
+        event_count: int,
+        size_bytes: int,
+        checksum_sha256: str,
+        verified_at: datetime,
+    ) -> None:
+        with self.connection.transaction():
+            self.connection.execute(
+                """
+                UPDATE ingest_metadata
+                SET event_count = %s, updated_at = %s
+                WHERE endpoint_id = %s AND bucket_start_at = %s
+                  AND storage_backend = 'CLICKHOUSE' AND storage_class = 'HOT'
+                  AND storage_status = 'HOT' AND is_delete = FALSE
+                """,
+                (event_count, verified_at, endpoint_id, bucket_start_at),
+            )
+            self.connection.execute(
+                """
+                INSERT INTO ingest_metadata (
+                    endpoint_id, bucket_start_at, bucket_end_at, storage_backend, storage_class,
+                    storage_status, storage_path, event_count, size_bytes, checksum_sha256,
+                    archived_at, archive_verified_at, restore_requested_at, restored_at,
+                    restore_expires_at, last_error, created_at, updated_at, is_delete
+                ) VALUES (
+                    %s, %s, %s, 'S3', 'GLACIER_FLEXIBLE_RETRIEVAL', 'ARCHIVED', %s,
+                    %s, %s, %s, %s, %s, NULL, NULL, NULL, NULL, %s, %s, FALSE
+                )
+                ON CONFLICT (endpoint_id, bucket_start_at, storage_backend, storage_class) DO UPDATE SET
+                    bucket_end_at = EXCLUDED.bucket_end_at,
+                    storage_status = 'ARCHIVED',
+                    storage_path = EXCLUDED.storage_path,
+                    event_count = EXCLUDED.event_count,
+                    size_bytes = EXCLUDED.size_bytes,
+                    checksum_sha256 = EXCLUDED.checksum_sha256,
+                    archived_at = EXCLUDED.archived_at,
+                    archive_verified_at = EXCLUDED.archive_verified_at,
+                    restore_requested_at = NULL,
+                    restored_at = NULL,
+                    restore_expires_at = NULL,
+                    last_error = NULL,
+                    updated_at = EXCLUDED.updated_at,
+                    is_delete = FALSE
+                """,
+                (
+                    endpoint_id,
+                    bucket_start_at,
+                    bucket_end_at,
+                    storage_path,
+                    event_count,
+                    size_bytes,
+                    checksum_sha256,
+                    verified_at,
+                    verified_at,
+                    verified_at,
+                    verified_at,
+                ),
+            )
+
+    def partition_deletion_candidates(self, *, verified_before: datetime, limit: int = 10) -> list[datetime]:
+        rows = self.connection.execute(
+            """
+            SELECT bucket_start_at
+            FROM ingest_metadata
+            WHERE storage_backend = 'CLICKHOUSE' AND storage_class = 'HOT'
+            GROUP BY bucket_start_at
+            HAVING (
+                bool_or(is_delete = TRUE AND partition_deleted_at IS NULL)
+                OR (
+                    bool_or(is_delete = FALSE)
+                    AND bool_and(
+                        is_delete = TRUE OR EXISTS (
+                            SELECT 1 FROM ingest_metadata AS archive
+                            WHERE archive.endpoint_id = ingest_metadata.endpoint_id
+                              AND archive.bucket_start_at = ingest_metadata.bucket_start_at
+                              AND archive.storage_backend = 'S3'
+                              AND archive.storage_class = 'GLACIER_FLEXIBLE_RETRIEVAL'
+                              AND archive.is_delete = FALSE
+                              AND archive.archive_verified_at IS NOT NULL
+                              AND archive.archive_verified_at <= %s
+                              AND archive.checksum_sha256 IS NOT NULL
+                              AND archive.event_count = ingest_metadata.event_count
+                        )
+                    )
+                )
+            )
+            ORDER BY bucket_start_at ASC
+            LIMIT %s
+            """,
+            (verified_before, limit),
+        ).fetchall()
+        return [row[0] for row in rows]
+
+    def claim_partition_deletion(self, *, bucket_start_at: datetime, verified_before: datetime, now: datetime) -> bool:
+        lock_name = f"edr_events:{bucket_start_at.astimezone(UTC).date().isoformat()}"
+        with self.connection.transaction():
+            self.connection.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (lock_name,))
+            pending = self.connection.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1 FROM ingest_metadata
+                    WHERE bucket_start_at = %s AND storage_backend = 'CLICKHOUSE'
+                      AND storage_class = 'HOT' AND is_delete = TRUE AND partition_deleted_at IS NULL
+                )
+                """,
+                (bucket_start_at,),
+            ).fetchone()[0]
+            if pending:
+                return True
+            eligibility = self.connection.execute(
+                """
+                SELECT count(*) AS hot_count,
+                       bool_and(EXISTS (
+                           SELECT 1 FROM ingest_metadata AS archive
+                           WHERE archive.endpoint_id = hot.endpoint_id
+                             AND archive.bucket_start_at = hot.bucket_start_at
+                             AND archive.storage_backend = 'S3'
+                             AND archive.storage_class = 'GLACIER_FLEXIBLE_RETRIEVAL'
+                             AND archive.is_delete = FALSE
+                             AND archive.archive_verified_at IS NOT NULL
+                             AND archive.archive_verified_at <= %s
+                             AND archive.checksum_sha256 IS NOT NULL
+                             AND archive.event_count = hot.event_count
+                       )) AS all_verified
+                FROM ingest_metadata AS hot
+                WHERE hot.bucket_start_at = %s
+                  AND hot.storage_backend = 'CLICKHOUSE' AND hot.storage_class = 'HOT'
+                  AND hot.storage_status = 'HOT' AND hot.is_delete = FALSE
+                """,
+                (verified_before, bucket_start_at),
+            ).fetchone()
+            if int(eligibility[0]) == 0 or not bool(eligibility[1]):
+                return False
+            self.connection.execute(
+                """
+                UPDATE ingest_metadata
+                SET is_delete = TRUE, updated_at = %s
+                WHERE bucket_start_at = %s AND storage_backend = 'CLICKHOUSE'
+                  AND storage_class = 'HOT' AND storage_status = 'HOT' AND is_delete = FALSE
+                """,
+                (now, bucket_start_at),
+            )
+            return True
+
+    def mark_partition_deleted(self, *, bucket_start_at: datetime, deleted_at: datetime) -> None:
+        with self.connection.transaction():
+            self.connection.execute(
+                """
+                UPDATE ingest_metadata
+                SET partition_deleted_at = %s, updated_at = %s
+                WHERE bucket_start_at = %s AND storage_backend = 'CLICKHOUSE'
+                  AND storage_class = 'HOT' AND is_delete = TRUE AND partition_deleted_at IS NULL
+                """,
+                (deleted_at, deleted_at, bucket_start_at),
+            )
+
+    def restore_buckets(
+        self,
+        endpoint_ids: Sequence[int],
+        from_: datetime,
+        to: datetime,
+        *,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        pagination = " LIMIT %s OFFSET %s" if limit is not None else ""
+        values: tuple[Any, ...] = (list(endpoint_ids), to, from_)
+        if limit is not None:
+            values += (limit, offset)
+        with self.connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                f"""
                 SELECT archive.*
                 FROM ingest_metadata AS archive
                 WHERE archive.endpoint_id = ANY(%s)
@@ -1108,11 +1785,66 @@ class IngestMetadataRepository:
                         AND hot.storage_status = 'HOT'
                         AND hot.is_delete = FALSE
                   )
-                ORDER BY archive.bucket_start_at DESC, archive.endpoint_id ASC
+                ORDER BY archive.bucket_start_at DESC, archive.endpoint_id ASC{pagination}
                 """,
-                (list(endpoint_ids), to, from_),
+                values,
             )
             return list(cursor.fetchall())
+
+    def count_restore_buckets(self, endpoint_ids: Sequence[int], from_: datetime, to: datetime) -> int:
+        row = self.connection.execute(
+            """
+            SELECT count(*)
+            FROM ingest_metadata AS archive
+            WHERE archive.endpoint_id = ANY(%s)
+              AND archive.bucket_start_at < %s
+              AND archive.bucket_end_at > %s
+              AND archive.storage_backend = 'S3'
+              AND archive.storage_class = 'GLACIER_FLEXIBLE_RETRIEVAL'
+              AND archive.is_delete = FALSE
+              AND NOT EXISTS (
+                  SELECT 1 FROM ingest_metadata AS hot
+                  WHERE hot.endpoint_id = archive.endpoint_id
+                    AND hot.bucket_start_at = archive.bucket_start_at
+                    AND hot.storage_backend = 'CLICKHOUSE'
+                    AND hot.storage_class = 'HOT'
+                    AND hot.storage_status = 'HOT'
+                    AND hot.is_delete = FALSE
+              )
+            """,
+            (list(endpoint_ids), to, from_),
+        ).fetchone()
+        return int(row[0])
+
+    def restore_bucket(self, *, endpoint_id: int, bucket_start_at: datetime) -> dict[str, Any] | None:
+        with self.connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """
+                SELECT * FROM ingest_metadata
+                WHERE endpoint_id = %s AND bucket_start_at = %s
+                  AND storage_backend = 'S3' AND storage_class = 'GLACIER_FLEXIBLE_RETRIEVAL'
+                  AND is_delete = FALSE
+                """,
+                (endpoint_id, bucket_start_at),
+            )
+            row = cursor.fetchone()
+            return dict(row) if row is not None else None
+
+    def requested_restores(self, *, limit: int = 100) -> list[dict[str, Any]]:
+        with self.connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """
+                SELECT * FROM ingest_metadata
+                WHERE storage_backend = 'S3'
+                  AND storage_class = 'GLACIER_FLEXIBLE_RETRIEVAL'
+                  AND storage_status = 'RESTORE_REQUESTED'
+                  AND is_delete = FALSE
+                ORDER BY restore_requested_at ASC NULLS FIRST, endpoint_id ASC, bucket_start_at ASC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            return [dict(row) for row in cursor.fetchall()]
 
     def request_restore(
         self,

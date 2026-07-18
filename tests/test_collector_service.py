@@ -133,6 +133,14 @@ def test_envelope_and_size_limits(monkeypatch) -> None:
         collector.telemetry(b"{}", content_encoding=None, certificate=identity())
 
 
+def test_gzip_expansion_is_stopped_at_uncompressed_limit(monkeypatch) -> None:
+    collector, _producer = service(monkeypatch)
+    compressed = gzip.compress(b"x" * (10 * 1024 * 1024))
+
+    with pytest.raises(PayloadTooLargeError):
+        collector.telemetry(compressed, content_encoding="gzip", certificate=identity())
+
+
 def test_all_kafka_acknowledgements_failed_is_503(monkeypatch) -> None:
     collector, _producer = service(monkeypatch, [False])
     with pytest.raises(ServiceUnavailableError) as caught:

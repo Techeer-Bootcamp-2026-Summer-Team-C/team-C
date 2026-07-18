@@ -103,8 +103,8 @@ def test_actual_http_kafka_storage_detection_failure_and_replay_flow() -> None:
     s3_bucket = "edr-failures"
     bootstrap = os.getenv("TEST_KAFKA_BOOTSTRAP", "127.0.0.1:59092")
     clickhouse = clickhouse_connect.get_client(
-        host="127.0.0.1",
-        port=58123,
+        host=os.getenv("TEST_CLICKHOUSE_HOST", "127.0.0.1"),
+        port=int(os.getenv("TEST_CLICKHOUSE_PORT", "58123")),
         username="edr",
         password=clickhouse_password,
         database="edr",
@@ -140,7 +140,10 @@ def test_actual_http_kafka_storage_detection_failure_and_replay_flow() -> None:
     settings = Settings(
         jwt_secret="test-jwt",
         postgres_dsn=postgres_dsn,
-        clickhouse_dsn=f"http://edr:{clickhouse_password}@127.0.0.1:58123/edr",
+        clickhouse_dsn=(
+            f"http://edr:{clickhouse_password}@{os.getenv('TEST_CLICKHOUSE_HOST', '127.0.0.1')}:"
+            f"{int(os.getenv('TEST_CLICKHOUSE_PORT', '58123'))}/edr"
+        ),
         kafka_bootstrap_servers=bootstrap,
         s3_endpoint_url=s3_endpoint,
         s3_access_key_id=s3_access_key,

@@ -17,6 +17,7 @@ Principles:
 
 import ipaddress
 import json
+import logging
 from datetime import datetime
 
 from .contracts.enums import DnsRecordType
@@ -32,6 +33,18 @@ from .dns_lookup import DnsLookupError, forward_lookup, normalize_domain, revers
 from .dns_lookup import lookup as raw_lookup
 from .errors import ApplicationError
 from .storage.clickhouse import EventRepository
+
+LOGGER = logging.getLogger(__name__)
+MAX_CORRELATION_EVENTS = 10_000
+MAX_CORRELATION_VALUES = 20_000
+CORRELATION_EVENT_COLUMNS = [
+    "remote_domain",
+    "http_host",
+    "tls_sni",
+    "remote_ip",
+    "dns_query",
+    "dns_answers_json",
+]
 
 
 def _to_application_error(error: DnsLookupError) -> ApplicationError:
@@ -138,6 +151,8 @@ class DnsIntelligenceService:
             if not canonical:
                 return None
             if canonical != target:
+                if canonical not in related and len(related) >= MAX_CORRELATION_VALUES:
+                    raise _correlation_too_large()
                 related.setdefault(canonical, (value_type, set()))[1].add(source)
             return canonical, value_type
 
@@ -149,6 +164,8 @@ class DnsIntelligenceService:
             source_canonical, source_type = source
             target_canonical, target_type = destination
             key = (relation, source_canonical, target_canonical)
+            if key not in relationships and len(relationships) >= MAX_CORRELATION_VALUES:
+                raise _correlation_too_large()
             relationships.setdefault(key, (source_type, target_type, set()))[2].add(evidence_source)
 
         def observed_domain(row: dict[str, object], field: str) -> str | None:
@@ -171,16 +188,31 @@ class DnsIntelligenceService:
             else:
                 for address in forward_lookup(target):
                     relate(target, address, "RESOLVES_TO", "LIVE_DNS")
-        except DnsLookupError:
-            pass  # a correlation lookup should still return what our own events know
+        except DnsLookupError as error:
+            LOGGER.warning("live DNS correlation lookup failed code=%s", error.code)
 
+        remaining = MAX_CORRELATION_EVENTS
         if is_ip:
-            for row in self.events.search(from_=from_, to=to, endpoint_ids=endpoint_ids, remote_ip=target):
+            remote_rows, remaining = self._event_rows(
+                remaining,
+                from_=from_,
+                to=to,
+                endpoint_ids=endpoint_ids,
+                remote_ip=target,
+            )
+            for row in remote_rows:
                 for field in ("remote_domain", "http_host", "tls_sni"):
                     domain = observed_domain(row, field)
                     if domain:
                         relate(domain, target, "RESOLVES_TO", "OBSERVED_EVENTS")
-            for row in self.events.search(from_=from_, to=to, endpoint_ids=endpoint_ids, dns_answer_ip=target):
+            answer_rows, remaining = self._event_rows(
+                remaining,
+                from_=from_,
+                to=to,
+                endpoint_ids=endpoint_ids,
+                dns_answer_ip=target,
+            )
+            for row in answer_rows:
                 domain = observed_domain(row, "dns_query")
                 if domain:
                     relate(domain, target, "RESOLVES_TO", "OBSERVED_EVENTS")
@@ -188,7 +220,14 @@ class DnsIntelligenceService:
             # related_domain matches the exact name or a subdomain across remote_domain,
             # http_host, tls_sni, and dns_query; from each matched event we collect both the
             # contacted IP and any resolved answer IPs.
-            for row in self.events.search(from_=from_, to=to, endpoint_ids=endpoint_ids, related_domain=target):
+            domain_rows, remaining = self._event_rows(
+                remaining,
+                from_=from_,
+                to=to,
+                endpoint_ids=endpoint_ids,
+                related_domain=target,
+            )
+            for row in domain_rows:
                 matching_domains: set[str] = set()
                 for field in ("remote_domain", "http_host", "tls_sni", "dns_query"):
                     domain = observed_domain(row, field)
@@ -235,3 +274,26 @@ class DnsIntelligenceService:
             related=items,
             relationships=relationship_items,
         )
+
+    def _event_rows(self, remaining: int, **filters: object) -> tuple[list[dict[str, object]], int]:
+        if remaining <= 0:
+            raise _correlation_too_large()
+        rows = self.events.search(
+            **filters,
+            columns=CORRELATION_EVENT_COLUMNS,
+            limit=remaining + 1,
+        )
+        if len(rows) > remaining:
+            raise _correlation_too_large()
+        return rows, remaining - len(rows)
+
+
+def _correlation_too_large() -> ApplicationError:
+    return ApplicationError(
+        400,
+        "VALIDATION_ERROR",
+        (
+            f"Correlation range contains more than {MAX_CORRELATION_EVENTS} events; "
+            "narrow the time range or Endpoint filter."
+        ),
+    )

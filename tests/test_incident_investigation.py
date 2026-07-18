@@ -77,8 +77,8 @@ class IncidentRows:
     def detail(self, _incident_id: int) -> dict | None:
         return self.incident
 
-    def alerts_for_incident(self, _incident_id: int) -> list[dict]:
-        return list(self.alerts)
+    def alerts_for_incident(self, _incident_id: int, *, limit: int | None = None) -> list[dict]:
+        return list(self.alerts[:limit]) if limit is not None else list(self.alerts)
 
 
 class EventRows:
@@ -185,6 +185,6 @@ def test_oversized_graph_is_capped_without_dangling_edges() -> None:
     assert result.truncated is True
     assert result.node_count == len(result.nodes) == MAX_INVESTIGATION_NODES
     assert result.edge_count <= MAX_INVESTIGATION_EDGES
-    assert len(result.warnings) == 260
+    assert len(result.warnings) == 250
     node_ids = {node.node_id for node in result.nodes}
     assert all(edge.source_node_id in node_ids and edge.target_node_id in node_ids for edge in result.edges)

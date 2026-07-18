@@ -1,5 +1,5 @@
-import gzip
 import json
+import zlib
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal, Protocol
 from urllib.parse import urlsplit
@@ -181,15 +181,22 @@ class CollectorService:
         )
 
     def _decode_body(self, body: bytes, content_encoding: str | None) -> bytes:
-        if len(body) > MAX_BODY_BYTES and content_encoding != "gzip":
+        if len(body) > MAX_BODY_BYTES:
             raise PayloadTooLargeError("Telemetry body exceeds 5 MiB.")
         if content_encoding not in {None, "", "identity", "gzip"}:
             raise RequestValidationError("Unsupported Content-Encoding.")
         if content_encoding == "gzip":
             try:
-                body = gzip.decompress(body)
-            except gzip.BadGzipFile as error:
+                decompressor = zlib.decompressobj(16 + zlib.MAX_WBITS)
+                body = decompressor.decompress(body, MAX_BODY_BYTES + 1)
+                if len(body) <= MAX_BODY_BYTES:
+                    body += decompressor.flush(MAX_BODY_BYTES + 1 - len(body))
+            except zlib.error as error:
                 raise RequestValidationError("Telemetry gzip body is invalid.") from error
+            if len(body) > MAX_BODY_BYTES:
+                raise PayloadTooLargeError("Uncompressed telemetry body exceeds 5 MiB.")
+            if not decompressor.eof or decompressor.unused_data:
+                raise RequestValidationError("Telemetry gzip body is invalid.")
         if len(body) > MAX_BODY_BYTES:
             raise PayloadTooLargeError("Uncompressed telemetry body exceeds 5 MiB.")
         return body

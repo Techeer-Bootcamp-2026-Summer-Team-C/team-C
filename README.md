@@ -102,7 +102,7 @@ py -3.13 -m tools.local_demo down
 | --- | --- | --- |
 | Edge/API | Nginx + FastAPI | `nginx`, `backend` |
 | Event Broker | Kafka | `kafka` |
-| Worker | Event Storage Worker + Detection Worker | `event-storage-worker`, `detection-worker` |
+| Worker | Event Storage Worker + Detection Worker + Storage Lifecycle Worker | `event-storage-worker`, `detection-worker`, `storage-lifecycle-worker` |
 | Relational DB | PostgreSQL | `postgres` |
 | Event DB | ClickHouse | `clickhouse` |
 | Frontend | Vercel | 로컬에서만 `frontend` 컨테이너 |
