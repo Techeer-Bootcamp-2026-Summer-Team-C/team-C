@@ -23,6 +23,7 @@ import "./styles/pages/alerts.css";
 import "./styles/pages/incidents.css";
 import "./styles/pages/endpoints-events.css";
 import "./styles/pages/intelligence-operations.css";
+import "./styles/pages/details.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {

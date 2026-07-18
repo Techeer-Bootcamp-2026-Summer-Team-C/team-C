@@ -49,6 +49,11 @@ describe("Incident investigation contract", () => {
     fireEvent.click(within(evidence).getByRole("button", { name: "Contains" }));
     expect(onSelect).toHaveBeenCalledWith({ kind: "EDGE", id: "edge-1" });
     expect(screen.queryByRole("application", { name: "Incident investigation graph" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Observed nodes in large view" }));
+    expect(screen.getByRole("dialog", { name: "Observed nodes · expanded investigation" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close expanded investigation" }));
+    expect(screen.queryByRole("dialog", { name: "Observed nodes · expanded investigation" })).not.toBeInTheDocument();
   });
 
   it("synchronizes graph context with timeline evidence and Process Tree PID", () => {

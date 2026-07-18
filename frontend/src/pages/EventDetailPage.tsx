@@ -6,7 +6,7 @@ import { ApiError } from "../api/client";
 import { api } from "../api/endpoints";
 import { ProcessTree } from "../components/ProcessTree";
 import { RawPayloadViewer } from "../components/RawPayloadViewer";
-import { DefinitionGrid, EmptyState, ErrorState, PageHeader, Panel, Skeleton, StatusPill } from "../components/ui";
+import { DetailLedger, DetailLedgerSection, EmptyState, ErrorState, PageHeader, Skeleton, StatusPill } from "../components/ui";
 import type { EventDetailDto } from "../contracts";
 import { eventDetailGroups, type EventDetailGroup } from "../features/eventPresentation";
 import { safeReturnPath } from "../features/listInteractions";
@@ -52,22 +52,26 @@ function EventDetail({ event, processTree }: { event: EventDetailDto; processTre
   const { locale, t } = useI18n();
   return <>
     <PageHeader eyebrow={`EVENT · SCHEMA V${event.schemaVersion}`} title={event.processName ?? event.remoteDomain ?? event.filePath ?? event.eventType} description={event.eventId} actions={<StatusPill value={event.eventType} />} />
-    <section className="detail-grid event-detail-grid">
-      {eventDetailGroups(event).map((group) => <Panel key={group} title={t(groupTitle(group))} subtitle={t(groupSubtitle(group))}><DefinitionGrid items={groupItems(event, group, locale, t)} /></Panel>)}
-      <Panel title={t("event.payloadIdentity")} subtitle={t("event.payloadSubtitle")}><DefinitionGrid items={[{ label: t("event.payloadSha"), value: <code>{event.payloadSha256}</code> }, { label: t("event.schemaVersion"), value: event.schemaVersion }]} /></Panel>
-      <Panel className="wide" title={t("event.processTree")} subtitle={t("event.processTreeSubtitle")} meta={<StatusPill value="READ ONLY" />}>{processTree}</Panel>
-      <div className="wide"><RawPayloadViewer payload={event.rawPayload} /></div>
+    <section aria-label={t("event.groupIdentity")} className="event-anchor-strip">
+      <div><span>Event ID</span><code>{event.eventId}</code></div>
+      <div><span>Endpoint</span><Link to={`/endpoints/${event.endpointId}`}>{event.hostname} · {event.endpointId}</Link></div>
+      <div><span>{t("event.occurred")}</span><strong>{formatDateTime(event.occurredAt)}</strong></div>
+      <div><span>{t("event.ingested")}</span><strong>{formatDateTime(event.ingestedAt)}</strong></div>
     </section>
+    <DetailLedger className="event-evidence-ledger">
+      {eventDetailGroups(event).map((group) => <DetailLedgerSection items={groupItems(event, group, locale, t)} key={group} subtitle={t(groupSubtitle(group))} title={t(groupTitle(group))} />)}
+      <DetailLedgerSection title={t("event.payloadIdentity")} subtitle={t("event.payloadSubtitle")} items={[{ label: t("event.payloadSha"), value: <code>{event.payloadSha256}</code> }, { label: t("event.schemaVersion"), value: event.schemaVersion }]} />
+      <DetailLedgerSection className="event-process-tree-section" title={t("event.processTree")} subtitle={t("event.processTreeSubtitle")}><div className="detail-ledger-meta"><StatusPill value="READ ONLY" /></div>{processTree}</DetailLedgerSection>
+    </DetailLedger>
+    <RawPayloadViewer payload={event.rawPayload} />
   </>;
 }
 
 function groupItems(event: EventDetailDto, group: EventDetailGroup, locale: "EN" | "KO", t: ReturnType<typeof useI18n>["t"]): { label: string; value: ReactNode }[] {
   switch (group) {
     case "IDENTITY": return [
-      { label: "Event ID", value: <code>{event.eventId}</code> }, { label: t("event.batchId"), value: <code>{event.batchId}</code> },
-      { label: "Endpoint", value: <Link to={`/endpoints/${event.endpointId}`}>{event.hostname} · {event.endpointId}</Link> }, { label: "Agent ID", value: <code>{event.agentId}</code> },
+      { label: t("event.batchId"), value: <code>{event.batchId}</code> }, { label: "Agent ID", value: <code>{event.agentId}</code> },
       { label: t("endpoints.operatingSystem"), value: event.osType }, { label: t("endpoint.ipAddress"), value: displayNullable(event.ipAddress) },
-      { label: t("event.occurred"), value: formatDateTime(event.occurredAt) }, { label: t("event.ingested"), value: formatDateTime(event.ingestedAt) },
     ];
     case "PROCESS": return [
       { label: t("event.processName"), value: displayNullable(event.processName) }, { label: t("event.processPath"), value: displayNullable(event.processPath) },

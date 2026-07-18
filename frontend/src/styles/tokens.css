@@ -1,3 +1,5 @@
+/* Hallmark · genre: modern-minimal · tone: technical-austere · anchor hue: royal blue · macrostructure: Workbench · design-system: docs/frontend/DESIGN.md · contrast: pass (40–41) · nav: N2 sidebar · footer: none · designed-as-app · desktop: 1280–2399 · wallboard: 2400–3840 · mobile: excluded by user */
+/* Hallmark · pre-emit critique: P5 H4 E4 S5 R4 V4 */
 :root {
   color-scheme: dark;
   font-family: "Inter Variable", Inter, "Pretendard Variable", Pretendard, "Noto Sans KR", system-ui, sans-serif;
@@ -38,6 +40,7 @@
   --text-disabled: #62646d;
   --text-placeholder: #858791;
   --text-inverse: #f8faff;
+  --color-accent-ink: var(--text-inverse);
   --text-link: #84adff;
   --text-link-hover: #b6ceff;
   --text-code: #a9c4ff;
@@ -80,6 +83,7 @@
   --elevation-tooltip: 0 6px 18px rgba(0, 0, 0, .36);
   --elevation-raised: 0 10px 28px rgba(0, 0, 0, .42);
   --elevation-modal: 0 24px 64px var(--shadow-color);
+  --shadow-panel-edge: inset 0 1px 0 rgba(255, 255, 255, .03);
 
   --space-1: 2px;
   --space-2: 4px;
@@ -93,8 +97,8 @@
   --space-12: 24px;
   --space-16: 32px;
   --space-20: 40px;
-  --radius-control: 7px;
-  --radius-panel: 10px;
+  --radius-control: 4px;
+  --radius-panel: 6px;
   --radius-pill: 999px;
 
   --weight-regular: 400;
@@ -189,6 +193,7 @@
   --text-disabled: #98a2b3;
   --text-placeholder: #667085;
   --text-inverse: #ffffff;
+  --color-accent-ink: var(--text-inverse);
   --text-link: #175cd3;
   --text-link-hover: #004eeb;
   --text-code: #1849a9;

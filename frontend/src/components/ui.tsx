@@ -186,8 +186,12 @@ export function Skeleton({ rows = 5 }: { rows?: number }) {
   return <div aria-label={t("common.loading")} className="skeleton" role="status"><span className="skeleton-heading" />{Array.from({ length: rows }, (_, index) => <span className="skeleton-row" key={index} />)}</div>;
 }
 
-export function EmptyState({ title, message }: { title: string; message: string }) {
-  return <div className="state-card empty"><CircleAlert aria-hidden="true" size={22} /><strong>{title}</strong><p>{message}</p></div>;
+export function EmptyState({ title, message, actions, compact = false }: { title: string; message: string; actions?: ReactNode; compact?: boolean }) {
+  return <div className={compact ? "state-card empty compact" : "state-card empty"}>
+    <CircleAlert aria-hidden="true" size={22} />
+    <div className="state-copy"><strong>{title}</strong><p>{message}</p></div>
+    {actions ? <div className="state-actions">{actions}</div> : null}
+  </div>;
 }
 
 export function ErrorState({ error, onRetry, archiveAction = false }: {
@@ -257,6 +261,27 @@ export function StaleWarning({ error, onRetry }: { error: unknown; onRetry: () =
 
 export function DefinitionGrid({ items }: { items: readonly { label: string; value: ReactNode }[] }) {
   return <dl className="definition-grid">{items.map((item) => <div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl>;
+}
+
+export function DetailLedger({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <div className={`detail-ledger ${className}`.trim()}>{children}</div>;
+}
+
+export function DetailLedgerSection({ title, subtitle, items, children, className = "" }: {
+  title: string;
+  subtitle?: string;
+  items?: readonly { label: string; value: ReactNode }[];
+  children?: ReactNode;
+  className?: string;
+}) {
+  const titleId = useId();
+  return <section aria-labelledby={titleId} className={`detail-ledger-section ${className}`.trim()}>
+    <header><h2 id={titleId}>{title}</h2>{subtitle ? <p>{subtitle}</p> : null}</header>
+    <div className="detail-ledger-content">
+      {items ? <dl className="detail-fact-list">{items.map((item) => <div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl> : null}
+      {children}
+    </div>
+  </section>;
 }
 
 export function ResponseGuidance({ steps }: { steps: ResponseGuidanceStepDto[] }) {

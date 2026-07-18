@@ -54,19 +54,24 @@ Service identity                         Endpoint · Time · Refresh
 
 [ KPI ][ KPI ][ KPI ][ KPI ]
 
-[ Detection Activity 2fr ][ Alert Severity 1fr ]
+[ Detection Activity 2fr ][ Alert Severity ][ Fleet Distribution ]
 
 [ Highest-risk Endpoints 1fr ][ Incident Queue 1fr ]
 ```
 
-### Wide desktop: 1280px 이상
+### Wide desktop: 1280–1719px
 
 - EDR state: full-width command strip
 - KPI: `grid-template-columns: repeat(4, minmax(0, 1fr))`
-- 분석: `grid-template-columns: minmax(0, 2fr) minmax(0, 1fr)`
+- 분석: Detection Activity를 왼쪽 두 행에 두고 Alert Severity와 Fleet Distribution을 오른쪽에 세로로 쌓는다.
 - 조사 대기열: `grid-template-columns: repeat(2, minmax(0, 1fr))`
 - panel gap: 12px
 - page, toolbar와 grid의 좌우 edge를 일치시킨다.
+
+### Wallboard: 1720px 이상
+
+- 분석: `grid-template-columns: minmax(0, 2.1fr) minmax(0, .82fr) minmax(0, .92fr)`
+- Detection Activity, Alert Severity와 Fleet Distribution을 한 행에 펼쳐 시간 추세와 두 분포를 같은 시야에서 비교한다.
 
 ### 1024–1279px
 
@@ -80,19 +85,20 @@ Service identity                         Endpoint · Time · Refresh
 - DOM 순서를 유지해 1–2열로 재배치한다.
 - 별도 모바일 미학을 만들지 않지만 기능, focus, text와 overflow를 손상시키지 않는다.
 
-## 5. 9개 Block과 데이터 계약
+## 5. 10개 Block과 데이터 계약
 
 | 순서 | Block | 데이터 | 표현 |
 | ---: | --- | --- | --- |
 | 1 | EDR State | `edrState.status`, `score`, `reasonCodes`, `threatLevel`, `collectionHealth` | 종합 상태와 두 진단 bar |
 | 2 | Total Alerts | `dashboard.alerts.total` | KPI |
 | 3 | Critical Alerts | `dashboard.alerts.bySeverity`의 `CRITICAL` | KPI |
-| 4 | High-risk Endpoints | `endpointSummary.risk` | KPI |
+| 4 | HIGH-level Endpoints | `endpointSummary.risk.highRiskEndpointCount` | 정확한 `HIGH` 등급 KPI |
 | 5 | Open Incidents | `dashboard.incidents.open` | KPI |
 | 6 | Detection Activity | Event·Alert time series와 Incident `openCount` | 공통 X축 small multiples |
 | 7 | Alert Severity | 서버 `bySeverity` | donut과 Critical/High/Medium/Low count·percentage 목록 |
-| 8 | Highest-risk Endpoints | `GET /endpoints` 위험도 정렬 결과 | rank, 점수·level, Alert·Incident count, 상세 link |
-| 9 | Incident Queue | `GET /incidents?status=OPEN` | Severity, status, alert count, last detected |
+| 8 | Fleet Distribution | `endpointSummary.risk.byLevel`, `sensorHealth` | 현재 Risk level bar와 Sensor Health stack·legend |
+| 9 | Highest-risk Endpoints | `GET /endpoints` 위험도 정렬 결과 | rank, 점수·level, Alert·Incident count, 상세 link |
+| 10 | Incident Queue | `GET /incidents?status=OPEN` | Severity, status, alert count, last detected |
 
 표시 비율은 서버 count와 서버 total로 계산하는 presentation 값이다. Endpoint Risk, EDR score, time bucket과 severity count를 원본 record에서 다시 집계하지 않는다.
 
@@ -135,7 +141,13 @@ Endpoint scope 선택기는 기존 paged `q` search를 사용하며 전체 fleet
 - 각 category의 label, count와 percentage를 hover 없이 표시한다.
 - total이 0이면 `0%`로 안전하게 표시하고 빈 분모 계산을 하지 않는다.
 - semantic status color와 text를 함께 사용한다.
-- Endpoint Risk 분포 panel은 제거하지만 High-risk Endpoint KPI용 서버 aggregate는 유지한다.
+
+### Fleet Distribution
+
+- 서버 Endpoint Summary가 제공하는 `risk.byLevel`과 `sensorHealth` 집계만 사용한다.
+- Risk는 `CRITICAL → HIGH → MEDIUM → LOW`, Sensor Health는 `HEALTHY → DEGRADED → UNAVAILABLE` 고정 순서로 표시한다.
+- 현재 snapshot임을 명시하고 시간 추세, delta 또는 원본 Endpoint 재집계를 만들지 않는다.
+- Risk 또는 Sensor 집계가 비어 있으면 0개 snapshot으로 꾸미지 않고 각각의 empty 설명을 표시한다.
 
 ### 조사 대기열
 
@@ -214,7 +226,7 @@ frontend/src/features/overview/
 
 - 상태: 완료
 - EDR overall, Threat Level, Collection Health를 구현한다.
-- Total Alerts, Critical Alerts, High-risk Endpoints, Open Incidents를 연결한다.
+- Total Alerts, Critical Alerts, HIGH-level Endpoints, Open Incidents를 연결한다.
 - reason code, 계산 시각, time scope와 drill-down을 보존한다.
 
 완료 조건: API에 없는 delta 없이 normal·zero·empty·stale를 표시.
@@ -593,4 +605,61 @@ Bundle 변화:
 - 브라우저 QA: 계약형 mock과 Vite를 사용한 1440×1100 Overview에서 9 blocks, document/main horizontal overflow `false`, console error/warning 0건을 확인했다. panel 외곽선은 `#34353C`, control 외곽선은 `#5D5E67`, 내부 divider는 `#25262B`로 분리됐고 Login form은 panel token, autofocus input은 focus ring을 유지했다. 증거: `frontend/output/playwright/team-b-redesign/qa-border-refinement-final-1440.png`.
 - Bundle 변화: CSS token과 selector 교체만 포함하며 새 runtime dependency와 JS 동작 변화는 없다. Production build는 passed했고 기존 ECharts lazy chunk warning은 동일하다.
 - 남은 위험: 없음. 모바일은 사용자 요청에 따라 이번 시각 판정에서 제외했다.
+- 다음 Package: 없음.
+
+### REF-10. 대형 관제 Overview 정보 밀도 복원
+
+- 상태: 완료
+- 입력: Overview는 일반 요약 페이지가 아니라 대형 화면에 상시 표시하는 SOC 관제 화면이므로, 시간 추세와 분포 시각 자료를 같은 시야에 유지해야 한다는 사용자 피드백과 승인된 `overview-wallboard-before-after.html` After 안.
+- 범위: immutable Default Overview의 기존 Signal ribbon, EDR command strip, KPI 4개, Detection Activity, Alert Severity, 조사 Queue 2개를 보존하고 Endpoint Summary가 이미 제공하는 Risk level과 Sensor Health 집계를 하나의 Fleet distribution panel로 복원한다. Custom Dashboard widget catalog와 다른 route는 변경하지 않는다.
+- 계약 경계: `EndpointSummaryDto.risk.byLevel`과 `sensorHealth`만 사용한다. 원본 Endpoint 재집계, 추세 추정, delta, 담당자, SLA와 새 API·DTO는 추가하지 않는다. Fleet 정보는 현재 snapshot임을 명시하고 시간 추세처럼 표현하지 않는다.
+- 변경 파일: `frontend/src/features/overview/FleetDistributionPanel.tsx`, `frontend/src/features/overview/OverviewDashboard.tsx`, `frontend/src/styles/pages/overview.css`, `frontend/src/i18n/translations.ts`, `frontend/tests/overview-redesign.test.tsx`, `frontend/tests/custom-dashboard.test.tsx`, `docs/frontend/DESIGN.md`, `docs/frontend/FRONTEND_SPEC.md`, 이 실행계획.
+- 설계 판단: 1440px에서는 Detection Activity를 왼쪽 두 행에 두고 Alert Severity와 Fleet Distribution을 오른쪽에 쌓아 chart 폭을 지켰다. 1720px 이상에서는 세 분석 panel을 `2.1fr + .82fr + .92fr` 한 행으로 펼쳐 대형 관제 화면의 동시 판독성을 높였다. Default Overview만 10-block으로 확장하고 Custom Dashboard catalog는 기존 9개를 유지했다.
+- empty·overflow 처리: Risk와 Sensor 집계가 없으면 명시적 empty copy를 표시하고 임의의 0 snapshot을 만들지 않는다. panel grid child에 `min-width: 0`, 긴 label에 안전한 줄바꿈과 bar·legend 최소 폭을 적용했다.
+- 실행한 검증: `npm run test -- overview-redesign.test.tsx custom-dashboard.test.tsx locale.test.tsx components.test.tsx` → 4 files / 44 tests passed. `npm run typecheck`, `npm run lint`, `npm run build`, `npm run openapi:check`, `git diff --check` passed. 전체 `npm run test`는 25 files 중 24 files / 135 tests passed 후, 작업 전부터 있던 untracked duplicate `overviewLayoutStorage 2.ts`, `ThemeProvider 2.tsx`의 `localStorage` 사용을 source-boundary allowlist가 거부해 1 test가 실패했다. 이 두 사용자 파일은 변경·삭제하지 않았다.
+- 브라우저 QA: 계약형 mock으로 1440×1100, 1920×1200, 2560×1440을 확인했다. 세 크기 모두 document/main/panel 가로 overflow가 없고 2560에서는 10개 block과 두 queue가 한 viewport에 모두 들어왔다. 1440은 오른쪽 stack, 1920·2560은 세 분석 panel 한 행으로 렌더링되며 텍스트 겹침을 발견하지 않았다. 증거: `frontend/output/playwright/overview-wallboard/ref-10-1440-full.png`, `ref-10-1920.png`, `ref-10-2560.png`.
+- Bundle 변화: 새 runtime dependency 없음. production `OverviewPage` 112.34 kB / 34.40 kB gzip, route-local `DetectionActivityPanel` 500.26 kB / 171.11 kB gzip. 기존 ECharts lazy chunk 경고는 유지된다.
+- 남은 위험: 전체 test의 source-boundary 1건은 위 untracked duplicate 파일 때문에 계속 실패한다. 모바일 시각 QA는 사용자 요청에 따라 제외했다.
+- 다음 Package: 없음.
+
+### REF-11. 대형 관제 가독성·의미·overflow 보완
+
+- 상태: 완료
+- 입력: 실제 local Backend를 연결한 1920×1200, 2560×1440, 3840×2160 감사에서 확인한 4K 미사용 폭과 작은 meta text, `highRiskEndpointCount`의 오해 가능한 label, Sensor 상태의 전체 합계만 노출되는 문제, 1920 세로 scroll, 빈 Incident Queue 높이 불일치와 차트 Y축 label 겹침.
+- 범위: Default Overview만 수정한다. 다른 route, API·DTO·OpenAPI, query/polling, Custom Dashboard 9개 widget catalog는 변경하지 않는다. 모바일은 사용자 요청에 따라 시각 QA 범위에서 제외한다.
+- 의미 보완: `highRiskEndpointCount`는 `CRITICAL + HIGH`가 아니라 정확한 `HIGH` count이므로 KPI를 `HIGH-level Endpoints` / `HIGH 등급 Endpoints`로 명시했다. Fleet Risk와 Sensor 상태를 locale별 label로 표시하고, `sensorHealth`의 기존 `sensor + status + count` 행을 재집계 없이 Sensor별 compact stack과 접근성 요약으로 노출했다.
+- wallboard 보완: 2400px 이상은 Overview가 main 폭을 사용하고 2560×1440에는 meta 13px·body 15px·panel title 17px, 3000px·1600px 이상에는 meta 15px·body 17px·panel title 20px을 적용한다. 4K Fleet은 Risk와 Sensor를 두 열로 배치하며 Detection chart와 분석 panel 높이를 확장한다. 1920×1200은 analysis·queue 간격과 row padding을 압축하고 빈 Queue를 반대쪽 panel 높이에 맞춘다.
+- chart·overflow 보완: ECharts grid를 container 비율로 계산하고 220px 미만 compact chart는 Y축을 2분할·정수 간격으로 제한해 label 겹침을 제거했다. EDR 점수와 donut 중앙값의 line box를 실제 glyph 높이보다 크게 확보했고 2400px 이상 Signal header 폭도 확대했다.
+- 자동 검증: `npm run test -- overview-redesign.test.tsx custom-dashboard.test.tsx locale.test.tsx components.test.tsx` → 4 files / 44 tests passed. `npm run typecheck`, `npm run lint`, `npm run build`, `npm run openapi:check`, `git diff --check` passed. 전체 `npm run test`는 24 files / 135 tests passed 후 사용자 소유 untracked duplicate `overviewLayoutStorage 2.ts`, `ThemeProvider 2.tsx` 때문에 기존과 동일한 source-boundary 1건만 실패했다.
+- 실제 브라우저 QA: 1920×1200에서 main `clientHeight 1132px / scrollHeight 1132px`로 기존 약 208px scroll을 제거했고 10개 block overflow는 0건이었다. 2560×1440은 main 폭의 97.9%를 사용하고 block overflow 0건, 3840×2160은 98.7%를 사용하며 block overflow와 clipped strong text가 모두 0건이었다. 4K에서 실제 7일 Detection Activity, Severity donut, Fleet Sensor별 분해와 두 Queue를 동시에 확인했고 console error/warning은 0건이었다.
+- 증거: `frontend/output/playwright/overview-wallboard/complement-live-1920-chart.png`, `complement-live-3840-chart.png`.
+- Bundle 변화: 새 runtime dependency 없음. production `OverviewPage` 113.63 kB / 34.75 kB gzip, route-local `DetectionActivityPanel` 500.42 kB / 171.17 kB gzip. 기존 ECharts lazy chunk warning은 유지된다.
+- 다음 Package: 없음.
+
+### REF-12. 관제 상태 의미·대형 화면 fit 오류 교정
+
+- 상태: 완료
+- 입력: Hallmark 재감사에서 확인한 Sensor `UNAVAILABLE` 의미 색상 drift, Sensor별 exact count의 비시각 노출, 2560×1440 세로 overflow와 4K 세로 공간 미사용.
+- 범위: Default Overview의 Fleet Distribution과 2400px 이상 wallboard layout만 수정한다. 기존 색상 체계, panel 구조, API·DTO·query·polling, Custom Dashboard와 다른 route는 변경하지 않는다. 모바일은 사용자 요청에 따라 시각 QA에서 제외한다.
+- 의미 교정: 기존 디자인 계약대로 `UNAVAILABLE` stack·legend를 `--status-critical`로 복구했다. Sensor별 compact row에는 `Healthy/Degraded/Unavailable` label과 exact count를 항상 표시하고, 같은 내용을 accessible list name으로 제공해 색상이나 hover에 의존하지 않게 했다.
+- wallboard fit: 2400~2999px의 중간 높이 구간에서 Detection Activity canvas를 높이 기준으로 조정해 2560×1440의 43px 세로 overflow를 제거했다. 3000px·1600px 이상에서는 Overview page와 dashboard workspace가 main viewport 높이를 사용하고 Detection Activity가 남는 세로 공간을 흡수한다.
+- 자동 검증: `npm run test -- overview-redesign.test.tsx custom-dashboard.test.tsx locale.test.tsx components.test.tsx` → 4 files / 44 tests passed. `npm run typecheck`, `npm run lint`, `npm run build`, `npm run openapi:check`, `git diff --check` passed. 전체 `npm run test`는 24 files / 135 tests passed 후 사용자 소유 untracked duplicate `overviewLayoutStorage 2.ts`, `ThemeProvider 2.tsx` 때문에 기존과 동일한 source-boundary 1건만 실패했다.
+- 실제 브라우저 QA: 1920×1200과 2560×1440에서 main client/scroll height가 각각 `1132/1132`, `1372/1372`였고, 3840×2160은 `2092/2092`였다. 세 화면 모두 block overflow와 visible text overflow 0건, Sensor별 exact count client/scroll width 일치, `UNAVAILABLE` computed color `rgb(240, 68, 68)`, console error/warning 0건을 확인했다. 4K Overview page는 main content 높이 2044px을 사용한다.
+- 증거: `frontend/output/playwright/overview-wallboard/fix-final-1920.png`, `fix-final-2560.png`, `fix-final-3840.png`.
+- Bundle 변화: 새 runtime dependency 없음. production `OverviewPage` 113.83 kB / 34.78 kB gzip, route-local `DetectionActivityPanel` 500.42 kB / 171.18 kB gzip이며 기존 ECharts chunk warning은 유지된다.
+- 다음 Package: 없음.
+
+### REF-13. 영어 wallboard overflow 오류 교정
+
+- 상태: 완료
+- 입력: 최종 데스크톱 QA에서 재현한 1920×1200 영어 Fleet Distribution 하단 3px overflow와 1920×1200·3840×2160 영어 `Observed signal stream` 제목 잘림.
+- 범위: Default Overview의 wallboard 전용 CSS만 수정한다. 기존 10-block 구조, 380px 분석 행, 색상·타이포·데이터 계약, API·DTO·query·polling, Custom Dashboard와 다른 route는 변경하지 않는다. 모바일은 사용자 요청에 따라 시각 QA에서 제외한다.
+- 수정 원칙: 1920 compact Fleet은 전체 행 높이를 늘리지 않고 내부 gap과 snapshot note padding에서 필요한 4px만 회수한다. Signal ribbon은 1720px 이상과 3000px 이상에서 영어 제목이 한 줄로 표시되는 최소 header 폭만 확보한다.
+- 변경 파일: `frontend/src/styles/pages/overview.css`, 이 실행계획. 검증 artifact로 `frontend/output/playwright/overview-wallboard/ref-13-overflow-qa.js`와 EN/KO 1920·4K screenshot을 생성했다.
+- 구현 결과: 1720px 이상 Signal header를 210px, 3000px·1600px 이상을 270px로 조정했다. 1250px 이하 compact Fleet은 panel body gap과 snapshot note padding을 각각 6px에서 4px로 줄여 전체 분석 행 높이를 바꾸지 않고 4px 여유를 확보했다.
+- 자동 검증: `npm run test -- overview-redesign.test.tsx custom-dashboard.test.tsx locale.test.tsx components.test.tsx` → 4 files / 44 tests passed. `npm run typecheck`, `npm run lint`, `npm run build`, `npm run openapi:check`, `git diff --check` passed. 전체 `npm run test`는 24 files / 135 tests passed 후 사용자 소유 untracked duplicate `overviewLayoutStorage 2.ts`, `ThemeProvider 2.tsx` 때문에 기존과 동일한 source-boundary 1건만 실패했다.
+- 실제 브라우저 QA: 계약형 mock으로 EN/KO 각각 1920×1200, 2560×1440, 3840×2160을 측정했다. 여섯 화면 모두 main client/scroll width·height가 일치하고 10개 block overflow 0건, Sensor exact count width overflow 0건, console error/warning과 page error 0건이었다. 영어 1920 Fleet은 block `380/380px`, body `316/316px`, note boundary 초과 0px이며 Signal 제목은 `170/170px`이다. 영어 4K Signal 제목도 `230/230px`로 잘림이 없다.
+- 증거: `frontend/output/playwright/overview-wallboard/ref-13-en-1920.png`, `ref-13-en-3840.png`, `ref-13-ko-1920.png`, `ref-13-ko-3840.png`.
+- Bundle 변화: 새 runtime dependency와 JS 변화 없음. production `OverviewPage` 113.83 kB / 34.78 kB gzip, route-local `DetectionActivityPanel` 500.42 kB / 171.17 kB gzip이며 기존 ECharts chunk warning은 유지된다.
+- 남은 위험: 전체 test의 source-boundary 1건은 위 사용자 소유 중복 파일 때문에 계속 실패한다. 이번 CSS 오류 교정과 직접 관련된 미해결 사항은 없다.
 - 다음 Package: 없음.

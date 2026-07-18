@@ -5,12 +5,13 @@ import { ChartFrame, EdrStateSummary, ErrorState, KpiCard, Panel, Skeleton, Stal
 import type { DashboardSummaryDto, EndpointDto, EndpointSummaryDto, IncidentDto, TimeRangeQuery } from "../../contracts";
 import { useI18n } from "../../i18n/LocaleContext";
 import { AlertSeverityDonut } from "./AlertSeverityDonut";
+import { FleetDistributionPanel } from "./FleetDistributionPanel";
 import { IncidentQueueList, RiskEndpointRanking } from "./InvestigationQueues";
 import { OVERVIEW_WIDGET_TYPES, type OverviewWidgetType } from "../overviewLayout/overviewLayoutModel";
 
 const DetectionActivityPanel = lazy(() => import("./DetectionActivityPanel"));
 
-export const OVERVIEW_BLOCK_IDS = OVERVIEW_WIDGET_TYPES;
+export const OVERVIEW_BLOCK_IDS = [...OVERVIEW_WIDGET_TYPES, "fleet-distribution"] as const;
 
 export interface OverviewDashboardData {
   dashboard: DashboardSummaryDto | undefined;
@@ -49,6 +50,7 @@ export function OverviewDashboard({ data, queueState = { endpoints: IDLE_PANEL_S
     </div>
     <div className="overview-analysis-row">
       {(["detection-activity", "alert-severity"] as const).map((type) => <OverviewBlock id={type} key={type}><OverviewWidget data={data} queueState={queueState} summaryState={summaryState} type={type} /></OverviewBlock>)}
+      <OverviewBlock id="fleet-distribution"><ResourceFeedback data={data.endpoints} render={(endpoints) => <FleetDistributionPanel summary={endpoints} />} rows={5} state={summaryState.endpoints} /></OverviewBlock>
     </div>
     <div className="overview-queue-row">
       {(["highest-risk-endpoints", "incident-queue"] as const).map((type) => <OverviewBlock id={type} key={type}><OverviewWidget data={data} queueState={queueState} summaryState={summaryState} type={type} /></OverviewBlock>)}
@@ -66,7 +68,7 @@ export function OverviewWidget({ data, queueState = { endpoints: IDLE_PANEL_STAT
   }} rows={2} state={summaryState.dashboard} />;
   if (type === "kpi-high-risk-endpoints") return <ResourceFeedback data={data.endpoints} render={(endpoints) => <KpiCard detail={t("overview.highRiskEndpointsDetail")} icon={<ShieldAlert size={18} />} label={t("overview.highRiskEndpoints")} to={scopedPath("/endpoints?riskLevel=HIGH&sortBy=riskScore&sortOrder=desc", data.selectedEndpointId, "endpointIds")} tone={endpoints.risk.highRiskEndpointCount ? "high" : "neutral"} value={endpoints.risk.highRiskEndpointCount} />} rows={2} state={summaryState.endpoints} />;
   if (type === "kpi-open-incidents") return <ResourceFeedback data={data.dashboard} render={(dashboard) => <KpiCard detail={t("overview.currentlyOpen")} icon={<CircleAlert size={18} />} label={t("overview.openIncidents")} to={timeScopedPath("/incidents?status=OPEN", data.timeRange, data.selectedEndpointId)} tone={dashboard.incidents.openCount ? "info" : "neutral"} value={dashboard.incidents.openCount} />} rows={2} state={summaryState.dashboard} />;
-  if (type === "detection-activity") return <ResourceFeedback data={data.dashboard} render={(dashboard) => <ChartFrame description={t("overview.detectionActivityDescription")} fallback={<DetectionActivityTable alerts={dashboard.alerts.timeSeries} events={dashboard.events.timeSeries} incidents={dashboard.incidents.timeSeries} />} title={t("overview.detectionActivity")}><Suspense fallback={<Skeleton rows={4} />}><DetectionActivityPanel alerts={dashboard.alerts.timeSeries} events={dashboard.events.timeSeries} incidents={dashboard.incidents.timeSeries} /></Suspense></ChartFrame>} rows={5} state={summaryState.dashboard} />;
+  if (type === "detection-activity") return <ResourceFeedback data={data.dashboard} render={(dashboard) => <ChartFrame description={t("overview.detectionActivityDescription")} fallback={<DetectionActivityTable alerts={dashboard.alerts.timeSeries} events={dashboard.events.timeSeries} incidents={dashboard.incidents.timeSeries} />} title={t("overview.detectionActivity")}><Suspense fallback={<Skeleton rows={4} />}><DetectionActivityPanel alerts={dashboard.alerts.timeSeries} events={dashboard.events.timeSeries} incidents={dashboard.incidents.timeSeries} recoveryTo={timeScopedPath("/", { timePreset: "LATEST_7D" }, data.selectedEndpointId)} /></Suspense></ChartFrame>} rows={5} state={summaryState.dashboard} />;
   if (type === "alert-severity") return <ResourceFeedback data={data.dashboard} render={(dashboard) => <Panel title={t("overview.alertSeverity")} subtitle={t("overview.serverDistribution")}><AlertSeverityDonut label={t("overview.totalAlerts")} rows={dashboard.alerts.bySeverity} total={dashboard.alerts.totalCount} /></Panel>} rows={5} state={summaryState.dashboard} />;
   if (type === "highest-risk-endpoints") return <Panel title={t("overview.highestRiskEndpoints")} subtitle={t("overview.currentRiskSnapshot")}><QueueFeedback items={data.topEndpoints} render={(items) => <RiskEndpointRanking endpoints={items} />} state={queueState.endpoints} /></Panel>;
   return <Panel title={t("overview.incidentQueueWidget")} subtitle={t("overview.recentOpenIncidents")}><QueueFeedback items={data.incidentQueue} render={(items) => <IncidentQueueList incidents={items} />} state={queueState.incidents} /></Panel>;

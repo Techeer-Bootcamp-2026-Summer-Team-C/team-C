@@ -151,7 +151,7 @@ export function Popover({ label, trigger, children, className = "" }: {
   </div>;
 }
 
-export function Dialog({ open, onClose, title, eyebrow, children, actions, closeLabel = "Close" }: {
+export function Dialog({ open, onClose, title, eyebrow, children, actions, closeLabel = "Close", className = "" }: {
   open: boolean;
   onClose: () => void;
   title: string;
@@ -159,6 +159,7 @@ export function Dialog({ open, onClose, title, eyebrow, children, actions, close
   children: ReactNode;
   actions?: ReactNode;
   closeLabel?: string;
+  className?: string;
 }) {
   const titleId = useId();
   const panelRef = useRef<HTMLElement>(null);
@@ -167,7 +168,7 @@ export function Dialog({ open, onClose, title, eyebrow, children, actions, close
   return <div className="modal-layer" onMouseDown={(event) => {
     if (event.currentTarget === event.target) onClose();
   }} role="presentation">
-    <section aria-labelledby={titleId} aria-modal="true" className="dialog-surface" ref={panelRef} role="dialog">
+    <section aria-labelledby={titleId} aria-modal="true" className={`dialog-surface ${className}`.trim()} ref={panelRef} role="dialog">
       <button aria-label={closeLabel} className="dialog-close icon-button" data-autofocus onClick={onClose} type="button"><X aria-hidden="true" size={18} /></button>
       {eyebrow ? <span className="eyebrow">{eyebrow}</span> : null}
       <h2 id={titleId}>{title}</h2>

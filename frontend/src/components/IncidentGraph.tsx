@@ -48,7 +48,7 @@ export function IncidentGraph({
     id: edge.edgeId,
     source: edge.sourceNodeId,
     target: edge.targetNodeId,
-    label: `${edge.relation} · ${edge.evidence}`,
+    label: edge.relation.replaceAll("_", " "),
     ariaLabel: `${edge.relation}, ${edge.evidence}`,
     markerEnd: { type: MarkerType.ArrowClosed },
     selected: selection?.kind === "EDGE" && selection.id === edge.edgeId,

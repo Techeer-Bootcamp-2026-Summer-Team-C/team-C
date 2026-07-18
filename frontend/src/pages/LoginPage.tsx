@@ -1,4 +1,4 @@
-import { Activity, Database, LockKeyhole, Radar, Search, Shield } from "lucide-react";
+import { Activity, LockKeyhole, Search, Shield, ShieldCheck } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../api/client";
@@ -41,10 +41,9 @@ export function LoginPage() {
         <h1>Move from signal to evidence.</h1>
         <p>Review current risk, collection health, Alerts, Incidents, Endpoint state, and event evidence from one operational console.</p>
         <ol aria-label="EDR evidence flow" className="login-signal-route">
-          <li><Activity aria-hidden="true" size={17} /><span>01</span><strong>Signal</strong><small>Endpoint telemetry</small></li>
-          <li><Database aria-hidden="true" size={17} /><span>02</span><strong>Collect</strong><small>Durable event intake</small></li>
-          <li><Radar aria-hidden="true" size={17} /><span>03</span><strong>Detect</strong><small>RuleV1 mapping</small></li>
-          <li><Search aria-hidden="true" size={17} /><span>04</span><strong>Investigate</strong><small>Evidence chain</small></li>
+          <li><Activity aria-hidden="true" size={17} /><span>01 SIGNAL</span><strong>Observe endpoint telemetry</strong><small>Current source-backed state</small></li>
+          <li><Search aria-hidden="true" size={17} /><span>02 EVIDENCE</span><strong>Trace alerts to source records</strong><small>Endpoint, event, and relationship context</small></li>
+          <li><ShieldCheck aria-hidden="true" size={17} /><span>03 DECISION</span><strong>Follow backend lifecycle state</strong><small>Read-only guidance and explicit actions</small></li>
         </ol>
         <div className="login-boundary"><strong>Read the state. Follow the source.</strong><span>Risk and EDR State are calculated by the Backend.</span></div>
       </section>

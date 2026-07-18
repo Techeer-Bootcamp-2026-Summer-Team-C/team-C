@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Globe2, Network, Radar, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { lazy, Suspense, useMemo, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/endpoints";
@@ -14,7 +14,6 @@ import {
   Field,
   GlobalFilterBar,
   Inspector,
-  KpiCard,
   PageHeader,
   Panel,
   PartialFailureWarning,
@@ -207,14 +206,14 @@ export function IntelligenceContent({
 }) {
   const { t } = useI18n();
   return <>
-    <section className="kpi-grid intelligence-kpis">
+    <section aria-label={t("intelligence.title")} className="intelligence-summary-rail">
       {dashboard ? <>
-        <KpiCard detail={t("intelligence.mappedTactics")} icon={<Radar size={18} />} label={t("intelligence.mitreTactics")} value={dashboard.alerts.mitreTactics.length} />
-        <KpiCard detail={t("intelligence.mappedTechniques")} icon={<Activity size={18} />} label={t("intelligence.mitreTechniques")} value={dashboard.alerts.mitreTechniques.length} />
+        <article><span>{t("intelligence.mitreTactics")}</span><strong>{dashboard.alerts.mitreTactics.length}</strong><small>{t("intelligence.mappedTactics")}</small></article>
+        <article><span>{t("intelligence.mitreTechniques")}</span><strong>{dashboard.alerts.mitreTechniques.length}</strong><small>{t("intelligence.mappedTechniques")}</small></article>
       </> : null}
       {topology ? <>
-        <KpiCard detail={t("intelligence.observedEgress")} icon={<Network size={18} />} label={t("intelligence.topologyNodes")} value={topology.nodes.length} />
-        <KpiCard detail={t("intelligence.uniqueRelationships")} icon={<Globe2 size={18} />} label={t("intelligence.egressEdges")} value={topology.edges.length} />
+        <article><span>{t("intelligence.topologyNodes")}</span><strong>{topology.nodes.length}</strong><small>{t("intelligence.observedEgress")}</small></article>
+        <article><span>{t("intelligence.egressEdges")}</span><strong>{topology.edges.length}</strong><small>{t("intelligence.uniqueRelationships")}</small></article>
       </> : null}
     </section>
     {dashboard ? <MitreAndSignals dashboard={dashboard} /> : null}

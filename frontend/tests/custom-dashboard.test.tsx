@@ -60,13 +60,14 @@ describe("custom Overview dashboard", () => {
     expect(screen.queryByRole("button", { name: "New dashboard" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit dashboard" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Delete dashboard" })).not.toBeInTheDocument();
-    expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(9);
+    expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(10);
   });
 
   it("keeps Default immutable and Cancel leaves no dashboard or storage", async () => {
     const user = userEvent.setup();
     const { container } = renderWorkspace();
-    expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(9);
+    expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(0);
+    expect(screen.getByRole("region", { name: "Dashboard controls" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit dashboard" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "New dashboard" }));
@@ -84,7 +85,8 @@ describe("custom Overview dashboard", () => {
     expect(localStorage.getItem("edr.overviewDashboards.v1.user.31")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Open dashboard settings" }));
     expect(screen.getByRole("combobox", { name: "Dashboard" })).toHaveValue("default");
-    expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(9);
+    expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(0);
+    expect(screen.getByRole("region", { name: "Dashboard controls" })).toBeInTheDocument();
   });
 
   it("hides used catalog items, restores them after removal, and deletes to Default", async () => {
@@ -136,7 +138,8 @@ describe("custom Overview dashboard", () => {
     await user.click(within(dialog).getByRole("button", { name: "Delete dashboard" }));
     await user.click(screen.getByRole("button", { name: "Open dashboard settings" }));
     expect(screen.getByRole("combobox", { name: "Dashboard" })).toHaveValue("default");
-    expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(9);
+    expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(0);
+    expect(screen.getByRole("region", { name: "Dashboard controls" })).toBeInTheDocument();
   });
 
   it("shows a completion state when all unique widget types are on the canvas", async () => {
@@ -147,7 +150,7 @@ describe("custom Overview dashboard", () => {
       "Current EDR state",
       "Total alerts",
       "Critical alerts",
-      "High-risk endpoints",
+      "HIGH-level endpoints",
       "Open incidents",
       "Detection activity",
       "Alert severity",

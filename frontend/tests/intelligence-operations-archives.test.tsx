@@ -41,7 +41,9 @@ describe("WP-08 Intelligence, Operations, and Archives", () => {
   });
 
   it("renders MITRE selection, Rules/Signals tabs, and a synchronized table fallback without bytesOut", async () => {
-    renderWithProviders(<IntelligenceContent dashboard={dashboardFixture} graphEnabled={false} topology={topologyFixture} />);
+    const { container } = renderWithProviders(<IntelligenceContent dashboard={dashboardFixture} graphEnabled={false} topology={topologyFixture} />);
+    expect(screen.getByRole("region", { name: "Intelligence" })).toHaveClass("intelligence-summary-rail");
+    expect(container.querySelectorAll(".intelligence-summary-rail .kpi-card")).toHaveLength(0);
     expect(screen.getByRole("heading", { name: "MITRE matrix" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /TA0002/ }));
     const mitreInspector = screen.getByRole("complementary", { name: "Execution" });
@@ -58,6 +60,9 @@ describe("WP-08 Intelligence, Operations, and Archives", () => {
   it("orders current pipeline problems first and never represents a historical flow", () => {
     expect(buildPipelineSnapshot(healthFixture, ingestFixture).map((stage) => stage.id)).toEqual(["DETECTION", "STORAGE", "COLLECTION"]);
     renderWithProviders(<PipelineSnapshot health={healthFixture} ingest={ingestFixture} />);
+    const collection = screen.getByRole("region", { name: "Multi-layer collection path table" });
+    expect(within(collection).getAllByRole("row")).toHaveLength(10);
+    expect(collection.querySelectorAll(".status-pill")).toHaveLength(0);
     const stages = within(screen.getByRole("list", { name: "Current pipeline snapshot" })).getAllByRole("listitem");
     expect(stages[0]).toHaveTextContent("Detection");
     expect(stages[0]).toHaveTextContent("Unavailable");
