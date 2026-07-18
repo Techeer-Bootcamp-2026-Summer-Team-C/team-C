@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import {
   DEFAULT_DASHBOARD_ID,
   createOverviewId,
+  deduplicateOverviewWidgetTypes,
   type CustomDashboardWidget,
   type CustomOverviewDashboard,
 } from "./overviewLayoutModel";
@@ -40,7 +41,7 @@ export function OverviewLayoutProvider({ children, userId }: { children: ReactNo
   const createDashboard = useCallback((name: string, widgets: CustomDashboardWidget[]) => {
     const id = createOverviewId("dashboard");
     const now = new Date().toISOString();
-    const dashboard: CustomOverviewDashboard = { id, name: name.trim(), widgets, createdAt: now, updatedAt: now };
+    const dashboard: CustomOverviewDashboard = { id, name: name.trim(), widgets: deduplicateOverviewWidgetTypes(widgets), createdAt: now, updatedAt: now };
     commit((current) => ({ dashboards: [...current.dashboards, dashboard], activeDashboardId: id }));
     return id;
   }, [commit]);
@@ -49,7 +50,7 @@ export function OverviewLayoutProvider({ children, userId }: { children: ReactNo
     commit((current) => ({
       ...current,
       dashboards: current.dashboards.map((dashboard) => dashboard.id === dashboardId
-        ? { ...dashboard, name: name.trim(), widgets, updatedAt: new Date().toISOString() }
+        ? { ...dashboard, name: name.trim(), widgets: deduplicateOverviewWidgetTypes(widgets), updatedAt: new Date().toISOString() }
         : dashboard),
     }));
   }, [commit]);

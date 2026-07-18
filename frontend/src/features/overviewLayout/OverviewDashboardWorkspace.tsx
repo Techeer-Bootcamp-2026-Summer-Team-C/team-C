@@ -1,5 +1,23 @@
-import { GripVertical, LayoutDashboard, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useId, useMemo, useState, useSyncExternalStore, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import {
+  Activity,
+  BellRing,
+  ChartPie,
+  CircleAlert,
+  CircleCheck,
+  GripVertical,
+  LayoutDashboard,
+  ListFilter,
+  ListOrdered,
+  MonitorDot,
+  Pencil,
+  Plus,
+  ShieldCheck,
+  Siren,
+  Trash2,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+import { useCallback, useId, useMemo, useRef, useState, useSyncExternalStore, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Link } from "react-router-dom";
 import {
   ResponsiveGridLayout,
@@ -35,7 +53,20 @@ import {
 
 const WIDGET_DRAG_TYPE = "application/x-edr-overview-widget";
 const FIXED_GRID_COMPACTOR = getCompactor(null, false, true);
+const WIDGET_CATALOG_ICONS: Record<OverviewWidgetType, LucideIcon> = {
+  "edr-state": ShieldCheck,
+  "kpi-alerts": BellRing,
+  "kpi-critical-alerts": Siren,
+  "kpi-high-risk-endpoints": MonitorDot,
+  "kpi-open-incidents": CircleAlert,
+  "detection-activity": Activity,
+  "alert-severity": ChartPie,
+  "highest-risk-endpoints": ListOrdered,
+  "incident-queue": ListFilter,
+};
 type DesktopBreakpoint = "desktop";
+type PlacementIssue = "duplicate" | "space";
+type BuilderFocusTarget = { kind: "palette"; type: OverviewWidgetType } | { kind: "widget"; uid: string };
 
 interface BuilderState {
   dashboardId: string | null;
@@ -201,19 +232,41 @@ function DashboardBuilder({ builder, editingAvailable, onCancel, onChange, onSav
 }) {
   const { t } = useI18n();
   const [draggedType, setDraggedType] = useState<OverviewWidgetType | null>(null);
-  const [placementUnavailable, setPlacementUnavailable] = useState(false);
+  const [placementIssue, setPlacementIssue] = useState<PlacementIssue | null>(null);
+  const pendingFocusRef = useRef<BuilderFocusTarget | null>(null);
   const valid = Boolean(builder.name.trim()) && builder.widgets.length > 0;
+  const usedTypes = new Set(builder.widgets.map((widget) => widget.type));
+  const availableDefinitions = OVERVIEW_WIDGET_DEFINITIONS.filter((definition) => !usedTypes.has(definition.type));
+  const registerPaletteButton = useCallback((type: OverviewWidgetType, element: HTMLButtonElement | null) => {
+    if (element && pendingFocusRef.current?.kind === "palette" && pendingFocusRef.current.type === type) {
+      pendingFocusRef.current = null;
+      element.focus();
+    }
+  }, []);
+  const registerWidgetHandle = useCallback((uid: string, element: HTMLButtonElement | null) => {
+    if (element && pendingFocusRef.current?.kind === "widget" && pendingFocusRef.current.uid === uid) {
+      pendingFocusRef.current = null;
+      element.focus();
+    }
+  }, []);
 
   function addWidget(type: OverviewWidgetType, position?: Pick<CustomDashboardWidget, "x" | "y" | "w" | "h">): void {
     if (!editingAvailable) return;
+    setDraggedType(null);
+    if (builder.widgets.some((widget) => widget.type === type)) {
+      setPlacementIssue("duplicate");
+      return;
+    }
     const widgets = position
       ? applyDroppedWidget(builder.widgets, type, position)
       : tryAddOverviewWidget(builder.widgets, type);
     if (widgets === builder.widgets) {
-      setPlacementUnavailable(true);
+      setPlacementIssue("space");
       return;
     }
-    setPlacementUnavailable(false);
+    setPlacementIssue(null);
+    const addedWidget = widgets[widgets.length - 1];
+    if (addedWidget) pendingFocusRef.current = { kind: "widget", uid: addedWidget.uid };
     onChange({ ...builder, widgets });
   }
 
@@ -230,38 +283,51 @@ function DashboardBuilder({ builder, editingAvailable, onCancel, onChange, onSav
       <aside aria-label={t("dashboard.palette")} className="dashboard-widget-palette">
         <h3>{t("dashboard.palette")}</h3>
         <p>{t("dashboard.paletteDescription")}</p>
-        <ul>{OVERVIEW_WIDGET_DEFINITIONS.map((definition) => {
+        <ul>{availableDefinitions.map((definition) => {
           const title = t(definition.titleKey);
+          const WidgetIcon = WIDGET_CATALOG_ICONS[definition.type];
           return <li key={definition.type}><button
             aria-label={t("dashboard.addWidget", { widget: title })}
+            data-widget-type={definition.type}
             disabled={!editingAvailable}
             draggable={editingAvailable}
             onClick={() => addWidget(definition.type)}
             onDragEnd={() => setDraggedType(null)}
             onDragStart={(event) => startPaletteDrag(event, definition.type, setDraggedType)}
+            ref={(element) => registerPaletteButton(definition.type, element)}
             type="button"
-          ><Plus aria-hidden="true" size={15} /><span>{title}</span><small>{definition.defaultW} × {definition.defaultH}</small></button></li>;
-        })}</ul>
+          >
+            <span aria-hidden="true" className="dashboard-widget-palette-icon"><WidgetIcon size={17} strokeWidth={1.7} /></span>
+            <span className="dashboard-widget-palette-copy"><strong>{title}</strong><small>{definition.defaultW} × {definition.defaultH}</small></span>
+          </button></li>;
+        })}{availableDefinitions.length === 0 ? <li className="dashboard-widget-palette-complete" role="status">
+          <CircleCheck aria-hidden="true" size={18} />
+          <span>{t("dashboard.paletteComplete")}</span>
+        </li> : null}</ul>
       </aside>
       <div className="dashboard-builder-canvas">
         <OverviewSignalRibbon data={props.data} />
-        {placementUnavailable ? <p className="dashboard-placement-unavailable" role="status">{t("dashboard.widgetPlacementUnavailable")}</p> : null}
-        {!builder.widgets.length ? <div className="dashboard-builder-empty"><LayoutDashboard aria-hidden="true" size={28} /><h3>{t("dashboard.emptyTitle")}</h3><p>{t("dashboard.emptyDescription")}</p></div> : <DashboardGrid
+        {placementIssue ? <p className="dashboard-placement-unavailable" role="status">{t(placementIssue === "duplicate" ? "dashboard.widgetAlreadyAdded" : "dashboard.widgetPlacementUnavailable")}</p> : null}
+        <DashboardGrid
           desktopLayout={editingAvailable}
           draggedType={draggedType}
           editable={editingAvailable}
+          onHandleRef={registerWidgetHandle}
           onDropWidget={(type, position) => addWidget(type, position)}
           onRemove={(uid) => {
-            setPlacementUnavailable(false);
+            const removedWidget = builder.widgets.find((widget) => widget.uid === uid);
+            if (removedWidget) pendingFocusRef.current = { kind: "palette", type: removedWidget.type };
+            setPlacementIssue(null);
             onChange({ ...builder, widgets: builder.widgets.filter((widget) => widget.uid !== uid) });
           }}
           onWidgetsChange={(widgets) => {
-            setPlacementUnavailable(false);
+            setPlacementIssue(null);
             onChange({ ...builder, widgets });
           }}
           props={props}
+          showEmptyState
           widgets={builder.widgets}
-        />}
+        />
       </div>
     </div>
   </section>;
@@ -280,14 +346,16 @@ function CustomDashboardView({ dashboard, desktopLayout, props }: { dashboard: C
   </section>;
 }
 
-function DashboardGrid({ desktopLayout = true, draggedType = null, editable, onDropWidget, onRemove, onWidgetsChange, props, widgets }: {
+function DashboardGrid({ desktopLayout = true, draggedType = null, editable, onDropWidget, onHandleRef, onRemove, onWidgetsChange, props, showEmptyState = false, widgets }: {
   desktopLayout?: boolean;
   draggedType?: OverviewWidgetType | null;
   editable: boolean;
   onDropWidget?: (type: OverviewWidgetType, position: Pick<CustomDashboardWidget, "x" | "y" | "w" | "h">) => void;
+  onHandleRef?: (uid: string, element: HTMLButtonElement | null) => void;
   onRemove?: (uid: string) => void;
   onWidgetsChange?: (widgets: CustomDashboardWidget[]) => void;
   props: OverviewDashboardProps;
+  showEmptyState?: boolean;
   widgets: CustomDashboardWidget[];
 }) {
   const { t } = useI18n();
@@ -312,6 +380,7 @@ function DashboardGrid({ desktopLayout = true, draggedType = null, editable, onD
           className="custom-widget-drag-handle"
           disabled={!editable}
           onKeyDown={editable && onWidgetsChange ? (event) => handleWidgetKeyboardAdjustment(event, widgets, widget.uid, onWidgetsChange) : undefined}
+          ref={(element) => onHandleRef?.(widget.uid, element)}
           title={t("dashboard.dragHandle", { widget: title })}
           type="button"
         ><GripVertical aria-hidden="true" size={15} /><span>{title}</span></button>
@@ -325,7 +394,7 @@ function DashboardGrid({ desktopLayout = true, draggedType = null, editable, onD
 
   if (!desktopLayout) return <div className="custom-dashboard-static-grid" data-dashboard-editing="disabled">{keyboardInstructions}{children}</div>;
 
-  return <div className="custom-dashboard-grid-container" data-dashboard-editing={editable ? "enabled" : "disabled"} ref={containerRef}>
+  return <div className={`custom-dashboard-grid-container${showEmptyState && !widgets.length ? " is-empty" : ""}`} data-dashboard-editing={editable ? "enabled" : "disabled"} ref={containerRef}>
     {keyboardInstructions}
     {mounted ? <ResponsiveGridLayout<DesktopBreakpoint>
       breakpoints={{ desktop: 0 }}
@@ -351,6 +420,7 @@ function DashboardGrid({ desktopLayout = true, draggedType = null, editable, onD
       rowHeight={44}
       width={width}
     >{children}</ResponsiveGridLayout> : null}
+    {showEmptyState && !widgets.length ? <div className="dashboard-builder-empty"><LayoutDashboard aria-hidden="true" size={28} /><h3>{t("dashboard.emptyTitle")}</h3><p>{t("dashboard.emptyDescription")}</p></div> : null}
   </div>;
 }
 
@@ -376,6 +446,7 @@ export function applyDroppedWidget(
   type: OverviewWidgetType,
   position: Pick<CustomDashboardWidget, "x" | "y" | "w" | "h">,
 ): CustomDashboardWidget[] {
+  if (widgets.some((widget) => widget.type === type)) return widgets;
   const created = createOverviewWidget(type);
   const widget = normalizeGridWidget(created, position);
   const available = findAvailableOverviewWidgetPosition(widget, widgets);
@@ -401,6 +472,7 @@ function widgetsDoNotOverlap(widgets: readonly CustomDashboardWidget[]): boolean
 }
 
 export function tryAddOverviewWidget(widgets: CustomDashboardWidget[], type: OverviewWidgetType): CustomDashboardWidget[] {
+  if (widgets.some((widget) => widget.type === type)) return widgets;
   const widget = createOverviewWidget(type);
   const available = findAvailableOverviewWidgetPosition(widget, widgets);
   return available ? [...widgets, { ...widget, ...available }] : widgets;

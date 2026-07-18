@@ -40,6 +40,17 @@ describe("Overview layout context", () => {
     expect(screen.getByTestId("active")).toHaveTextContent("default");
     expect(screen.getByTestId("names")).toBeEmptyDOMElement();
   });
+
+  it("enforces one widget per type at create and update boundaries", async () => {
+    render(<OverviewLayoutProvider userId={31}><LayoutProbe /></OverviewLayoutProvider>);
+    await userEvent.click(screen.getByRole("button", { name: "create duplicates" }));
+    let store = JSON.parse(localStorage.getItem("edr.overviewDashboards.v1.user.31") ?? "{}");
+    expect(store.dashboards[0].widgets.map((widget: { type: string }) => widget.type)).toEqual(["kpi-alerts", "kpi-critical-alerts"]);
+
+    await userEvent.click(screen.getByRole("button", { name: "update duplicates" }));
+    store = JSON.parse(localStorage.getItem("edr.overviewDashboards.v1.user.31") ?? "{}");
+    expect(store.dashboards[0].widgets.map((widget: { type: string }) => widget.type)).toEqual(["kpi-alerts", "kpi-critical-alerts", "kpi-open-incidents"]);
+  });
 });
 
 function LayoutProbe() {
@@ -50,6 +61,8 @@ function LayoutProbe() {
     <button onClick={() => layout.createDashboard("Investigation", [createOverviewWidget("kpi-alerts")])} type="button">create</button>
     <button onClick={() => layout.activeDashboard && layout.updateDashboard(layout.activeDashboard.id, "Priority view", layout.activeDashboard.widgets)} type="button">rename</button>
     <button onClick={() => layout.activeDashboard && layout.updateDashboard(layout.activeDashboard.id, layout.activeDashboard.name, layout.activeDashboard.widgets.map((widget, index) => index === 0 ? { ...widget, x: 4, y: 3, w: 4, h: 3 } : widget))} type="button">move</button>
+    <button onClick={() => layout.createDashboard("Deduplicated", [createOverviewWidget("kpi-alerts"), createOverviewWidget("kpi-alerts"), createOverviewWidget("kpi-critical-alerts")])} type="button">create duplicates</button>
+    <button onClick={() => layout.activeDashboard && layout.updateDashboard(layout.activeDashboard.id, layout.activeDashboard.name, [...layout.activeDashboard.widgets, createOverviewWidget("kpi-alerts"), createOverviewWidget("kpi-open-incidents")])} type="button">update duplicates</button>
     <button onClick={() => layout.activeDashboard && layout.deleteDashboard(layout.activeDashboard.id)} type="button">delete</button>
   </>;
 }

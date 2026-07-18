@@ -7,6 +7,7 @@ import {
   readOverviewLayoutState,
   writeOverviewLayoutState,
 } from "../src/features/overviewLayout/overviewLayoutStorage";
+import { OVERVIEW_WIDGET_DEFINITIONS } from "../src/features/overviewLayout/overviewLayoutModel";
 
 describe("Overview dashboard storage model", () => {
   it("separates storage by numeric userId", () => {
@@ -20,7 +21,7 @@ describe("Overview dashboard storage model", () => {
     expect(normalizeOverviewDashboardStore({ version: 2, dashboards: [] }).dashboards).toEqual([]);
   });
 
-  it("drops unknown widgets and duplicate UIDs, clamps geometry, and allows duplicate types", () => {
+  it("drops unknown widgets, duplicate UIDs, and duplicate types while clamping geometry", () => {
     const store = normalizeOverviewDashboardStore({
       version: 1,
       dashboards: [{
@@ -39,10 +40,10 @@ describe("Overview dashboard storage model", () => {
 
     expect(store.dashboards).toHaveLength(1);
     expect(store.dashboards[0]?.name).toBe("Investigation");
-    expect(store.dashboards[0]?.widgets.map((widget) => widget.type)).toEqual(["kpi-alerts", "kpi-alerts"]);
+    expect(store.dashboards[0]?.widgets.map((widget) => widget.type)).toEqual(["kpi-alerts", "alert-severity"]);
     expect(store.dashboards[0]?.widgets.map((widget) => widget.uid)).toEqual(["widget-a", "widget-b"]);
     expect(store.dashboards[0]?.widgets[0]).toMatchObject({ x: 0, y: 0, w: 6, h: 2 });
-    expect(store.dashboards[0]?.widgets[1]).toMatchObject({ x: 9, y: 254, w: 3, h: 2 });
+    expect(store.dashboards[0]?.widgets[1]).toMatchObject({ x: 6, y: 0, w: 4, h: 7 });
     expect(store.dashboards[0]?.createdAt).toBe(new Date(0).toISOString());
   });
 
@@ -63,25 +64,25 @@ describe("Overview dashboard storage model", () => {
     expect(() => writeOverviewLayoutState(1, { dashboards: [], activeDashboardId: "default" }, storage)).not.toThrow();
   });
 
-  it("keeps all valid dashboards and widget instances during normalization", () => {
+  it("keeps all valid dashboards and unique widget types during normalization", () => {
     const dashboards = Array.from({ length: 25 }, (_, dashboardIndex) => ({
       id: `dash-${dashboardIndex}`,
       name: `Dashboard ${dashboardIndex}`,
       createdAt: "2026-07-17T00:00:00.000Z",
       updatedAt: "2026-07-17T00:00:00.000Z",
-      widgets: Array.from({ length: dashboardIndex === 0 ? 65 : 1 }, (_, widgetIndex) => ({
+      widgets: (dashboardIndex === 0 ? OVERVIEW_WIDGET_DEFINITIONS : OVERVIEW_WIDGET_DEFINITIONS.slice(0, 1)).map((definition, widgetIndex) => ({
         uid: `widget-${dashboardIndex}-${widgetIndex}`,
-        type: "kpi-alerts",
-        x: (widgetIndex % 4) * 3,
-        y: Math.floor(widgetIndex / 4) * 2,
-        w: 3,
-        h: 2,
+        type: definition.type,
+        x: 0,
+        y: 0,
+        w: definition.defaultW,
+        h: definition.defaultH,
       })),
     }));
 
     const store = normalizeOverviewDashboardStore({ version: 1, dashboards });
     expect(store.dashboards).toHaveLength(25);
-    expect(store.dashboards[0]?.widgets).toHaveLength(65);
+    expect(store.dashboards[0]?.widgets).toHaveLength(OVERVIEW_WIDGET_DEFINITIONS.length);
     expect(store.dashboards[24]?.id).toBe("dash-24");
   });
 
@@ -95,26 +96,29 @@ describe("Overview dashboard storage model", () => {
         updatedAt: "2026-07-17T00:00:00.000Z",
         widgets: [
           { uid: "widget-1", type: "kpi-alerts", x: 0, y: 0, w: 3, h: 2 },
-          { uid: "widget-2", type: "kpi-alerts", x: 0, y: 0, w: 3, h: 2 },
+          { uid: "widget-2", type: "kpi-open-incidents", x: 0, y: 0, w: 3, h: 2 },
         ],
       }],
     });
 
     expect(store.dashboards[0]?.widgets).toEqual([
       { uid: "widget-1", type: "kpi-alerts", x: 0, y: 0, w: 3, h: 2 },
-      { uid: "widget-2", type: "kpi-alerts", x: 3, y: 0, w: 3, h: 2 },
+      { uid: "widget-2", type: "kpi-open-incidents", x: 3, y: 0, w: 3, h: 2 },
     ]);
   });
 
-  it("bounds normalization work for over-capacity stored widget arrays", () => {
-    const widgets = Array.from({ length: 5_000 }, (_, index) => ({
-      uid: `widget-${index}`,
-      type: "kpi-alerts",
-      x: 0,
-      y: 0,
-      w: 3,
-      h: 2,
-    }));
+  it("bounds normalization work for large duplicate-type arrays", () => {
+    const widgets = Array.from({ length: 5_000 }, (_, index) => {
+      const definition = OVERVIEW_WIDGET_DEFINITIONS[index % OVERVIEW_WIDGET_DEFINITIONS.length]!;
+      return {
+        uid: `widget-${index}`,
+        type: definition.type,
+        x: 0,
+        y: 0,
+        w: definition.defaultW,
+        h: definition.defaultH,
+      };
+    });
     const startedAt = performance.now();
     const store = normalizeOverviewDashboardStore({
       version: 1,
@@ -127,7 +131,7 @@ describe("Overview dashboard storage model", () => {
       }],
     });
 
-    expect(store.dashboards[0]?.widgets).toHaveLength(512);
+    expect(store.dashboards[0]?.widgets).toHaveLength(OVERVIEW_WIDGET_DEFINITIONS.length);
     expect(performance.now() - startedAt).toBeLessThan(1_000);
   });
 

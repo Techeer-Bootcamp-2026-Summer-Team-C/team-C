@@ -89,20 +89,27 @@ describe("custom Overview dashboard", () => {
     expect(screen.getByRole("region", { name: "Dashboard controls" })).toBeInTheDocument();
   });
 
-  it("creates duplicate widget instances, edits them through Save, and deletes to Default", async () => {
+  it("hides used catalog items, restores them after removal, and deletes to Default", async () => {
     const user = userEvent.setup();
     const { container } = renderWorkspace();
     await user.click(screen.getByRole("button", { name: "New dashboard" }));
+    expect(container.querySelectorAll(".dashboard-widget-palette-icon")).toHaveLength(9);
+    const glyphClasses = Array.from(container.querySelectorAll(".dashboard-widget-palette-icon svg"), (icon) => icon.getAttribute("class"));
+    expect(new Set(glyphClasses)).toHaveLength(9);
     await user.click(screen.getByRole("button", { name: "Add Total alerts" }));
-    await user.click(screen.getByRole("button", { name: "Add Total alerts" }));
+    expect(screen.queryByRole("button", { name: "Add Total alerts" })).not.toBeInTheDocument();
+    expect(container.querySelectorAll(".dashboard-widget-palette-icon")).toHaveLength(8);
+    await user.click(screen.getByRole("button", { name: "Add Critical alerts" }));
     await user.type(screen.getByRole("textbox", { name: "Dashboard name" }), "Priority investigation");
     await user.click(screen.getByRole("button", { name: "Save dashboard" }));
 
     expect(screen.getByRole("region", { name: "Custom dashboard: Priority investigation" })).toBeInTheDocument();
-    expect(container.querySelectorAll('[data-widget-type="kpi-alerts"]')).toHaveLength(2);
+    expect(container.querySelectorAll('[data-widget-type="kpi-alerts"]')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-widget-type="kpi-critical-alerts"]')).toHaveLength(1);
     expect(container.querySelectorAll(".overview-signal-ribbon")).toHaveLength(1);
     const stored = JSON.parse(localStorage.getItem("edr.overviewDashboards.v1.user.31") ?? "{}");
     expect(stored.dashboards[0].widgets).toHaveLength(2);
+    expect(stored.dashboards[0].widgets.map((widget: CustomDashboardWidget) => widget.type)).toEqual(["kpi-alerts", "kpi-critical-alerts"]);
     expect(new Set(stored.dashboards[0].widgets.map((widget: CustomDashboardWidget) => widget.uid)).size).toBe(2);
 
     await user.click(screen.getByRole("button", { name: "Open dashboard settings" }));
@@ -116,10 +123,14 @@ describe("custom Overview dashboard", () => {
     const name = screen.getByRole("textbox", { name: "Dashboard name" });
     await user.clear(name);
     await user.type(name, "Triage focus");
-    await user.click(screen.getAllByRole("button", { name: "Remove Total alerts" })[0]!);
+    await user.click(screen.getByRole("button", { name: "Remove Total alerts" }));
+    expect(screen.getByRole("button", { name: "Add Total alerts" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Add Total alerts" }));
+    expect(screen.queryByRole("button", { name: "Add Total alerts" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save dashboard" }));
     expect(screen.getByRole("region", { name: "Custom dashboard: Triage focus" })).toBeInTheDocument();
     expect(container.querySelectorAll('[data-widget-type="kpi-alerts"]')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-widget-type="kpi-critical-alerts"]')).toHaveLength(1);
 
     await user.click(screen.getByRole("button", { name: "Open dashboard settings" }));
     await user.click(screen.getByRole("button", { name: "Delete dashboard" }));
@@ -129,6 +140,47 @@ describe("custom Overview dashboard", () => {
     expect(screen.getByRole("combobox", { name: "Dashboard" })).toHaveValue("default");
     expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(0);
     expect(screen.getByRole("region", { name: "Dashboard controls" })).toBeInTheDocument();
+  });
+
+  it("shows a completion state when all unique widget types are on the canvas", async () => {
+    const user = userEvent.setup();
+    const { container } = renderWorkspace();
+    await user.click(screen.getByRole("button", { name: "New dashboard" }));
+    const widgetTitles = [
+      "Current EDR state",
+      "Total alerts",
+      "Critical alerts",
+      "HIGH-level endpoints",
+      "Open incidents",
+      "Detection activity",
+      "Alert severity",
+      "Highest-risk endpoints",
+      "Incident queue",
+    ];
+    for (const title of widgetTitles) await user.click(screen.getByRole("button", { name: `Add ${title}` }));
+
+    expect(container.querySelectorAll(".dashboard-widget-palette-icon")).toHaveLength(0);
+    expect(screen.getByText("All available widgets are on the canvas. Remove one to make it available again.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Remove Total alerts" }));
+    expect(screen.getByRole("button", { name: "Add Total alerts" })).toBeInTheDocument();
+    expect(screen.queryByText("All available widgets are on the canvas. Remove one to make it available again.")).not.toBeInTheDocument();
+  });
+
+  it("moves keyboard focus to the added widget and back to its restored catalog item", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    await user.click(screen.getByRole("button", { name: "New dashboard" }));
+    expect(document.querySelector('[data-dashboard-editing="enabled"]')).toContainElement(screen.getByRole("heading", { name: "Start with one investigation widget" }));
+    const addButton = screen.getByRole("button", { name: "Add Total alerts" });
+    addButton.focus();
+    await user.keyboard("{Enter}");
+
+    const moveHandle = screen.getByRole("button", { name: /^Move Total alerts\./ });
+    expect(moveHandle).toHaveFocus();
+    const removeButton = screen.getByRole("button", { name: "Remove Total alerts" });
+    removeButton.focus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("button", { name: "Add Total alerts" })).toHaveFocus();
   });
 
   it("disables custom dashboard editing below 1280px without removing saved content", async () => {
@@ -150,7 +202,7 @@ describe("custom Overview dashboard", () => {
     act(() => editing.set(false));
 
     expect(screen.getByRole("textbox", { name: "Dashboard name" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Add Total alerts" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add Critical alerts" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Save dashboard" })).toBeDisabled();
     expect(screen.getByRole("button", { name: /^Move Total alerts\./ })).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Remove Total alerts" })).not.toBeInTheDocument();
@@ -161,14 +213,14 @@ describe("custom Overview dashboard", () => {
   it("maps drag and resize stop geometry without changing widget identity", () => {
     const widgets: CustomDashboardWidget[] = [
       { uid: "widget-1", type: "kpi-alerts", x: 0, y: 0, w: 3, h: 2 },
-      { uid: "widget-2", type: "kpi-alerts", x: 3, y: 0, w: 3, h: 2 },
+      { uid: "widget-2", type: "kpi-open-incidents", x: 3, y: 0, w: 3, h: 2 },
     ];
     const updated = applyGridLayout(widgets, [
       { i: "widget-1", x: 6, y: 4, w: 4, h: 3 },
       { i: "widget-2", x: 0, y: 0, w: 3, h: 2 },
     ]);
     expect(updated[0]).toEqual({ uid: "widget-1", type: "kpi-alerts", x: 6, y: 4, w: 4, h: 3 });
-    expect(updated[1]).toEqual({ uid: "widget-2", type: "kpi-alerts", x: 0, y: 0, w: 3, h: 2 });
+    expect(updated[1]).toEqual({ uid: "widget-2", type: "kpi-open-incidents", x: 0, y: 0, w: 3, h: 2 });
 
     const source = readFileSync("src/features/overviewLayout/OverviewDashboardWorkspace.tsx", "utf8");
     expect(source).toContain("onDragStop={commitLayout}");
@@ -181,7 +233,7 @@ describe("custom Overview dashboard", () => {
   it("preserves existing geometry and places only the dropped widget", () => {
     const widgets: CustomDashboardWidget[] = [
       { uid: "widget-1", type: "kpi-alerts", x: 0, y: 0, w: 3, h: 2 },
-      { uid: "widget-2", type: "kpi-alerts", x: 0, y: 2, w: 3, h: 2 },
+      { uid: "widget-2", type: "kpi-open-incidents", x: 0, y: 2, w: 3, h: 2 },
     ];
     const updated = applyDroppedWidget(widgets, "detection-activity", { x: 0, y: 0, w: 8, h: 7 });
 
@@ -192,7 +244,7 @@ describe("custom Overview dashboard", () => {
 
   it("fills available width before adding another row", () => {
     const first = tryAddOverviewWidget([], "highest-risk-endpoints");
-    const second = tryAddOverviewWidget(first, "highest-risk-endpoints");
+    const second = tryAddOverviewWidget(first, "incident-queue");
 
     expect(first[0]).toMatchObject({ x: 0, y: 0, w: 6, h: 7 });
     expect(second[1]).toMatchObject({ x: 6, y: 0, w: 6, h: 7 });
@@ -246,7 +298,7 @@ describe("custom Overview dashboard", () => {
   it("rejects keyboard adjustments that cross a grid boundary or another widget", () => {
     const widgets: CustomDashboardWidget[] = [
       { uid: "widget-1", type: "kpi-alerts", x: 0, y: 0, w: 3, h: 2 },
-      { uid: "widget-2", type: "kpi-alerts", x: 4, y: 0, w: 3, h: 2 },
+      { uid: "widget-2", type: "kpi-open-incidents", x: 4, y: 0, w: 3, h: 2 },
     ];
     const moved = applyKeyboardWidgetAdjustment(widgets, "widget-1", "ArrowRight", false);
     expect(moved[0]).toMatchObject({ x: 1, y: 0, w: 3, h: 2 });
@@ -258,24 +310,15 @@ describe("custom Overview dashboard", () => {
     expect(applyKeyboardWidgetAdjustment(widgets, "widget-1", "ArrowLeft", false)).toBe(widgets);
   });
 
-  it("rejects only the widget size that cannot fit in the remaining grid space", () => {
-    let widgets: CustomDashboardWidget[] = [];
-    for (let index = 0; index < 25; index += 1) {
-      const next = tryAddOverviewWidget(widgets, "detection-activity");
-      expect(next).not.toBe(widgets);
-      widgets = next;
-    }
-
+  it("rejects duplicate click and drop additions without changing existing geometry", () => {
+    const widgets = tryAddOverviewWidget([], "detection-activity");
     expect(tryAddOverviewWidget(widgets, "detection-activity")).toBe(widgets);
-    expect(widgets).toHaveLength(25);
-    widgets.forEach((widget, index) => {
-      expect(widget.y + widget.h).toBeLessThanOrEqual(OVERVIEW_GRID_MAX_ROWS);
-      expect(widgets.slice(index + 1).every((candidate) => !overviewWidgetsOverlap(widget, candidate))).toBe(true);
-    });
+    expect(applyDroppedWidget(widgets, "detection-activity", { x: 4, y: 12, w: 8, h: 10 })).toBe(widgets);
 
-    const withSmallerWidget = tryAddOverviewWidget(widgets, "alert-severity");
-    expect(withSmallerWidget).toHaveLength(26);
-    expect(withSmallerWidget.at(-1)).toMatchObject({ type: "alert-severity", x: 8, y: 0, w: 4, h: 7 });
+    const withUniqueWidget = tryAddOverviewWidget(widgets, "alert-severity");
+    expect(withUniqueWidget).toHaveLength(2);
+    expect(withUniqueWidget[0]).toEqual(widgets[0]);
+    expect(withUniqueWidget[1]).toMatchObject({ type: "alert-severity", x: 8, y: 0, w: 4, h: 7 });
   });
 
   it("uses content-safe widget geometry without nested body scrolling", () => {

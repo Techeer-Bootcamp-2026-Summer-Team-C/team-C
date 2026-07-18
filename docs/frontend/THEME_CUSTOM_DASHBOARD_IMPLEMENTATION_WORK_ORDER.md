@@ -27,7 +27,8 @@
 - 현재 고정 Overview는 `Default` dashboard로 계속 제공하며 수정할 수 없다.
 - 사용자는 별도의 custom dashboard를 여러 개 만들고 이름 변경·삭제할 수 있다.
 - custom dashboard에는 기존 9개 Overview widget을 drag/drop으로 추가하고 이동·resize할 수 있다.
-- 같은 widget 종류를 여러 번 추가할 수 있다.
+- Widget palette는 각 항목의 의미를 구분하는 preview glyph를 표시한다.
+- 한 custom dashboard에는 같은 widget 종류를 하나만 추가할 수 있다.
 - custom dashboard는 현재 로그인 사용자의 `userId`별 browser localStorage에만 저장한다.
 - Backend layout API, OpenAPI, DTO, DB와 migration은 변경하지 않는다.
 
@@ -64,9 +65,9 @@ Reference와 현재 API/DTO가 충돌하면 현재 Team C 계약을 우선한다
 - ECharts, panel, form, table, popover, dialog, skeleton, 상태색의 theme 대응
 - immutable Default dashboard
 - 여러 custom dashboard 생성·선택·이름 변경·삭제
-- widget palette와 drag/drop 추가
+- semantic preview glyph를 포함한 widget palette와 drag/drop 추가
 - custom widget 이동·resize·삭제
-- duplicate widget instance
+- widget type별 단일 instance와 중복 저장값 정규화
 - 사용자별 localStorage persistence와 손상 데이터 복구
 - desktop keyboard와 screen-reader 접근성
 - unit/component/source-boundary test
@@ -366,7 +367,7 @@ interface OverviewDashboardStoreV1 {
 규칙:
 
 - dashboard와 widget instance ID는 충돌하지 않는 browser-generated ID를 사용한다.
-- 같은 widget `type`을 여러 번 넣을 수 있으며 `uid`는 매 instance마다 다르다.
+- 같은 widget `type`은 한 dashboard에 하나만 넣을 수 있으며, parser/normalizer는 중복 type 중 첫 번째 유효 instance만 유지한다.
 - dashboard name은 trim하고 빈 이름은 저장하지 않는다.
 - 알 수 없는 version, widget type, 비정상 좌표·크기, 중복 UID와 손상 JSON을 그대로 신뢰하지 않는다.
 - parser/normalizer는 invalid item만 제거하거나 안전한 값으로 clamp한다.
@@ -393,6 +394,8 @@ interface OverviewWidgetDefinition {
 
 - widget은 현재 Overview query 결과를 재사용한다.
 - widget instance마다 새 API query를 만들지 않는다.
+- palette item은 Widget 의미를 나타내는 semantic preview glyph, 이름과 기본 geometry를 함께 표시한다.
+- 이미 Canvas에 배치된 type은 palette에서 숨기고 Widget을 제거하면 다시 표시한다.
 - 기존 `ResourceFeedback`, `QueueFeedback`, stale/error/loading 의미를 보존한다.
 - widget을 catalog로 분리하면서 drill-down URL, selected Endpoint scope와 Time range를 잃지 않는다.
 - Signal ribbon은 dashboard grid 밖의 고정 영역으로 유지하며 palette에 넣지 않는다.
@@ -515,7 +518,7 @@ import {
 - version validation
 - unknown widget 제거
 - coordinate/size normalization
-- duplicate type 허용, duplicate UID 방지
+- duplicate type과 duplicate UID 방지
 - dashboard create/rename/delete
 - active dashboard 복원과 삭제 후 Default fallback
 - userId 변경 시 in-memory state 재초기화
@@ -529,7 +532,8 @@ import {
 - 신규 builder Cancel 시 dashboard 미생성
 - 이름과 widget 1개 이상을 갖춘 Save 시 dashboard 생성·active 전환
 - palette add
-- 같은 widget 두 번 추가
+- 같은 widget type의 click/drop 중복 추가 차단
+- 배치된 widget type의 palette item 숨김과 제거 후 복귀
 - drag stop, resize stop 저장
 - widget 삭제
 - Signal ribbon은 grid 밖에 한 번만 표시
@@ -761,6 +765,18 @@ npm test -- overview-redesign.test.tsx custom-dashboard.test.tsx locale.test.tsx
 - Desktop browser QA: 수정된 Vite source를 기존 Nginx API proxy와 연결해 1280px에서 확인했다. 6 × 7 Widget 두 개를 click 추가하면 각각 `1열 1행`, `7열 1행`에 배치됐다. 오른쪽 Widget을 왼쪽 Widget 위로 pointer drag해 충돌시킨 뒤에도 두 geometry가 그대로 유지됐다. 검사용 Draft는 Cancel했고 저장된 Dashboard는 변경하지 않았다.
 - 계약·QA 경계: Backend, API_SPEC, OpenAPI, generated schema, DTO, DB와 Frontend API client는 변경하지 않았다. 모바일 시각 QA와 모바일 전용 builder UX는 기존 사용자 결정대로 범위에서 제외했다.
 
+### TCD-13. Widget catalog preview와 type 중복 방지
+
+- 상태: 완료
+- 사용자 결정: Widget palette에서 항목의 의미를 배치 전에 빠르게 식별할 수 있어야 하며, 한 Dashboard에 동일한 데이터 Widget을 반복 배치하지 않는다.
+- 구현 결과: 기존 9개 Widget에 Lucide semantic glyph를 매핑해 이름·기본 geometry와 함께 표시한다. 이미 배치된 type은 palette에서 숨기고 제거하면 다시 표시하며, palette click, stale drop과 exported add helper가 동일 type을 다시 추가하지 않는다. 9종을 모두 배치하면 완료 안내를 표시한다. 추가 직후 새 Widget 이동 handle로, 제거 직후 복원된 palette item으로 keyboard focus를 이어 간다. Context create/update도 widgets를 저장하기 전에 type별 첫 instance만 남긴다. 빈 Draft에서도 RGL drop surface를 항상 렌더링하고 empty-state 안내가 pointer event를 가로채지 않게 해 첫 Widget의 palette drop을 보장한다.
+- 복구 규칙: 과거 저장값에 동일 type이 여러 개 있으면 원래 순서에서 첫 번째로 유효하게 배치된 instance만 유지하고 나머지는 제거한다. 알 수 없는 type, 중복 UID, 비정상 geometry와 손상 JSON의 기존 방어는 유지한다.
+- 보존 경계: Default Overview 9-block, Widget query와 drill-down URL, fixed-grid collision 정책, Draft Save/Cancel, 사용자별 browser-local storage key와 12열 × 256행 geometry를 유지한다. Backend, API_SPEC, OpenAPI, generated schema, DTO와 DB는 변경하지 않는다.
+- 이전 기록 경계: TCD-03/04/05/07/08의 duplicate instance와 대용량 동일-type 복원 내용은 당시 완료 근거로 보존한다. 현재 제품 계약과 회귀 기준은 본 TCD-13의 type별 단일 instance가 대체한다.
+- 변경 파일: `frontend/src/features/overviewLayout/OverviewDashboardWorkspace.tsx`, `frontend/src/features/overviewLayout/OverviewLayoutContext.tsx`, `frontend/src/features/overviewLayout/overviewLayoutModel.ts`, `frontend/src/features/overviewLayout/overviewLayoutStorage.ts`, `frontend/src/i18n/translations.ts`, `frontend/src/styles/pages/overview-layout.css`, `frontend/tests/custom-dashboard.test.tsx`, `frontend/tests/overview-layout-context.test.tsx`, `frontend/tests/overview-layout.test.ts`, `docs/frontend/DESIGN.md`, `docs/frontend/FRONTEND_SPEC.md`, 이 작업지시서.
+- 자동 검증: targeted `npm test -- custom-dashboard.test.tsx overview-layout.test.ts overview-layout-context.test.tsx` → 3 files / 30 tests passed. `npm run openapi:check`, `npm run typecheck`, `npm run lint`, 전체 `npm test` → 25 files / 134 tests, `npm run build`, `git diff --check`가 모두 통과했다. Build의 기존 ECharts lazy chunk 500.14 kB warning은 실패가 아니다.
+- Desktop browser QA: 수정 source를 기존 8080 Backend proxy와 연결해 1440 × 900과 1280 × 900에서 확인했다. 두 viewport 모두 palette glyph 9개와 이름의 잘림 0건, page `scrollWidth=clientWidth`, 9번째 item bottom 893.5px로 첫 화면 내 노출을 확인했다. 1280px 빈 Draft에서 Playwright DOM drag로 `Detection Activity`를 palette에서 Canvas로 옮기자 palette 9→8, Canvas 0→1, geometry `3열 1행, 너비 8, 높이 10`으로 배치되고 새 이동 handle이 focus를 받았다. App browser의 실제 pointer drag로 이 Widget을 `1열`에서 `4열`로 이동한 뒤에도 page `scrollWidth=clientWidth`였다. `전체 Alerts` 제거 후 복원된 palette button으로 focus가 돌아왔고 console warning/error는 0건이었다. 검사용 Draft는 Cancel했고 QA 브라우저와 전용 Vite server를 종료했다.
+
 ## 12. Desktop browser QA
 
 모바일 viewport는 확인하지 않는다.
@@ -779,7 +795,8 @@ npm test -- overview-redesign.test.tsx custom-dashboard.test.tsx locale.test.tsx
 
 - custom dashboard 생성
 - widget drag/drop 추가
-- 같은 widget 두 번 추가
+- palette의 Widget별 preview glyph와 이름 식별
+- 같은 widget type 중복 추가 차단과 삭제 후 palette 복귀
 - widget 이동·resize·삭제
 - dashboard 이름 변경·삭제
 - reload 후 active dashboard와 layout 복원

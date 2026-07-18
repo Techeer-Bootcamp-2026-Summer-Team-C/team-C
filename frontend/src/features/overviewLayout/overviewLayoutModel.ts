@@ -86,6 +86,17 @@ export function createOverviewWidget(type: OverviewWidgetType): CustomDashboardW
   };
 }
 
+export function deduplicateOverviewWidgetTypes(widgets: readonly CustomDashboardWidget[]): CustomDashboardWidget[] {
+  const widgetTypes = new Set<OverviewWidgetType>();
+  const uniqueWidgets: CustomDashboardWidget[] = [];
+  for (const widget of widgets) {
+    if (widgetTypes.has(widget.type)) continue;
+    widgetTypes.add(widget.type);
+    uniqueWidgets.push({ ...widget });
+  }
+  return uniqueWidgets;
+}
+
 export function findAvailableOverviewWidgetPosition(
   widget: Pick<CustomDashboardWidget, "x" | "y" | "w" | "h">,
   widgets: readonly CustomDashboardWidget[],
