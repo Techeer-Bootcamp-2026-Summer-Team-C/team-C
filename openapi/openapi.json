@@ -16,11 +16,16 @@
             "$ref": "#/components/schemas/EndpointStatus"
           },
           "nextHeartbeatSeconds": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Nextheartbeatseconds",
             "type": "integer"
           },
           "serverTime": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Servertime",
             "type": "string"
           }
@@ -37,27 +42,36 @@
         "additionalProperties": false,
         "properties": {
           "agentArch": {
-            "$ref": "#/components/schemas/AgentArchitecture"
+            "$ref": "#/components/schemas/AgentArchitecture",
+            "description": "현재 실행 중인 Agent 아키텍처입니다."
           },
           "agentBuildId": {
+            "description": "현재 실행 중인 Agent 빌드 ID입니다.",
             "title": "Agentbuildid",
             "type": "string"
           },
           "agentId": {
+            "description": "mTLS 인증서 SAN과 일치해야 하는 Agent 고유 ID입니다.",
+            "examples": [
+              "agent-001"
+            ],
             "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
             "title": "Agentid",
             "type": "string"
           },
           "agentVersion": {
+            "description": "현재 실행 중인 Agent 버전입니다.",
             "title": "Agentversion",
             "type": "string"
           },
           "bufferDepth": {
+            "description": "전송을 기다리는 로컬 이벤트 수입니다.",
             "minimum": 0.0,
             "title": "Bufferdepth",
             "type": "integer"
           },
           "capabilityCodes": {
+            "description": "현재 활성화된 수집 기능 코드 목록입니다.",
             "items": {
               "type": "string"
             },
@@ -65,6 +79,7 @@
             "type": "array"
           },
           "sensorHealth": {
+            "description": "센서별 상태 스냅샷입니다.",
             "items": {
               "$ref": "#/components/schemas/SensorHealthSnapshot"
             },
@@ -72,6 +87,10 @@
             "type": "array"
           },
           "sentAt": {
+            "description": "Agent가 heartbeat를 생성한 UTC 시각입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "format": "date-time",
             "title": "Sentat",
             "type": "string"
@@ -98,16 +117,22 @@
             "type": "string"
           },
           "endpointId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Endpointid",
             "type": "integer"
           },
           "heartbeatIntervalSeconds": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Heartbeatintervalseconds",
             "type": "integer"
           },
           "registeredAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Registeredat",
             "type": "string"
           },
@@ -129,22 +154,36 @@
         "additionalProperties": false,
         "properties": {
           "agentArch": {
-            "$ref": "#/components/schemas/AgentArchitecture"
+            "$ref": "#/components/schemas/AgentArchitecture",
+            "description": "Agent 바이너리 아키텍처입니다."
           },
           "agentBuildId": {
+            "description": "배포 바이너리를 식별하는 빌드 ID입니다.",
+            "examples": [
+              "20260719.1"
+            ],
             "title": "Agentbuildid",
             "type": "string"
           },
           "agentId": {
+            "description": "mTLS 인증서 SAN과 일치해야 하는 Agent 고유 ID입니다.",
+            "examples": [
+              "agent-001"
+            ],
             "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
             "title": "Agentid",
             "type": "string"
           },
           "agentVersion": {
+            "description": "Agent 애플리케이션 버전입니다.",
+            "examples": [
+              "1.0.0"
+            ],
             "title": "Agentversion",
             "type": "string"
           },
           "capabilityCodes": {
+            "description": "Agent가 지원하는 수집 기능 코드 목록입니다.",
             "items": {
               "type": "string"
             },
@@ -152,13 +191,22 @@
             "type": "array"
           },
           "hostname": {
+            "description": "Agent가 설치된 호스트 이름입니다.",
+            "examples": [
+              "workstation-01"
+            ],
             "title": "Hostname",
             "type": "string"
           },
           "osType": {
-            "$ref": "#/components/schemas/OsType"
+            "$ref": "#/components/schemas/OsType",
+            "description": "호스트 운영체제 유형입니다."
           },
           "osVersion": {
+            "description": "호스트 운영체제 버전입니다.",
+            "examples": [
+              "Windows 11 24H2"
+            ],
             "title": "Osversion",
             "type": "string"
           }
@@ -184,6 +232,7 @@
             "type": "string"
           },
           "alertId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Alertid",
             "type": "integer"
@@ -200,14 +249,23 @@
             "title": "Batchid"
           },
           "createdAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Createdat",
             "type": "string"
           },
           "detectedAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Detectedat",
             "type": "string"
           },
           "endpointId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Endpointid",
             "type": "integer"
@@ -217,6 +275,10 @@
             "type": "string"
           },
           "eventOccurredAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Eventoccurredat",
             "type": "string"
           },
@@ -251,6 +313,7 @@
             "type": "array"
           },
           "riskScore": {
+            "description": "0부터 100까지의 점수입니다.",
             "maximum": 100.0,
             "minimum": 0.0,
             "title": "Riskscore",
@@ -293,6 +356,10 @@
             "type": "string"
           },
           "updatedAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Updatedat",
             "type": "string"
           }
@@ -334,6 +401,7 @@
             "type": "string"
           },
           "alertId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Alertid",
             "type": "integer"
@@ -350,14 +418,23 @@
             "title": "Batchid"
           },
           "createdAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Createdat",
             "type": "string"
           },
           "detectedAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Detectedat",
             "type": "string"
           },
           "endpointId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Endpointid",
             "type": "integer"
@@ -367,6 +444,10 @@
             "type": "string"
           },
           "eventOccurredAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Eventoccurredat",
             "type": "string"
           },
@@ -387,6 +468,7 @@
             "type": "string"
           },
           "riskScore": {
+            "description": "0부터 100까지의 점수입니다.",
             "maximum": 100.0,
             "minimum": 0.0,
             "title": "Riskscore",
@@ -419,6 +501,10 @@
             "type": "string"
           },
           "updatedAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Updatedat",
             "type": "string"
           }
@@ -473,6 +559,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -492,7 +579,11 @@
         "additionalProperties": false,
         "properties": {
           "status": {
-            "$ref": "#/components/schemas/AlertStatus"
+            "$ref": "#/components/schemas/AlertStatus",
+            "description": "변경할 Alert 처리 상태입니다.",
+            "examples": [
+              "IN_PROGRESS"
+            ]
           }
         },
         "required": [
@@ -527,10 +618,18 @@
             "title": "Archivedat"
           },
           "bucketEndAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Bucketendat",
             "type": "string"
           },
           "bucketStartAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Bucketstartat",
             "type": "string"
           },
@@ -546,11 +645,13 @@
             "title": "Checksumsha256"
           },
           "endpointId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Endpointid",
             "type": "integer"
           },
           "eventCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Eventcount",
             "type": "integer"
@@ -602,6 +703,7 @@
           "sizeBytes": {
             "anyOf": [
               {
+                "description": "0 이상의 정수입니다.",
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -650,7 +752,15 @@
         "additionalProperties": false,
         "properties": {
           "endpointIds": {
+            "description": "복원할 엔드포인트 ID입니다.",
+            "examples": [
+              [
+                1,
+                2
+              ]
+            ],
             "items": {
+              "description": "1 이상의 리소스 식별자입니다.",
               "minimum": 1.0,
               "type": "integer"
             },
@@ -660,11 +770,19 @@
             "type": "array"
           },
           "from": {
+            "description": "복원 범위의 시작 시각입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "format": "date-time",
             "title": "From",
             "type": "string"
           },
           "to": {
+            "description": "복원 범위의 종료 시각입니다. 최대 복원 범위는 31일입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "format": "date-time",
             "title": "To",
             "type": "string"
@@ -690,6 +808,7 @@
           },
           "endpointIds": {
             "items": {
+              "description": "1 이상의 리소스 식별자입니다.",
               "minimum": 1.0,
               "type": "integer"
             },
@@ -697,6 +816,10 @@
             "type": "array"
           },
           "from": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "From",
             "type": "string"
           },
@@ -711,6 +834,10 @@
             "type": "string"
           },
           "to": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "To",
             "type": "string"
           }
@@ -730,11 +857,13 @@
         "additionalProperties": false,
         "properties": {
           "endpointId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Endpointid",
             "type": "integer"
           },
           "incidentId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Incidentid",
             "type": "integer"
@@ -761,6 +890,7 @@
           "alertId": {
             "anyOf": [
               {
+                "description": "1 이상의 리소스 식별자입니다.",
                 "minimum": 1.0,
                 "type": "integer"
               },
@@ -771,6 +901,7 @@
             "title": "Alertid"
           },
           "endpointId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Endpointid",
             "type": "integer"
@@ -799,6 +930,7 @@
           "incidentId": {
             "anyOf": [
               {
+                "description": "1 이상의 리소스 식별자입니다.",
                 "minimum": 1.0,
                 "type": "integer"
               },
@@ -818,6 +950,10 @@
             "type": "string"
           },
           "occurredAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Occurredat",
             "type": "string"
           },
@@ -871,6 +1007,10 @@
             "type": "string"
           },
           "expiresAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Expiresat",
             "type": "string"
           },
@@ -883,6 +1023,10 @@
             "type": "boolean"
           },
           "issuedAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Issuedat",
             "type": "string"
           },
@@ -915,6 +1059,10 @@
         "additionalProperties": false,
         "properties": {
           "from": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "From",
             "type": "string"
           },
@@ -945,6 +1093,10 @@
             "type": "array"
           },
           "to": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "To",
             "type": "string"
           }
@@ -1065,6 +1217,7 @@
             "type": "array"
           },
           "totalCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Totalcount",
             "type": "integer"
@@ -1086,26 +1239,31 @@
         "additionalProperties": false,
         "properties": {
           "offlineCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Offlinecount",
             "type": "integer"
           },
           "onlineCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Onlinecount",
             "type": "integer"
           },
           "retiredCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Retiredcount",
             "type": "integer"
           },
           "staleCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Stalecount",
             "type": "integer"
           },
           "totalCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Totalcount",
             "type": "integer"
@@ -1146,6 +1304,7 @@
             "type": "array"
           },
           "totalCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Totalcount",
             "type": "integer"
@@ -1220,6 +1379,7 @@
             "type": "array"
           },
           "totalCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Totalcount",
             "type": "integer"
@@ -1250,11 +1410,13 @@
             "type": "array"
           },
           "closedCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Closedcount",
             "type": "integer"
           },
           "openCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Opencount",
             "type": "integer"
@@ -1306,6 +1468,7 @@
             "type": "integer"
           },
           "revision": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Revision",
             "type": "integer"
@@ -1332,6 +1495,7 @@
         "additionalProperties": false,
         "properties": {
           "layoutVersion": {
+            "description": "레이아웃 계약 버전입니다.",
             "enum": [
               1,
               2
@@ -1340,11 +1504,13 @@
             "type": "integer"
           },
           "revision": {
+            "description": "낙관적 동시성 제어에 사용하는 현재 revision입니다.",
             "minimum": 0.0,
             "title": "Revision",
             "type": "integer"
           },
           "widgets": {
+            "description": "저장할 위젯 배치 목록입니다.",
             "items": {
               "$ref": "#/components/schemas/DashboardWidgetLayoutDto"
             },
@@ -1385,6 +1551,7 @@
             "type": "array"
           },
           "totalBucketCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Totalbucketcount",
             "type": "integer"
@@ -1472,11 +1639,13 @@
             "type": "integer"
           },
           "x": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "X",
             "type": "integer"
           },
           "y": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Y",
             "type": "integer"
@@ -1523,21 +1692,28 @@
         "additionalProperties": false,
         "properties": {
           "eventId": {
+            "description": "Agent가 생성한 이벤트 고유 ID입니다.",
             "title": "Eventid",
             "type": "string"
           },
           "eventType": {
             "const": "DNS_QUERY",
+            "description": "DNS 질의 이벤트 유형입니다.",
             "title": "Eventtype",
             "type": "string"
           },
           "occurredAt": {
+            "description": "이벤트가 엔드포인트에서 발생한 UTC 시각입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "format": "date-time",
             "title": "Occurredat",
             "type": "string"
           },
           "payload": {
-            "$ref": "#/components/schemas/DnsQueryPayload"
+            "$ref": "#/components/schemas/DnsQueryPayload",
+            "description": "DNS 질의 세부 정보입니다."
           }
         },
         "required": [
@@ -1553,6 +1729,7 @@
         "additionalProperties": false,
         "properties": {
           "answers": {
+            "description": "DNS 응답 값 목록입니다.",
             "items": {
               "type": "string"
             },
@@ -1560,23 +1737,34 @@
             "type": "array"
           },
           "pid": {
+            "description": "DNS 질의를 생성한 프로세스 ID입니다.",
             "minimum": 0,
             "title": "Pid",
             "type": "integer"
           },
           "processName": {
+            "description": "DNS 질의를 생성한 프로세스 이름입니다.",
             "title": "Processname",
             "type": "string"
           },
           "query": {
+            "description": "DNS 질의 이름입니다.",
+            "examples": [
+              "example.com"
+            ],
             "title": "Query",
             "type": "string"
           },
           "recordType": {
+            "description": "DNS 레코드 유형입니다.",
+            "examples": [
+              "A"
+            ],
             "title": "Recordtype",
             "type": "string"
           },
           "responseCode": {
+            "description": "DNS 응답 코드입니다.",
             "title": "Responsecode",
             "type": "string"
           }
@@ -1610,6 +1798,7 @@
             "type": "array"
           },
           "score": {
+            "description": "0부터 100까지의 정수 점수입니다.",
             "maximum": 100.0,
             "minimum": 0.0,
             "title": "Score",
@@ -1631,6 +1820,10 @@
         "additionalProperties": false,
         "properties": {
           "calculatedAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Calculatedat",
             "type": "string"
           },
@@ -1638,11 +1831,13 @@
             "$ref": "#/components/schemas/EdrStateAxisDto"
           },
           "criticalRiskEndpointCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Criticalriskendpointcount",
             "type": "integer"
           },
           "highRiskEndpointCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Highriskendpointcount",
             "type": "integer"
@@ -1650,6 +1845,7 @@
           "highestEndpointRiskScore": {
             "anyOf": [
               {
+                "description": "0부터 100까지의 정수 점수입니다.",
                 "maximum": 100.0,
                 "minimum": 0.0,
                 "type": "integer"
@@ -1668,6 +1864,7 @@
             "type": "array"
           },
           "score": {
+            "description": "0부터 100까지의 정수 점수입니다.",
             "maximum": 100.0,
             "minimum": 0.0,
             "title": "Score",
@@ -1732,6 +1929,10 @@
             "type": "array"
           },
           "from": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "From",
             "type": "string"
           },
@@ -1743,6 +1944,10 @@
             "type": "array"
           },
           "to": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "To",
             "type": "string"
           }
@@ -1810,6 +2015,7 @@
             "type": "array"
           },
           "endpointId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Endpointid",
             "type": "integer"
@@ -1859,6 +2065,10 @@
             "title": "Osversion"
           },
           "registeredAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Registeredat",
             "type": "string"
           },
@@ -1945,6 +2155,7 @@
             "type": "array"
           },
           "endpointId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Endpointid",
             "type": "integer"
@@ -1994,6 +2205,10 @@
             "title": "Osversion"
           },
           "registeredAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Registeredat",
             "type": "string"
           },
@@ -2036,17 +2251,23 @@
         "additionalProperties": false,
         "properties": {
           "activeAlertCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Activealertcount",
             "type": "integer"
           },
           "calculatedAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Calculatedat",
             "type": "string"
           },
           "highestAlertRiskScore": {
             "anyOf": [
               {
+                "description": "0부터 100까지의 점수입니다.",
                 "maximum": 100.0,
                 "minimum": 0.0,
                 "type": "number"
@@ -2061,6 +2282,7 @@
             "$ref": "#/components/schemas/RiskLevel"
           },
           "openIncidentCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Openincidentcount",
             "type": "integer"
@@ -2073,6 +2295,7 @@
             "type": "array"
           },
           "score": {
+            "description": "0부터 100까지의 정수 점수입니다.",
             "maximum": 100.0,
             "minimum": 0.0,
             "title": "Score",
@@ -2099,6 +2322,7 @@
             "type": "string"
           },
           "contribution": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Contribution",
             "type": "integer"
@@ -2108,6 +2332,7 @@
             "type": "string"
           },
           "sourceId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Sourceid",
             "type": "integer"
@@ -2150,15 +2375,21 @@
             "type": "array"
           },
           "calculatedAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Calculatedat",
             "type": "string"
           },
           "criticalRiskEndpointCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Criticalriskendpointcount",
             "type": "integer"
           },
           "highRiskEndpointCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Highriskendpointcount",
             "type": "integer"
@@ -2166,6 +2397,7 @@
           "highestScore": {
             "anyOf": [
               {
+                "description": "0부터 100까지의 정수 점수입니다.",
                 "maximum": 100.0,
                 "minimum": 0.0,
                 "type": "integer"
@@ -2207,6 +2439,7 @@
             "type": "array"
           },
           "totalCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Totalcount",
             "type": "integer"
@@ -2236,16 +2469,19 @@
             "$ref": "#/components/schemas/EndpointSummaryIncidentsDto"
           },
           "offlineCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Offlinecount",
             "type": "integer"
           },
           "onlineCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Onlinecount",
             "type": "integer"
           },
           "retiredCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Retiredcount",
             "type": "integer"
@@ -2261,6 +2497,7 @@
             "type": "array"
           },
           "staleCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Stalecount",
             "type": "integer"
@@ -2269,6 +2506,7 @@
             "$ref": "#/components/schemas/TimeRangeDto"
           },
           "totalCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Totalcount",
             "type": "integer"
@@ -2301,16 +2539,19 @@
             "type": "array"
           },
           "closedCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Closedcount",
             "type": "integer"
           },
           "openCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Opencount",
             "type": "integer"
           },
           "totalCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Totalcount",
             "type": "integer"
@@ -2329,10 +2570,12 @@
         "additionalProperties": false,
         "properties": {
           "code": {
+            "description": "클라이언트가 분기 처리할 수 있는 안정적인 오류 코드입니다.",
             "title": "Code",
             "type": "string"
           },
           "details": {
+            "description": "입력 필드 등 오류의 세부 정보입니다.",
             "items": {
               "$ref": "#/components/schemas/ErrorDetail"
             },
@@ -2340,10 +2583,12 @@
             "type": "array"
           },
           "message": {
+            "description": "오류 원인을 설명하는 메시지입니다.",
             "title": "Message",
             "type": "string"
           },
           "retryable": {
+            "description": "같은 요청을 다시 시도할 수 있는지 나타냅니다.",
             "title": "Retryable",
             "type": "boolean"
           }
@@ -2476,6 +2721,7 @@
             "title": "Dnsresponsecode"
           },
           "endpointId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Endpointid",
             "type": "integer"
@@ -2569,6 +2815,10 @@
             "title": "Httpuseragent"
           },
           "ingestedAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Ingestedat",
             "type": "string"
           },
@@ -2595,6 +2845,10 @@
             "title": "L7Protocol"
           },
           "occurredAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Occurredat",
             "type": "string"
           },
@@ -2608,6 +2862,7 @@
           "pid": {
             "anyOf": [
               {
+                "description": "0 이상의 정수입니다.",
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -2620,6 +2875,7 @@
           "ppid": {
             "anyOf": [
               {
+                "description": "0 이상의 정수입니다.",
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -2701,6 +2957,7 @@
             "title": "Remoteport"
           },
           "schemaVersion": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Schemaversion",
             "type": "integer"
@@ -2892,6 +3149,7 @@
             "title": "Dnsresponsecode"
           },
           "endpointId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Endpointid",
             "type": "integer"
@@ -2985,6 +3243,10 @@
             "title": "Httpuseragent"
           },
           "ingestedAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Ingestedat",
             "type": "string"
           },
@@ -3011,6 +3273,10 @@
             "title": "L7Protocol"
           },
           "occurredAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Occurredat",
             "type": "string"
           },
@@ -3020,6 +3286,7 @@
           "pid": {
             "anyOf": [
               {
+                "description": "0 이상의 정수입니다.",
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -3032,6 +3299,7 @@
           "ppid": {
             "anyOf": [
               {
+                "description": "0 이상의 정수입니다.",
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -3236,10 +3504,15 @@
             "type": "string"
           },
           "createdAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Createdat",
             "type": "string"
           },
           "endpointId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Endpointid",
             "type": "integer"
@@ -3253,6 +3526,10 @@
             "type": "string"
           },
           "failedAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Failedat",
             "type": "string"
           },
@@ -3311,6 +3588,7 @@
           "payloadSizeBytes": {
             "anyOf": [
               {
+                "description": "0 이상의 정수입니다.",
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -3321,6 +3599,7 @@
             "title": "Payloadsizebytes"
           },
           "replayCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Replaycount",
             "type": "integer"
@@ -3348,10 +3627,15 @@
             "title": "Resolvedat"
           },
           "retentionExpiresAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Retentionexpiresat",
             "type": "string"
           },
           "retryCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Retrycount",
             "type": "integer"
@@ -3361,11 +3645,13 @@
             "type": "boolean"
           },
           "sourceOffset": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Sourceoffset",
             "type": "integer"
           },
           "sourcePartition": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Sourcepartition",
             "type": "integer"
@@ -3378,6 +3664,10 @@
             "$ref": "#/components/schemas/EventFailureStatus"
           },
           "updatedAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Updatedat",
             "type": "string"
           }
@@ -3435,6 +3725,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -3454,6 +3745,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -3481,6 +3773,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -3501,6 +3794,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -3520,21 +3814,28 @@
         "additionalProperties": false,
         "properties": {
           "eventId": {
+            "description": "Agent가 생성한 이벤트 고유 ID입니다.",
             "title": "Eventid",
             "type": "string"
           },
           "eventType": {
             "const": "FILE_EVENT",
+            "description": "파일 이벤트 유형입니다.",
             "title": "Eventtype",
             "type": "string"
           },
           "occurredAt": {
+            "description": "이벤트가 엔드포인트에서 발생한 UTC 시각입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "format": "date-time",
             "title": "Occurredat",
             "type": "string"
           },
           "payload": {
-            "$ref": "#/components/schemas/FileEventPayload"
+            "$ref": "#/components/schemas/FileEventPayload",
+            "description": "파일 동작 세부 정보입니다."
           }
         },
         "required": [
@@ -3550,23 +3851,31 @@
         "additionalProperties": false,
         "properties": {
           "action": {
+            "description": "파일에 수행된 동작입니다.",
+            "examples": [
+              "CREATE"
+            ],
             "title": "Action",
             "type": "string"
           },
           "filePath": {
+            "description": "관찰된 파일의 절대 경로입니다.",
             "title": "Filepath",
             "type": "string"
           },
           "pid": {
+            "description": "파일 동작을 수행한 프로세스 ID입니다.",
             "minimum": 0,
             "title": "Pid",
             "type": "integer"
           },
           "processName": {
+            "description": "파일 동작을 수행한 프로세스 이름입니다.",
             "title": "Processname",
             "type": "string"
           },
           "sha256": {
+            "description": "파일 내용의 SHA-256 해시입니다.",
             "title": "Sha256",
             "type": "string"
           }
@@ -3604,6 +3913,7 @@
         "additionalProperties": false,
         "properties": {
           "alertCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Alertcount",
             "type": "integer"
@@ -3631,6 +3941,10 @@
             "type": "string"
           },
           "createdAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Createdat",
             "type": "string"
           },
@@ -3646,20 +3960,30 @@
             "title": "Description"
           },
           "endpointId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Endpointid",
             "type": "integer"
           },
           "firstDetectedAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Firstdetectedat",
             "type": "string"
           },
           "incidentId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Incidentid",
             "type": "integer"
           },
           "lastDetectedAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Lastdetectedat",
             "type": "string"
           },
@@ -3674,14 +3998,26 @@
             "type": "string"
           },
           "updatedAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Updatedat",
             "type": "string"
           },
           "windowEndAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Windowendat",
             "type": "string"
           },
           "windowStartAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Windowstartat",
             "type": "string"
           }
@@ -3711,6 +4047,7 @@
         "additionalProperties": false,
         "properties": {
           "alertCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Alertcount",
             "type": "integer"
@@ -3731,6 +4068,10 @@
             "type": "string"
           },
           "createdAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Createdat",
             "type": "string"
           },
@@ -3746,20 +4087,30 @@
             "title": "Description"
           },
           "endpointId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Endpointid",
             "type": "integer"
           },
           "firstDetectedAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Firstdetectedat",
             "type": "string"
           },
           "incidentId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Incidentid",
             "type": "integer"
           },
           "lastDetectedAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Lastdetectedat",
             "type": "string"
           },
@@ -3774,14 +4125,26 @@
             "type": "string"
           },
           "updatedAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Updatedat",
             "type": "string"
           },
           "windowEndAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Windowendat",
             "type": "string"
           },
           "windowStartAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Windowstartat",
             "type": "string"
           }
@@ -3810,6 +4173,7 @@
         "additionalProperties": false,
         "properties": {
           "edgeCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Edgecount",
             "type": "integer"
@@ -3825,11 +4189,13 @@
             "$ref": "#/components/schemas/InvestigationFallbackDto"
           },
           "incidentId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Incidentid",
             "type": "integer"
           },
           "nodeCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Nodecount",
             "type": "integer"
@@ -3879,6 +4245,7 @@
         "additionalProperties": false,
         "properties": {
           "incidentId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Incidentid",
             "type": "integer"
@@ -3894,10 +4261,18 @@
             "type": "string"
           },
           "windowEndAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Windowendat",
             "type": "string"
           },
           "windowStartAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Windowstartat",
             "type": "string"
           }
@@ -3925,15 +4300,21 @@
         "additionalProperties": false,
         "properties": {
           "bucketStartAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Bucketstartat",
             "type": "string"
           },
           "closedCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Closedcount",
             "type": "integer"
           },
           "openCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Opencount",
             "type": "integer"
@@ -3951,6 +4332,7 @@
         "additionalProperties": false,
         "properties": {
           "failedCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Failedcount",
             "type": "integer"
@@ -3972,11 +4354,13 @@
             "type": "number"
           },
           "reprocessFailedCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Reprocessfailedcount",
             "type": "integer"
           },
           "reprocessedCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Reprocessedcount",
             "type": "integer"
@@ -3996,6 +4380,7 @@
         "additionalProperties": false,
         "properties": {
           "ingestedCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Ingestedcount",
             "type": "integer"
@@ -4029,31 +4414,37 @@
         "additionalProperties": false,
         "properties": {
           "clickhouseHotBucketCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Clickhousehotbucketcount",
             "type": "integer"
           },
           "expiredBucketCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Expiredbucketcount",
             "type": "integer"
           },
           "failedBucketCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Failedbucketcount",
             "type": "integer"
           },
           "glacierArchivedBucketCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Glacierarchivedbucketcount",
             "type": "integer"
           },
           "restoredBucketCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Restoredbucketcount",
             "type": "integer"
           },
           "restoringBucketCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Restoringbucketcount",
             "type": "integer"
@@ -4101,6 +4492,7 @@
           "alertId": {
             "anyOf": [
               {
+                "description": "1 이상의 리소스 식별자입니다.",
                 "minimum": 1.0,
                 "type": "integer"
               },
@@ -4131,6 +4523,7 @@
           "incidentId": {
             "anyOf": [
               {
+                "description": "1 이상의 리소스 식별자입니다.",
                 "minimum": 1.0,
                 "type": "integer"
               },
@@ -4214,6 +4607,7 @@
           "alertId": {
             "anyOf": [
               {
+                "description": "1 이상의 리소스 식별자입니다.",
                 "minimum": 1.0,
                 "type": "integer"
               },
@@ -4237,6 +4631,7 @@
           "endpointId": {
             "anyOf": [
               {
+                "description": "1 이상의 리소스 식별자입니다.",
                 "minimum": 1.0,
                 "type": "integer"
               },
@@ -4270,6 +4665,7 @@
           "incidentId": {
             "anyOf": [
               {
+                "description": "1 이상의 리소스 식별자입니다.",
                 "minimum": 1.0,
                 "type": "integer"
               },
@@ -4304,6 +4700,7 @@
           "pid": {
             "anyOf": [
               {
+                "description": "0 이상의 정수입니다.",
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -4338,6 +4735,7 @@
           "riskScore": {
             "anyOf": [
               {
+                "description": "0부터 100까지의 점수입니다.",
                 "maximum": 100.0,
                 "minimum": 0.0,
                 "type": "number"
@@ -4417,6 +4815,7 @@
           "endpointId": {
             "anyOf": [
               {
+                "description": "1 이상의 리소스 식별자입니다.",
                 "minimum": 1.0,
                 "type": "integer"
               },
@@ -4467,21 +4866,28 @@
         "additionalProperties": false,
         "properties": {
           "eventId": {
+            "description": "Agent가 생성한 이벤트 고유 ID입니다.",
             "title": "Eventid",
             "type": "string"
           },
           "eventType": {
             "const": "L7_EVENT",
+            "description": "응용 계층 이벤트 유형입니다.",
             "title": "Eventtype",
             "type": "string"
           },
           "occurredAt": {
+            "description": "이벤트가 엔드포인트에서 발생한 UTC 시각입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "format": "date-time",
             "title": "Occurredat",
             "type": "string"
           },
           "payload": {
-            "$ref": "#/components/schemas/L7EventPayload"
+            "$ref": "#/components/schemas/L7EventPayload",
+            "description": "응용 계층 통신 세부 정보입니다."
           }
         },
         "required": [
@@ -4497,46 +4903,60 @@
         "additionalProperties": false,
         "properties": {
           "httpHost": {
+            "description": "HTTP Host 값입니다.",
             "title": "Httphost",
             "type": "string"
           },
           "httpMethod": {
+            "description": "HTTP 요청 메서드입니다.",
             "title": "Httpmethod",
             "type": "string"
           },
           "httpStatusCode": {
+            "description": "HTTP 응답 상태 코드입니다.",
             "title": "Httpstatuscode",
             "type": "integer"
           },
           "httpUserAgent": {
+            "description": "HTTP User-Agent 값입니다.",
             "title": "Httpuseragent",
             "type": "string"
           },
           "l7Protocol": {
+            "description": "응용 계층 프로토콜입니다.",
+            "examples": [
+              "HTTP"
+            ],
             "title": "L7Protocol",
             "type": "string"
           },
           "tlsCertificateIssuer": {
+            "description": "서버 인증서 Issuer입니다.",
             "title": "Tlscertificateissuer",
             "type": "string"
           },
           "tlsCertificateSha256": {
+            "description": "서버 인증서 DER 값의 SHA-256 해시입니다.",
             "title": "Tlscertificatesha256",
             "type": "string"
           },
           "tlsCertificateSubject": {
+            "description": "서버 인증서 Subject입니다.",
             "title": "Tlscertificatesubject",
             "type": "string"
           },
           "tlsSni": {
+            "description": "TLS SNI 값입니다.",
             "title": "Tlssni",
             "type": "string"
           },
           "tlsVersion": {
+            "description": "협상된 TLS 버전입니다.",
             "title": "Tlsversion",
             "type": "string"
           },
           "url": {
+            "description": "관찰된 요청 URL입니다.",
             "title": "Url",
             "type": "string"
           }
@@ -4551,21 +4971,25 @@
         "additionalProperties": false,
         "properties": {
           "accessToken": {
+            "description": "후속 API 요청의 Authorization 헤더에 사용할 JWT입니다.",
             "title": "Accesstoken",
             "type": "string"
           },
           "expiresIn": {
+            "description": "액세스 토큰 만료까지 남은 초입니다.",
             "minimum": 0.0,
             "title": "Expiresin",
             "type": "integer"
           },
           "tokenType": {
             "const": "Bearer",
+            "description": "토큰 인증 유형입니다.",
             "title": "Tokentype",
             "type": "string"
           },
           "user": {
-            "$ref": "#/components/schemas/UserDto"
+            "$ref": "#/components/schemas/UserDto",
+            "description": "로그인한 사용자 정보입니다."
           }
         },
         "required": [
@@ -4581,6 +5005,10 @@
         "additionalProperties": false,
         "properties": {
           "loginId": {
+            "description": "로그인에 사용하는 사용자 ID입니다. 영문 소문자로 정규화됩니다.",
+            "examples": [
+              "frontend-admin@example.com"
+            ],
             "maxLength": 64,
             "minLength": 3,
             "pattern": "^[a-z0-9][a-z0-9._@+-]{2,63}$",
@@ -4588,6 +5016,7 @@
             "type": "string"
           },
           "password": {
+            "description": "사용자 비밀번호입니다.",
             "maxLength": 1024,
             "minLength": 1,
             "title": "Password",
@@ -4605,6 +5034,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -4630,6 +5060,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -4655,21 +5086,28 @@
         "additionalProperties": false,
         "properties": {
           "eventId": {
+            "description": "Agent가 생성한 이벤트 고유 ID입니다.",
             "title": "Eventid",
             "type": "string"
           },
           "eventType": {
             "const": "NETWORK_CONNECTION",
+            "description": "네트워크 연결 이벤트 유형입니다.",
             "title": "Eventtype",
             "type": "string"
           },
           "occurredAt": {
+            "description": "이벤트가 엔드포인트에서 발생한 UTC 시각입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "format": "date-time",
             "title": "Occurredat",
             "type": "string"
           },
           "payload": {
-            "$ref": "#/components/schemas/NetworkConnectionPayload"
+            "$ref": "#/components/schemas/NetworkConnectionPayload",
+            "description": "네트워크 연결 세부 정보입니다."
           }
         },
         "required": [
@@ -4685,27 +5123,39 @@
         "additionalProperties": false,
         "properties": {
           "pid": {
+            "description": "통신을 생성한 프로세스 ID입니다.",
             "minimum": 0,
             "title": "Pid",
             "type": "integer"
           },
           "processName": {
+            "description": "통신을 생성한 프로세스 이름입니다.",
             "title": "Processname",
             "type": "string"
           },
           "protocol": {
+            "description": "전송 계층 프로토콜입니다.",
+            "examples": [
+              "TCP"
+            ],
             "title": "Protocol",
             "type": "string"
           },
           "remoteDomain": {
+            "description": "확인된 원격 Domain입니다.",
             "title": "Remotedomain",
             "type": "string"
           },
           "remoteIp": {
+            "description": "원격 IPv4 또는 IPv6 주소입니다.",
+            "examples": [
+              "203.0.113.10"
+            ],
             "title": "Remoteip",
             "type": "string"
           },
           "remotePort": {
+            "description": "원격 포트 번호입니다.",
             "maximum": 65535,
             "minimum": 0,
             "title": "Remoteport",
@@ -4724,6 +5174,10 @@
         "additionalProperties": false,
         "properties": {
           "checkedAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Checkedat",
             "type": "string"
           },
@@ -4766,6 +5220,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -4785,6 +5240,7 @@
         "additionalProperties": false,
         "properties": {
           "items": {
+            "description": "현재 페이지에 포함된 항목입니다.",
             "items": {
               "$ref": "#/components/schemas/AlertDto"
             },
@@ -4792,17 +5248,20 @@
             "type": "array"
           },
           "page": {
+            "description": "현재 페이지 번호입니다.",
             "minimum": 1.0,
             "title": "Page",
             "type": "integer"
           },
           "size": {
+            "description": "페이지당 최대 항목 수입니다.",
             "maximum": 500.0,
             "minimum": 1.0,
             "title": "Size",
             "type": "integer"
           },
           "total": {
+            "description": "조회 조건에 일치하는 전체 항목 수입니다.",
             "minimum": 0.0,
             "title": "Total",
             "type": "integer"
@@ -4821,6 +5280,7 @@
         "additionalProperties": false,
         "properties": {
           "items": {
+            "description": "현재 페이지에 포함된 항목입니다.",
             "items": {
               "$ref": "#/components/schemas/ArchiveBucketDto"
             },
@@ -4828,17 +5288,20 @@
             "type": "array"
           },
           "page": {
+            "description": "현재 페이지 번호입니다.",
             "minimum": 1.0,
             "title": "Page",
             "type": "integer"
           },
           "size": {
+            "description": "페이지당 최대 항목 수입니다.",
             "maximum": 500.0,
             "minimum": 1.0,
             "title": "Size",
             "type": "integer"
           },
           "total": {
+            "description": "조회 조건에 일치하는 전체 항목 수입니다.",
             "minimum": 0.0,
             "title": "Total",
             "type": "integer"
@@ -4857,6 +5320,7 @@
         "additionalProperties": false,
         "properties": {
           "items": {
+            "description": "현재 페이지에 포함된 항목입니다.",
             "items": {
               "$ref": "#/components/schemas/EndpointDto"
             },
@@ -4864,17 +5328,20 @@
             "type": "array"
           },
           "page": {
+            "description": "현재 페이지 번호입니다.",
             "minimum": 1.0,
             "title": "Page",
             "type": "integer"
           },
           "size": {
+            "description": "페이지당 최대 항목 수입니다.",
             "maximum": 500.0,
             "minimum": 1.0,
             "title": "Size",
             "type": "integer"
           },
           "total": {
+            "description": "조회 조건에 일치하는 전체 항목 수입니다.",
             "minimum": 0.0,
             "title": "Total",
             "type": "integer"
@@ -4893,6 +5360,7 @@
         "additionalProperties": false,
         "properties": {
           "items": {
+            "description": "현재 페이지에 포함된 항목입니다.",
             "items": {
               "$ref": "#/components/schemas/EventDto"
             },
@@ -4900,17 +5368,20 @@
             "type": "array"
           },
           "page": {
+            "description": "현재 페이지 번호입니다.",
             "minimum": 1.0,
             "title": "Page",
             "type": "integer"
           },
           "size": {
+            "description": "페이지당 최대 항목 수입니다.",
             "maximum": 500.0,
             "minimum": 1.0,
             "title": "Size",
             "type": "integer"
           },
           "total": {
+            "description": "조회 조건에 일치하는 전체 항목 수입니다.",
             "minimum": 0.0,
             "title": "Total",
             "type": "integer"
@@ -4929,6 +5400,7 @@
         "additionalProperties": false,
         "properties": {
           "items": {
+            "description": "현재 페이지에 포함된 항목입니다.",
             "items": {
               "$ref": "#/components/schemas/EventFailureDto"
             },
@@ -4936,17 +5408,20 @@
             "type": "array"
           },
           "page": {
+            "description": "현재 페이지 번호입니다.",
             "minimum": 1.0,
             "title": "Page",
             "type": "integer"
           },
           "size": {
+            "description": "페이지당 최대 항목 수입니다.",
             "maximum": 500.0,
             "minimum": 1.0,
             "title": "Size",
             "type": "integer"
           },
           "total": {
+            "description": "조회 조건에 일치하는 전체 항목 수입니다.",
             "minimum": 0.0,
             "title": "Total",
             "type": "integer"
@@ -4965,6 +5440,7 @@
         "additionalProperties": false,
         "properties": {
           "items": {
+            "description": "현재 페이지에 포함된 항목입니다.",
             "items": {
               "$ref": "#/components/schemas/IncidentDto"
             },
@@ -4972,17 +5448,20 @@
             "type": "array"
           },
           "page": {
+            "description": "현재 페이지 번호입니다.",
             "minimum": 1.0,
             "title": "Page",
             "type": "integer"
           },
           "size": {
+            "description": "페이지당 최대 항목 수입니다.",
             "maximum": 500.0,
             "minimum": 1.0,
             "title": "Size",
             "type": "integer"
           },
           "total": {
+            "description": "조회 조건에 일치하는 전체 항목 수입니다.",
             "minimum": 0.0,
             "title": "Total",
             "type": "integer"
@@ -5011,6 +5490,7 @@
           "lag": {
             "anyOf": [
               {
+                "description": "0 이상의 정수입니다.",
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -5023,6 +5503,7 @@
           "memberCount": {
             "anyOf": [
               {
+                "description": "0 이상의 정수입니다.",
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -5060,21 +5541,28 @@
         "additionalProperties": false,
         "properties": {
           "eventId": {
+            "description": "Agent가 생성한 이벤트 고유 ID입니다.",
             "title": "Eventid",
             "type": "string"
           },
           "eventType": {
             "const": "PROCESS_EXECUTION",
+            "description": "프로세스 실행 이벤트 유형입니다.",
             "title": "Eventtype",
             "type": "string"
           },
           "occurredAt": {
+            "description": "이벤트가 엔드포인트에서 발생한 UTC 시각입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "format": "date-time",
             "title": "Occurredat",
             "type": "string"
           },
           "payload": {
-            "$ref": "#/components/schemas/ProcessExecutionPayload"
+            "$ref": "#/components/schemas/ProcessExecutionPayload",
+            "description": "프로세스 실행 세부 정보입니다."
           }
         },
         "required": [
@@ -5090,28 +5578,34 @@
         "additionalProperties": false,
         "properties": {
           "commandLine": {
+            "description": "프로세스 실행 명령줄입니다.",
             "title": "Commandline",
             "type": "string"
           },
           "pid": {
+            "description": "프로세스 ID입니다.",
             "minimum": 0,
             "title": "Pid",
             "type": "integer"
           },
           "ppid": {
+            "description": "부모 프로세스 ID입니다.",
             "minimum": 0,
             "title": "Ppid",
             "type": "integer"
           },
           "processName": {
+            "description": "실행된 프로세스 이름입니다.",
             "title": "Processname",
             "type": "string"
           },
           "processPath": {
+            "description": "실행 파일의 절대 경로입니다.",
             "title": "Processpath",
             "type": "string"
           },
           "userName": {
+            "description": "프로세스를 실행한 사용자 이름입니다.",
             "title": "Username",
             "type": "string"
           }
@@ -5127,11 +5621,16 @@
         "additionalProperties": false,
         "properties": {
           "endpointId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Endpointid",
             "type": "integer"
           },
           "from": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "From",
             "type": "string"
           },
@@ -5143,6 +5642,10 @@
             "type": "array"
           },
           "to": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "To",
             "type": "string"
           }
@@ -5171,15 +5674,24 @@
             "title": "Commandline"
           },
           "eventCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Eventcount",
             "type": "integer"
           },
           "firstSeenAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Firstseenat",
             "type": "string"
           },
           "lastSeenAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Lastseenat",
             "type": "string"
           },
@@ -5188,6 +5700,7 @@
             "type": "boolean"
           },
           "pid": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Pid",
             "type": "integer"
@@ -5195,6 +5708,7 @@
           "ppid": {
             "anyOf": [
               {
+                "description": "0 이상의 정수입니다.",
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -5319,6 +5833,10 @@
         "additionalProperties": false,
         "properties": {
           "requestId": {
+            "description": "요청 추적에 사용하는 고유 ID입니다.",
+            "examples": [
+              "req_12345678"
+            ],
             "title": "Requestid",
             "type": "string"
           }
@@ -5362,6 +5880,7 @@
         "additionalProperties": false,
         "properties": {
           "affectedAlertCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Affectedalertcount",
             "type": "integer"
@@ -5377,11 +5896,13 @@
             ]
           },
           "manualActionStepCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Manualactionstepcount",
             "type": "integer"
           },
           "ruleCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Rulecount",
             "type": "integer"
@@ -5440,6 +5961,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -5468,6 +5990,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -5494,6 +6017,7 @@
           "packetDropCount": {
             "anyOf": [
               {
+                "description": "0 이상의 정수입니다.",
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -5506,6 +6030,7 @@
           "parseErrorCount": {
             "anyOf": [
               {
+                "description": "0 이상의 정수입니다.",
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -5548,25 +6073,33 @@
         "additionalProperties": false,
         "properties": {
           "packetDropCount": {
+            "description": "누적 패킷 유실 수입니다.",
             "minimum": 0.0,
             "title": "Packetdropcount",
             "type": "integer"
           },
           "parseErrorCount": {
+            "description": "누적 파싱 오류 수입니다.",
             "minimum": 0.0,
             "title": "Parseerrorcount",
             "type": "integer"
           },
           "provider": {
+            "description": "센서 구현 또는 데이터 제공자입니다.",
             "title": "Provider",
             "type": "string"
           },
           "sensor": {
+            "description": "상태를 보고하는 센서 이름입니다.",
+            "examples": [
+              "network"
+            ],
             "title": "Sensor",
             "type": "string"
           },
           "status": {
-            "$ref": "#/components/schemas/SensorHealth"
+            "$ref": "#/components/schemas/SensorHealth",
+            "description": "센서의 현재 상태입니다."
           }
         },
         "required": [
@@ -5584,6 +6117,7 @@
             "type": "string"
           },
           "latencyMs": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Latencyms",
             "type": "integer"
@@ -5619,6 +6153,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -5646,6 +6181,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -5673,6 +6209,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -5704,6 +6241,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -5723,10 +6261,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/AgentHeartbeatData"
+            "$ref": "#/components/schemas/AgentHeartbeatData",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -5740,10 +6280,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/AgentRegisterData"
+            "$ref": "#/components/schemas/AgentRegisterData",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -5757,10 +6299,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/AlertDetailDto"
+            "$ref": "#/components/schemas/AlertDetailDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -5774,10 +6318,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/AlertDto"
+            "$ref": "#/components/schemas/AlertDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -5791,10 +6337,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ArchiveRestoreStartDto"
+            "$ref": "#/components/schemas/ArchiveRestoreStartDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -5808,10 +6356,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/AttackTimelineDto"
+            "$ref": "#/components/schemas/AttackTimelineDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -5825,10 +6375,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/CorrelationDto"
+            "$ref": "#/components/schemas/CorrelationDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -5842,10 +6394,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/DashboardLayoutDto"
+            "$ref": "#/components/schemas/DashboardLayoutDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -5859,10 +6413,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/DashboardSummaryDto"
+            "$ref": "#/components/schemas/DashboardSummaryDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -5876,10 +6432,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/DnsLookupDto"
+            "$ref": "#/components/schemas/DnsLookupDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -5893,10 +6451,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/EgressTopologyDto"
+            "$ref": "#/components/schemas/EgressTopologyDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -5910,10 +6470,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/EndpointDetailDto"
+            "$ref": "#/components/schemas/EndpointDetailDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -5927,10 +6489,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/EndpointSummaryDto"
+            "$ref": "#/components/schemas/EndpointSummaryDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -5944,10 +6508,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/EventDetailDto"
+            "$ref": "#/components/schemas/EventDetailDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -5961,10 +6527,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ForwardDnsDto"
+            "$ref": "#/components/schemas/ForwardDnsDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -5978,10 +6546,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/IncidentDetailDto"
+            "$ref": "#/components/schemas/IncidentDetailDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -5995,10 +6565,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/IncidentInvestigationDto"
+            "$ref": "#/components/schemas/IncidentInvestigationDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -6012,10 +6584,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/IngestSummaryDto"
+            "$ref": "#/components/schemas/IngestSummaryDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -6029,10 +6603,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/LoginData"
+            "$ref": "#/components/schemas/LoginData",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -6046,10 +6622,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/OperationsHealthDto"
+            "$ref": "#/components/schemas/OperationsHealthDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -6063,10 +6641,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/PagedData_AlertDto_"
+            "$ref": "#/components/schemas/PagedData_AlertDto_",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -6080,10 +6660,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/PagedData_ArchiveBucketDto_"
+            "$ref": "#/components/schemas/PagedData_ArchiveBucketDto_",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -6097,10 +6679,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/PagedData_EndpointDto_"
+            "$ref": "#/components/schemas/PagedData_EndpointDto_",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -6114,10 +6698,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/PagedData_EventDto_"
+            "$ref": "#/components/schemas/PagedData_EventDto_",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -6131,10 +6717,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/PagedData_EventFailureDto_"
+            "$ref": "#/components/schemas/PagedData_EventFailureDto_",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -6148,10 +6736,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/PagedData_IncidentDto_"
+            "$ref": "#/components/schemas/PagedData_IncidentDto_",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -6165,10 +6755,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ProcessTreeDto"
+            "$ref": "#/components/schemas/ProcessTreeDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -6182,10 +6774,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ReverseDnsDto"
+            "$ref": "#/components/schemas/ReverseDnsDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -6199,10 +6793,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/TelemetryBatchData"
+            "$ref": "#/components/schemas/TelemetryBatchData",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -6216,10 +6812,12 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/UserDto"
+            "$ref": "#/components/schemas/UserDto",
+            "description": "API별 성공 응답 데이터입니다."
           },
           "meta": {
-            "$ref": "#/components/schemas/RequestMeta"
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
           }
         },
         "required": [
@@ -6263,16 +6861,23 @@
         "additionalProperties": false,
         "properties": {
           "agentId": {
+            "description": "mTLS 인증서 SAN과 일치해야 하는 Agent 고유 ID입니다.",
+            "examples": [
+              "agent-001"
+            ],
             "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
             "title": "Agentid",
             "type": "string"
           },
           "batchId": {
+            "description": "재전송 중복 제거에 사용하는 배치 고유 ID입니다.",
             "title": "Batchid",
             "type": "string"
           },
           "events": {
+            "description": "1개 이상 100개 이하의 텔레메트리 이벤트입니다.",
             "items": {
+              "description": "eventType으로 구분되는 텔레메트리 이벤트입니다.",
               "discriminator": {
                 "mapping": {
                   "DNS_QUERY": "#/components/schemas/DnsQueryEvent",
@@ -6308,10 +6913,15 @@
           },
           "schemaVersion": {
             "const": 1,
+            "description": "텔레메트리 계약 버전입니다.",
             "title": "Schemaversion",
             "type": "integer"
           },
           "sentAt": {
+            "description": "Agent가 배치를 전송한 UTC 시각입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "format": "date-time",
             "title": "Sentat",
             "type": "string"
@@ -6342,10 +6952,18 @@
         "additionalProperties": false,
         "properties": {
           "from": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "From",
             "type": "string"
           },
           "to": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "To",
             "type": "string"
           }
@@ -6361,10 +6979,15 @@
         "additionalProperties": false,
         "properties": {
           "bucketStartAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Bucketstartat",
             "type": "string"
           },
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -6381,6 +7004,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -6401,6 +7025,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -6421,6 +7046,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -6441,6 +7067,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -6461,6 +7088,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -6481,6 +7109,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -6501,6 +7130,7 @@
         "additionalProperties": false,
         "properties": {
           "count": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Count",
             "type": "integer"
@@ -6526,21 +7156,28 @@
         "additionalProperties": false,
         "properties": {
           "alertCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Alertcount",
             "type": "integer"
           },
           "endpointId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Endpointid",
             "type": "integer"
           },
           "eventCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Eventcount",
             "type": "integer"
           },
           "lastSeenAt": {
+            "description": "UTC 기준 RFC 3339 일시입니다.",
+            "examples": [
+              "2026-07-19T13:00:00Z"
+            ],
             "title": "Lastseenat",
             "type": "string"
           },
@@ -6573,11 +7210,13 @@
         "additionalProperties": false,
         "properties": {
           "alertCount": {
+            "description": "0 이상의 정수입니다.",
             "minimum": 0.0,
             "title": "Alertcount",
             "type": "integer"
           },
           "endpointId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Endpointid",
             "type": "integer"
@@ -6590,6 +7229,7 @@
             "$ref": "#/components/schemas/RiskLevel"
           },
           "riskScore": {
+            "description": "0부터 100까지의 정수 점수입니다.",
             "maximum": 100.0,
             "minimum": 0.0,
             "title": "Riskscore",
@@ -6617,6 +7257,10 @@
             "$ref": "#/components/schemas/UserLocale"
           },
           "loginId": {
+            "description": "로그인에 사용하는 사용자 ID입니다. 영문 소문자로 정규화됩니다.",
+            "examples": [
+              "frontend-admin@example.com"
+            ],
             "maxLength": 64,
             "minLength": 3,
             "pattern": "^[a-z0-9][a-z0-9._@+-]{2,63}$",
@@ -6634,6 +7278,7 @@
             "$ref": "#/components/schemas/UserStatus"
           },
           "userId": {
+            "description": "1 이상의 리소스 식별자입니다.",
             "minimum": 1.0,
             "title": "Userid",
             "type": "integer"
@@ -6662,7 +7307,11 @@
         "additionalProperties": false,
         "properties": {
           "locale": {
-            "$ref": "#/components/schemas/UserLocale"
+            "$ref": "#/components/schemas/UserLocale",
+            "description": "대시보드 표시 언어입니다.",
+            "examples": [
+              "KO"
+            ]
           }
         },
         "required": [
@@ -6701,72 +7350,90 @@
     },
     "securitySchemes": {
       "BearerJWT": {
-        "description": "JWT access token returned by POST /api/v1/auth/login.",
+        "description": "POST /api/v1/auth/login에서 발급받은 JWT 액세스 토큰을 입력합니다.",
         "scheme": "bearer",
         "type": "http"
       },
       "mutualTLS": {
-        "description": "Agent certificate validated by the Collector Nginx mTLS boundary.",
+        "description": "Collector Nginx mTLS 경계에서 검증된 Agent 클라이언트 인증서를 사용합니다.",
         "type": "mutualTLS"
       }
     }
   },
   "info": {
-    "title": "EDR_C",
+    "description": "EDR_C 대시보드와 수집 Agent가 사용하는 API입니다. 대시보드 API는 Bearer JWT, Collector API는 mTLS 클라이언트 인증서를 사용합니다.",
+    "title": "EDR_C API",
     "version": "0.1.0"
   },
   "openapi": "3.1.0",
   "paths": {
     "/api/v1/alerts": {
       "get": {
+        "description": "탐지 시각, 심각도, 상태, 엔드포인트 조건으로 Alert 목록을 페이지 단위로 조회합니다.",
         "operationId": "alertsList",
         "parameters": [
           {
+            "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다.",
             "in": "query",
             "name": "timePreset",
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/TimePreset",
-              "default": "LATEST_24H"
+              "default": "LATEST_24H",
+              "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다."
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 시작 시각입니다.",
             "in": "query",
             "name": "from",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 시작 시각입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "From",
               "type": "string"
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
             "in": "query",
             "name": "to",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "To",
               "type": "string"
             }
           },
           {
+            "description": "조회할 페이지 번호입니다.",
             "in": "query",
             "name": "page",
             "required": false,
             "schema": {
               "default": 1,
+              "description": "조회할 페이지 번호입니다.",
               "minimum": 1,
               "title": "Page",
               "type": "integer"
             }
           },
           {
+            "description": "페이지당 항목 수입니다.",
             "in": "query",
             "name": "size",
             "required": false,
             "schema": {
               "default": 50,
+              "description": "페이지당 항목 수입니다.",
               "maximum": 500,
               "minimum": 1,
               "title": "Size",
@@ -6774,55 +7441,67 @@
             }
           },
           {
+            "description": "특정 엔드포인트의 Alert만 조회합니다.",
             "in": "query",
             "name": "endpointId",
             "required": false,
             "schema": {
+              "description": "특정 엔드포인트의 Alert만 조회합니다.",
               "minimum": 1,
               "title": "Endpointid",
               "type": "integer"
             }
           },
           {
+            "description": "Alert 처리 상태 필터입니다.",
             "in": "query",
             "name": "status",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/AlertStatus"
+              "$ref": "#/components/schemas/AlertStatus",
+              "description": "Alert 처리 상태 필터입니다."
             }
           },
           {
+            "description": "Alert 심각도 필터입니다.",
             "in": "query",
             "name": "severity",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/Severity"
+              "$ref": "#/components/schemas/Severity",
+              "description": "Alert 심각도 필터입니다."
             }
           },
           {
+            "description": "탐지 규칙 코드 필터입니다.",
             "in": "query",
             "name": "ruleCode",
             "required": false,
             "schema": {
+              "description": "탐지 규칙 코드 필터입니다.",
               "title": "Rulecode",
               "type": "string"
             }
           },
           {
+            "description": "Alert 정렬 기준입니다.",
             "in": "query",
             "name": "sortBy",
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/AlertSortBy",
-              "default": "priority"
+              "default": "priority",
+              "description": "Alert 정렬 기준입니다."
             }
           },
           {
+            "description": "정렬 방향입니다.",
             "in": "query",
             "name": "sortOrder",
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "정렬 방향입니다.",
               "enum": [
                 "asc",
                 "desc"
@@ -6841,7 +7520,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -6851,7 +7530,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -6861,7 +7540,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "503": {
             "content": {
@@ -6871,7 +7550,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -6879,7 +7558,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Alerts",
+        "summary": "Alert 목록 조회",
         "tags": [
           "Alerts"
         ]
@@ -6887,13 +7566,16 @@
     },
     "/api/v1/alerts/{alertId}": {
       "get": {
+        "description": "Alert의 탐지 규칙, 관련 이벤트, MITRE ATT&CK 정보와 대응 지침을 조회합니다.",
         "operationId": "alertsGet",
         "parameters": [
           {
+            "description": "조회할 Alert ID입니다.",
             "in": "path",
             "name": "alertId",
             "required": true,
             "schema": {
+              "description": "조회할 Alert ID입니다.",
               "title": "Alertid",
               "type": "integer"
             }
@@ -6908,7 +7590,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -6918,7 +7600,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -6928,7 +7610,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "404": {
             "content": {
@@ -6938,7 +7620,7 @@
                 }
               }
             },
-            "description": "The requested resource was not found."
+            "description": "요청한 리소스를 찾을 수 없습니다."
           },
           "503": {
             "content": {
@@ -6948,7 +7630,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -6956,7 +7638,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Alert Detail",
+        "summary": "Alert 상세 조회",
         "tags": [
           "Alerts"
         ]
@@ -6964,13 +7646,16 @@
     },
     "/api/v1/alerts/{alertId}/status": {
       "patch": {
+        "description": "쓰기 권한이 있는 사용자가 Alert 처리 상태를 변경합니다. 변경 내용은 감사 정보와 함께 기록됩니다.",
         "operationId": "alertsUpdateStatus",
         "parameters": [
           {
+            "description": "상태를 변경할 Alert ID입니다.",
             "in": "path",
             "name": "alertId",
             "required": true,
             "schema": {
+              "description": "상태를 변경할 Alert ID입니다.",
               "title": "Alertid",
               "type": "integer"
             }
@@ -6995,7 +7680,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -7005,7 +7690,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -7015,7 +7700,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "403": {
             "content": {
@@ -7025,7 +7710,7 @@
                 }
               }
             },
-            "description": "The authenticated identity is not permitted to perform this operation."
+            "description": "인증된 주체에게 이 작업을 수행할 권한이 없습니다."
           },
           "404": {
             "content": {
@@ -7035,7 +7720,7 @@
                 }
               }
             },
-            "description": "The requested resource was not found."
+            "description": "요청한 리소스를 찾을 수 없습니다."
           },
           "503": {
             "content": {
@@ -7045,7 +7730,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -7053,7 +7738,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Alert Status",
+        "summary": "Alert 상태 변경",
         "tags": [
           "Alerts"
         ]
@@ -7061,25 +7746,30 @@
     },
     "/api/v1/archives/restores": {
       "get": {
+        "description": "엔드포인트와 시간 범위에 해당하는 아카이브 버킷의 복원 상태를 페이지 단위로 조회합니다.",
         "operationId": "archiveRestoresList",
         "parameters": [
           {
+            "description": "조회할 페이지 번호입니다.",
             "in": "query",
             "name": "page",
             "required": false,
             "schema": {
               "default": 1,
+              "description": "조회할 페이지 번호입니다.",
               "minimum": 1,
               "title": "Page",
               "type": "integer"
             }
           },
           {
+            "description": "페이지당 항목 수입니다.",
             "in": "query",
             "name": "size",
             "required": false,
             "schema": {
               "default": 50,
+              "description": "페이지당 항목 수입니다.",
               "maximum": 500,
               "minimum": 1,
               "title": "Size",
@@ -7087,11 +7777,20 @@
             }
           },
           {
+            "description": "복원 상태를 조회할 엔드포인트 ID입니다.",
             "in": "query",
             "name": "endpointIds",
             "required": true,
             "schema": {
+              "description": "복원 상태를 조회할 엔드포인트 ID입니다.",
+              "examples": [
+                [
+                  1,
+                  2
+                ]
+              ],
               "items": {
+                "description": "1 이상의 리소스 식별자입니다.",
                 "minimum": 1,
                 "type": "integer"
               },
@@ -7102,20 +7801,30 @@
             }
           },
           {
+            "description": "조회 범위의 시작 시각입니다.",
             "in": "query",
             "name": "from",
             "required": true,
             "schema": {
+              "description": "조회 범위의 시작 시각입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "From",
               "type": "string"
             }
           },
           {
+            "description": "조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
             "in": "query",
             "name": "to",
             "required": true,
             "schema": {
+              "description": "조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "To",
               "type": "string"
@@ -7131,7 +7840,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -7141,7 +7850,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -7151,7 +7860,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "503": {
             "content": {
@@ -7161,7 +7870,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -7169,12 +7878,13 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Restore List",
+        "summary": "아카이브 복원 목록 조회",
         "tags": [
           "Archives"
         ]
       },
       "post": {
+        "description": "선택한 엔드포인트와 시간 범위의 아카이브 데이터를 조회 가능한 RESTORED 영역으로 복원 요청합니다.",
         "operationId": "archiveRestoresStart",
         "requestBody": {
           "content": {
@@ -7195,7 +7905,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "202": {
             "content": {
@@ -7205,7 +7915,7 @@
                 }
               }
             },
-            "description": "Restore accepted."
+            "description": "복원 요청을 접수했습니다."
           },
           "400": {
             "content": {
@@ -7215,7 +7925,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -7225,7 +7935,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "403": {
             "content": {
@@ -7235,7 +7945,7 @@
                 }
               }
             },
-            "description": "The authenticated identity is not permitted to perform this operation."
+            "description": "인증된 주체에게 이 작업을 수행할 권한이 없습니다."
           },
           "503": {
             "content": {
@@ -7245,7 +7955,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -7253,7 +7963,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Restore Start",
+        "summary": "아카이브 복원 시작",
         "tags": [
           "Archives"
         ]
@@ -7261,6 +7971,7 @@
     },
     "/api/v1/auth/login": {
       "post": {
+        "description": "로그인 ID와 비밀번호를 검증하고 대시보드 API 호출에 사용할 Bearer JWT를 발급합니다.",
         "operationId": "authLogin",
         "requestBody": {
           "content": {
@@ -7281,7 +7992,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -7291,7 +8002,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -7301,7 +8012,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "403": {
             "content": {
@@ -7311,7 +8022,7 @@
                 }
               }
             },
-            "description": "The authenticated identity is not permitted to perform this operation."
+            "description": "인증된 주체에게 이 작업을 수행할 권한이 없습니다."
           },
           "429": {
             "content": {
@@ -7321,7 +8032,7 @@
                 }
               }
             },
-            "description": "The request exceeded the configured rate limit."
+            "description": "설정된 요청 속도 제한을 초과했습니다."
           },
           "503": {
             "content": {
@@ -7331,10 +8042,10 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
-        "summary": "Login",
+        "summary": "대시보드 로그인",
         "tags": [
           "Auth"
         ]
@@ -7342,6 +8053,7 @@
     },
     "/api/v1/collector/agents/heartbeat": {
       "post": {
+        "description": "mTLS로 인증된 Agent의 센서 상태, 정책 버전과 최근 활동 시각을 갱신합니다.",
         "operationId": "collectorHeartbeatAgent",
         "requestBody": {
           "content": {
@@ -7362,7 +8074,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -7372,7 +8084,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -7382,7 +8094,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "403": {
             "content": {
@@ -7392,7 +8104,7 @@
                 }
               }
             },
-            "description": "The authenticated identity is not permitted to perform this operation."
+            "description": "인증된 주체에게 이 작업을 수행할 권한이 없습니다."
           },
           "503": {
             "content": {
@@ -7402,7 +8114,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -7410,7 +8122,7 @@
             "mutualTLS": []
           }
         ],
-        "summary": "Heartbeat",
+        "summary": "Agent heartbeat 수신",
         "tags": [
           "Collector"
         ]
@@ -7418,6 +8130,7 @@
     },
     "/api/v1/collector/agents/register": {
       "post": {
+        "description": "mTLS 인증서의 Agent 식별자와 요청 본문을 검증해 Agent를 등록하거나 기존 정보를 갱신합니다.",
         "operationId": "collectorRegisterAgent",
         "requestBody": {
           "content": {
@@ -7438,7 +8151,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "201": {
             "content": {
@@ -7448,7 +8161,7 @@
                 }
               }
             },
-            "description": "Agent created."
+            "description": "새 Agent를 등록했습니다."
           },
           "400": {
             "content": {
@@ -7458,7 +8171,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -7468,7 +8181,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "403": {
             "content": {
@@ -7478,7 +8191,7 @@
                 }
               }
             },
-            "description": "The authenticated identity is not permitted to perform this operation."
+            "description": "인증된 주체에게 이 작업을 수행할 권한이 없습니다."
           },
           "409": {
             "content": {
@@ -7488,7 +8201,7 @@
                 }
               }
             },
-            "description": "The request conflicts with the current resource, identity, or Archive state."
+            "description": "현재 리소스, 인증 주체 또는 Archive 상태와 요청이 충돌합니다."
           },
           "503": {
             "content": {
@@ -7498,7 +8211,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -7506,7 +8219,7 @@
             "mutualTLS": []
           }
         ],
-        "summary": "Register Agent",
+        "summary": "Agent 등록",
         "tags": [
           "Collector"
         ]
@@ -7514,6 +8227,7 @@
     },
     "/api/v1/collector/telemetry/batches": {
       "post": {
+        "description": "mTLS로 인증된 Agent가 보낸 이벤트 배치를 검증하고 Kafka 수집 파이프라인에 전달합니다.",
         "operationId": "collectorIngestTelemetryBatch",
         "requestBody": {
           "content": {
@@ -7534,7 +8248,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -7544,7 +8258,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -7554,7 +8268,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "403": {
             "content": {
@@ -7564,7 +8278,7 @@
                 }
               }
             },
-            "description": "The authenticated identity is not permitted to perform this operation."
+            "description": "인증된 주체에게 이 작업을 수행할 권한이 없습니다."
           },
           "413": {
             "content": {
@@ -7574,7 +8288,7 @@
                 }
               }
             },
-            "description": "The request body or event count exceeds the documented limit."
+            "description": "요청 본문 크기 또는 이벤트 수가 허용 한도를 초과했습니다."
           },
           "503": {
             "content": {
@@ -7584,7 +8298,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -7592,7 +8306,7 @@
             "mutualTLS": []
           }
         ],
-        "summary": "Telemetry Batch",
+        "summary": "텔레메트리 배치 수집",
         "tags": [
           "Collector"
         ]
@@ -7600,42 +8314,57 @@
     },
     "/api/v1/dashboard/endpoints/summary": {
       "get": {
+        "description": "엔드포인트 상태, 센서 상태, 위험도 분포와 관련 Alert·Incident 지표를 집계합니다.",
         "operationId": "dashboardGetEndpointSummary",
         "parameters": [
           {
+            "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다.",
             "in": "query",
             "name": "timePreset",
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/TimePreset",
-              "default": "LATEST_24H"
+              "default": "LATEST_24H",
+              "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다."
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 시작 시각입니다.",
             "in": "query",
             "name": "from",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 시작 시각입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "From",
               "type": "string"
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
             "in": "query",
             "name": "to",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "To",
               "type": "string"
             }
           },
           {
+            "description": "특정 엔드포인트 지표만 집계합니다.",
             "in": "query",
             "name": "endpointId",
             "required": false,
             "schema": {
+              "description": "특정 엔드포인트 지표만 집계합니다.",
               "minimum": 1,
               "title": "Endpointid",
               "type": "integer"
@@ -7651,7 +8380,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -7661,7 +8390,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -7671,7 +8400,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "503": {
             "content": {
@@ -7681,7 +8410,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -7689,7 +8418,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Endpoint Summary",
+        "summary": "엔드포인트 현황 요약 조회",
         "tags": [
           "Dashboard"
         ]
@@ -7697,42 +8426,57 @@
     },
     "/api/v1/dashboard/ingest/summary": {
       "get": {
+        "description": "선택한 시간 범위의 수집 이벤트, 저장 상태와 실패 현황을 집계해 반환합니다.",
         "operationId": "dashboardGetIngestSummary",
         "parameters": [
           {
+            "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다.",
             "in": "query",
             "name": "timePreset",
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/TimePreset",
-              "default": "LATEST_24H"
+              "default": "LATEST_24H",
+              "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다."
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 시작 시각입니다.",
             "in": "query",
             "name": "from",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 시작 시각입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "From",
               "type": "string"
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
             "in": "query",
             "name": "to",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "To",
               "type": "string"
             }
           },
           {
+            "description": "특정 엔드포인트 지표만 집계합니다.",
             "in": "query",
             "name": "endpointId",
             "required": false,
             "schema": {
+              "description": "특정 엔드포인트 지표만 집계합니다.",
               "minimum": 1,
               "title": "Endpointid",
               "type": "integer"
@@ -7748,7 +8492,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -7758,7 +8502,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -7768,7 +8512,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "503": {
             "content": {
@@ -7778,7 +8522,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -7786,7 +8530,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Ingest Summary",
+        "summary": "수집 파이프라인 요약 조회",
         "tags": [
           "Dashboard"
         ]
@@ -7794,13 +8538,16 @@
     },
     "/api/v1/dashboard/layouts/{dashboardKey}": {
       "delete": {
+        "description": "현재 사용자의 저장된 대시보드 레이아웃을 삭제하고 기본 레이아웃 정보를 반환합니다.",
         "operationId": "dashboardLayoutsDelete",
         "parameters": [
           {
+            "description": "대시보드를 구분하는 안정적인 키입니다.",
             "in": "path",
             "name": "dashboardKey",
             "required": true,
             "schema": {
+              "description": "대시보드를 구분하는 안정적인 키입니다.",
               "title": "Dashboardkey",
               "type": "string"
             }
@@ -7815,7 +8562,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "401": {
             "content": {
@@ -7825,7 +8572,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "404": {
             "content": {
@@ -7835,7 +8582,7 @@
                 }
               }
             },
-            "description": "The requested resource was not found."
+            "description": "요청한 리소스를 찾을 수 없습니다."
           },
           "503": {
             "content": {
@@ -7845,7 +8592,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -7853,19 +8600,22 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Dashboard Layout Delete",
+        "summary": "대시보드 레이아웃 초기화",
         "tags": [
           "Dashboard"
         ]
       },
       "get": {
+        "description": "현재 사용자가 저장한 대시보드별 위젯 배치와 버전 정보를 조회합니다.",
         "operationId": "dashboardLayoutsGet",
         "parameters": [
           {
+            "description": "대시보드를 구분하는 안정적인 키입니다.",
             "in": "path",
             "name": "dashboardKey",
             "required": true,
             "schema": {
+              "description": "대시보드를 구분하는 안정적인 키입니다.",
               "title": "Dashboardkey",
               "type": "string"
             }
@@ -7880,7 +8630,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "401": {
             "content": {
@@ -7890,7 +8640,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "404": {
             "content": {
@@ -7900,7 +8650,7 @@
                 }
               }
             },
-            "description": "The requested resource was not found."
+            "description": "요청한 리소스를 찾을 수 없습니다."
           },
           "503": {
             "content": {
@@ -7910,7 +8660,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -7918,19 +8668,22 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Dashboard Layout Get",
+        "summary": "대시보드 레이아웃 조회",
         "tags": [
           "Dashboard"
         ]
       },
       "put": {
+        "description": "현재 사용자의 대시보드 위젯 배치를 생성하거나 기존 버전을 갱신합니다.",
         "operationId": "dashboardLayoutsPut",
         "parameters": [
           {
+            "description": "대시보드를 구분하는 안정적인 키입니다.",
             "in": "path",
             "name": "dashboardKey",
             "required": true,
             "schema": {
+              "description": "대시보드를 구분하는 안정적인 키입니다.",
               "title": "Dashboardkey",
               "type": "string"
             }
@@ -7955,7 +8708,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -7965,7 +8718,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -7975,7 +8728,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "404": {
             "content": {
@@ -7985,7 +8738,7 @@
                 }
               }
             },
-            "description": "The requested resource was not found."
+            "description": "요청한 리소스를 찾을 수 없습니다."
           },
           "409": {
             "content": {
@@ -7995,7 +8748,7 @@
                 }
               }
             },
-            "description": "The request conflicts with the current resource, identity, or Archive state."
+            "description": "현재 리소스, 인증 주체 또는 Archive 상태와 요청이 충돌합니다."
           },
           "503": {
             "content": {
@@ -8005,7 +8758,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -8013,7 +8766,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Dashboard Layout Put",
+        "summary": "대시보드 레이아웃 저장",
         "tags": [
           "Dashboard"
         ]
@@ -8021,52 +8774,69 @@
     },
     "/api/v1/dashboard/summary": {
       "get": {
+        "description": "선택한 시간 범위의 이벤트, Alert, Incident, 엔드포인트와 저장소 지표를 집계해 반환합니다.",
         "operationId": "dashboardGetSummary",
         "parameters": [
           {
+            "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다.",
             "in": "query",
             "name": "timePreset",
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/TimePreset",
-              "default": "LATEST_24H"
+              "default": "LATEST_24H",
+              "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다."
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 시작 시각입니다.",
             "in": "query",
             "name": "from",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 시작 시각입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "From",
               "type": "string"
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
             "in": "query",
             "name": "to",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "To",
               "type": "string"
             }
           },
           {
+            "description": "특정 엔드포인트 지표만 집계합니다.",
             "in": "query",
             "name": "endpointId",
             "required": false,
             "schema": {
+              "description": "특정 엔드포인트 지표만 집계합니다.",
               "minimum": 1,
               "title": "Endpointid",
               "type": "integer"
             }
           },
           {
+            "description": "시계열 집계 간격입니다.",
             "in": "query",
             "name": "interval",
             "required": true,
             "schema": {
+              "description": "시계열 집계 간격입니다.",
               "enum": [
                 "1m",
                 "5m",
@@ -8087,7 +8857,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -8097,7 +8867,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -8107,7 +8877,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "503": {
             "content": {
@@ -8117,7 +8887,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -8125,7 +8895,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Dashboard Summary",
+        "summary": "통합 대시보드 요약 조회",
         "tags": [
           "Dashboard"
         ]
@@ -8133,43 +8903,65 @@
     },
     "/api/v1/dashboard/topology": {
       "get": {
+        "description": "선택한 시간 범위의 엔드포인트와 외부 IP·Domain 통신 관계를 토폴로지로 집계합니다.",
         "operationId": "dashboardGetTopology",
         "parameters": [
           {
+            "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다.",
             "in": "query",
             "name": "timePreset",
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/TimePreset",
-              "default": "LATEST_24H"
+              "default": "LATEST_24H",
+              "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다."
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 시작 시각입니다.",
             "in": "query",
             "name": "from",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 시작 시각입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "From",
               "type": "string"
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
             "in": "query",
             "name": "to",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "To",
               "type": "string"
             }
           },
           {
+            "description": "지정한 엔드포인트의 외부 통신만 집계합니다.",
             "in": "query",
             "name": "endpointIds",
             "required": false,
             "schema": {
+              "description": "지정한 엔드포인트의 외부 통신만 집계합니다.",
+              "examples": [
+                [
+                  1,
+                  2
+                ]
+              ],
               "items": {
+                "description": "1 이상의 리소스 식별자입니다.",
                 "minimum": 1,
                 "type": "integer"
               },
@@ -8189,7 +8981,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -8199,7 +8991,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -8209,7 +9001,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "503": {
             "content": {
@@ -8219,7 +9011,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -8227,7 +9019,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Dashboard Topology",
+        "summary": "외부 통신 토폴로지 조회",
         "tags": [
           "Dashboard"
         ]
@@ -8235,25 +9027,30 @@
     },
     "/api/v1/endpoints": {
       "get": {
+        "description": "검색, 상태, 운영체제, 위험도 조건을 적용해 엔드포인트 목록을 페이지 단위로 조회합니다.",
         "operationId": "endpointsList",
         "parameters": [
           {
+            "description": "조회할 페이지 번호입니다.",
             "in": "query",
             "name": "page",
             "required": false,
             "schema": {
               "default": 1,
+              "description": "조회할 페이지 번호입니다.",
               "minimum": 1,
               "title": "Page",
               "type": "integer"
             }
           },
           {
+            "description": "페이지당 항목 수입니다.",
             "in": "query",
             "name": "size",
             "required": false,
             "schema": {
               "default": 50,
+              "description": "페이지당 항목 수입니다.",
               "maximum": 500,
               "minimum": 1,
               "title": "Size",
@@ -8261,11 +9058,20 @@
             }
           },
           {
+            "description": "조회할 엔드포인트 ID입니다.",
             "in": "query",
             "name": "endpointIds",
             "required": false,
             "schema": {
+              "description": "조회할 엔드포인트 ID입니다.",
+              "examples": [
+                [
+                  1,
+                  2
+                ]
+              ],
               "items": {
+                "description": "1 이상의 리소스 식별자입니다.",
                 "minimum": 1,
                 "type": "integer"
               },
@@ -8276,10 +9082,15 @@
             }
           },
           {
+            "description": "hostname, Agent ID 또는 IP 주소를 검색합니다.",
             "in": "query",
             "name": "q",
             "required": false,
             "schema": {
+              "description": "hostname, Agent ID 또는 IP 주소를 검색합니다.",
+              "examples": [
+                "workstation-01"
+              ],
               "maxLength": 128,
               "minLength": 1,
               "title": "Q",
@@ -8287,10 +9098,12 @@
             }
           },
           {
+            "description": "엔드포인트 연결 상태 필터입니다.",
             "in": "query",
             "name": "status",
             "required": false,
             "schema": {
+              "description": "엔드포인트 연결 상태 필터입니다.",
               "enum": [
                 "ONLINE",
                 "OFFLINE",
@@ -8301,27 +9114,33 @@
             }
           },
           {
+            "description": "운영체제 유형 필터입니다.",
             "in": "query",
             "name": "osType",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/OsType"
+              "$ref": "#/components/schemas/OsType",
+              "description": "운영체제 유형 필터입니다."
             }
           },
           {
+            "description": "백엔드 산정 위험도 필터입니다.",
             "in": "query",
             "name": "riskLevel",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/RiskLevel"
+              "$ref": "#/components/schemas/RiskLevel",
+              "description": "백엔드 산정 위험도 필터입니다."
             }
           },
           {
+            "description": "목록 정렬 기준입니다.",
             "in": "query",
             "name": "sortBy",
             "required": false,
             "schema": {
               "default": "riskScore",
+              "description": "목록 정렬 기준입니다.",
               "enum": [
                 "riskScore",
                 "lastSeenAt",
@@ -8332,11 +9151,13 @@
             }
           },
           {
+            "description": "정렬 방향입니다.",
             "in": "query",
             "name": "sortOrder",
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "정렬 방향입니다.",
               "enum": [
                 "asc",
                 "desc"
@@ -8355,7 +9176,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -8365,7 +9186,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -8375,7 +9196,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "503": {
             "content": {
@@ -8385,7 +9206,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -8393,7 +9214,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Endpoints",
+        "summary": "엔드포인트 목록 조회",
         "tags": [
           "Endpoints"
         ]
@@ -8401,13 +9222,16 @@
     },
     "/api/v1/endpoints/{endpointId}": {
       "get": {
+        "description": "엔드포인트 기본 정보, 센서 상태, 최근 활동과 백엔드 산정 위험도를 조회합니다.",
         "operationId": "endpointsGet",
         "parameters": [
           {
+            "description": "조회할 엔드포인트 ID입니다.",
             "in": "path",
             "name": "endpointId",
             "required": true,
             "schema": {
+              "description": "조회할 엔드포인트 ID입니다.",
               "title": "Endpointid",
               "type": "integer"
             }
@@ -8422,7 +9246,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -8432,7 +9256,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -8442,7 +9266,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "404": {
             "content": {
@@ -8452,7 +9276,7 @@
                 }
               }
             },
-            "description": "The requested resource was not found."
+            "description": "요청한 리소스를 찾을 수 없습니다."
           },
           "503": {
             "content": {
@@ -8462,7 +9286,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -8470,7 +9294,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Endpoint Detail",
+        "summary": "엔드포인트 상세 조회",
         "tags": [
           "Endpoints"
         ]
@@ -8478,51 +9302,68 @@
     },
     "/api/v1/endpoints/{endpointId}/process-tree": {
       "get": {
+        "description": "지정한 시간 범위에서 수집된 프로세스 실행 이벤트를 부모·자식 트리로 구성해 반환합니다.",
         "operationId": "endpointsGetProcessTree",
         "parameters": [
           {
+            "description": "프로세스 트리를 조회할 엔드포인트 ID입니다.",
             "in": "path",
             "name": "endpointId",
             "required": true,
             "schema": {
+              "description": "프로세스 트리를 조회할 엔드포인트 ID입니다.",
               "title": "Endpointid",
               "type": "integer"
             }
           },
           {
+            "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다.",
             "in": "query",
             "name": "timePreset",
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/TimePreset",
-              "default": "LATEST_24H"
+              "default": "LATEST_24H",
+              "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다."
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 시작 시각입니다.",
             "in": "query",
             "name": "from",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 시작 시각입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "From",
               "type": "string"
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
             "in": "query",
             "name": "to",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "To",
               "type": "string"
             }
           },
           {
+            "description": "지정하면 해당 PID를 중심으로 프로세스 트리를 표시합니다.",
             "in": "query",
             "name": "selectedPid",
             "required": false,
             "schema": {
+              "description": "지정하면 해당 PID를 중심으로 프로세스 트리를 표시합니다.",
               "minimum": 0,
               "title": "Selectedpid",
               "type": "integer"
@@ -8538,7 +9379,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -8548,7 +9389,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -8558,7 +9399,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "503": {
             "content": {
@@ -8568,7 +9409,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -8576,7 +9417,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Endpoint Process Tree",
+        "summary": "엔드포인트 프로세스 트리 조회",
         "tags": [
           "Endpoints"
         ]
@@ -8584,54 +9425,71 @@
     },
     "/api/v1/events": {
       "get": {
+        "description": "HOT 또는 복원된 저장소에서 시간, 엔드포인트, 이벤트 유형 조건으로 이벤트 증거를 조회합니다.",
         "operationId": "eventsList",
         "parameters": [
           {
+            "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다.",
             "in": "query",
             "name": "timePreset",
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/TimePreset",
-              "default": "LATEST_24H"
+              "default": "LATEST_24H",
+              "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다."
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 시작 시각입니다.",
             "in": "query",
             "name": "from",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 시작 시각입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "From",
               "type": "string"
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
             "in": "query",
             "name": "to",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "To",
               "type": "string"
             }
           },
           {
+            "description": "조회할 페이지 번호입니다.",
             "in": "query",
             "name": "page",
             "required": false,
             "schema": {
               "default": 1,
+              "description": "조회할 페이지 번호입니다.",
               "minimum": 1,
               "title": "Page",
               "type": "integer"
             }
           },
           {
+            "description": "페이지당 항목 수입니다.",
             "in": "query",
             "name": "size",
             "required": false,
             "schema": {
               "default": 50,
+              "description": "페이지당 항목 수입니다.",
               "maximum": 500,
               "minimum": 1,
               "title": "Size",
@@ -8639,83 +9497,101 @@
             }
           },
           {
+            "description": "특정 엔드포인트의 이벤트만 조회합니다.",
             "in": "query",
             "name": "endpointId",
             "required": false,
             "schema": {
+              "description": "특정 엔드포인트의 이벤트만 조회합니다.",
               "minimum": 1,
               "title": "Endpointid",
               "type": "integer"
             }
           },
           {
+            "description": "이벤트 유형 필터입니다.",
             "in": "query",
             "name": "eventType",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/EventType"
+              "$ref": "#/components/schemas/EventType",
+              "description": "이벤트 유형 필터입니다."
             }
           },
           {
+            "description": "프로세스 이름 검색 조건입니다.",
             "in": "query",
             "name": "processName",
             "required": false,
             "schema": {
+              "description": "프로세스 이름 검색 조건입니다.",
               "title": "Processname",
               "type": "string"
             }
           },
           {
+            "description": "파일 경로 검색 조건입니다.",
             "in": "query",
             "name": "filePath",
             "required": false,
             "schema": {
+              "description": "파일 경로 검색 조건입니다.",
               "title": "Filepath",
               "type": "string"
             }
           },
           {
+            "description": "원격 Domain 검색 조건입니다.",
             "in": "query",
             "name": "domain",
             "required": false,
             "schema": {
+              "description": "원격 Domain 검색 조건입니다.",
               "title": "Domain",
               "type": "string"
             }
           },
           {
+            "description": "원격 IP 주소 검색 조건입니다.",
             "in": "query",
             "name": "remoteIp",
             "required": false,
             "schema": {
+              "description": "원격 IP 주소 검색 조건입니다.",
               "title": "Remoteip",
               "type": "string"
             }
           },
           {
+            "description": "DNS 질의값 검색 조건입니다.",
             "in": "query",
             "name": "dnsQuery",
             "required": false,
             "schema": {
+              "description": "DNS 질의값 검색 조건입니다.",
               "title": "Dnsquery",
               "type": "string"
             }
           },
           {
+            "description": "L7 프로토콜 검색 조건입니다.",
             "in": "query",
             "name": "l7Protocol",
             "required": false,
             "schema": {
+              "description": "L7 프로토콜 검색 조건입니다.",
               "title": "L7Protocol",
               "type": "string"
             }
           },
           {
+            "description": "이벤트 발생 시각 정렬 방향입니다.",
             "in": "query",
             "name": "sortOrder",
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "이벤트 발생 시각 정렬 방향입니다.",
               "enum": [
                 "asc",
                 "desc"
@@ -8734,7 +9610,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -8744,7 +9620,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -8754,7 +9630,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "409": {
             "content": {
@@ -8764,7 +9640,7 @@
                 }
               }
             },
-            "description": "The request conflicts with the current resource, identity, or Archive state."
+            "description": "현재 리소스, 인증 주체 또는 Archive 상태와 요청이 충돌합니다."
           },
           "503": {
             "content": {
@@ -8774,7 +9650,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -8782,7 +9658,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Events",
+        "summary": "이벤트 목록 조회",
         "tags": [
           "Events"
         ]
@@ -8790,33 +9666,43 @@
     },
     "/api/v1/events/{eventId}": {
       "get": {
+        "description": "이벤트 ID와 저장 위치 식별 조건을 사용해 단일 이벤트의 상세 증거를 조회합니다.",
         "operationId": "eventsGet",
         "parameters": [
           {
+            "description": "조회할 이벤트 UUID입니다.",
             "in": "path",
             "name": "eventId",
             "required": true,
             "schema": {
+              "description": "조회할 이벤트 UUID입니다.",
               "format": "uuid",
               "title": "Eventid",
               "type": "string"
             }
           },
           {
+            "description": "이벤트가 발생한 엔드포인트 ID입니다.",
             "in": "query",
             "name": "endpointId",
             "required": true,
             "schema": {
+              "description": "이벤트가 발생한 엔드포인트 ID입니다.",
               "minimum": 1,
               "title": "Endpointid",
               "type": "integer"
             }
           },
           {
+            "description": "이벤트가 발생한 UTC 시각입니다.",
             "in": "query",
             "name": "occurredAt",
             "required": true,
             "schema": {
+              "description": "이벤트가 발생한 UTC 시각입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "Occurredat",
               "type": "string"
@@ -8832,7 +9718,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -8842,7 +9728,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -8852,7 +9738,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "404": {
             "content": {
@@ -8862,7 +9748,7 @@
                 }
               }
             },
-            "description": "The requested resource was not found."
+            "description": "요청한 리소스를 찾을 수 없습니다."
           },
           "409": {
             "content": {
@@ -8872,7 +9758,7 @@
                 }
               }
             },
-            "description": "The request conflicts with the current resource, identity, or Archive state."
+            "description": "현재 리소스, 인증 주체 또는 Archive 상태와 요청이 충돌합니다."
           },
           "503": {
             "content": {
@@ -8882,7 +9768,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -8890,7 +9776,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Event Detail",
+        "summary": "이벤트 상세 조회",
         "tags": [
           "Events"
         ]
@@ -8898,54 +9784,71 @@
     },
     "/api/v1/failures": {
       "get": {
+        "description": "수집, 검증, 저장 단계에서 발생한 실패 이벤트와 재처리 상태를 페이지 단위로 조회합니다.",
         "operationId": "failuresList",
         "parameters": [
           {
+            "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다.",
             "in": "query",
             "name": "timePreset",
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/TimePreset",
-              "default": "LATEST_24H"
+              "default": "LATEST_24H",
+              "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다."
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 시작 시각입니다.",
             "in": "query",
             "name": "from",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 시작 시각입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "From",
               "type": "string"
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
             "in": "query",
             "name": "to",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "To",
               "type": "string"
             }
           },
           {
+            "description": "조회할 페이지 번호입니다.",
             "in": "query",
             "name": "page",
             "required": false,
             "schema": {
               "default": 1,
+              "description": "조회할 페이지 번호입니다.",
               "minimum": 1,
               "title": "Page",
               "type": "integer"
             }
           },
           {
+            "description": "페이지당 항목 수입니다.",
             "in": "query",
             "name": "size",
             "required": false,
             "schema": {
               "default": 50,
+              "description": "페이지당 항목 수입니다.",
               "maximum": 500,
               "minimum": 1,
               "title": "Size",
@@ -8953,37 +9856,45 @@
             }
           },
           {
+            "description": "실패 처리 상태 필터입니다.",
             "in": "query",
             "name": "status",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/EventFailureStatus"
+              "$ref": "#/components/schemas/EventFailureStatus",
+              "description": "실패 처리 상태 필터입니다."
             }
           },
           {
+            "description": "실패가 발생한 파이프라인 단계입니다.",
             "in": "query",
             "name": "failureStage",
             "required": false,
             "schema": {
+              "description": "실패가 발생한 파이프라인 단계입니다.",
               "title": "Failurestage",
               "type": "string"
             }
           },
           {
+            "description": "재처리 가능 여부 필터입니다.",
             "in": "query",
             "name": "retryable",
             "required": false,
             "schema": {
+              "description": "재처리 가능 여부 필터입니다.",
               "title": "Retryable",
               "type": "boolean"
             }
           },
           {
+            "description": "실패 발생 시각 정렬 방향입니다.",
             "in": "query",
             "name": "sortOrder",
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "실패 발생 시각 정렬 방향입니다.",
               "enum": [
                 "asc",
                 "desc"
@@ -9002,7 +9913,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -9012,7 +9923,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -9022,7 +9933,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "503": {
             "content": {
@@ -9032,7 +9943,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -9040,7 +9951,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Failures",
+        "summary": "파이프라인 실패 목록 조회",
         "tags": [
           "Operations"
         ]
@@ -9048,54 +9959,71 @@
     },
     "/api/v1/incidents": {
       "get": {
+        "description": "상관분석으로 생성된 Incident를 시간, 심각도, 상태 조건으로 페이지 단위 조회합니다.",
         "operationId": "incidentsList",
         "parameters": [
           {
+            "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다.",
             "in": "query",
             "name": "timePreset",
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/TimePreset",
-              "default": "LATEST_24H"
+              "default": "LATEST_24H",
+              "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다."
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 시작 시각입니다.",
             "in": "query",
             "name": "from",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 시작 시각입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "From",
               "type": "string"
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
             "in": "query",
             "name": "to",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "To",
               "type": "string"
             }
           },
           {
+            "description": "조회할 페이지 번호입니다.",
             "in": "query",
             "name": "page",
             "required": false,
             "schema": {
               "default": 1,
+              "description": "조회할 페이지 번호입니다.",
               "minimum": 1,
               "title": "Page",
               "type": "integer"
             }
           },
           {
+            "description": "페이지당 항목 수입니다.",
             "in": "query",
             "name": "size",
             "required": false,
             "schema": {
               "default": 50,
+              "description": "페이지당 항목 수입니다.",
               "maximum": 500,
               "minimum": 1,
               "title": "Size",
@@ -9103,37 +10031,45 @@
             }
           },
           {
+            "description": "특정 엔드포인트의 Incident만 조회합니다.",
             "in": "query",
             "name": "endpointId",
             "required": false,
             "schema": {
+              "description": "특정 엔드포인트의 Incident만 조회합니다.",
               "minimum": 1,
               "title": "Endpointid",
               "type": "integer"
             }
           },
           {
+            "description": "Incident 상태 필터입니다.",
             "in": "query",
             "name": "status",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/IncidentStatus"
+              "$ref": "#/components/schemas/IncidentStatus",
+              "description": "Incident 상태 필터입니다."
             }
           },
           {
+            "description": "Incident 심각도 필터입니다.",
             "in": "query",
             "name": "severity",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/Severity"
+              "$ref": "#/components/schemas/Severity",
+              "description": "Incident 심각도 필터입니다."
             }
           },
           {
+            "description": "정렬 방향입니다.",
             "in": "query",
             "name": "sortOrder",
             "required": false,
             "schema": {
               "default": "desc",
+              "description": "정렬 방향입니다.",
               "enum": [
                 "asc",
                 "desc"
@@ -9152,7 +10088,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -9162,7 +10098,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -9172,7 +10108,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "503": {
             "content": {
@@ -9182,7 +10118,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -9190,7 +10126,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Incidents",
+        "summary": "Incident 목록 조회",
         "tags": [
           "Incidents"
         ]
@@ -9198,13 +10134,16 @@
     },
     "/api/v1/incidents/{incidentId}": {
       "get": {
+        "description": "Incident 기본 정보, 위험도, 관련 엔드포인트와 연결된 Alert를 조회합니다.",
         "operationId": "incidentsGet",
         "parameters": [
           {
+            "description": "조회할 Incident ID입니다.",
             "in": "path",
             "name": "incidentId",
             "required": true,
             "schema": {
+              "description": "조회할 Incident ID입니다.",
               "title": "Incidentid",
               "type": "integer"
             }
@@ -9219,7 +10158,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -9229,7 +10168,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -9239,7 +10178,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "404": {
             "content": {
@@ -9249,7 +10188,7 @@
                 }
               }
             },
-            "description": "The requested resource was not found."
+            "description": "요청한 리소스를 찾을 수 없습니다."
           },
           "503": {
             "content": {
@@ -9259,7 +10198,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -9267,7 +10206,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Incident Detail",
+        "summary": "Incident 상세 조회",
         "tags": [
           "Incidents"
         ]
@@ -9275,13 +10214,16 @@
     },
     "/api/v1/incidents/{incidentId}/investigation": {
       "get": {
+        "description": "Incident의 이벤트, Alert, 엔드포인트와 관찰값을 조사 그래프의 노드와 관계로 반환합니다.",
         "operationId": "incidentsGetInvestigation",
         "parameters": [
           {
+            "description": "조사 그래프를 조회할 Incident ID입니다.",
             "in": "path",
             "name": "incidentId",
             "required": true,
             "schema": {
+              "description": "조사 그래프를 조회할 Incident ID입니다.",
               "title": "Incidentid",
               "type": "integer"
             }
@@ -9296,7 +10238,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -9306,7 +10248,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -9316,7 +10258,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "404": {
             "content": {
@@ -9326,7 +10268,7 @@
                 }
               }
             },
-            "description": "The requested resource was not found."
+            "description": "요청한 리소스를 찾을 수 없습니다."
           },
           "503": {
             "content": {
@@ -9336,7 +10278,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -9344,7 +10286,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Incident Investigation",
+        "summary": "Incident 조사 그래프 조회",
         "tags": [
           "Incidents"
         ]
@@ -9352,13 +10294,16 @@
     },
     "/api/v1/incidents/{incidentId}/timeline": {
       "get": {
+        "description": "Incident에 연결된 이벤트와 Alert를 시간순 공격 타임라인으로 구성해 반환합니다.",
         "operationId": "incidentsGetTimeline",
         "parameters": [
           {
+            "description": "타임라인을 조회할 Incident ID입니다.",
             "in": "path",
             "name": "incidentId",
             "required": true,
             "schema": {
+              "description": "타임라인을 조회할 Incident ID입니다.",
               "title": "Incidentid",
               "type": "integer"
             }
@@ -9373,7 +10318,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -9383,7 +10328,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -9393,7 +10338,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "404": {
             "content": {
@@ -9403,7 +10348,7 @@
                 }
               }
             },
-            "description": "The requested resource was not found."
+            "description": "요청한 리소스를 찾을 수 없습니다."
           },
           "503": {
             "content": {
@@ -9413,7 +10358,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -9421,7 +10366,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Incident Timeline",
+        "summary": "Incident 공격 타임라인 조회",
         "tags": [
           "Incidents"
         ]
@@ -9429,52 +10374,79 @@
     },
     "/api/v1/intelligence/correlate": {
       "get": {
+        "description": "IP 또는 Domain 관찰값을 선택한 시간 범위의 이벤트·엔드포인트와 연결해 반환합니다.",
         "operationId": "intelligenceCorrelate",
         "parameters": [
           {
+            "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다.",
             "in": "query",
             "name": "timePreset",
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/TimePreset",
-              "default": "LATEST_24H"
+              "default": "LATEST_24H",
+              "description": "조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다."
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 시작 시각입니다.",
             "in": "query",
             "name": "from",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 시작 시각입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "From",
               "type": "string"
             }
           },
           {
+            "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
             "in": "query",
             "name": "to",
             "required": false,
             "schema": {
+              "description": "CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다.",
+              "examples": [
+                "2026-07-19T13:00:00Z"
+              ],
               "format": "date-time",
               "title": "To",
               "type": "string"
             }
           },
           {
+            "description": "상관분석할 IP 주소 또는 Domain입니다.",
             "in": "query",
             "name": "value",
             "required": true,
             "schema": {
+              "description": "상관분석할 IP 주소 또는 Domain입니다.",
+              "examples": [
+                "example.com"
+              ],
               "title": "Value",
               "type": "string"
             }
           },
           {
+            "description": "지정한 엔드포인트에서 관찰된 관계만 조회합니다.",
             "in": "query",
             "name": "endpointIds",
             "required": false,
             "schema": {
+              "description": "지정한 엔드포인트에서 관찰된 관계만 조회합니다.",
+              "examples": [
+                [
+                  1,
+                  2
+                ]
+              ],
               "items": {
+                "description": "1 이상의 리소스 식별자입니다.",
                 "minimum": 1,
                 "type": "integer"
               },
@@ -9494,7 +10466,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -9504,7 +10476,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -9514,7 +10486,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "503": {
             "content": {
@@ -9524,7 +10496,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -9532,7 +10504,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Intelligence Correlate",
+        "summary": "관찰값 상관분석",
         "tags": [
           "Intelligence"
         ]
@@ -9540,23 +10512,34 @@
     },
     "/api/v1/intelligence/dns-lookup": {
       "get": {
+        "description": "질의값과 레코드 유형을 지정해 DNS 응답, TTL과 조회 메타데이터를 반환합니다.",
         "operationId": "intelligenceDnsLookup",
         "parameters": [
           {
+            "description": "조회할 Domain 또는 IP 주소입니다.",
             "in": "query",
             "name": "query",
             "required": true,
             "schema": {
+              "description": "조회할 Domain 또는 IP 주소입니다.",
+              "examples": [
+                "example.com"
+              ],
               "title": "Query",
               "type": "string"
             }
           },
           {
+            "description": "조회할 DNS 레코드 유형입니다.",
             "in": "query",
             "name": "recordType",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/DnsRecordType"
+              "$ref": "#/components/schemas/DnsRecordType",
+              "description": "조회할 DNS 레코드 유형입니다.",
+              "examples": [
+                "A"
+              ]
             }
           }
         ],
@@ -9569,7 +10552,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -9579,7 +10562,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -9589,7 +10572,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "404": {
             "content": {
@@ -9599,7 +10582,7 @@
                 }
               }
             },
-            "description": "The requested resource was not found."
+            "description": "요청한 리소스를 찾을 수 없습니다."
           },
           "503": {
             "content": {
@@ -9609,7 +10592,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -9617,7 +10600,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Intelligence Dns Lookup",
+        "summary": "DNS 레코드 조회",
         "tags": [
           "Intelligence"
         ]
@@ -9625,13 +10608,19 @@
     },
     "/api/v1/intelligence/forward-dns": {
       "get": {
+        "description": "Domain 이름을 DNS로 조회해 확인된 IP 주소와 조회 메타데이터를 반환합니다.",
         "operationId": "intelligenceForwardDns",
         "parameters": [
           {
+            "description": "정방향 조회할 Domain 이름입니다.",
             "in": "query",
             "name": "domain",
             "required": true,
             "schema": {
+              "description": "정방향 조회할 Domain 이름입니다.",
+              "examples": [
+                "example.com"
+              ],
               "title": "Domain",
               "type": "string"
             }
@@ -9646,7 +10635,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -9656,7 +10645,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -9666,7 +10655,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "404": {
             "content": {
@@ -9676,7 +10665,7 @@
                 }
               }
             },
-            "description": "The requested resource was not found."
+            "description": "요청한 리소스를 찾을 수 없습니다."
           },
           "503": {
             "content": {
@@ -9686,7 +10675,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -9694,7 +10683,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Intelligence Forward Dns",
+        "summary": "정방향 DNS 조회",
         "tags": [
           "Intelligence"
         ]
@@ -9702,13 +10691,19 @@
     },
     "/api/v1/intelligence/reverse-dns": {
       "get": {
+        "description": "IP 주소의 PTR 레코드를 조회해 연결된 Domain 이름을 반환합니다.",
         "operationId": "intelligenceReverseDns",
         "parameters": [
           {
+            "description": "역방향 조회할 IPv4 또는 IPv6 주소입니다.",
             "in": "query",
             "name": "ip",
             "required": true,
             "schema": {
+              "description": "역방향 조회할 IPv4 또는 IPv6 주소입니다.",
+              "examples": [
+                "8.8.8.8"
+              ],
               "title": "Ip",
               "type": "string"
             }
@@ -9723,7 +10718,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -9733,7 +10728,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -9743,7 +10738,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "404": {
             "content": {
@@ -9753,7 +10748,7 @@
                 }
               }
             },
-            "description": "The requested resource was not found."
+            "description": "요청한 리소스를 찾을 수 없습니다."
           },
           "503": {
             "content": {
@@ -9763,7 +10758,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -9771,7 +10766,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Intelligence Reverse Dns",
+        "summary": "역방향 DNS 조회",
         "tags": [
           "Intelligence"
         ]
@@ -9779,6 +10774,7 @@
     },
     "/api/v1/operations/health": {
       "get": {
+        "description": "PostgreSQL, ClickHouse, Kafka, S3와 파이프라인 워커의 현재 상태를 점검해 반환합니다.",
         "operationId": "operationsGetHealth",
         "responses": {
           "200": {
@@ -9789,7 +10785,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "401": {
             "content": {
@@ -9799,7 +10795,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           }
         },
         "security": [
@@ -9807,7 +10803,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Operations Health",
+        "summary": "운영 구성요소 상태 조회",
         "tags": [
           "Operations"
         ]
@@ -9815,6 +10811,7 @@
     },
     "/api/v1/users/me": {
       "get": {
+        "description": "현재 Bearer JWT에 연결된 활성 사용자의 프로필, 권한, 언어 설정을 조회합니다.",
         "operationId": "usersMeGet",
         "responses": {
           "200": {
@@ -9825,7 +10822,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "401": {
             "content": {
@@ -9835,7 +10832,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "503": {
             "content": {
@@ -9845,7 +10842,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -9853,7 +10850,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Users Me",
+        "summary": "내 사용자 정보 조회",
         "tags": [
           "Users"
         ]
@@ -9861,6 +10858,7 @@
     },
     "/api/v1/users/me/locale": {
       "patch": {
+        "description": "현재 사용자의 대시보드 표시 언어를 변경하고 갱신된 사용자 정보를 반환합니다.",
         "operationId": "usersLocaleUpdate",
         "requestBody": {
           "content": {
@@ -9881,7 +10879,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "요청을 성공적으로 처리했습니다."
           },
           "400": {
             "content": {
@@ -9891,7 +10889,7 @@
                 }
               }
             },
-            "description": "Request validation failed."
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
           },
           "401": {
             "content": {
@@ -9901,7 +10899,7 @@
                 }
               }
             },
-            "description": "Authentication failed."
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
           },
           "503": {
             "content": {
@@ -9911,7 +10909,7 @@
                 }
               }
             },
-            "description": "A required dependency is temporarily unavailable."
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
           }
         },
         "security": [
@@ -9919,7 +10917,7 @@
             "BearerJWT": []
           }
         ],
-        "summary": "Update User Locale",
+        "summary": "내 언어 설정 변경",
         "tags": [
           "Users"
         ]
@@ -9928,47 +10926,47 @@
   },
   "tags": [
     {
-      "description": "Dashboard user authentication.",
+      "description": "대시보드 사용자 인증과 JWT 액세스 토큰 발급 기능입니다.",
       "name": "Auth"
     },
     {
-      "description": "Authenticated dashboard user profile and preferences.",
+      "description": "인증된 대시보드 사용자의 프로필과 환경설정을 관리합니다.",
       "name": "Users"
     },
     {
-      "description": "Endpoint inventory, health, and Backend-calculated risk.",
+      "description": "엔드포인트 목록, 상태, 백엔드 산정 위험도와 프로세스 트리를 조회합니다.",
       "name": "Endpoints"
     },
     {
-      "description": "HOT ClickHouse and RESTORED Parquet event evidence.",
+      "description": "ClickHouse HOT 데이터와 복원된 Parquet 이벤트 증거를 조회합니다.",
       "name": "Events"
     },
     {
-      "description": "Archive restore lifecycle operations.",
+      "description": "아카이브 버킷의 복원 요청과 진행 상태를 관리합니다.",
       "name": "Archives"
     },
     {
-      "description": "RuleV1 detections and Alert workflow state.",
+      "description": "RuleV1 탐지 결과와 Alert 처리 상태를 조회하고 변경합니다.",
       "name": "Alerts"
     },
     {
-      "description": "Read-only correlated Incident views.",
+      "description": "상관분석으로 생성된 Incident와 조사 정보를 읽기 전용으로 제공합니다.",
       "name": "Incidents"
     },
     {
-      "description": "Backend-calculated security and collection summaries.",
+      "description": "백엔드가 계산한 보안, 수집, 토폴로지 요약과 대시보드 레이아웃을 제공합니다.",
       "name": "Dashboard"
     },
     {
-      "description": "Live dependency and pipeline worker health.",
+      "description": "의존 서비스, 파이프라인 워커와 실패 이벤트의 운영 상태를 제공합니다.",
       "name": "Operations"
     },
     {
-      "description": "DNS lookups and IP/Domain correlation.",
+      "description": "DNS 조회와 IP·Domain·이벤트 간 상관분석 기능을 제공합니다.",
       "name": "Intelligence"
     },
     {
-      "description": "mTLS-authenticated Agent registration and telemetry ingest.",
+      "description": "mTLS로 인증된 Agent 등록, heartbeat, 텔레메트리 수집 기능입니다.",
       "name": "Collector"
     }
   ]

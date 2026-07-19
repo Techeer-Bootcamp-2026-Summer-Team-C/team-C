@@ -1,3 +1,5 @@
+from pydantic import Field
+
 from .common import ContractModel, PositiveId, ScoreNumber, UtcDateTime
 from .enums import AlertStatus, IncidentStatus, Severity
 from .events import EventDto
@@ -50,4 +52,4 @@ class AlertDetailDto(AlertDto):
 
 
 class AlertStatusUpdateRequest(ContractModel):
-    status: AlertStatus
+    status: AlertStatus = Field(description="변경할 Alert 처리 상태입니다.", examples=["IN_PROGRESS"])

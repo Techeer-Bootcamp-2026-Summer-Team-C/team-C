@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 from backend.contracts.api_manifest import PRODUCT_API_CONTRACTS
@@ -10,6 +11,7 @@ TAGS = {
     "Auth", "Users", "Endpoints", "Events", "Archives",
     "Alerts", "Incidents", "Dashboard", "Operations", "Intelligence", "Collector",
 }
+HANGUL = re.compile(r"[가-힣]")
 EXPECTED_RESPONSES = {
     "authLogin": {"200", "400", "401", "403", "429", "503"},
     "usersMeGet": {"200", "401", "503"},
@@ -66,6 +68,30 @@ def test_openapi_has_exact_product_operations_tags_and_unique_ids() -> None:
     assert set(operation_ids) == EXPECTED_RESPONSES.keys()
     assert {tag["name"] for tag in schema["tags"]} == TAGS
     assert all(len(operation["tags"]) == 1 and operation["tags"][0] in TAGS for _, _, operation in items)
+
+
+def test_openapi_documentation_is_koreanized_without_contract_renames() -> None:
+    schema = create_app().openapi()
+
+    assert schema["info"]["title"] == "EDR_C API"
+    assert HANGUL.search(schema["info"]["description"])
+    assert {tag["name"] for tag in schema["tags"]} == TAGS
+    assert all(HANGUL.search(tag["description"]) for tag in schema["tags"])
+
+    for _path, _method, operation in operations(schema):
+        assert HANGUL.search(operation["summary"])
+        assert HANGUL.search(operation["description"])
+        assert all(HANGUL.search(parameter["description"]) for parameter in operation.get("parameters", []))
+        assert all(HANGUL.search(response["description"]) for response in operation["responses"].values())
+
+    schemes = schema["components"]["securitySchemes"]
+    assert HANGUL.search(schemes["BearerJWT"]["description"])
+    assert HANGUL.search(schemes["mutualTLS"]["description"])
+
+    schemas = schema["components"]["schemas"]
+    assert HANGUL.search(schemas["LoginRequest"]["properties"]["loginId"]["description"])
+    assert HANGUL.search(schemas["LoginRequest"]["properties"]["password"]["description"])
+    assert HANGUL.search(schemas["TelemetryBatchRequest"]["properties"]["events"]["description"])
 
 
 def test_openapi_security_headers_and_responses_match_runtime_contract() -> None:

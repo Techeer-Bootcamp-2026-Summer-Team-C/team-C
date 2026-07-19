@@ -11,7 +11,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Alerts */
+        /**
+         * Alert 목록 조회
+         * @description 탐지 시각, 심각도, 상태, 엔드포인트 조건으로 Alert 목록을 페이지 단위로 조회합니다.
+         */
         get: operations["alertsList"];
         put?: never;
         post?: never;
@@ -28,7 +31,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Alert Detail */
+        /**
+         * Alert 상세 조회
+         * @description Alert의 탐지 규칙, 관련 이벤트, MITRE ATT&CK 정보와 대응 지침을 조회합니다.
+         */
         get: operations["alertsGet"];
         put?: never;
         post?: never;
@@ -51,7 +57,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Alert Status */
+        /**
+         * Alert 상태 변경
+         * @description 쓰기 권한이 있는 사용자가 Alert 처리 상태를 변경합니다. 변경 내용은 감사 정보와 함께 기록됩니다.
+         */
         patch: operations["alertsUpdateStatus"];
         trace?: never;
     };
@@ -62,10 +71,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Restore List */
+        /**
+         * 아카이브 복원 목록 조회
+         * @description 엔드포인트와 시간 범위에 해당하는 아카이브 버킷의 복원 상태를 페이지 단위로 조회합니다.
+         */
         get: operations["archiveRestoresList"];
         put?: never;
-        /** Restore Start */
+        /**
+         * 아카이브 복원 시작
+         * @description 선택한 엔드포인트와 시간 범위의 아카이브 데이터를 조회 가능한 RESTORED 영역으로 복원 요청합니다.
+         */
         post: operations["archiveRestoresStart"];
         delete?: never;
         options?: never;
@@ -82,7 +97,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Login */
+        /**
+         * 대시보드 로그인
+         * @description 로그인 ID와 비밀번호를 검증하고 대시보드 API 호출에 사용할 Bearer JWT를 발급합니다.
+         */
         post: operations["authLogin"];
         delete?: never;
         options?: never;
@@ -99,7 +117,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Heartbeat */
+        /**
+         * Agent heartbeat 수신
+         * @description mTLS로 인증된 Agent의 센서 상태, 정책 버전과 최근 활동 시각을 갱신합니다.
+         */
         post: operations["collectorHeartbeatAgent"];
         delete?: never;
         options?: never;
@@ -116,7 +137,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register Agent */
+        /**
+         * Agent 등록
+         * @description mTLS 인증서의 Agent 식별자와 요청 본문을 검증해 Agent를 등록하거나 기존 정보를 갱신합니다.
+         */
         post: operations["collectorRegisterAgent"];
         delete?: never;
         options?: never;
@@ -133,7 +157,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Telemetry Batch */
+        /**
+         * 텔레메트리 배치 수집
+         * @description mTLS로 인증된 Agent가 보낸 이벤트 배치를 검증하고 Kafka 수집 파이프라인에 전달합니다.
+         */
         post: operations["collectorIngestTelemetryBatch"];
         delete?: never;
         options?: never;
@@ -148,7 +175,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Endpoint Summary */
+        /**
+         * 엔드포인트 현황 요약 조회
+         * @description 엔드포인트 상태, 센서 상태, 위험도 분포와 관련 Alert·Incident 지표를 집계합니다.
+         */
         get: operations["dashboardGetEndpointSummary"];
         put?: never;
         post?: never;
@@ -165,7 +195,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Ingest Summary */
+        /**
+         * 수집 파이프라인 요약 조회
+         * @description 선택한 시간 범위의 수집 이벤트, 저장 상태와 실패 현황을 집계해 반환합니다.
+         */
         get: operations["dashboardGetIngestSummary"];
         put?: never;
         post?: never;
@@ -182,12 +215,21 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Dashboard Layout Get */
+        /**
+         * 대시보드 레이아웃 조회
+         * @description 현재 사용자가 저장한 대시보드별 위젯 배치와 버전 정보를 조회합니다.
+         */
         get: operations["dashboardLayoutsGet"];
-        /** Dashboard Layout Put */
+        /**
+         * 대시보드 레이아웃 저장
+         * @description 현재 사용자의 대시보드 위젯 배치를 생성하거나 기존 버전을 갱신합니다.
+         */
         put: operations["dashboardLayoutsPut"];
         post?: never;
-        /** Dashboard Layout Delete */
+        /**
+         * 대시보드 레이아웃 초기화
+         * @description 현재 사용자의 저장된 대시보드 레이아웃을 삭제하고 기본 레이아웃 정보를 반환합니다.
+         */
         delete: operations["dashboardLayoutsDelete"];
         options?: never;
         head?: never;
@@ -201,7 +243,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Dashboard Summary */
+        /**
+         * 통합 대시보드 요약 조회
+         * @description 선택한 시간 범위의 이벤트, Alert, Incident, 엔드포인트와 저장소 지표를 집계해 반환합니다.
+         */
         get: operations["dashboardGetSummary"];
         put?: never;
         post?: never;
@@ -218,7 +263,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Dashboard Topology */
+        /**
+         * 외부 통신 토폴로지 조회
+         * @description 선택한 시간 범위의 엔드포인트와 외부 IP·Domain 통신 관계를 토폴로지로 집계합니다.
+         */
         get: operations["dashboardGetTopology"];
         put?: never;
         post?: never;
@@ -235,7 +283,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Endpoints */
+        /**
+         * 엔드포인트 목록 조회
+         * @description 검색, 상태, 운영체제, 위험도 조건을 적용해 엔드포인트 목록을 페이지 단위로 조회합니다.
+         */
         get: operations["endpointsList"];
         put?: never;
         post?: never;
@@ -252,7 +303,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Endpoint Detail */
+        /**
+         * 엔드포인트 상세 조회
+         * @description 엔드포인트 기본 정보, 센서 상태, 최근 활동과 백엔드 산정 위험도를 조회합니다.
+         */
         get: operations["endpointsGet"];
         put?: never;
         post?: never;
@@ -269,7 +323,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Endpoint Process Tree */
+        /**
+         * 엔드포인트 프로세스 트리 조회
+         * @description 지정한 시간 범위에서 수집된 프로세스 실행 이벤트를 부모·자식 트리로 구성해 반환합니다.
+         */
         get: operations["endpointsGetProcessTree"];
         put?: never;
         post?: never;
@@ -286,7 +343,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Events */
+        /**
+         * 이벤트 목록 조회
+         * @description HOT 또는 복원된 저장소에서 시간, 엔드포인트, 이벤트 유형 조건으로 이벤트 증거를 조회합니다.
+         */
         get: operations["eventsList"];
         put?: never;
         post?: never;
@@ -303,7 +363,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Event Detail */
+        /**
+         * 이벤트 상세 조회
+         * @description 이벤트 ID와 저장 위치 식별 조건을 사용해 단일 이벤트의 상세 증거를 조회합니다.
+         */
         get: operations["eventsGet"];
         put?: never;
         post?: never;
@@ -320,7 +383,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Failures */
+        /**
+         * 파이프라인 실패 목록 조회
+         * @description 수집, 검증, 저장 단계에서 발생한 실패 이벤트와 재처리 상태를 페이지 단위로 조회합니다.
+         */
         get: operations["failuresList"];
         put?: never;
         post?: never;
@@ -337,7 +403,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Incidents */
+        /**
+         * Incident 목록 조회
+         * @description 상관분석으로 생성된 Incident를 시간, 심각도, 상태 조건으로 페이지 단위 조회합니다.
+         */
         get: operations["incidentsList"];
         put?: never;
         post?: never;
@@ -354,7 +423,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Incident Detail */
+        /**
+         * Incident 상세 조회
+         * @description Incident 기본 정보, 위험도, 관련 엔드포인트와 연결된 Alert를 조회합니다.
+         */
         get: operations["incidentsGet"];
         put?: never;
         post?: never;
@@ -371,7 +443,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Incident Investigation */
+        /**
+         * Incident 조사 그래프 조회
+         * @description Incident의 이벤트, Alert, 엔드포인트와 관찰값을 조사 그래프의 노드와 관계로 반환합니다.
+         */
         get: operations["incidentsGetInvestigation"];
         put?: never;
         post?: never;
@@ -388,7 +463,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Incident Timeline */
+        /**
+         * Incident 공격 타임라인 조회
+         * @description Incident에 연결된 이벤트와 Alert를 시간순 공격 타임라인으로 구성해 반환합니다.
+         */
         get: operations["incidentsGetTimeline"];
         put?: never;
         post?: never;
@@ -405,7 +483,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Intelligence Correlate */
+        /**
+         * 관찰값 상관분석
+         * @description IP 또는 Domain 관찰값을 선택한 시간 범위의 이벤트·엔드포인트와 연결해 반환합니다.
+         */
         get: operations["intelligenceCorrelate"];
         put?: never;
         post?: never;
@@ -422,7 +503,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Intelligence Dns Lookup */
+        /**
+         * DNS 레코드 조회
+         * @description 질의값과 레코드 유형을 지정해 DNS 응답, TTL과 조회 메타데이터를 반환합니다.
+         */
         get: operations["intelligenceDnsLookup"];
         put?: never;
         post?: never;
@@ -439,7 +523,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Intelligence Forward Dns */
+        /**
+         * 정방향 DNS 조회
+         * @description Domain 이름을 DNS로 조회해 확인된 IP 주소와 조회 메타데이터를 반환합니다.
+         */
         get: operations["intelligenceForwardDns"];
         put?: never;
         post?: never;
@@ -456,7 +543,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Intelligence Reverse Dns */
+        /**
+         * 역방향 DNS 조회
+         * @description IP 주소의 PTR 레코드를 조회해 연결된 Domain 이름을 반환합니다.
+         */
         get: operations["intelligenceReverseDns"];
         put?: never;
         post?: never;
@@ -473,7 +563,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Operations Health */
+        /**
+         * 운영 구성요소 상태 조회
+         * @description PostgreSQL, ClickHouse, Kafka, S3와 파이프라인 워커의 현재 상태를 점검해 반환합니다.
+         */
         get: operations["operationsGetHealth"];
         put?: never;
         post?: never;
@@ -490,7 +583,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Users Me */
+        /**
+         * 내 사용자 정보 조회
+         * @description 현재 Bearer JWT에 연결된 활성 사용자의 프로필, 권한, 언어 설정을 조회합니다.
+         */
         get: operations["usersMeGet"];
         put?: never;
         post?: never;
@@ -513,7 +609,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Update User Locale */
+        /**
+         * 내 언어 설정 변경
+         * @description 현재 사용자의 대시보드 표시 언어를 변경하고 갱신된 사용자 정보를 반환합니다.
+         */
         patch: operations["usersLocaleUpdate"];
         trace?: never;
     };
@@ -529,29 +628,58 @@ export interface components {
         /** AgentHeartbeatData */
         AgentHeartbeatData: {
             endpointStatus: components["schemas"]["EndpointStatus"];
-            /** Nextheartbeatseconds */
+            /**
+             * Nextheartbeatseconds
+             * @description 0 이상의 정수입니다.
+             */
             nextHeartbeatSeconds: number;
-            /** Servertime */
+            /**
+             * Servertime
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             serverTime: string;
         };
         /** AgentHeartbeatRequest */
         AgentHeartbeatRequest: {
+            /** @description 현재 실행 중인 Agent 아키텍처입니다. */
             agentArch: components["schemas"]["AgentArchitecture"];
-            /** Agentbuildid */
+            /**
+             * Agentbuildid
+             * @description 현재 실행 중인 Agent 빌드 ID입니다.
+             */
             agentBuildId: string;
-            /** Agentid */
+            /**
+             * Agentid
+             * @description mTLS 인증서 SAN과 일치해야 하는 Agent 고유 ID입니다.
+             * @example agent-001
+             */
             agentId: string;
-            /** Agentversion */
+            /**
+             * Agentversion
+             * @description 현재 실행 중인 Agent 버전입니다.
+             */
             agentVersion: string;
-            /** Bufferdepth */
+            /**
+             * Bufferdepth
+             * @description 전송을 기다리는 로컬 이벤트 수입니다.
+             */
             bufferDepth: number;
-            /** Capabilitycodes */
+            /**
+             * Capabilitycodes
+             * @description 현재 활성화된 수집 기능 코드 목록입니다.
+             */
             capabilityCodes: string[];
-            /** Sensorhealth */
+            /**
+             * Sensorhealth
+             * @description 센서별 상태 스냅샷입니다.
+             */
             sensorHealth: components["schemas"]["SensorHealthSnapshot"][];
             /**
              * Sentat
              * Format: date-time
+             * @description Agent가 heartbeat를 생성한 UTC 시각입니다.
+             * @example 2026-07-19T13:00:00Z
              */
             sentAt: string;
         };
@@ -559,48 +687,101 @@ export interface components {
         AgentRegisterData: {
             /** Agentid */
             agentId: string;
-            /** Endpointid */
+            /**
+             * Endpointid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             endpointId: number;
-            /** Heartbeatintervalseconds */
+            /**
+             * Heartbeatintervalseconds
+             * @description 0 이상의 정수입니다.
+             */
             heartbeatIntervalSeconds: number;
-            /** Registeredat */
+            /**
+             * Registeredat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             registeredAt: string;
             status: components["schemas"]["EndpointStatus"];
         };
         /** AgentRegisterRequest */
         AgentRegisterRequest: {
+            /** @description Agent 바이너리 아키텍처입니다. */
             agentArch: components["schemas"]["AgentArchitecture"];
-            /** Agentbuildid */
+            /**
+             * Agentbuildid
+             * @description 배포 바이너리를 식별하는 빌드 ID입니다.
+             * @example 20260719.1
+             */
             agentBuildId: string;
-            /** Agentid */
+            /**
+             * Agentid
+             * @description mTLS 인증서 SAN과 일치해야 하는 Agent 고유 ID입니다.
+             * @example agent-001
+             */
             agentId: string;
-            /** Agentversion */
+            /**
+             * Agentversion
+             * @description Agent 애플리케이션 버전입니다.
+             * @example 1.0.0
+             */
             agentVersion: string;
-            /** Capabilitycodes */
+            /**
+             * Capabilitycodes
+             * @description Agent가 지원하는 수집 기능 코드 목록입니다.
+             */
             capabilityCodes: string[];
-            /** Hostname */
+            /**
+             * Hostname
+             * @description Agent가 설치된 호스트 이름입니다.
+             * @example workstation-01
+             */
             hostname: string;
+            /** @description 호스트 운영체제 유형입니다. */
             osType: components["schemas"]["OsType"];
-            /** Osversion */
+            /**
+             * Osversion
+             * @description 호스트 운영체제 버전입니다.
+             * @example Windows 11 24H2
+             */
             osVersion: string;
         };
         /** AlertDetailDto */
         AlertDetailDto: {
             /** Agentid */
             agentId: string;
-            /** Alertid */
+            /**
+             * Alertid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             alertId: number;
             /** Batchid */
             batchId: string | null;
-            /** Createdat */
+            /**
+             * Createdat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             createdAt: string;
-            /** Detectedat */
+            /**
+             * Detectedat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             detectedAt: string;
-            /** Endpointid */
+            /**
+             * Endpointid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             endpointId: number;
             /** Eventid */
             eventId: string;
-            /** Eventoccurredat */
+            /**
+             * Eventoccurredat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             eventOccurredAt: string;
             /** Incidents */
             incidents: components["schemas"]["IncidentReferenceDto"][];
@@ -614,7 +795,10 @@ export interface components {
             mitreTechniqueName: string;
             /** Responseguidance */
             responseGuidance: components["schemas"]["ResponseGuidanceStepDto"][];
-            /** Riskscore */
+            /**
+             * Riskscore
+             * @description 0부터 100까지의 점수입니다.
+             */
             riskScore: number;
             /** Rulecode */
             ruleCode: string;
@@ -629,26 +813,48 @@ export interface components {
             summary: string;
             /** Title */
             title: string;
-            /** Updatedat */
+            /**
+             * Updatedat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             updatedAt: string;
         };
         /** AlertDto */
         AlertDto: {
             /** Agentid */
             agentId: string;
-            /** Alertid */
+            /**
+             * Alertid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             alertId: number;
             /** Batchid */
             batchId: string | null;
-            /** Createdat */
+            /**
+             * Createdat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             createdAt: string;
-            /** Detectedat */
+            /**
+             * Detectedat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             detectedAt: string;
-            /** Endpointid */
+            /**
+             * Endpointid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             endpointId: number;
             /** Eventid */
             eventId: string;
-            /** Eventoccurredat */
+            /**
+             * Eventoccurredat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             eventOccurredAt: string;
             /** Mitretacticcode */
             mitreTacticCode: string;
@@ -658,7 +864,10 @@ export interface components {
             mitreTechniqueCode: string;
             /** Mitretechniquename */
             mitreTechniqueName: string;
-            /** Riskscore */
+            /**
+             * Riskscore
+             * @description 0부터 100까지의 점수입니다.
+             */
             riskScore: number;
             /** Rulecode */
             ruleCode: string;
@@ -672,7 +881,11 @@ export interface components {
             summary: string;
             /** Title */
             title: string;
-            /** Updatedat */
+            /**
+             * Updatedat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             updatedAt: string;
         };
         /**
@@ -687,12 +900,19 @@ export interface components {
         AlertStatus: "OPEN" | "IN_PROGRESS" | "RESOLVED";
         /** AlertStatusCountDto */
         AlertStatusCountDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             status: components["schemas"]["AlertStatus"];
         };
         /** AlertStatusUpdateRequest */
         AlertStatusUpdateRequest: {
+            /**
+             * @description 변경할 Alert 처리 상태입니다.
+             * @example IN_PROGRESS
+             */
             status: components["schemas"]["AlertStatus"];
         };
         /** ArchiveBucketDto */
@@ -701,15 +921,29 @@ export interface components {
             archiveVerifiedAt: string | null;
             /** Archivedat */
             archivedAt: string | null;
-            /** Bucketendat */
+            /**
+             * Bucketendat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             bucketEndAt: string;
-            /** Bucketstartat */
+            /**
+             * Bucketstartat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             bucketStartAt: string;
             /** Checksumsha256 */
             checksumSha256: string | null;
-            /** Endpointid */
+            /**
+             * Endpointid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             endpointId: number;
-            /** Eventcount */
+            /**
+             * Eventcount
+             * @description 0 이상의 정수입니다.
+             */
             eventCount: number;
             /** Lasterror */
             lastError: string | null;
@@ -729,16 +963,27 @@ export interface components {
         };
         /** ArchiveRestoreRequest */
         ArchiveRestoreRequest: {
-            /** Endpointids */
+            /**
+             * Endpointids
+             * @description 복원할 엔드포인트 ID입니다.
+             * @example [
+             *       1,
+             *       2
+             *     ]
+             */
             endpointIds: number[];
             /**
              * From
              * Format: date-time
+             * @description 복원 범위의 시작 시각입니다.
+             * @example 2026-07-19T13:00:00Z
              */
             from: string;
             /**
              * To
              * Format: date-time
+             * @description 복원 범위의 종료 시각입니다. 최대 복원 범위는 31일입니다.
+             * @example 2026-07-19T13:00:00Z
              */
             to: string;
         };
@@ -748,7 +993,11 @@ export interface components {
             buckets: components["schemas"]["ArchiveBucketDto"][];
             /** Endpointids */
             endpointIds: number[];
-            /** From */
+            /**
+             * From
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             from: string;
             /**
              * Restoredays
@@ -760,14 +1009,24 @@ export interface components {
              * @constant
              */
             retrievalTier: "Standard";
-            /** To */
+            /**
+             * To
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             to: string;
         };
         /** AttackTimelineDto */
         AttackTimelineDto: {
-            /** Endpointid */
+            /**
+             * Endpointid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             endpointId: number;
-            /** Incidentid */
+            /**
+             * Incidentid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             incidentId: number;
             /** Items */
             items: components["schemas"]["AttackTimelineItemDto"][];
@@ -776,7 +1035,10 @@ export interface components {
         AttackTimelineItemDto: {
             /** Alertid */
             alertId: number | null;
-            /** Endpointid */
+            /**
+             * Endpointid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             endpointId: number;
             /** Eventid */
             eventId: string | null;
@@ -788,7 +1050,11 @@ export interface components {
              * @enum {string}
              */
             itemType: "INCIDENT" | "EVENT" | "ALERT";
-            /** Occurredat */
+            /**
+             * Occurredat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             occurredAt: string;
             severity: components["schemas"]["Severity"] | null;
             /** Summary */
@@ -804,20 +1070,32 @@ export interface components {
             certSanAgentId: string;
             /** Certsubject */
             certSubject: string;
-            /** Expiresat */
+            /**
+             * Expiresat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             expiresAt: string;
             /** Isexpired */
             isExpired: boolean;
             /** Isrevoked */
             isRevoked: boolean;
-            /** Issuedat */
+            /**
+             * Issuedat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             issuedAt: string;
             /** Revokedat */
             revokedAt: string | null;
         };
         /** CorrelationDto */
         CorrelationDto: {
-            /** From */
+            /**
+             * From
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             from: string;
             /**
              * Inputtype
@@ -830,7 +1108,11 @@ export interface components {
             related: components["schemas"]["RelatedValueDto"][];
             /** Relationships */
             relationships: components["schemas"]["CorrelationRelationshipDto"][];
-            /** To */
+            /**
+             * To
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             to: string;
         };
         /** CorrelationRelationshipDto */
@@ -871,20 +1153,38 @@ export interface components {
             timeSeries: components["schemas"]["TimeSeriesPointDto"][];
             /** Toprules */
             topRules: components["schemas"]["TopRuleDto"][];
-            /** Totalcount */
+            /**
+             * Totalcount
+             * @description 0 이상의 정수입니다.
+             */
             totalCount: number;
         };
         /** DashboardEndpointsDto */
         DashboardEndpointsDto: {
-            /** Offlinecount */
+            /**
+             * Offlinecount
+             * @description 0 이상의 정수입니다.
+             */
             offlineCount: number;
-            /** Onlinecount */
+            /**
+             * Onlinecount
+             * @description 0 이상의 정수입니다.
+             */
             onlineCount: number;
-            /** Retiredcount */
+            /**
+             * Retiredcount
+             * @description 0 이상의 정수입니다.
+             */
             retiredCount: number;
-            /** Stalecount */
+            /**
+             * Stalecount
+             * @description 0 이상의 정수입니다.
+             */
             staleCount: number;
-            /** Totalcount */
+            /**
+             * Totalcount
+             * @description 0 이상의 정수입니다.
+             */
             totalCount: number;
         };
         /** DashboardEventFailuresDto */
@@ -895,7 +1195,10 @@ export interface components {
             byStage: components["schemas"]["FailureStageCountDto"][];
             /** Bystatus */
             byStatus: components["schemas"]["FailureStatusCountDto"][];
-            /** Totalcount */
+            /**
+             * Totalcount
+             * @description 0 이상의 정수입니다.
+             */
             totalCount: number;
         };
         /** DashboardEventsDto */
@@ -916,16 +1219,25 @@ export interface components {
             topProcesses: components["schemas"]["TopProcessDto"][];
             /** Topremoteips */
             topRemoteIps: components["schemas"]["TopRemoteIpDto"][];
-            /** Totalcount */
+            /**
+             * Totalcount
+             * @description 0 이상의 정수입니다.
+             */
             totalCount: number;
         };
         /** DashboardIncidentsDto */
         DashboardIncidentsDto: {
             /** Byseverity */
             bySeverity: components["schemas"]["SeverityCountDto"][];
-            /** Closedcount */
+            /**
+             * Closedcount
+             * @description 0 이상의 정수입니다.
+             */
             closedCount: number;
-            /** Opencount */
+            /**
+             * Opencount
+             * @description 0 이상의 정수입니다.
+             */
             openCount: number;
             /** Timeseries */
             timeSeries: components["schemas"]["IncidentTimeSeriesPointDto"][];
@@ -946,7 +1258,10 @@ export interface components {
              * @enum {integer}
              */
             layoutVersion: 1 | 2;
-            /** Revision */
+            /**
+             * Revision
+             * @description 0 이상의 정수입니다.
+             */
             revision: number;
             /** Widgets */
             widgets: components["schemas"]["DashboardWidgetLayoutDto"][];
@@ -955,12 +1270,19 @@ export interface components {
         DashboardLayoutPutRequest: {
             /**
              * Layoutversion
+             * @description 레이아웃 계약 버전입니다.
              * @enum {integer}
              */
             layoutVersion: 1 | 2;
-            /** Revision */
+            /**
+             * Revision
+             * @description 낙관적 동시성 제어에 사용하는 현재 revision입니다.
+             */
             revision: number;
-            /** Widgets */
+            /**
+             * Widgets
+             * @description 저장할 위젯 배치 목록입니다.
+             */
             widgets: components["schemas"]["DashboardWidgetLayoutDto"][];
         };
         /** DashboardStorageDto */
@@ -971,7 +1293,10 @@ export interface components {
             byClass: components["schemas"]["StorageClassCountDto"][];
             /** Bystatus */
             byStatus: components["schemas"]["StorageStatusCountDto"][];
-            /** Totalbucketcount */
+            /**
+             * Totalbucketcount
+             * @description 0 이상의 정수입니다.
+             */
             totalBucketCount: number;
         };
         /** DashboardSummaryDto */
@@ -997,9 +1322,15 @@ export interface components {
             id: string;
             /** W */
             w: number;
-            /** X */
+            /**
+             * X
+             * @description 0 이상의 정수입니다.
+             */
             x: number;
-            /** Y */
+            /**
+             * Y
+             * @description 0 이상의 정수입니다.
+             */
             y: number;
         };
         /** DnsLookupDto */
@@ -1012,33 +1343,59 @@ export interface components {
         };
         /** DnsQueryEvent */
         DnsQueryEvent: {
-            /** Eventid */
+            /**
+             * Eventid
+             * @description Agent가 생성한 이벤트 고유 ID입니다.
+             */
             eventId: string;
             /**
-             * @description discriminator enum property added by openapi-typescript
+             * @description DNS 질의 이벤트 유형입니다. (enum property replaced by openapi-typescript)
              * @enum {string}
              */
             eventType: "DNS_QUERY";
             /**
              * Occurredat
              * Format: date-time
+             * @description 이벤트가 엔드포인트에서 발생한 UTC 시각입니다.
+             * @example 2026-07-19T13:00:00Z
              */
             occurredAt: string;
+            /** @description DNS 질의 세부 정보입니다. */
             payload: components["schemas"]["DnsQueryPayload"];
         };
         /** DnsQueryPayload */
         DnsQueryPayload: {
-            /** Answers */
+            /**
+             * Answers
+             * @description DNS 응답 값 목록입니다.
+             */
             answers?: string[];
-            /** Pid */
+            /**
+             * Pid
+             * @description DNS 질의를 생성한 프로세스 ID입니다.
+             */
             pid?: number;
-            /** Processname */
+            /**
+             * Processname
+             * @description DNS 질의를 생성한 프로세스 이름입니다.
+             */
             processName?: string;
-            /** Query */
+            /**
+             * Query
+             * @description DNS 질의 이름입니다.
+             * @example example.com
+             */
             query: string;
-            /** Recordtype */
+            /**
+             * Recordtype
+             * @description DNS 레코드 유형입니다.
+             * @example A
+             */
             recordType: string;
-            /** Responsecode */
+            /**
+             * Responsecode
+             * @description DNS 응답 코드입니다.
+             */
             responseCode?: string;
         };
         /**
@@ -1050,24 +1407,40 @@ export interface components {
         EdrStateAxisDto: {
             /** Reasoncodes */
             reasonCodes: components["schemas"]["EdrStateReasonCode"][];
-            /** Score */
+            /**
+             * Score
+             * @description 0부터 100까지의 정수 점수입니다.
+             */
             score: number;
             status: components["schemas"]["EdrStateStatus"];
         };
         /** EdrStateDto */
         EdrStateDto: {
-            /** Calculatedat */
+            /**
+             * Calculatedat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             calculatedAt: string;
             collectionHealth: components["schemas"]["EdrStateAxisDto"];
-            /** Criticalriskendpointcount */
+            /**
+             * Criticalriskendpointcount
+             * @description 0 이상의 정수입니다.
+             */
             criticalRiskEndpointCount: number;
-            /** Highriskendpointcount */
+            /**
+             * Highriskendpointcount
+             * @description 0 이상의 정수입니다.
+             */
             highRiskEndpointCount: number;
             /** Highestendpointriskscore */
             highestEndpointRiskScore: number | null;
             /** Reasoncodes */
             reasonCodes: components["schemas"]["EdrStateReasonCode"][];
-            /** Score */
+            /**
+             * Score
+             * @description 0부터 100까지의 정수 점수입니다.
+             */
             score: number;
             status: components["schemas"]["EdrStateStatus"];
             threatLevel: components["schemas"]["EdrStateAxisDto"];
@@ -1086,11 +1459,19 @@ export interface components {
         EgressTopologyDto: {
             /** Edges */
             edges: components["schemas"]["TopologyEdgeDto"][];
-            /** From */
+            /**
+             * From
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             from: string;
             /** Nodes */
             nodes: components["schemas"]["TopologyNodeDto"][];
-            /** To */
+            /**
+             * To
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             to: string;
         };
         /** EndpointDetailDto */
@@ -1106,7 +1487,10 @@ export interface components {
             capabilityCodes: string[];
             /** Certificates */
             certificates: components["schemas"]["CertificateDto"][];
-            /** Endpointid */
+            /**
+             * Endpointid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             endpointId: number;
             /** Hostname */
             hostname: string;
@@ -1119,7 +1503,11 @@ export interface components {
             osType: components["schemas"]["OsType"];
             /** Osversion */
             osVersion: string | null;
-            /** Registeredat */
+            /**
+             * Registeredat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             registeredAt: string;
             risk: components["schemas"]["EndpointRiskDto"];
             /** Sensorhealth */
@@ -1137,7 +1525,10 @@ export interface components {
             agentVersion: string | null;
             /** Capabilitycodes */
             capabilityCodes: string[];
-            /** Endpointid */
+            /**
+             * Endpointid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             endpointId: number;
             /** Hostname */
             hostname: string;
@@ -1150,7 +1541,11 @@ export interface components {
             osType: components["schemas"]["OsType"];
             /** Osversion */
             osVersion: string | null;
-            /** Registeredat */
+            /**
+             * Registeredat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             registeredAt: string;
             risk: components["schemas"]["EndpointRiskDto"];
             /** Sensorhealth */
@@ -1159,29 +1554,48 @@ export interface components {
         };
         /** EndpointRiskDto */
         EndpointRiskDto: {
-            /** Activealertcount */
+            /**
+             * Activealertcount
+             * @description 0 이상의 정수입니다.
+             */
             activeAlertCount: number;
-            /** Calculatedat */
+            /**
+             * Calculatedat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             calculatedAt: string;
             /** Highestalertriskscore */
             highestAlertRiskScore: number | null;
             level: components["schemas"]["RiskLevel"];
-            /** Openincidentcount */
+            /**
+             * Openincidentcount
+             * @description 0 이상의 정수입니다.
+             */
             openIncidentCount: number;
             /** Riskfactors */
             riskFactors: components["schemas"]["EndpointRiskFactorDto"][];
-            /** Score */
+            /**
+             * Score
+             * @description 0부터 100까지의 정수 점수입니다.
+             */
             score: number;
         };
         /** EndpointRiskFactorDto */
         EndpointRiskFactorDto: {
             /** Code */
             code: string;
-            /** Contribution */
+            /**
+             * Contribution
+             * @description 0 이상의 정수입니다.
+             */
             contribution: number;
             /** Description */
             description: string;
-            /** Sourceid */
+            /**
+             * Sourceid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             sourceId: number;
             sourceType: components["schemas"]["EndpointRiskFactorSourceType"];
             /** Title */
@@ -1196,11 +1610,21 @@ export interface components {
         EndpointRiskSummaryDto: {
             /** Bylevel */
             byLevel: components["schemas"]["RiskLevelCountDto"][];
-            /** Calculatedat */
+            /**
+             * Calculatedat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             calculatedAt: string;
-            /** Criticalriskendpointcount */
+            /**
+             * Criticalriskendpointcount
+             * @description 0 이상의 정수입니다.
+             */
             criticalRiskEndpointCount: number;
-            /** Highriskendpointcount */
+            /**
+             * Highriskendpointcount
+             * @description 0 이상의 정수입니다.
+             */
             highRiskEndpointCount: number;
             /** Highestscore */
             highestScore: number | null;
@@ -1214,7 +1638,10 @@ export interface components {
         EndpointSummaryAlertsDto: {
             /** Byseverity */
             bySeverity: components["schemas"]["SeverityCountDto"][];
-            /** Totalcount */
+            /**
+             * Totalcount
+             * @description 0 이상의 정수입니다.
+             */
             totalCount: number;
         };
         /** EndpointSummaryDto */
@@ -1223,41 +1650,77 @@ export interface components {
             /** Byostype */
             byOsType: components["schemas"]["OsTypeCountDto"][];
             incidents: components["schemas"]["EndpointSummaryIncidentsDto"];
-            /** Offlinecount */
+            /**
+             * Offlinecount
+             * @description 0 이상의 정수입니다.
+             */
             offlineCount: number;
-            /** Onlinecount */
+            /**
+             * Onlinecount
+             * @description 0 이상의 정수입니다.
+             */
             onlineCount: number;
-            /** Retiredcount */
+            /**
+             * Retiredcount
+             * @description 0 이상의 정수입니다.
+             */
             retiredCount: number;
             risk: components["schemas"]["EndpointRiskSummaryDto"];
             /** Sensorhealth */
             sensorHealth: components["schemas"]["SensorHealthCountDto"][];
-            /** Stalecount */
+            /**
+             * Stalecount
+             * @description 0 이상의 정수입니다.
+             */
             staleCount: number;
             timeRange: components["schemas"]["TimeRangeDto"];
-            /** Totalcount */
+            /**
+             * Totalcount
+             * @description 0 이상의 정수입니다.
+             */
             totalCount: number;
         };
         /** EndpointSummaryIncidentsDto */
         EndpointSummaryIncidentsDto: {
             /** Byseverity */
             bySeverity: components["schemas"]["SeverityCountDto"][];
-            /** Closedcount */
+            /**
+             * Closedcount
+             * @description 0 이상의 정수입니다.
+             */
             closedCount: number;
-            /** Opencount */
+            /**
+             * Opencount
+             * @description 0 이상의 정수입니다.
+             */
             openCount: number;
-            /** Totalcount */
+            /**
+             * Totalcount
+             * @description 0 이상의 정수입니다.
+             */
             totalCount: number;
         };
         /** ErrorBody */
         ErrorBody: {
-            /** Code */
+            /**
+             * Code
+             * @description 클라이언트가 분기 처리할 수 있는 안정적인 오류 코드입니다.
+             */
             code: string;
-            /** Details */
+            /**
+             * Details
+             * @description 입력 필드 등 오류의 세부 정보입니다.
+             */
             details: components["schemas"]["ErrorDetail"][];
-            /** Message */
+            /**
+             * Message
+             * @description 오류 원인을 설명하는 메시지입니다.
+             */
             message: string;
-            /** Retryable */
+            /**
+             * Retryable
+             * @description 같은 요청을 다시 시도할 수 있는지 나타냅니다.
+             */
             retryable: boolean;
         };
         /** ErrorDetail */
@@ -1292,7 +1755,10 @@ export interface components {
             dnsRecordType: string | null;
             /** Dnsresponsecode */
             dnsResponseCode: string | null;
-            /** Endpointid */
+            /**
+             * Endpointid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             endpointId: number;
             /** Eventid */
             eventId: string;
@@ -1313,13 +1779,21 @@ export interface components {
             httpStatusCode: number | null;
             /** Httpuseragent */
             httpUserAgent: string | null;
-            /** Ingestedat */
+            /**
+             * Ingestedat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             ingestedAt: string;
             /** Ipaddress */
             ipAddress: string | null;
             /** L7Protocol */
             l7Protocol: string | null;
-            /** Occurredat */
+            /**
+             * Occurredat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             occurredAt: string;
             osType: components["schemas"]["OsType"];
             /** Payloadsha256 */
@@ -1344,7 +1818,10 @@ export interface components {
             remoteIp: string | null;
             /** Remoteport */
             remotePort: number | null;
-            /** Schemaversion */
+            /**
+             * Schemaversion
+             * @description 0 이상의 정수입니다.
+             */
             schemaVersion: number;
             /** Tlscertificateissuer */
             tlsCertificateIssuer: string | null;
@@ -1377,7 +1854,10 @@ export interface components {
             dnsRecordType: string | null;
             /** Dnsresponsecode */
             dnsResponseCode: string | null;
-            /** Endpointid */
+            /**
+             * Endpointid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             endpointId: number;
             /** Eventid */
             eventId: string;
@@ -1398,13 +1878,21 @@ export interface components {
             httpStatusCode: number | null;
             /** Httpuseragent */
             httpUserAgent: string | null;
-            /** Ingestedat */
+            /**
+             * Ingestedat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             ingestedAt: string;
             /** Ipaddress */
             ipAddress: string | null;
             /** L7Protocol */
             l7Protocol: string | null;
-            /** Occurredat */
+            /**
+             * Occurredat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             occurredAt: string;
             osType: components["schemas"]["OsType"];
             /** Pid */
@@ -1442,15 +1930,26 @@ export interface components {
         EventFailureDto: {
             /** Consumername */
             consumerName: string;
-            /** Createdat */
+            /**
+             * Createdat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             createdAt: string;
-            /** Endpointid */
+            /**
+             * Endpointid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             endpointId: number;
             /** Errormessage */
             errorMessage: string;
             /** Eventid */
             eventId: string;
-            /** Failedat */
+            /**
+             * Failedat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             failedAt: string;
             /** Failurecode */
             failureCode: string | null;
@@ -1466,26 +1965,46 @@ export interface components {
             payloadSha256: string | null;
             /** Payloadsizebytes */
             payloadSizeBytes: number | null;
-            /** Replaycount */
+            /**
+             * Replaycount
+             * @description 0 이상의 정수입니다.
+             */
             replayCount: number;
             /** Reprocessoutcome */
             reprocessOutcome: string | null;
             /** Resolvedat */
             resolvedAt: string | null;
-            /** Retentionexpiresat */
+            /**
+             * Retentionexpiresat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             retentionExpiresAt: string;
-            /** Retrycount */
+            /**
+             * Retrycount
+             * @description 0 이상의 정수입니다.
+             */
             retryCount: number;
             /** Retryable */
             retryable: boolean;
-            /** Sourceoffset */
+            /**
+             * Sourceoffset
+             * @description 0 이상의 정수입니다.
+             */
             sourceOffset: number;
-            /** Sourcepartition */
+            /**
+             * Sourcepartition
+             * @description 0 이상의 정수입니다.
+             */
             sourcePartition: number;
             /** Sourcetopic */
             sourceTopic: string;
             status: components["schemas"]["EventFailureStatus"];
-            /** Updatedat */
+            /**
+             * Updatedat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             updatedAt: string;
         };
         /**
@@ -1500,57 +2019,91 @@ export interface components {
         EventType: "PROCESS_EXECUTION" | "NETWORK_CONNECTION" | "FILE_EVENT" | "DNS_QUERY" | "L7_EVENT";
         /** EventTypeCountDto */
         EventTypeCountDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             eventType: components["schemas"]["EventType"];
         };
         /** FailureCodeCountDto */
         FailureCodeCountDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             /** Failurecode */
             failureCode: string | null;
         };
         /** FailureStageCountDto */
         FailureStageCountDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             /** Failurestage */
             failureStage: string;
         };
         /** FailureStatusCountDto */
         FailureStatusCountDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             status: components["schemas"]["EventFailureStatus"];
         };
         /** FileEvent */
         FileEvent: {
-            /** Eventid */
+            /**
+             * Eventid
+             * @description Agent가 생성한 이벤트 고유 ID입니다.
+             */
             eventId: string;
             /**
-             * @description discriminator enum property added by openapi-typescript
+             * @description 파일 이벤트 유형입니다. (enum property replaced by openapi-typescript)
              * @enum {string}
              */
             eventType: "FILE_EVENT";
             /**
              * Occurredat
              * Format: date-time
+             * @description 이벤트가 엔드포인트에서 발생한 UTC 시각입니다.
+             * @example 2026-07-19T13:00:00Z
              */
             occurredAt: string;
+            /** @description 파일 동작 세부 정보입니다. */
             payload: components["schemas"]["FileEventPayload"];
         };
         /** FileEventPayload */
         FileEventPayload: {
-            /** Action */
+            /**
+             * Action
+             * @description 파일에 수행된 동작입니다.
+             * @example CREATE
+             */
             action: string;
-            /** Filepath */
+            /**
+             * Filepath
+             * @description 관찰된 파일의 절대 경로입니다.
+             */
             filePath: string;
-            /** Pid */
+            /**
+             * Pid
+             * @description 파일 동작을 수행한 프로세스 ID입니다.
+             */
             pid?: number;
-            /** Processname */
+            /**
+             * Processname
+             * @description 파일 동작을 수행한 프로세스 이름입니다.
+             */
             processName?: string;
-            /** Sha256 */
+            /**
+             * Sha256
+             * @description 파일 내용의 SHA-256 해시입니다.
+             */
             sha256?: string;
         };
         /** ForwardDnsDto */
@@ -1562,7 +2115,10 @@ export interface components {
         };
         /** IncidentDetailDto */
         IncidentDetailDto: {
-            /** Alertcount */
+            /**
+             * Alertcount
+             * @description 0 이상의 정수입니다.
+             */
             alertCount: number;
             /** Alerts */
             alerts: components["schemas"]["AlertDto"][];
@@ -1570,70 +2126,142 @@ export interface components {
             closedAt: string | null;
             /** Correlationkey */
             correlationKey: string;
-            /** Createdat */
+            /**
+             * Createdat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             createdAt: string;
             /** Description */
             description: string | null;
-            /** Endpointid */
+            /**
+             * Endpointid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             endpointId: number;
-            /** Firstdetectedat */
+            /**
+             * Firstdetectedat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             firstDetectedAt: string;
-            /** Incidentid */
+            /**
+             * Incidentid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             incidentId: number;
-            /** Lastdetectedat */
+            /**
+             * Lastdetectedat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             lastDetectedAt: string;
             severity: components["schemas"]["Severity"];
             status: components["schemas"]["IncidentStatus"];
             /** Title */
             title: string;
-            /** Updatedat */
+            /**
+             * Updatedat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             updatedAt: string;
-            /** Windowendat */
+            /**
+             * Windowendat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             windowEndAt: string;
-            /** Windowstartat */
+            /**
+             * Windowstartat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             windowStartAt: string;
         };
         /** IncidentDto */
         IncidentDto: {
-            /** Alertcount */
+            /**
+             * Alertcount
+             * @description 0 이상의 정수입니다.
+             */
             alertCount: number;
             /** Closedat */
             closedAt: string | null;
             /** Correlationkey */
             correlationKey: string;
-            /** Createdat */
+            /**
+             * Createdat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             createdAt: string;
             /** Description */
             description: string | null;
-            /** Endpointid */
+            /**
+             * Endpointid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             endpointId: number;
-            /** Firstdetectedat */
+            /**
+             * Firstdetectedat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             firstDetectedAt: string;
-            /** Incidentid */
+            /**
+             * Incidentid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             incidentId: number;
-            /** Lastdetectedat */
+            /**
+             * Lastdetectedat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             lastDetectedAt: string;
             severity: components["schemas"]["Severity"];
             status: components["schemas"]["IncidentStatus"];
             /** Title */
             title: string;
-            /** Updatedat */
+            /**
+             * Updatedat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             updatedAt: string;
-            /** Windowendat */
+            /**
+             * Windowendat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             windowEndAt: string;
-            /** Windowstartat */
+            /**
+             * Windowstartat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             windowStartAt: string;
         };
         /** IncidentInvestigationDto */
         IncidentInvestigationDto: {
-            /** Edgecount */
+            /**
+             * Edgecount
+             * @description 0 이상의 정수입니다.
+             */
             edgeCount: number;
             /** Edges */
             edges: components["schemas"]["InvestigationEdgeDto"][];
             fallback: components["schemas"]["InvestigationFallbackDto"];
-            /** Incidentid */
+            /**
+             * Incidentid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             incidentId: number;
-            /** Nodecount */
+            /**
+             * Nodecount
+             * @description 0 이상의 정수입니다.
+             */
             nodeCount: number;
             /** Nodes */
             nodes: components["schemas"]["InvestigationNodeDto"][];
@@ -1647,15 +2275,26 @@ export interface components {
         };
         /** IncidentReferenceDto */
         IncidentReferenceDto: {
-            /** Incidentid */
+            /**
+             * Incidentid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             incidentId: number;
             severity: components["schemas"]["Severity"];
             status: components["schemas"]["IncidentStatus"];
             /** Title */
             title: string;
-            /** Windowendat */
+            /**
+             * Windowendat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             windowEndAt: string;
-            /** Windowstartat */
+            /**
+             * Windowstartat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             windowStartAt: string;
         };
         /**
@@ -1665,29 +2304,51 @@ export interface components {
         IncidentStatus: "OPEN" | "CLOSED";
         /** IncidentTimeSeriesPointDto */
         IncidentTimeSeriesPointDto: {
-            /** Bucketstartat */
+            /**
+             * Bucketstartat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             bucketStartAt: string;
-            /** Closedcount */
+            /**
+             * Closedcount
+             * @description 0 이상의 정수입니다.
+             */
             closedCount: number;
-            /** Opencount */
+            /**
+             * Opencount
+             * @description 0 이상의 정수입니다.
+             */
             openCount: number;
         };
         /** IngestEventFailuresDto */
         IngestEventFailuresDto: {
-            /** Failedcount */
+            /**
+             * Failedcount
+             * @description 0 이상의 정수입니다.
+             */
             failedCount: number;
             /** Oldestfailedat */
             oldestFailedAt: string | null;
             /** Rateperminute */
             ratePerMinute: number;
-            /** Reprocessfailedcount */
+            /**
+             * Reprocessfailedcount
+             * @description 0 이상의 정수입니다.
+             */
             reprocessFailedCount: number;
-            /** Reprocessedcount */
+            /**
+             * Reprocessedcount
+             * @description 0 이상의 정수입니다.
+             */
             reprocessedCount: number;
         };
         /** IngestEventsDto */
         IngestEventsDto: {
-            /** Ingestedcount */
+            /**
+             * Ingestedcount
+             * @description 0 이상의 정수입니다.
+             */
             ingestedCount: number;
             /** Latestingestedat */
             latestIngestedAt: string | null;
@@ -1696,17 +2357,35 @@ export interface components {
         };
         /** IngestStorageDto */
         IngestStorageDto: {
-            /** Clickhousehotbucketcount */
+            /**
+             * Clickhousehotbucketcount
+             * @description 0 이상의 정수입니다.
+             */
             clickhouseHotBucketCount: number;
-            /** Expiredbucketcount */
+            /**
+             * Expiredbucketcount
+             * @description 0 이상의 정수입니다.
+             */
             expiredBucketCount: number;
-            /** Failedbucketcount */
+            /**
+             * Failedbucketcount
+             * @description 0 이상의 정수입니다.
+             */
             failedBucketCount: number;
-            /** Glacierarchivedbucketcount */
+            /**
+             * Glacierarchivedbucketcount
+             * @description 0 이상의 정수입니다.
+             */
             glacierArchivedBucketCount: number;
-            /** Restoredbucketcount */
+            /**
+             * Restoredbucketcount
+             * @description 0 이상의 정수입니다.
+             */
             restoredBucketCount: number;
-            /** Restoringbucketcount */
+            /**
+             * Restoringbucketcount
+             * @description 0 이상의 정수입니다.
+             */
             restoringBucketCount: number;
         };
         /** IngestSummaryDto */
@@ -1808,68 +2487,126 @@ export interface components {
         };
         /** L7Event */
         L7Event: {
-            /** Eventid */
+            /**
+             * Eventid
+             * @description Agent가 생성한 이벤트 고유 ID입니다.
+             */
             eventId: string;
             /**
-             * @description discriminator enum property added by openapi-typescript
+             * @description 응용 계층 이벤트 유형입니다. (enum property replaced by openapi-typescript)
              * @enum {string}
              */
             eventType: "L7_EVENT";
             /**
              * Occurredat
              * Format: date-time
+             * @description 이벤트가 엔드포인트에서 발생한 UTC 시각입니다.
+             * @example 2026-07-19T13:00:00Z
              */
             occurredAt: string;
+            /** @description 응용 계층 통신 세부 정보입니다. */
             payload: components["schemas"]["L7EventPayload"];
         };
         /** L7EventPayload */
         L7EventPayload: {
-            /** Httphost */
+            /**
+             * Httphost
+             * @description HTTP Host 값입니다.
+             */
             httpHost?: string;
-            /** Httpmethod */
+            /**
+             * Httpmethod
+             * @description HTTP 요청 메서드입니다.
+             */
             httpMethod?: string;
-            /** Httpstatuscode */
+            /**
+             * Httpstatuscode
+             * @description HTTP 응답 상태 코드입니다.
+             */
             httpStatusCode?: number;
-            /** Httpuseragent */
+            /**
+             * Httpuseragent
+             * @description HTTP User-Agent 값입니다.
+             */
             httpUserAgent?: string;
-            /** L7Protocol */
+            /**
+             * L7Protocol
+             * @description 응용 계층 프로토콜입니다.
+             * @example HTTP
+             */
             l7Protocol: string;
-            /** Tlscertificateissuer */
+            /**
+             * Tlscertificateissuer
+             * @description 서버 인증서 Issuer입니다.
+             */
             tlsCertificateIssuer?: string;
-            /** Tlscertificatesha256 */
+            /**
+             * Tlscertificatesha256
+             * @description 서버 인증서 DER 값의 SHA-256 해시입니다.
+             */
             tlsCertificateSha256?: string;
-            /** Tlscertificatesubject */
+            /**
+             * Tlscertificatesubject
+             * @description 서버 인증서 Subject입니다.
+             */
             tlsCertificateSubject?: string;
-            /** Tlssni */
+            /**
+             * Tlssni
+             * @description TLS SNI 값입니다.
+             */
             tlsSni?: string;
-            /** Tlsversion */
+            /**
+             * Tlsversion
+             * @description 협상된 TLS 버전입니다.
+             */
             tlsVersion?: string;
-            /** Url */
+            /**
+             * Url
+             * @description 관찰된 요청 URL입니다.
+             */
             url?: string;
         };
         /** LoginData */
         LoginData: {
-            /** Accesstoken */
+            /**
+             * Accesstoken
+             * @description 후속 API 요청의 Authorization 헤더에 사용할 JWT입니다.
+             */
             accessToken: string;
-            /** Expiresin */
+            /**
+             * Expiresin
+             * @description 액세스 토큰 만료까지 남은 초입니다.
+             */
             expiresIn: number;
             /**
              * Tokentype
+             * @description 토큰 인증 유형입니다.
              * @constant
              */
             tokenType: "Bearer";
+            /** @description 로그인한 사용자 정보입니다. */
             user: components["schemas"]["UserDto"];
         };
         /** LoginRequest */
         LoginRequest: {
-            /** Loginid */
+            /**
+             * Loginid
+             * @description 로그인에 사용하는 사용자 ID입니다. 영문 소문자로 정규화됩니다.
+             * @example frontend-admin@example.com
+             */
             loginId: string;
-            /** Password */
+            /**
+             * Password
+             * @description 사용자 비밀번호입니다.
+             */
             password: string;
         };
         /** MitreTacticCountDto */
         MitreTacticCountDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             /** Mitretacticcode */
             mitreTacticCode: string;
@@ -1878,7 +2615,10 @@ export interface components {
         };
         /** MitreTechniqueCountDto */
         MitreTechniqueCountDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             /** Mitretechniquecode */
             mitreTechniqueCode: string;
@@ -1887,38 +2627,68 @@ export interface components {
         };
         /** NetworkConnectionEvent */
         NetworkConnectionEvent: {
-            /** Eventid */
+            /**
+             * Eventid
+             * @description Agent가 생성한 이벤트 고유 ID입니다.
+             */
             eventId: string;
             /**
-             * @description discriminator enum property added by openapi-typescript
+             * @description 네트워크 연결 이벤트 유형입니다. (enum property replaced by openapi-typescript)
              * @enum {string}
              */
             eventType: "NETWORK_CONNECTION";
             /**
              * Occurredat
              * Format: date-time
+             * @description 이벤트가 엔드포인트에서 발생한 UTC 시각입니다.
+             * @example 2026-07-19T13:00:00Z
              */
             occurredAt: string;
+            /** @description 네트워크 연결 세부 정보입니다. */
             payload: components["schemas"]["NetworkConnectionPayload"];
         };
         /** NetworkConnectionPayload */
         NetworkConnectionPayload: {
-            /** Pid */
+            /**
+             * Pid
+             * @description 통신을 생성한 프로세스 ID입니다.
+             */
             pid?: number;
-            /** Processname */
+            /**
+             * Processname
+             * @description 통신을 생성한 프로세스 이름입니다.
+             */
             processName?: string;
-            /** Protocol */
+            /**
+             * Protocol
+             * @description 전송 계층 프로토콜입니다.
+             * @example TCP
+             */
             protocol: string;
-            /** Remotedomain */
+            /**
+             * Remotedomain
+             * @description 확인된 원격 Domain입니다.
+             */
             remoteDomain?: string;
-            /** Remoteip */
+            /**
+             * Remoteip
+             * @description 원격 IPv4 또는 IPv6 주소입니다.
+             * @example 203.0.113.10
+             */
             remoteIp: string;
-            /** Remoteport */
+            /**
+             * Remoteport
+             * @description 원격 포트 번호입니다.
+             */
             remotePort: number;
         };
         /** OperationsHealthDto */
         OperationsHealthDto: {
-            /** Checkedat */
+            /**
+             * Checkedat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             checkedAt: string;
             /** Services */
             services: components["schemas"]["ServiceHealthDto"][];
@@ -1933,74 +2703,149 @@ export interface components {
         OsType: "WINDOWS" | "MACOS";
         /** OsTypeCountDto */
         OsTypeCountDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             osType: components["schemas"]["OsType"];
         };
         /** PagedData[AlertDto] */
         PagedData_AlertDto_: {
-            /** Items */
+            /**
+             * Items
+             * @description 현재 페이지에 포함된 항목입니다.
+             */
             items: components["schemas"]["AlertDto"][];
-            /** Page */
+            /**
+             * Page
+             * @description 현재 페이지 번호입니다.
+             */
             page: number;
-            /** Size */
+            /**
+             * Size
+             * @description 페이지당 최대 항목 수입니다.
+             */
             size: number;
-            /** Total */
+            /**
+             * Total
+             * @description 조회 조건에 일치하는 전체 항목 수입니다.
+             */
             total: number;
         };
         /** PagedData[ArchiveBucketDto] */
         PagedData_ArchiveBucketDto_: {
-            /** Items */
+            /**
+             * Items
+             * @description 현재 페이지에 포함된 항목입니다.
+             */
             items: components["schemas"]["ArchiveBucketDto"][];
-            /** Page */
+            /**
+             * Page
+             * @description 현재 페이지 번호입니다.
+             */
             page: number;
-            /** Size */
+            /**
+             * Size
+             * @description 페이지당 최대 항목 수입니다.
+             */
             size: number;
-            /** Total */
+            /**
+             * Total
+             * @description 조회 조건에 일치하는 전체 항목 수입니다.
+             */
             total: number;
         };
         /** PagedData[EndpointDto] */
         PagedData_EndpointDto_: {
-            /** Items */
+            /**
+             * Items
+             * @description 현재 페이지에 포함된 항목입니다.
+             */
             items: components["schemas"]["EndpointDto"][];
-            /** Page */
+            /**
+             * Page
+             * @description 현재 페이지 번호입니다.
+             */
             page: number;
-            /** Size */
+            /**
+             * Size
+             * @description 페이지당 최대 항목 수입니다.
+             */
             size: number;
-            /** Total */
+            /**
+             * Total
+             * @description 조회 조건에 일치하는 전체 항목 수입니다.
+             */
             total: number;
         };
         /** PagedData[EventDto] */
         PagedData_EventDto_: {
-            /** Items */
+            /**
+             * Items
+             * @description 현재 페이지에 포함된 항목입니다.
+             */
             items: components["schemas"]["EventDto"][];
-            /** Page */
+            /**
+             * Page
+             * @description 현재 페이지 번호입니다.
+             */
             page: number;
-            /** Size */
+            /**
+             * Size
+             * @description 페이지당 최대 항목 수입니다.
+             */
             size: number;
-            /** Total */
+            /**
+             * Total
+             * @description 조회 조건에 일치하는 전체 항목 수입니다.
+             */
             total: number;
         };
         /** PagedData[EventFailureDto] */
         PagedData_EventFailureDto_: {
-            /** Items */
+            /**
+             * Items
+             * @description 현재 페이지에 포함된 항목입니다.
+             */
             items: components["schemas"]["EventFailureDto"][];
-            /** Page */
+            /**
+             * Page
+             * @description 현재 페이지 번호입니다.
+             */
             page: number;
-            /** Size */
+            /**
+             * Size
+             * @description 페이지당 최대 항목 수입니다.
+             */
             size: number;
-            /** Total */
+            /**
+             * Total
+             * @description 조회 조건에 일치하는 전체 항목 수입니다.
+             */
             total: number;
         };
         /** PagedData[IncidentDto] */
         PagedData_IncidentDto_: {
-            /** Items */
+            /**
+             * Items
+             * @description 현재 페이지에 포함된 항목입니다.
+             */
             items: components["schemas"]["IncidentDto"][];
-            /** Page */
+            /**
+             * Page
+             * @description 현재 페이지 번호입니다.
+             */
             page: number;
-            /** Size */
+            /**
+             * Size
+             * @description 페이지당 최대 항목 수입니다.
+             */
             size: number;
-            /** Total */
+            /**
+             * Total
+             * @description 조회 조건에 일치하는 전체 항목 수입니다.
+             */
             total: number;
         };
         /** PipelineWorkerDto */
@@ -2021,59 +2866,108 @@ export interface components {
         };
         /** ProcessExecutionEvent */
         ProcessExecutionEvent: {
-            /** Eventid */
+            /**
+             * Eventid
+             * @description Agent가 생성한 이벤트 고유 ID입니다.
+             */
             eventId: string;
             /**
-             * @description discriminator enum property added by openapi-typescript
+             * @description 프로세스 실행 이벤트 유형입니다. (enum property replaced by openapi-typescript)
              * @enum {string}
              */
             eventType: "PROCESS_EXECUTION";
             /**
              * Occurredat
              * Format: date-time
+             * @description 이벤트가 엔드포인트에서 발생한 UTC 시각입니다.
+             * @example 2026-07-19T13:00:00Z
              */
             occurredAt: string;
+            /** @description 프로세스 실행 세부 정보입니다. */
             payload: components["schemas"]["ProcessExecutionPayload"];
         };
         /** ProcessExecutionPayload */
         ProcessExecutionPayload: {
-            /** Commandline */
+            /**
+             * Commandline
+             * @description 프로세스 실행 명령줄입니다.
+             */
             commandLine?: string;
-            /** Pid */
+            /**
+             * Pid
+             * @description 프로세스 ID입니다.
+             */
             pid: number;
-            /** Ppid */
+            /**
+             * Ppid
+             * @description 부모 프로세스 ID입니다.
+             */
             ppid?: number;
-            /** Processname */
+            /**
+             * Processname
+             * @description 실행된 프로세스 이름입니다.
+             */
             processName: string;
-            /** Processpath */
+            /**
+             * Processpath
+             * @description 실행 파일의 절대 경로입니다.
+             */
             processPath?: string;
-            /** Username */
+            /**
+             * Username
+             * @description 프로세스를 실행한 사용자 이름입니다.
+             */
             userName?: string;
         };
         /** ProcessTreeDto */
         ProcessTreeDto: {
-            /** Endpointid */
+            /**
+             * Endpointid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             endpointId: number;
-            /** From */
+            /**
+             * From
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             from: string;
             /** Nodes */
             nodes: components["schemas"]["ProcessTreeNodeDto"][];
-            /** To */
+            /**
+             * To
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             to: string;
         };
         /** ProcessTreeNodeDto */
         ProcessTreeNodeDto: {
             /** Commandline */
             commandLine: string | null;
-            /** Eventcount */
+            /**
+             * Eventcount
+             * @description 0 이상의 정수입니다.
+             */
             eventCount: number;
-            /** Firstseenat */
+            /**
+             * Firstseenat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             firstSeenAt: string;
-            /** Lastseenat */
+            /**
+             * Lastseenat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             lastSeenAt: string;
             /** Parentcaptured */
             parentCaptured: boolean;
-            /** Pid */
+            /**
+             * Pid
+             * @description 0 이상의 정수입니다.
+             */
             pid: number;
             /** Ppid */
             ppid: number | null;
@@ -2111,7 +3005,11 @@ export interface components {
         };
         /** RequestMeta */
         RequestMeta: {
-            /** Requestid */
+            /**
+             * Requestid
+             * @description 요청 추적에 사용하는 고유 ID입니다.
+             * @example req_12345678
+             */
             requestId: string;
         };
         /** ResponseGuidanceStepDto */
@@ -2127,12 +3025,21 @@ export interface components {
         };
         /** ResponseGuidanceSummaryDto */
         ResponseGuidanceSummaryDto: {
-            /** Affectedalertcount */
+            /**
+             * Affectedalertcount
+             * @description 0 이상의 정수입니다.
+             */
             affectedAlertCount: number;
             highestSeverity: components["schemas"]["Severity"] | null;
-            /** Manualactionstepcount */
+            /**
+             * Manualactionstepcount
+             * @description 0 이상의 정수입니다.
+             */
             manualActionStepCount: number;
-            /** Rulecount */
+            /**
+             * Rulecount
+             * @description 0 이상의 정수입니다.
+             */
             ruleCount: number;
             /** Steps */
             steps: components["schemas"]["ResponseGuidanceStepDto"][];
@@ -2151,7 +3058,10 @@ export interface components {
         RiskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
         /** RiskLevelCountDto */
         RiskLevelCountDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             level: components["schemas"]["RiskLevel"];
         };
@@ -2162,7 +3072,10 @@ export interface components {
         SensorHealth: "HEALTHY" | "DEGRADED" | "UNAVAILABLE";
         /** SensorHealthCountDto */
         SensorHealthCountDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             /** Sensor */
             sensor: string;
@@ -2182,21 +3095,38 @@ export interface components {
         };
         /** SensorHealthSnapshot */
         SensorHealthSnapshot: {
-            /** Packetdropcount */
+            /**
+             * Packetdropcount
+             * @description 누적 패킷 유실 수입니다.
+             */
             packetDropCount?: number;
-            /** Parseerrorcount */
+            /**
+             * Parseerrorcount
+             * @description 누적 파싱 오류 수입니다.
+             */
             parseErrorCount?: number;
-            /** Provider */
+            /**
+             * Provider
+             * @description 센서 구현 또는 데이터 제공자입니다.
+             */
             provider?: string;
-            /** Sensor */
+            /**
+             * Sensor
+             * @description 상태를 보고하는 센서 이름입니다.
+             * @example network
+             */
             sensor: string;
+            /** @description 센서의 현재 상태입니다. */
             status: components["schemas"]["SensorHealth"];
         };
         /** ServiceHealthDto */
         ServiceHealthDto: {
             /** Detail */
             detail: string;
-            /** Latencyms */
+            /**
+             * Latencyms
+             * @description 0 이상의 정수입니다.
+             */
             latencyMs: number;
             /** Service */
             service: string;
@@ -2209,7 +3139,10 @@ export interface components {
         Severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
         /** SeverityCountDto */
         SeverityCountDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             severity: components["schemas"]["Severity"];
         };
@@ -2220,7 +3153,10 @@ export interface components {
         StorageBackend: "CLICKHOUSE" | "S3";
         /** StorageBackendCountDto */
         StorageBackendCountDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             storageBackend: components["schemas"]["StorageBackend"];
         };
@@ -2231,7 +3167,10 @@ export interface components {
         StorageClass: "HOT" | "GLACIER_FLEXIBLE_RETRIEVAL";
         /** StorageClassCountDto */
         StorageClassCountDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             storageClass: components["schemas"]["StorageClass"];
         };
@@ -2242,158 +3181,221 @@ export interface components {
         StorageStatus: "HOT" | "ARCHIVED" | "RESTORE_REQUESTED" | "RESTORED" | "RESTORE_FAILED" | "EXPIRED";
         /** StorageStatusCountDto */
         StorageStatusCountDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             storageStatus: components["schemas"]["StorageStatus"];
         };
         /** SuccessEnvelope[AgentHeartbeatData] */
         SuccessEnvelope_AgentHeartbeatData_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["AgentHeartbeatData"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[AgentRegisterData] */
         SuccessEnvelope_AgentRegisterData_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["AgentRegisterData"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[AlertDetailDto] */
         SuccessEnvelope_AlertDetailDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["AlertDetailDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[AlertDto] */
         SuccessEnvelope_AlertDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["AlertDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[ArchiveRestoreStartDto] */
         SuccessEnvelope_ArchiveRestoreStartDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["ArchiveRestoreStartDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[AttackTimelineDto] */
         SuccessEnvelope_AttackTimelineDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["AttackTimelineDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[CorrelationDto] */
         SuccessEnvelope_CorrelationDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["CorrelationDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[DashboardLayoutDto] */
         SuccessEnvelope_DashboardLayoutDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["DashboardLayoutDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[DashboardSummaryDto] */
         SuccessEnvelope_DashboardSummaryDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["DashboardSummaryDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[DnsLookupDto] */
         SuccessEnvelope_DnsLookupDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["DnsLookupDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[EgressTopologyDto] */
         SuccessEnvelope_EgressTopologyDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["EgressTopologyDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[EndpointDetailDto] */
         SuccessEnvelope_EndpointDetailDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["EndpointDetailDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[EndpointSummaryDto] */
         SuccessEnvelope_EndpointSummaryDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["EndpointSummaryDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[EventDetailDto] */
         SuccessEnvelope_EventDetailDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["EventDetailDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[ForwardDnsDto] */
         SuccessEnvelope_ForwardDnsDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["ForwardDnsDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[IncidentDetailDto] */
         SuccessEnvelope_IncidentDetailDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["IncidentDetailDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[IncidentInvestigationDto] */
         SuccessEnvelope_IncidentInvestigationDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["IncidentInvestigationDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[IngestSummaryDto] */
         SuccessEnvelope_IngestSummaryDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["IngestSummaryDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[LoginData] */
         SuccessEnvelope_LoginData_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["LoginData"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[OperationsHealthDto] */
         SuccessEnvelope_OperationsHealthDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["OperationsHealthDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[PagedData[AlertDto]] */
         SuccessEnvelope_PagedData_AlertDto__: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["PagedData_AlertDto_"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[PagedData[ArchiveBucketDto]] */
         SuccessEnvelope_PagedData_ArchiveBucketDto__: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["PagedData_ArchiveBucketDto_"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[PagedData[EndpointDto]] */
         SuccessEnvelope_PagedData_EndpointDto__: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["PagedData_EndpointDto_"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[PagedData[EventDto]] */
         SuccessEnvelope_PagedData_EventDto__: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["PagedData_EventDto_"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[PagedData[EventFailureDto]] */
         SuccessEnvelope_PagedData_EventFailureDto__: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["PagedData_EventFailureDto_"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[PagedData[IncidentDto]] */
         SuccessEnvelope_PagedData_IncidentDto__: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["PagedData_IncidentDto_"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[ProcessTreeDto] */
         SuccessEnvelope_ProcessTreeDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["ProcessTreeDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[ReverseDnsDto] */
         SuccessEnvelope_ReverseDnsDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["ReverseDnsDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[TelemetryBatchData] */
         SuccessEnvelope_TelemetryBatchData_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["TelemetryBatchData"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** SuccessEnvelope[UserDto] */
         SuccessEnvelope_UserDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["UserDto"];
+            /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
         /** TelemetryBatchData */
@@ -2407,20 +3409,33 @@ export interface components {
         };
         /** TelemetryBatchRequest */
         TelemetryBatchRequest: {
-            /** Agentid */
+            /**
+             * Agentid
+             * @description mTLS 인증서 SAN과 일치해야 하는 Agent 고유 ID입니다.
+             * @example agent-001
+             */
             agentId: string;
-            /** Batchid */
+            /**
+             * Batchid
+             * @description 재전송 중복 제거에 사용하는 배치 고유 ID입니다.
+             */
             batchId: string;
-            /** Events */
+            /**
+             * Events
+             * @description 1개 이상 100개 이하의 텔레메트리 이벤트입니다.
+             */
             events: (components["schemas"]["ProcessExecutionEvent"] | components["schemas"]["NetworkConnectionEvent"] | components["schemas"]["FileEvent"] | components["schemas"]["DnsQueryEvent"] | components["schemas"]["L7Event"])[];
             /**
              * Schemaversion
+             * @description 텔레메트리 계약 버전입니다.
              * @constant
              */
             schemaVersion: 1;
             /**
              * Sentat
              * Format: date-time
+             * @description Agent가 배치를 전송한 UTC 시각입니다.
+             * @example 2026-07-19T13:00:00Z
              */
             sentAt: string;
         };
@@ -2431,63 +3446,99 @@ export interface components {
         TimePreset: "LATEST_15M" | "LATEST_1H" | "LATEST_24H" | "LATEST_7D" | "CUSTOM";
         /** TimeRangeDto */
         TimeRangeDto: {
-            /** From */
+            /**
+             * From
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             from: string;
-            /** To */
+            /**
+             * To
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             to: string;
         };
         /** TimeSeriesPointDto */
         TimeSeriesPointDto: {
-            /** Bucketstartat */
+            /**
+             * Bucketstartat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             bucketStartAt: string;
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
         };
         /** TopDnsQueryDto */
         TopDnsQueryDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             /** Dnsquery */
             dnsQuery: string;
         };
         /** TopDomainDto */
         TopDomainDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             /** Domain */
             domain: string;
         };
         /** TopFileHashDto */
         TopFileHashDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             /** Filehashsha256 */
             fileHashSha256: string;
         };
         /** TopL7ProtocolDto */
         TopL7ProtocolDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             /** L7Protocol */
             l7Protocol: string;
         };
         /** TopProcessDto */
         TopProcessDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             /** Processname */
             processName: string;
         };
         /** TopRemoteIpDto */
         TopRemoteIpDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             /** Remoteip */
             remoteIp: string;
         };
         /** TopRuleDto */
         TopRuleDto: {
-            /** Count */
+            /**
+             * Count
+             * @description 0 이상의 정수입니다.
+             */
             count: number;
             /** Rulecode */
             ruleCode: string;
@@ -2496,13 +3547,26 @@ export interface components {
         };
         /** TopologyEdgeDto */
         TopologyEdgeDto: {
-            /** Alertcount */
+            /**
+             * Alertcount
+             * @description 0 이상의 정수입니다.
+             */
             alertCount: number;
-            /** Endpointid */
+            /**
+             * Endpointid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             endpointId: number;
-            /** Eventcount */
+            /**
+             * Eventcount
+             * @description 0 이상의 정수입니다.
+             */
             eventCount: number;
-            /** Lastseenat */
+            /**
+             * Lastseenat
+             * @description UTC 기준 RFC 3339 일시입니다.
+             * @example 2026-07-19T13:00:00Z
+             */
             lastSeenAt: string;
             /** Protocol */
             protocol: string;
@@ -2513,27 +3577,43 @@ export interface components {
         };
         /** TopologyNodeDto */
         TopologyNodeDto: {
-            /** Alertcount */
+            /**
+             * Alertcount
+             * @description 0 이상의 정수입니다.
+             */
             alertCount: number;
-            /** Endpointid */
+            /**
+             * Endpointid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             endpointId: number;
             /** Hostname */
             hostname: string;
             riskLevel: components["schemas"]["RiskLevel"];
-            /** Riskscore */
+            /**
+             * Riskscore
+             * @description 0부터 100까지의 정수 점수입니다.
+             */
             riskScore: number;
             status: components["schemas"]["EndpointStatus"];
         };
         /** UserDto */
         UserDto: {
             locale: components["schemas"]["UserLocale"];
-            /** Loginid */
+            /**
+             * Loginid
+             * @description 로그인에 사용하는 사용자 ID입니다. 영문 소문자로 정규화됩니다.
+             * @example frontend-admin@example.com
+             */
             loginId: string;
             /** Name */
             name: string;
             role: components["schemas"]["UserRole"];
             status: components["schemas"]["UserStatus"];
-            /** Userid */
+            /**
+             * Userid
+             * @description 1 이상의 리소스 식별자입니다.
+             */
             userId: number;
         };
         /**
@@ -2543,6 +3623,10 @@ export interface components {
         UserLocale: "EN" | "KO";
         /** UserLocaleUpdateRequest */
         UserLocaleUpdateRequest: {
+            /**
+             * @description 대시보드 표시 언어입니다.
+             * @example KO
+             */
             locale: components["schemas"]["UserLocale"];
         };
         /**
@@ -2572,16 +3656,27 @@ export interface operations {
     alertsList: {
         parameters: {
             query?: {
+                /** @description 조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다. */
                 timePreset?: components["schemas"]["TimePreset"];
+                /** @description CUSTOM 조회 범위의 시작 시각입니다. */
                 from?: string;
+                /** @description CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다. */
                 to?: string;
+                /** @description 조회할 페이지 번호입니다. */
                 page?: number;
+                /** @description 페이지당 항목 수입니다. */
                 size?: number;
+                /** @description 특정 엔드포인트의 Alert만 조회합니다. */
                 endpointId?: number;
+                /** @description Alert 처리 상태 필터입니다. */
                 status?: components["schemas"]["AlertStatus"];
+                /** @description Alert 심각도 필터입니다. */
                 severity?: components["schemas"]["Severity"];
+                /** @description 탐지 규칙 코드 필터입니다. */
                 ruleCode?: string;
+                /** @description Alert 정렬 기준입니다. */
                 sortBy?: components["schemas"]["AlertSortBy"];
+                /** @description 정렬 방향입니다. */
                 sortOrder?: "asc" | "desc";
             };
             header?: never;
@@ -2590,7 +3685,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2599,7 +3694,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_PagedData_AlertDto__"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2608,7 +3703,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2617,7 +3712,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2633,13 +3728,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description 조회할 Alert ID입니다. */
                 alertId: number;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2648,7 +3744,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_AlertDetailDto_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2657,7 +3753,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2666,7 +3762,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The requested resource was not found. */
+            /** @description 요청한 리소스를 찾을 수 없습니다. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2675,7 +3771,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2691,6 +3787,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description 상태를 변경할 Alert ID입니다. */
                 alertId: number;
             };
             cookie?: never;
@@ -2701,7 +3798,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2710,7 +3807,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_AlertDto_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2719,7 +3816,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2728,7 +3825,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The authenticated identity is not permitted to perform this operation. */
+            /** @description 인증된 주체에게 이 작업을 수행할 권한이 없습니다. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2737,7 +3834,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The requested resource was not found. */
+            /** @description 요청한 리소스를 찾을 수 없습니다. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2746,7 +3843,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2760,10 +3857,15 @@ export interface operations {
     archiveRestoresList: {
         parameters: {
             query: {
+                /** @description 조회할 페이지 번호입니다. */
                 page?: number;
+                /** @description 페이지당 항목 수입니다. */
                 size?: number;
+                /** @description 복원 상태를 조회할 엔드포인트 ID입니다. */
                 endpointIds: number[];
+                /** @description 조회 범위의 시작 시각입니다. */
                 from: string;
+                /** @description 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다. */
                 to: string;
             };
             header?: never;
@@ -2772,7 +3874,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2781,7 +3883,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_PagedData_ArchiveBucketDto__"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2790,7 +3892,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2799,7 +3901,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2823,7 +3925,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2832,7 +3934,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_ArchiveRestoreStartDto_"];
                 };
             };
-            /** @description Restore accepted. */
+            /** @description 복원 요청을 접수했습니다. */
             202: {
                 headers: {
                     [name: string]: unknown;
@@ -2841,7 +3943,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_ArchiveRestoreStartDto_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2850,7 +3952,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2859,7 +3961,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The authenticated identity is not permitted to perform this operation. */
+            /** @description 인증된 주체에게 이 작업을 수행할 권한이 없습니다. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2868,7 +3970,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2892,7 +3994,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2901,7 +4003,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_LoginData_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2910,7 +4012,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2919,7 +4021,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The authenticated identity is not permitted to perform this operation. */
+            /** @description 인증된 주체에게 이 작업을 수행할 권한이 없습니다. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2928,7 +4030,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The request exceeded the configured rate limit. */
+            /** @description 설정된 요청 속도 제한을 초과했습니다. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -2937,7 +4039,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2961,7 +4063,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2970,7 +4072,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_AgentHeartbeatData_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2979,7 +4081,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2988,7 +4090,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The authenticated identity is not permitted to perform this operation. */
+            /** @description 인증된 주체에게 이 작업을 수행할 권한이 없습니다. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2997,7 +4099,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3021,7 +4123,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3030,7 +4132,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_AgentRegisterData_"];
                 };
             };
-            /** @description Agent created. */
+            /** @description 새 Agent를 등록했습니다. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -3039,7 +4141,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_AgentRegisterData_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3048,7 +4150,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3057,7 +4159,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The authenticated identity is not permitted to perform this operation. */
+            /** @description 인증된 주체에게 이 작업을 수행할 권한이 없습니다. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -3066,7 +4168,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The request conflicts with the current resource, identity, or Archive state. */
+            /** @description 현재 리소스, 인증 주체 또는 Archive 상태와 요청이 충돌합니다. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -3075,7 +4177,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3099,7 +4201,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3108,7 +4210,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_TelemetryBatchData_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3117,7 +4219,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3126,7 +4228,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The authenticated identity is not permitted to perform this operation. */
+            /** @description 인증된 주체에게 이 작업을 수행할 권한이 없습니다. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -3135,7 +4237,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The request body or event count exceeds the documented limit. */
+            /** @description 요청 본문 크기 또는 이벤트 수가 허용 한도를 초과했습니다. */
             413: {
                 headers: {
                     [name: string]: unknown;
@@ -3144,7 +4246,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3158,9 +4260,13 @@ export interface operations {
     dashboardGetEndpointSummary: {
         parameters: {
             query?: {
+                /** @description 조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다. */
                 timePreset?: components["schemas"]["TimePreset"];
+                /** @description CUSTOM 조회 범위의 시작 시각입니다. */
                 from?: string;
+                /** @description CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다. */
                 to?: string;
+                /** @description 특정 엔드포인트 지표만 집계합니다. */
                 endpointId?: number;
             };
             header?: never;
@@ -3169,7 +4275,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3178,7 +4284,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_EndpointSummaryDto_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3187,7 +4293,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3196,7 +4302,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3210,9 +4316,13 @@ export interface operations {
     dashboardGetIngestSummary: {
         parameters: {
             query?: {
+                /** @description 조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다. */
                 timePreset?: components["schemas"]["TimePreset"];
+                /** @description CUSTOM 조회 범위의 시작 시각입니다. */
                 from?: string;
+                /** @description CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다. */
                 to?: string;
+                /** @description 특정 엔드포인트 지표만 집계합니다. */
                 endpointId?: number;
             };
             header?: never;
@@ -3221,7 +4331,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3230,7 +4340,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_IngestSummaryDto_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3239,7 +4349,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3248,7 +4358,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3264,13 +4374,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description 대시보드를 구분하는 안정적인 키입니다. */
                 dashboardKey: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3279,7 +4390,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_DashboardLayoutDto_"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3288,7 +4399,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The requested resource was not found. */
+            /** @description 요청한 리소스를 찾을 수 없습니다. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3297,7 +4408,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3313,6 +4424,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description 대시보드를 구분하는 안정적인 키입니다. */
                 dashboardKey: string;
             };
             cookie?: never;
@@ -3323,7 +4435,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3332,7 +4444,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_DashboardLayoutDto_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3341,7 +4453,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3350,7 +4462,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The requested resource was not found. */
+            /** @description 요청한 리소스를 찾을 수 없습니다. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3359,7 +4471,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The request conflicts with the current resource, identity, or Archive state. */
+            /** @description 현재 리소스, 인증 주체 또는 Archive 상태와 요청이 충돌합니다. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -3368,7 +4480,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3384,13 +4496,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description 대시보드를 구분하는 안정적인 키입니다. */
                 dashboardKey: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3399,7 +4512,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_DashboardLayoutDto_"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3408,7 +4521,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The requested resource was not found. */
+            /** @description 요청한 리소스를 찾을 수 없습니다. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3417,7 +4530,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3431,10 +4544,15 @@ export interface operations {
     dashboardGetSummary: {
         parameters: {
             query: {
+                /** @description 조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다. */
                 timePreset?: components["schemas"]["TimePreset"];
+                /** @description CUSTOM 조회 범위의 시작 시각입니다. */
                 from?: string;
+                /** @description CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다. */
                 to?: string;
+                /** @description 특정 엔드포인트 지표만 집계합니다. */
                 endpointId?: number;
+                /** @description 시계열 집계 간격입니다. */
                 interval: "1m" | "5m" | "1h" | "1d";
             };
             header?: never;
@@ -3443,7 +4561,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3452,7 +4570,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_DashboardSummaryDto_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3461,7 +4579,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3470,7 +4588,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3484,9 +4602,13 @@ export interface operations {
     dashboardGetTopology: {
         parameters: {
             query?: {
+                /** @description 조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다. */
                 timePreset?: components["schemas"]["TimePreset"];
+                /** @description CUSTOM 조회 범위의 시작 시각입니다. */
                 from?: string;
+                /** @description CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다. */
                 to?: string;
+                /** @description 지정한 엔드포인트의 외부 통신만 집계합니다. */
                 endpointIds?: number[];
             };
             header?: never;
@@ -3495,7 +4617,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3504,7 +4626,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_EgressTopologyDto_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3513,7 +4635,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3522,7 +4644,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3536,14 +4658,23 @@ export interface operations {
     endpointsList: {
         parameters: {
             query?: {
+                /** @description 조회할 페이지 번호입니다. */
                 page?: number;
+                /** @description 페이지당 항목 수입니다. */
                 size?: number;
+                /** @description 조회할 엔드포인트 ID입니다. */
                 endpointIds?: number[];
+                /** @description hostname, Agent ID 또는 IP 주소를 검색합니다. */
                 q?: string;
+                /** @description 엔드포인트 연결 상태 필터입니다. */
                 status?: "ONLINE" | "OFFLINE" | "RETIRED";
+                /** @description 운영체제 유형 필터입니다. */
                 osType?: components["schemas"]["OsType"];
+                /** @description 백엔드 산정 위험도 필터입니다. */
                 riskLevel?: components["schemas"]["RiskLevel"];
+                /** @description 목록 정렬 기준입니다. */
                 sortBy?: "riskScore" | "lastSeenAt" | "registeredAt";
+                /** @description 정렬 방향입니다. */
                 sortOrder?: "asc" | "desc";
             };
             header?: never;
@@ -3552,7 +4683,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3561,7 +4692,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_PagedData_EndpointDto__"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3570,7 +4701,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3579,7 +4710,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3595,13 +4726,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description 조회할 엔드포인트 ID입니다. */
                 endpointId: number;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3610,7 +4742,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_EndpointDetailDto_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3619,7 +4751,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3628,7 +4760,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The requested resource was not found. */
+            /** @description 요청한 리소스를 찾을 수 없습니다. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3637,7 +4769,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3651,20 +4783,25 @@ export interface operations {
     endpointsGetProcessTree: {
         parameters: {
             query?: {
+                /** @description 조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다. */
                 timePreset?: components["schemas"]["TimePreset"];
+                /** @description CUSTOM 조회 범위의 시작 시각입니다. */
                 from?: string;
+                /** @description CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다. */
                 to?: string;
+                /** @description 지정하면 해당 PID를 중심으로 프로세스 트리를 표시합니다. */
                 selectedPid?: number;
             };
             header?: never;
             path: {
+                /** @description 프로세스 트리를 조회할 엔드포인트 ID입니다. */
                 endpointId: number;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3673,7 +4810,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_ProcessTreeDto_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3682,7 +4819,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3691,7 +4828,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3705,19 +4842,33 @@ export interface operations {
     eventsList: {
         parameters: {
             query?: {
+                /** @description 조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다. */
                 timePreset?: components["schemas"]["TimePreset"];
+                /** @description CUSTOM 조회 범위의 시작 시각입니다. */
                 from?: string;
+                /** @description CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다. */
                 to?: string;
+                /** @description 조회할 페이지 번호입니다. */
                 page?: number;
+                /** @description 페이지당 항목 수입니다. */
                 size?: number;
+                /** @description 특정 엔드포인트의 이벤트만 조회합니다. */
                 endpointId?: number;
+                /** @description 이벤트 유형 필터입니다. */
                 eventType?: components["schemas"]["EventType"];
+                /** @description 프로세스 이름 검색 조건입니다. */
                 processName?: string;
+                /** @description 파일 경로 검색 조건입니다. */
                 filePath?: string;
+                /** @description 원격 Domain 검색 조건입니다. */
                 domain?: string;
+                /** @description 원격 IP 주소 검색 조건입니다. */
                 remoteIp?: string;
+                /** @description DNS 질의값 검색 조건입니다. */
                 dnsQuery?: string;
+                /** @description L7 프로토콜 검색 조건입니다. */
                 l7Protocol?: string;
+                /** @description 이벤트 발생 시각 정렬 방향입니다. */
                 sortOrder?: "asc" | "desc";
             };
             header?: never;
@@ -3726,7 +4877,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3735,7 +4886,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_PagedData_EventDto__"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3744,7 +4895,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3753,7 +4904,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The request conflicts with the current resource, identity, or Archive state. */
+            /** @description 현재 리소스, 인증 주체 또는 Archive 상태와 요청이 충돌합니다. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -3762,7 +4913,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3776,18 +4927,21 @@ export interface operations {
     eventsGet: {
         parameters: {
             query: {
+                /** @description 이벤트가 발생한 엔드포인트 ID입니다. */
                 endpointId: number;
+                /** @description 이벤트가 발생한 UTC 시각입니다. */
                 occurredAt: string;
             };
             header?: never;
             path: {
+                /** @description 조회할 이벤트 UUID입니다. */
                 eventId: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3796,7 +4950,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_EventDetailDto_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3805,7 +4959,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3814,7 +4968,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The requested resource was not found. */
+            /** @description 요청한 리소스를 찾을 수 없습니다. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3823,7 +4977,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The request conflicts with the current resource, identity, or Archive state. */
+            /** @description 현재 리소스, 인증 주체 또는 Archive 상태와 요청이 충돌합니다. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -3832,7 +4986,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3846,14 +5000,23 @@ export interface operations {
     failuresList: {
         parameters: {
             query?: {
+                /** @description 조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다. */
                 timePreset?: components["schemas"]["TimePreset"];
+                /** @description CUSTOM 조회 범위의 시작 시각입니다. */
                 from?: string;
+                /** @description CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다. */
                 to?: string;
+                /** @description 조회할 페이지 번호입니다. */
                 page?: number;
+                /** @description 페이지당 항목 수입니다. */
                 size?: number;
+                /** @description 실패 처리 상태 필터입니다. */
                 status?: components["schemas"]["EventFailureStatus"];
+                /** @description 실패가 발생한 파이프라인 단계입니다. */
                 failureStage?: string;
+                /** @description 재처리 가능 여부 필터입니다. */
                 retryable?: boolean;
+                /** @description 실패 발생 시각 정렬 방향입니다. */
                 sortOrder?: "asc" | "desc";
             };
             header?: never;
@@ -3862,7 +5025,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3871,7 +5034,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_PagedData_EventFailureDto__"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3880,7 +5043,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3889,7 +5052,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3903,14 +5066,23 @@ export interface operations {
     incidentsList: {
         parameters: {
             query?: {
+                /** @description 조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다. */
                 timePreset?: components["schemas"]["TimePreset"];
+                /** @description CUSTOM 조회 범위의 시작 시각입니다. */
                 from?: string;
+                /** @description CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다. */
                 to?: string;
+                /** @description 조회할 페이지 번호입니다. */
                 page?: number;
+                /** @description 페이지당 항목 수입니다. */
                 size?: number;
+                /** @description 특정 엔드포인트의 Incident만 조회합니다. */
                 endpointId?: number;
+                /** @description Incident 상태 필터입니다. */
                 status?: components["schemas"]["IncidentStatus"];
+                /** @description Incident 심각도 필터입니다. */
                 severity?: components["schemas"]["Severity"];
+                /** @description 정렬 방향입니다. */
                 sortOrder?: "asc" | "desc";
             };
             header?: never;
@@ -3919,7 +5091,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3928,7 +5100,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_PagedData_IncidentDto__"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3937,7 +5109,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3946,7 +5118,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3962,13 +5134,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description 조회할 Incident ID입니다. */
                 incidentId: number;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3977,7 +5150,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_IncidentDetailDto_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3986,7 +5159,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3995,7 +5168,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The requested resource was not found. */
+            /** @description 요청한 리소스를 찾을 수 없습니다. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -4004,7 +5177,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4020,13 +5193,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description 조사 그래프를 조회할 Incident ID입니다. */
                 incidentId: number;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4035,7 +5209,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_IncidentInvestigationDto_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4044,7 +5218,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -4053,7 +5227,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The requested resource was not found. */
+            /** @description 요청한 리소스를 찾을 수 없습니다. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -4062,7 +5236,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4078,13 +5252,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description 타임라인을 조회할 Incident ID입니다. */
                 incidentId: number;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4093,7 +5268,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_AttackTimelineDto_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4102,7 +5277,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -4111,7 +5286,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The requested resource was not found. */
+            /** @description 요청한 리소스를 찾을 수 없습니다. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -4120,7 +5295,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4134,10 +5309,15 @@ export interface operations {
     intelligenceCorrelate: {
         parameters: {
             query: {
+                /** @description 조회 시간 프리셋입니다. CUSTOM이면 from과 to를 모두 지정해야 합니다. */
                 timePreset?: components["schemas"]["TimePreset"];
+                /** @description CUSTOM 조회 범위의 시작 시각입니다. */
                 from?: string;
+                /** @description CUSTOM 조회 범위의 종료 시각입니다. 최대 조회 범위는 31일입니다. */
                 to?: string;
+                /** @description 상관분석할 IP 주소 또는 Domain입니다. */
                 value: string;
+                /** @description 지정한 엔드포인트에서 관찰된 관계만 조회합니다. */
                 endpointIds?: number[];
             };
             header?: never;
@@ -4146,7 +5326,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4155,7 +5335,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_CorrelationDto_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4164,7 +5344,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -4173,7 +5353,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4187,7 +5367,9 @@ export interface operations {
     intelligenceDnsLookup: {
         parameters: {
             query: {
+                /** @description 조회할 Domain 또는 IP 주소입니다. */
                 query: string;
+                /** @description 조회할 DNS 레코드 유형입니다. */
                 recordType: components["schemas"]["DnsRecordType"];
             };
             header?: never;
@@ -4196,7 +5378,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4205,7 +5387,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_DnsLookupDto_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4214,7 +5396,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -4223,7 +5405,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The requested resource was not found. */
+            /** @description 요청한 리소스를 찾을 수 없습니다. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -4232,7 +5414,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4246,6 +5428,7 @@ export interface operations {
     intelligenceForwardDns: {
         parameters: {
             query: {
+                /** @description 정방향 조회할 Domain 이름입니다. */
                 domain: string;
             };
             header?: never;
@@ -4254,7 +5437,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4263,7 +5446,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_ForwardDnsDto_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4272,7 +5455,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -4281,7 +5464,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The requested resource was not found. */
+            /** @description 요청한 리소스를 찾을 수 없습니다. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -4290,7 +5473,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4304,6 +5487,7 @@ export interface operations {
     intelligenceReverseDns: {
         parameters: {
             query: {
+                /** @description 역방향 조회할 IPv4 또는 IPv6 주소입니다. */
                 ip: string;
             };
             header?: never;
@@ -4312,7 +5496,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4321,7 +5505,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_ReverseDnsDto_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4330,7 +5514,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -4339,7 +5523,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description The requested resource was not found. */
+            /** @description 요청한 리소스를 찾을 수 없습니다. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -4348,7 +5532,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4368,7 +5552,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4377,7 +5561,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_OperationsHealthDto_"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -4397,7 +5581,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4406,7 +5590,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_UserDto_"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -4415,7 +5599,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4439,7 +5623,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description 요청을 성공적으로 처리했습니다. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4448,7 +5632,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_UserDto_"];
                 };
             };
-            /** @description Request validation failed. */
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4457,7 +5641,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Authentication failed. */
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -4466,7 +5650,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description A required dependency is temporarily unavailable. */
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
             503: {
                 headers: {
                     [name: string]: unknown;

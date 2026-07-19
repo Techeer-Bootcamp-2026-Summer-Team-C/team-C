@@ -17,9 +17,9 @@ class DashboardWidgetLayoutDto(ContractModel):
 
 
 class DashboardLayoutPutRequest(ContractModel):
-    layout_version: DashboardLayoutVersion
-    revision: NonNegativeInt
-    widgets: list[DashboardWidgetLayoutDto]
+    layout_version: DashboardLayoutVersion = Field(description="레이아웃 계약 버전입니다.")
+    revision: NonNegativeInt = Field(description="낙관적 동시성 제어에 사용하는 현재 revision입니다.")
+    widgets: list[DashboardWidgetLayoutDto] = Field(description="저장할 위젯 배치 목록입니다.")
 
 
 class DashboardLayoutDto(ContractModel):

@@ -7,9 +7,9 @@ from .enums import StorageBackend, StorageClass, StorageStatus
 
 
 class ArchiveRestoreRequest(ContractModel):
-    endpoint_ids: EndpointIdList
-    from_: UtcDateTime = Field(alias="from")
-    to: UtcDateTime
+    endpoint_ids: EndpointIdList = Field(description="복원할 엔드포인트 ID입니다.")
+    from_: UtcDateTime = Field(alias="from", description="복원 범위의 시작 시각입니다.")
+    to: UtcDateTime = Field(description="복원 범위의 종료 시각입니다. 최대 복원 범위는 31일입니다.")
 
     @model_validator(mode="after")
     def validate_range(self) -> "ArchiveRestoreRequest":

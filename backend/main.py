@@ -8,7 +8,7 @@ import pyarrow
 from botocore.exceptions import BotoCoreError
 from clickhouse_connect.driver.exceptions import ClickHouseError
 from confluent_kafka import KafkaException
-from fastapi import Depends, FastAPI, Query, Request, Response
+from fastapi import Depends, FastAPI, Path, Query, Request, Response
 from fastapi.exceptions import RequestValidationError as FastApiRequestValidationError
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
@@ -84,34 +84,34 @@ from .summary_service import SummaryService
 from .time_range import resolve_time_range
 
 OPENAPI_TAGS = [
-    {"name": "Auth", "description": "Dashboard user authentication."},
-    {"name": "Users", "description": "Authenticated dashboard user profile and preferences."},
-    {"name": "Endpoints", "description": "Endpoint inventory, health, and Backend-calculated risk."},
-    {"name": "Events", "description": "HOT ClickHouse and RESTORED Parquet event evidence."},
-    {"name": "Archives", "description": "Archive restore lifecycle operations."},
-    {"name": "Alerts", "description": "RuleV1 detections and Alert workflow state."},
-    {"name": "Incidents", "description": "Read-only correlated Incident views."},
-    {"name": "Dashboard", "description": "Backend-calculated security and collection summaries."},
-    {"name": "Operations", "description": "Live dependency and pipeline worker health."},
-    {"name": "Intelligence", "description": "DNS lookups and IP/Domain correlation."},
-    {"name": "Collector", "description": "mTLS-authenticated Agent registration and telemetry ingest."},
+    {"name": "Auth", "description": "대시보드 사용자 인증과 JWT 액세스 토큰 발급 기능입니다."},
+    {"name": "Users", "description": "인증된 대시보드 사용자의 프로필과 환경설정을 관리합니다."},
+    {"name": "Endpoints", "description": "엔드포인트 목록, 상태, 백엔드 산정 위험도와 프로세스 트리를 조회합니다."},
+    {"name": "Events", "description": "ClickHouse HOT 데이터와 복원된 Parquet 이벤트 증거를 조회합니다."},
+    {"name": "Archives", "description": "아카이브 버킷의 복원 요청과 진행 상태를 관리합니다."},
+    {"name": "Alerts", "description": "RuleV1 탐지 결과와 Alert 처리 상태를 조회하고 변경합니다."},
+    {"name": "Incidents", "description": "상관분석으로 생성된 Incident와 조사 정보를 읽기 전용으로 제공합니다."},
+    {"name": "Dashboard", "description": "백엔드가 계산한 보안, 수집, 토폴로지 요약과 대시보드 레이아웃을 제공합니다."},
+    {"name": "Operations", "description": "의존 서비스, 파이프라인 워커와 실패 이벤트의 운영 상태를 제공합니다."},
+    {"name": "Intelligence", "description": "DNS 조회와 IP·Domain·이벤트 간 상관분석 기능을 제공합니다."},
+    {"name": "Collector", "description": "mTLS로 인증된 Agent 등록, heartbeat, 텔레메트리 수집 기능입니다."},
 ]
 
 ERROR_DESCRIPTIONS = {
-    400: "Request validation failed.",
-    401: "Authentication failed.",
-    403: "The authenticated identity is not permitted to perform this operation.",
-    404: "The requested resource was not found.",
-    409: "The request conflicts with the current resource, identity, or Archive state.",
-    413: "The request body or event count exceeds the documented limit.",
-    429: "The request exceeded the configured rate limit.",
-    503: "A required dependency is temporarily unavailable.",
+    400: "요청 형식 또는 입력값 검증에 실패했습니다.",
+    401: "인증에 실패했거나 유효한 인증 정보가 없습니다.",
+    403: "인증된 주체에게 이 작업을 수행할 권한이 없습니다.",
+    404: "요청한 리소스를 찾을 수 없습니다.",
+    409: "현재 리소스, 인증 주체 또는 Archive 상태와 요청이 충돌합니다.",
+    413: "요청 본문 크기 또는 이벤트 수가 허용 한도를 초과했습니다.",
+    429: "설정된 요청 속도 제한을 초과했습니다.",
+    503: "필수 의존 서비스를 일시적으로 사용할 수 없습니다.",
 }
 
 BEARER = HTTPBearer(
     auto_error=False,
     scheme_name="BearerJWT",
-    description="JWT access token returned by POST /api/v1/auth/login.",
+    description="POST /api/v1/auth/login에서 발급받은 JWT 액세스 토큰을 입력합니다.",
 )
 LOGGER = logging.getLogger(__name__)
 INFRASTRUCTURE_EXCEPTIONS = (psycopg.Error, ClickHouseError, BotoCoreError, KafkaException, pyarrow.ArrowException)
@@ -142,7 +142,11 @@ def current_user(
 
 def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
     app = FastAPI(
-        title="EDR_C",
+        title="EDR_C API",
+        description=(
+            "EDR_C 대시보드와 수집 Agent가 사용하는 API입니다. "
+            "대시보드 API는 Bearer JWT, Collector API는 mTLS 클라이언트 인증서를 사용합니다."
+        ),
         version="0.1.0",
         docs_url="/docs",
         openapi_url="/openapi.json",
@@ -208,6 +212,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/auth/login",
         response_model=SuccessEnvelope[LoginData],
         operation_id="authLogin",
+        summary="대시보드 로그인",
+        description="로그인 ID와 비밀번호를 검증하고 대시보드 API 호출에 사용할 Bearer JWT를 발급합니다.",
         tags=["Auth"],
         responses=_error_responses(400, 401, 403, 429, 503),
     )
@@ -251,6 +257,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/users/me",
         response_model=SuccessEnvelope[UserDto],
         operation_id="usersMeGet",
+        summary="내 사용자 정보 조회",
+        description="현재 Bearer JWT에 연결된 활성 사용자의 프로필, 권한, 언어 설정을 조회합니다.",
         tags=["Users"],
         responses=_error_responses(401, 503),
     )
@@ -269,6 +277,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/users/me/locale",
         response_model=SuccessEnvelope[UserDto],
         operation_id="usersLocaleUpdate",
+        summary="내 언어 설정 변경",
+        description="현재 사용자의 대시보드 표시 언어를 변경하고 갱신된 사용자 정보를 반환합니다.",
         tags=["Users"],
         responses=_error_responses(400, 401, 503),
     )
@@ -293,6 +303,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/endpoints",
         response_model=SuccessEnvelope[PagedData[EndpointDto]],
         operation_id="endpointsList",
+        summary="엔드포인트 목록 조회",
+        description="검색, 상태, 운영체제, 위험도 조건을 적용해 엔드포인트 목록을 페이지 단위로 조회합니다.",
         tags=["Endpoints"],
         responses=_error_responses(400, 401, 503),
     )
@@ -311,11 +323,13 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/endpoints/{endpointId}",
         response_model=SuccessEnvelope[EndpointDetailDto],
         operation_id="endpointsGet",
+        summary="엔드포인트 상세 조회",
+        description="엔드포인트 기본 정보, 센서 상태, 최근 활동과 백엔드 산정 위험도를 조회합니다.",
         tags=["Endpoints"],
         responses=_error_responses(400, 401, 404, 503),
     )
     def endpoint_detail(
-        endpointId: int,
+        endpointId: Annotated[int, Path(description="조회할 엔드포인트 ID입니다.")],
         request: Request,
         _user: Annotated[AuthenticatedUser, Depends(current_user)],
     ) -> SuccessEnvelope[EndpointDetailDto]:
@@ -328,11 +342,13 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/endpoints/{endpointId}/process-tree",
         response_model=SuccessEnvelope[ProcessTreeDto],
         operation_id="endpointsGetProcessTree",
+        summary="엔드포인트 프로세스 트리 조회",
+        description="지정한 시간 범위에서 수집된 프로세스 실행 이벤트를 부모·자식 트리로 구성해 반환합니다.",
         tags=["Endpoints"],
         responses=_error_responses(400, 401, 503),
     )
     def endpoint_process_tree(
-        endpointId: int,
+        endpointId: Annotated[int, Path(description="프로세스 트리를 조회할 엔드포인트 ID입니다.")],
         request: Request,
         query: Annotated[ProcessTreeQuery, Query()],
         _user: Annotated[AuthenticatedUser, Depends(current_user)],
@@ -352,6 +368,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/events",
         response_model=SuccessEnvelope[PagedData[EventDto]],
         operation_id="eventsList",
+        summary="이벤트 목록 조회",
+        description="HOT 또는 복원된 저장소에서 시간, 엔드포인트, 이벤트 유형 조건으로 이벤트 증거를 조회합니다.",
         tags=["Events"],
         responses=_error_responses(400, 401, 409, 503),
     )
@@ -370,11 +388,13 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/events/{eventId}",
         response_model=SuccessEnvelope[EventDetailDto],
         operation_id="eventsGet",
+        summary="이벤트 상세 조회",
+        description="이벤트 ID와 저장 위치 식별 조건을 사용해 단일 이벤트의 상세 증거를 조회합니다.",
         tags=["Events"],
         responses=_error_responses(400, 401, 404, 409, 503),
     )
     def event_detail(
-        eventId: UUID,
+        eventId: Annotated[UUID, Path(description="조회할 이벤트 UUID입니다.")],
         request: Request,
         query: Annotated[EventDetailQuery, Query()],
         _user: Annotated[AuthenticatedUser, Depends(current_user)],
@@ -392,6 +412,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/failures",
         response_model=SuccessEnvelope[PagedData[EventFailureDto]],
         operation_id="failuresList",
+        summary="파이프라인 실패 목록 조회",
+        description="수집, 검증, 저장 단계에서 발생한 실패 이벤트와 재처리 상태를 페이지 단위로 조회합니다.",
         tags=["Operations"],
         responses=_error_responses(400, 401, 503),
     )
@@ -409,9 +431,11 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/archives/restores",
         response_model=SuccessEnvelope[ArchiveRestoreStartDto],
         operation_id="archiveRestoresStart",
+        summary="아카이브 복원 시작",
+        description="선택한 엔드포인트와 시간 범위의 아카이브 데이터를 조회 가능한 RESTORED 영역으로 복원 요청합니다.",
         tags=["Archives"],
         responses={
-            202: {"model": SuccessEnvelope[ArchiveRestoreStartDto], "description": "Restore accepted."},
+            202: {"model": SuccessEnvelope[ArchiveRestoreStartDto], "description": "복원 요청을 접수했습니다."},
             **_error_responses(400, 401, 403, 503),
         },
     )
@@ -439,6 +463,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/archives/restores",
         response_model=SuccessEnvelope[PagedData[ArchiveBucketDto]],
         operation_id="archiveRestoresList",
+        summary="아카이브 복원 목록 조회",
+        description="엔드포인트와 시간 범위에 해당하는 아카이브 버킷의 복원 상태를 페이지 단위로 조회합니다.",
         tags=["Archives"],
         responses=_error_responses(400, 401, 503),
     )
@@ -470,6 +496,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/alerts",
         response_model=SuccessEnvelope[PagedData[AlertDto]],
         operation_id="alertsList",
+        summary="Alert 목록 조회",
+        description="탐지 시각, 심각도, 상태, 엔드포인트 조건으로 Alert 목록을 페이지 단위로 조회합니다.",
         tags=["Alerts"],
         responses=_error_responses(400, 401, 503),
     )
@@ -488,11 +516,13 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/alerts/{alertId}",
         response_model=SuccessEnvelope[AlertDetailDto],
         operation_id="alertsGet",
+        summary="Alert 상세 조회",
+        description="Alert의 탐지 규칙, 관련 이벤트, MITRE ATT&CK 정보와 대응 지침을 조회합니다.",
         tags=["Alerts"],
         responses=_error_responses(400, 401, 404, 503),
     )
     def alert_detail(
-        alertId: int,
+        alertId: Annotated[int, Path(description="조회할 Alert ID입니다.")],
         request: Request,
         _user: Annotated[AuthenticatedUser, Depends(current_user)],
     ) -> SuccessEnvelope[AlertDetailDto]:
@@ -505,11 +535,13 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/alerts/{alertId}/status",
         response_model=SuccessEnvelope[AlertDto],
         operation_id="alertsUpdateStatus",
+        summary="Alert 상태 변경",
+        description="쓰기 권한이 있는 사용자가 Alert 처리 상태를 변경합니다. 변경 내용은 감사 정보와 함께 기록됩니다.",
         tags=["Alerts"],
         responses=_error_responses(400, 401, 403, 404, 503),
     )
     def alert_status(
-        alertId: int,
+        alertId: Annotated[int, Path(description="상태를 변경할 Alert ID입니다.")],
         request: Request,
         body: AlertStatusUpdateRequest,
         user: Annotated[AuthenticatedUser, Depends(current_user)],
@@ -530,6 +562,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/incidents",
         response_model=SuccessEnvelope[PagedData[IncidentDto]],
         operation_id="incidentsList",
+        summary="Incident 목록 조회",
+        description="상관분석으로 생성된 Incident를 시간, 심각도, 상태 조건으로 페이지 단위 조회합니다.",
         tags=["Incidents"],
         responses=_error_responses(400, 401, 503),
     )
@@ -548,11 +582,13 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/incidents/{incidentId}",
         response_model=SuccessEnvelope[IncidentDetailDto],
         operation_id="incidentsGet",
+        summary="Incident 상세 조회",
+        description="Incident 기본 정보, 위험도, 관련 엔드포인트와 연결된 Alert를 조회합니다.",
         tags=["Incidents"],
         responses=_error_responses(400, 401, 404, 503),
     )
     def incident_detail(
-        incidentId: int,
+        incidentId: Annotated[int, Path(description="조회할 Incident ID입니다.")],
         request: Request,
         _user: Annotated[AuthenticatedUser, Depends(current_user)],
     ) -> SuccessEnvelope[IncidentDetailDto]:
@@ -565,11 +601,13 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/incidents/{incidentId}/timeline",
         response_model=SuccessEnvelope[AttackTimelineDto],
         operation_id="incidentsGetTimeline",
+        summary="Incident 공격 타임라인 조회",
+        description="Incident에 연결된 이벤트와 Alert를 시간순 공격 타임라인으로 구성해 반환합니다.",
         tags=["Incidents"],
         responses=_error_responses(400, 401, 404, 503),
     )
     def incident_timeline(
-        incidentId: int,
+        incidentId: Annotated[int, Path(description="타임라인을 조회할 Incident ID입니다.")],
         request: Request,
         _user: Annotated[AuthenticatedUser, Depends(current_user)],
     ) -> SuccessEnvelope[AttackTimelineDto]:
@@ -582,11 +620,13 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/incidents/{incidentId}/investigation",
         response_model=SuccessEnvelope[IncidentInvestigationDto],
         operation_id="incidentsGetInvestigation",
+        summary="Incident 조사 그래프 조회",
+        description="Incident의 이벤트, Alert, 엔드포인트와 관찰값을 조사 그래프의 노드와 관계로 반환합니다.",
         tags=["Incidents"],
         responses=_error_responses(400, 401, 404, 503),
     )
     def incident_investigation(
-        incidentId: int,
+        incidentId: Annotated[int, Path(description="조사 그래프를 조회할 Incident ID입니다.")],
         request: Request,
         _user: Annotated[AuthenticatedUser, Depends(current_user)],
     ) -> SuccessEnvelope[IncidentInvestigationDto]:
@@ -599,6 +639,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/dashboard/summary",
         response_model=SuccessEnvelope[DashboardSummaryDto],
         operation_id="dashboardGetSummary",
+        summary="통합 대시보드 요약 조회",
+        description="선택한 시간 범위의 이벤트, Alert, Incident, 엔드포인트와 저장소 지표를 집계해 반환합니다.",
         tags=["Dashboard"],
         responses=_error_responses(400, 401, 503),
     )
@@ -624,6 +666,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/dashboard/endpoints/summary",
         response_model=SuccessEnvelope[EndpointSummaryDto],
         operation_id="dashboardGetEndpointSummary",
+        summary="엔드포인트 현황 요약 조회",
+        description="엔드포인트 상태, 센서 상태, 위험도 분포와 관련 Alert·Incident 지표를 집계합니다.",
         tags=["Dashboard"],
         responses=_error_responses(400, 401, 503),
     )
@@ -645,6 +689,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/dashboard/ingest/summary",
         response_model=SuccessEnvelope[IngestSummaryDto],
         operation_id="dashboardGetIngestSummary",
+        summary="수집 파이프라인 요약 조회",
+        description="선택한 시간 범위의 수집 이벤트, 저장 상태와 실패 현황을 집계해 반환합니다.",
         tags=["Dashboard"],
         responses=_error_responses(400, 401, 503),
     )
@@ -665,12 +711,14 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/dashboard/layouts/{dashboardKey}",
         response_model=SuccessEnvelope[DashboardLayoutDto],
         operation_id="dashboardLayoutsGet",
+        summary="대시보드 레이아웃 조회",
+        description="현재 사용자가 저장한 대시보드별 위젯 배치와 버전 정보를 조회합니다.",
         tags=["Dashboard"],
         responses=_error_responses(401, 404, 503),
     )
     def dashboard_layout_get(
         request: Request,
-        dashboardKey: str,
+        dashboardKey: Annotated[str, Path(description="대시보드를 구분하는 안정적인 키입니다.")],
         user: Annotated[AuthenticatedUser, Depends(current_user)],
     ) -> SuccessEnvelope[DashboardLayoutDto]:
         runtime = _runtime(request)
@@ -684,12 +732,14 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/dashboard/layouts/{dashboardKey}",
         response_model=SuccessEnvelope[DashboardLayoutDto],
         operation_id="dashboardLayoutsPut",
+        summary="대시보드 레이아웃 저장",
+        description="현재 사용자의 대시보드 위젯 배치를 생성하거나 기존 버전을 갱신합니다.",
         tags=["Dashboard"],
         responses=_error_responses(400, 401, 404, 409, 503),
     )
     def dashboard_layout_put(
         request: Request,
-        dashboardKey: str,
+        dashboardKey: Annotated[str, Path(description="대시보드를 구분하는 안정적인 키입니다.")],
         body: DashboardLayoutPutRequest,
         user: Annotated[AuthenticatedUser, Depends(current_user)],
     ) -> SuccessEnvelope[DashboardLayoutDto]:
@@ -707,12 +757,14 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/dashboard/layouts/{dashboardKey}",
         response_model=SuccessEnvelope[DashboardLayoutDto],
         operation_id="dashboardLayoutsDelete",
+        summary="대시보드 레이아웃 초기화",
+        description="현재 사용자의 저장된 대시보드 레이아웃을 삭제하고 기본 레이아웃 정보를 반환합니다.",
         tags=["Dashboard"],
         responses=_error_responses(401, 404, 503),
     )
     def dashboard_layout_delete(
         request: Request,
-        dashboardKey: str,
+        dashboardKey: Annotated[str, Path(description="대시보드를 구분하는 안정적인 키입니다.")],
         user: Annotated[AuthenticatedUser, Depends(current_user)],
     ) -> SuccessEnvelope[DashboardLayoutDto]:
         runtime = _runtime(request)
@@ -726,6 +778,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/dashboard/topology",
         response_model=SuccessEnvelope[EgressTopologyDto],
         operation_id="dashboardGetTopology",
+        summary="외부 통신 토폴로지 조회",
+        description="선택한 시간 범위의 엔드포인트와 외부 IP·Domain 통신 관계를 토폴로지로 집계합니다.",
         tags=["Dashboard"],
         responses=_error_responses(400, 401, 503),
     )
@@ -750,6 +804,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/operations/health",
         response_model=SuccessEnvelope[OperationsHealthDto],
         operation_id="operationsGetHealth",
+        summary="운영 구성요소 상태 조회",
+        description="PostgreSQL, ClickHouse, Kafka, S3와 파이프라인 워커의 현재 상태를 점검해 반환합니다.",
         tags=["Operations"],
         responses=_error_responses(401),
     )
@@ -764,6 +820,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/intelligence/forward-dns",
         response_model=SuccessEnvelope[ForwardDnsDto],
         operation_id="intelligenceForwardDns",
+        summary="정방향 DNS 조회",
+        description="Domain 이름을 DNS로 조회해 확인된 IP 주소와 조회 메타데이터를 반환합니다.",
         tags=["Intelligence"],
         responses=_error_responses(400, 401, 404, 503),
     )
@@ -779,6 +837,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/intelligence/reverse-dns",
         response_model=SuccessEnvelope[ReverseDnsDto],
         operation_id="intelligenceReverseDns",
+        summary="역방향 DNS 조회",
+        description="IP 주소의 PTR 레코드를 조회해 연결된 Domain 이름을 반환합니다.",
         tags=["Intelligence"],
         responses=_error_responses(400, 401, 404, 503),
     )
@@ -794,6 +854,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/intelligence/dns-lookup",
         response_model=SuccessEnvelope[DnsLookupDto],
         operation_id="intelligenceDnsLookup",
+        summary="DNS 레코드 조회",
+        description="질의값과 레코드 유형을 지정해 DNS 응답, TTL과 조회 메타데이터를 반환합니다.",
         tags=["Intelligence"],
         responses=_error_responses(400, 401, 404, 503),
     )
@@ -809,6 +871,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/intelligence/correlate",
         response_model=SuccessEnvelope[CorrelationDto],
         operation_id="intelligenceCorrelate",
+        summary="관찰값 상관분석",
+        description="IP 또는 Domain 관찰값을 선택한 시간 범위의 이벤트·엔드포인트와 연결해 반환합니다.",
         tags=["Intelligence"],
         responses=_error_responses(400, 401, 503),
     )
@@ -828,9 +892,11 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/collector/agents/register",
         response_model=SuccessEnvelope[AgentRegisterData],
         operation_id="collectorRegisterAgent",
+        summary="Agent 등록",
+        description="mTLS 인증서의 Agent 식별자와 요청 본문을 검증해 Agent를 등록하거나 기존 정보를 갱신합니다.",
         tags=["Collector"],
         responses={
-            201: {"model": SuccessEnvelope[AgentRegisterData], "description": "Agent created."},
+            201: {"model": SuccessEnvelope[AgentRegisterData], "description": "새 Agent를 등록했습니다."},
             **_error_responses(400, 401, 403, 409, 503),
         },
     )
@@ -849,6 +915,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/collector/agents/heartbeat",
         response_model=SuccessEnvelope[AgentHeartbeatData],
         operation_id="collectorHeartbeatAgent",
+        summary="Agent heartbeat 수신",
+        description="mTLS로 인증된 Agent의 센서 상태, 정책 버전과 최근 활동 시각을 갱신합니다.",
         tags=["Collector"],
         responses=_error_responses(400, 401, 403, 503),
     )
@@ -864,6 +932,8 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         "/api/v1/collector/telemetry/batches",
         response_model=SuccessEnvelope[TelemetryBatchData],
         operation_id="collectorIngestTelemetryBatch",
+        summary="텔레메트리 배치 수집",
+        description="mTLS로 인증된 Agent가 보낸 이벤트 배치를 검증하고 Kafka 수집 파이프라인에 전달합니다.",
         tags=["Collector"],
         responses=_error_responses(400, 401, 403, 413, 503),
         openapi_extra={
@@ -907,7 +977,7 @@ def _openapi_schema(app: FastAPI) -> dict[str, object]:
     security_schemes = components.setdefault("securitySchemes", {})
     security_schemes["mutualTLS"] = {
         "type": "mutualTLS",
-        "description": "Agent certificate validated by the Collector Nginx mTLS boundary.",
+        "description": "Collector Nginx mTLS 경계에서 검증된 Agent 클라이언트 인증서를 사용합니다.",
     }
 
     telemetry_schema = TelemetryBatchRequest.model_json_schema(
@@ -925,6 +995,9 @@ def _openapi_schema(app: FastAPI) -> dict[str, object]:
             if not isinstance(operation, dict) or "responses" not in operation:
                 continue
             operation["responses"].pop("422", None)
+            success_response = operation["responses"].get("200")
+            if isinstance(success_response, dict) and success_response.get("description") == "Successful Response":
+                success_response["description"] = "요청을 성공적으로 처리했습니다."
             if path.startswith("/api/v1/collector/"):
                 operation["security"] = [{"mutualTLS": []}]
     schema["paths"]["/api/v1/auth/login"]["post"].pop("security", None)

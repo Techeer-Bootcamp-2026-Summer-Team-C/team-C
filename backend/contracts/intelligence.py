@@ -7,7 +7,7 @@ from .enums import DnsRecordType
 
 
 class ForwardDnsQuery(ContractModel):
-    domain: str
+    domain: str = Field(description="정방향 조회할 Domain 이름입니다.", examples=["example.com"])
 
 
 class ForwardDnsDto(ContractModel):
@@ -16,7 +16,7 @@ class ForwardDnsDto(ContractModel):
 
 
 class ReverseDnsQuery(ContractModel):
-    ip: str
+    ip: str = Field(description="역방향 조회할 IPv4 또는 IPv6 주소입니다.", examples=["8.8.8.8"])
 
 
 class ReverseDnsDto(ContractModel):
@@ -25,8 +25,8 @@ class ReverseDnsDto(ContractModel):
 
 
 class DnsLookupQuery(ContractModel):
-    query: str
-    record_type: DnsRecordType
+    query: str = Field(description="조회할 Domain 또는 IP 주소입니다.", examples=["example.com"])
+    record_type: DnsRecordType = Field(description="조회할 DNS 레코드 유형입니다.", examples=["A"])
 
 
 class DnsLookupDto(ContractModel):
