@@ -36,10 +36,14 @@ class CapturingRestoreClient:
 
 
 def _settings() -> Settings:
+    clickhouse_host = os.getenv("TEST_CLICKHOUSE_HOST", "127.0.0.1")
+    clickhouse_port = int(os.getenv("TEST_CLICKHOUSE_PORT", "58123"))
     return Settings(
         jwt_secret="dashboard-integration-jwt-secret-32-bytes-minimum",
         postgres_dsn=os.environ["TEST_POSTGRES_DSN"],
-        clickhouse_dsn=(f"http://edr:{os.environ['TEST_CLICKHOUSE_PASSWORD']}@127.0.0.1:58123/edr"),
+        clickhouse_dsn=(
+            f"http://edr:{os.environ['TEST_CLICKHOUSE_PASSWORD']}@{clickhouse_host}:{clickhouse_port}/edr"
+        ),
         kafka_bootstrap_servers=os.getenv("TEST_KAFKA_BOOTSTRAP", "127.0.0.1:59092"),
         s3_endpoint_url=os.getenv("TEST_S3_ENDPOINT", "http://127.0.0.1:59000"),
         s3_access_key_id=os.getenv("TEST_S3_ACCESS_KEY", "edr-local"),
@@ -83,8 +87,8 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
     settings = _settings()
     postgres_dsn = settings.postgres_dsn.get_secret_value()
     clickhouse = clickhouse_connect.get_client(
-        host="127.0.0.1",
-        port=58123,
+        host=os.getenv("TEST_CLICKHOUSE_HOST", "127.0.0.1"),
+        port=int(os.getenv("TEST_CLICKHOUSE_PORT", "58123")),
         username="edr",
         password=os.environ["TEST_CLICKHOUSE_PASSWORD"],
         database="edr",

@@ -31,10 +31,13 @@ def test_boto3_aws_mode_uses_region_without_endpoint_or_explicit_credentials(mon
     monkeypatch.setattr(runtime_module.boto3, "client", fake_client)
 
     assert create_s3_client(settings()) is sentinel
+    config = captured["options"].pop("config")
     assert captured == {
         "service": "s3",
         "options": {"region_name": "ap-northeast-2"},
     }
+    assert config.connect_timeout == 5
+    assert config.read_timeout == 10
 
 
 def test_boto3_minio_mode_passes_endpoint_region_and_explicit_credentials(monkeypatch) -> None:
@@ -55,6 +58,7 @@ def test_boto3_minio_mode_passes_endpoint_region_and_explicit_credentials(monkey
         )
     )
 
+    config = captured["options"].pop("config")
     assert captured == {
         "service": "s3",
         "options": {
@@ -64,6 +68,8 @@ def test_boto3_minio_mode_passes_endpoint_region_and_explicit_credentials(monkey
             "aws_secret_access_key": "minio-secret",
         },
     }
+    assert config.connect_timeout == 5
+    assert config.read_timeout == 10
 
 
 def test_pyarrow_aws_mode_uses_region_without_endpoint_or_explicit_credentials(monkeypatch) -> None:
@@ -83,7 +89,7 @@ def test_pyarrow_aws_mode_uses_region_without_endpoint_or_explicit_credentials(m
         bucket="bucket",
     )
 
-    assert captured == {"region": "ap-northeast-2"}
+    assert captured == {"region": "ap-northeast-2", "connect_timeout": 5, "request_timeout": 10}
 
 
 def test_pyarrow_minio_mode_passes_endpoint_and_explicit_credentials(monkeypatch) -> None:
@@ -109,4 +115,6 @@ def test_pyarrow_minio_mode_passes_endpoint_and_explicit_credentials(monkeypatch
         "scheme": "http",
         "access_key": "minio-access",
         "secret_key": "minio-secret",
+        "connect_timeout": 5,
+        "request_timeout": 10,
     }

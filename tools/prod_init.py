@@ -1,3 +1,4 @@
+import hashlib
 import sys
 import time
 from collections.abc import Callable
@@ -14,6 +15,14 @@ from backend.settings import Settings, get_settings
 from backend.storage.migrations import apply_clickhouse_file, apply_postgres_file
 
 ROOT = Path(__file__).parents[1]
+POSTGRES_BASELINE_MIGRATIONS = {
+    "0001_initial.up.sql",
+    "0002_user_login_id.up.sql",
+    "0003_user_locale.up.sql",
+    "0004_user_dashboard_layouts.up.sql",
+    "0005_query_search_sort_indexes.up.sql",
+    "0006_backend_hardening.up.sql",
+}
 
 
 def retry_dependency[T](
@@ -105,6 +114,7 @@ def initialize_postgres(settings: Settings) -> None:
             apply_postgres_file(connection, ROOT / "migrations/postgresql/0004_user_dashboard_layouts.up.sql")
 
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0005_query_search_sort_indexes.up.sql")
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0006_backend_hardening.up.sql")
 
         login_id_length = connection.execute(
             """
@@ -115,6 +125,55 @@ def initialize_postgres(settings: Settings) -> None:
         ).fetchone()[0]
         if login_id_length != 64:
             connection.execute("ALTER TABLE users ALTER COLUMN login_id TYPE VARCHAR(64)")
+        _apply_versioned_postgres_migrations(connection)
+
+
+def _apply_versioned_postgres_migrations(connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            migration_name TEXT PRIMARY KEY,
+            checksum_sha256 CHAR(64) NOT NULL,
+            applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    connection.commit()
+    migration_paths = sorted((ROOT / "migrations/postgresql").glob("*.up.sql"))
+    applied = {
+        str(row[0]): str(row[1])
+        for row in connection.execute(
+            "SELECT migration_name, checksum_sha256 FROM schema_migrations"
+        ).fetchall()
+    }
+    if not applied:
+        for path in migration_paths:
+            if path.name in POSTGRES_BASELINE_MIGRATIONS:
+                checksum = hashlib.sha256(path.read_bytes()).hexdigest()
+                connection.execute(
+                    "INSERT INTO schema_migrations (migration_name, checksum_sha256) VALUES (%s, %s)",
+                    (path.name, checksum),
+                )
+        connection.commit()
+        applied = {
+            str(row[0]): str(row[1])
+            for row in connection.execute(
+                "SELECT migration_name, checksum_sha256 FROM schema_migrations"
+            ).fetchall()
+        }
+    for path in migration_paths:
+        checksum = hashlib.sha256(path.read_bytes()).hexdigest()
+        recorded = applied.get(path.name)
+        if recorded is not None:
+            if recorded != checksum:
+                raise RuntimeError(f"PostgreSQL migration checksum drift: {path.name}")
+            continue
+        apply_postgres_file(connection, path)
+        connection.execute(
+            "INSERT INTO schema_migrations (migration_name, checksum_sha256) VALUES (%s, %s)",
+            (path.name, checksum),
+        )
+        connection.commit()
 
 
 def initialize_clickhouse(settings: Settings) -> None:
@@ -123,7 +182,8 @@ def initialize_clickhouse(settings: Settings) -> None:
         autogenerate_session_id=False,
     )
     try:
-        apply_clickhouse_file(client, ROOT / "migrations/clickhouse/0001_initial.up.sql")
+        for path in sorted((ROOT / "migrations/clickhouse").glob("*.up.sql")):
+            apply_clickhouse_file(client, path)
     finally:
         client.close()
 

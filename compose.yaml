@@ -28,6 +28,10 @@ x-app-service: &app-service
   networks:
     - data
   restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
 
 services:
   postgres:
@@ -177,6 +181,13 @@ services:
   detection-worker:
     <<: *app-service
     command: ["python", "-m", "tools.run_detection_worker"]
+    depends_on:
+      app-init:
+        condition: service_completed_successfully
+
+  storage-lifecycle-worker:
+    <<: *app-service
+    command: ["python", "-m", "tools.run_storage_lifecycle_worker"]
     depends_on:
       app-init:
         condition: service_completed_successfully

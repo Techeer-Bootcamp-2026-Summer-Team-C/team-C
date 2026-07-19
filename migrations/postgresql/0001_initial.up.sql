@@ -89,6 +89,7 @@ CREATE TABLE ingest_metadata (
     restored_at TIMESTAMPTZ NULL,
     restore_expires_at TIMESTAMPTZ NULL,
     last_error TEXT NULL,
+    partition_deleted_at TIMESTAMPTZ NULL,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
     is_delete BOOLEAN NOT NULL DEFAULT FALSE,
@@ -105,6 +106,14 @@ CREATE TABLE ingest_metadata (
 CREATE INDEX idx_ingest_metadata_overlap
     ON ingest_metadata (endpoint_id, bucket_start_at, bucket_end_at)
     WHERE is_delete = FALSE;
+
+CREATE INDEX idx_ingest_metadata_restore_pending
+    ON ingest_metadata (restore_requested_at, endpoint_id, bucket_start_at)
+    WHERE is_delete = FALSE AND storage_status = 'RESTORE_REQUESTED';
+
+CREATE INDEX idx_ingest_metadata_archive_candidates
+    ON ingest_metadata (bucket_end_at, endpoint_id, bucket_start_at)
+    WHERE is_delete = FALSE AND storage_backend = 'CLICKHOUSE' AND storage_class = 'HOT';
 
 CREATE TABLE alerts (
     alert_id BIGSERIAL PRIMARY KEY,
@@ -159,6 +168,8 @@ CREATE TABLE incidents (
 
 CREATE INDEX idx_incidents_endpoint_last_detected
     ON incidents (endpoint_id, last_detected_at DESC) WHERE is_delete = FALSE;
+CREATE INDEX idx_incidents_last_detected
+    ON incidents (last_detected_at DESC, incident_id ASC) WHERE is_delete = FALSE;
 CREATE INDEX idx_incidents_open_window
     ON incidents (window_end_at) WHERE is_delete = FALSE AND status = 'OPEN';
 

@@ -57,6 +57,8 @@ from .rule_loader import LoadedRule
 from .storage.clickhouse import DASHBOARD_TOP_LIMIT, EventRepository, FailureRepository
 from .storage.postgres import AlertRepository, EndpointRepository, IncidentRepository, IngestMetadataRepository
 
+MAX_SUMMARY_ENDPOINTS = 10_000
+
 
 class SummaryService:
     def __init__(
@@ -98,56 +100,73 @@ class SummaryService:
         if ceil((to - from_).total_seconds() / seconds) > 2000:
             raise ApplicationError(400, "VALIDATION_ERROR", "Dashboard interval exceeds 2,000 points.")
         endpoint_items = self._endpoint_items(calculated_at, endpoint_id=endpoint_id)
-        alert_rows = self.alerts.list_rows(from_=from_, to=to, endpoint_id=endpoint_id)
-        incident_rows = self.incidents.list_rows(from_=from_, to=to, endpoint_id=endpoint_id)
+        alert_summary = self._alert_summary(
+            from_=from_, to=to, endpoint_id=endpoint_id, interval_seconds=seconds
+        )
+        incident_summary = self._incident_summary(
+            from_=from_, to=to, endpoint_id=endpoint_id, interval_seconds=seconds
+        )
         event_summary = self.event_service.dashboard_summary(
             from_=from_,
             to=to,
             interval_seconds=seconds,
             endpoint_id=endpoint_id,
         )
-        failure_rows = self.failures.current_rows(from_=from_, to=to, endpoint_id=endpoint_id)
-        storage_rows = _filter_endpoint_rows(self.metadata.all_current(), endpoint_id)
+        failure_summary = self._failure_summary(from_=from_, to=to, endpoint_id=endpoint_id)
+        storage_summary = self._storage_summary(endpoint_id=endpoint_id)
         edr_state = self._edr_state(endpoint_items, calculated_at=calculated_at, endpoint_id=endpoint_id)
-
-        alert_time = Counter(_bucket(row["detected_at"], seconds) for row in alert_rows)
         incident_time: dict[datetime, Counter[str]] = {}
-        for row in incident_rows:
-            incident_time.setdefault(_bucket(row["last_detected_at"], seconds), Counter())[str(row["status"])] += 1
+        for row in incident_summary["time_series"]:
+            incident_time.setdefault(_aware(row["bucket_start_at"]), Counter())[str(row["status"])] += int(
+                row["count"]
+            )
         return DashboardSummaryDto(
             time_range=TimeRangeDto(from_=from_, to=to),
             interval=interval,
             edr_state=edr_state,
             alerts=DashboardAlertsDto(
-                total_count=len(alert_rows),
-                by_severity=_enum_counts(alert_rows, "severity", Severity, SeverityCountDto, "severity"),
-                by_status=_enum_counts(alert_rows, "status", AlertStatus, AlertStatusCountDto, "status"),
+                total_count=alert_summary["total"],
+                by_severity=_enum_count_map(
+                    alert_summary["by_severity"], Severity, SeverityCountDto, "severity"
+                ),
+                by_status=_enum_count_map(
+                    alert_summary["by_status"], AlertStatus, AlertStatusCountDto, "status"
+                ),
                 top_rules=[
-                    TopRuleDto(rule_code=code, rule_name=name, count=count)
-                    for (code, name), count in _rank(
-                        Counter((row["rule_code"], row["rule_name"]) for row in alert_rows)
+                    TopRuleDto(
+                        rule_code=row["rule_code"],
+                        rule_name=row["rule_name"],
+                        count=row["event_count"],
                     )
+                    for row in alert_summary["top_rules"]
                 ],
                 mitre_tactics=[
-                    MitreTacticCountDto(mitre_tactic_code=code, mitre_tactic_name=name, count=count)
-                    for (code, name), count in _rank(
-                        Counter((row["mitre_tactic_code"], row["mitre_tactic_name"]) for row in alert_rows)
+                    MitreTacticCountDto(
+                        mitre_tactic_code=row["mitre_tactic_code"],
+                        mitre_tactic_name=row["mitre_tactic_name"],
+                        count=row["event_count"],
                     )
+                    for row in alert_summary["mitre_tactics"]
                 ],
                 mitre_techniques=[
-                    MitreTechniqueCountDto(mitre_technique_code=code, mitre_technique_name=name, count=count)
-                    for (code, name), count in _rank(
-                        Counter((row["mitre_technique_code"], row["mitre_technique_name"]) for row in alert_rows)
+                    MitreTechniqueCountDto(
+                        mitre_technique_code=row["mitre_technique_code"],
+                        mitre_technique_name=row["mitre_technique_name"],
+                        count=row["event_count"],
                     )
+                    for row in alert_summary["mitre_techniques"]
                 ],
                 time_series=[
-                    TimeSeriesPointDto(bucket_start_at=key, count=value) for key, value in sorted(alert_time.items())
+                    TimeSeriesPointDto(bucket_start_at=key, count=value)
+                    for key, value in sorted(alert_summary["time_series"].items())
                 ],
             ),
             incidents=DashboardIncidentsDto(
-                open_count=sum(row["status"] == "OPEN" for row in incident_rows),
-                closed_count=sum(row["status"] == "CLOSED" for row in incident_rows),
-                by_severity=_enum_counts(incident_rows, "severity", Severity, SeverityCountDto, "severity"),
+                open_count=incident_summary["by_status"].get("OPEN", 0),
+                closed_count=incident_summary["by_status"].get("CLOSED", 0),
+                by_severity=_enum_count_map(
+                    incident_summary["by_severity"], Severity, SeverityCountDto, "severity"
+                ),
                 time_series=[
                     IncidentTimeSeriesPointDto(
                         bucket_start_at=key,
@@ -195,24 +214,33 @@ class SummaryService:
                 ],
             ),
             event_failures=DashboardEventFailuresDto(
-                total_count=len(failure_rows),
+                total_count=failure_summary["total"],
                 by_stage=[
                     FailureStageCountDto(failure_stage=value, count=count)
-                    for value, count in _rank_values(row["failure_stage"] for row in failure_rows)
+                    for value, count in _rank(Counter(failure_summary["by_stage"]))
                 ],
                 by_code=[
                     FailureCodeCountDto(failure_code=value, count=count)
-                    for value, count in _rank_nullable(row["failure_code"] for row in failure_rows)
+                    for value, count in _rank(Counter(failure_summary["by_code"]))
                 ],
-                by_status=_enum_counts(failure_rows, "status", EventFailureStatus, FailureStatusCountDto, "status"),
+                by_status=_enum_count_map(
+                    failure_summary["by_status"],
+                    EventFailureStatus,
+                    FailureStatusCountDto,
+                    "status",
+                ),
             ),
             storage=DashboardStorageDto(
-                total_bucket_count=len(storage_rows),
-                by_backend=_string_counts(storage_rows, "storage_backend", StorageBackendCountDto, "storage_backend"),
-                by_class=_string_counts(storage_rows, "storage_class", StorageClassCountDto, "storage_class"),
-                by_status=_string_counts(storage_rows, "storage_status", StorageStatusCountDto, "storage_status"),
+                total_bucket_count=storage_summary["total"],
+                by_backend=_string_count_map(
+                    storage_summary["by_backend"], StorageBackendCountDto, "storage_backend"
+                ),
+                by_class=_string_count_map(storage_summary["by_class"], StorageClassCountDto, "storage_class"),
+                by_status=_string_count_map(
+                    storage_summary["by_status"], StorageStatusCountDto, "storage_status"
+                ),
             ),
-            response_guidance=self._response_guidance(alert_rows),
+            response_guidance=self._response_guidance_summary(alert_summary["active_rules"]),
         )
 
     def endpoint_summary(
@@ -224,8 +252,12 @@ class SummaryService:
         endpoint_id: int | None = None,
     ) -> EndpointSummaryDto:
         endpoint_items = self._endpoint_items(calculated_at, endpoint_id=endpoint_id)
-        alert_rows = self.alerts.list_rows(from_=from_, to=to, endpoint_id=endpoint_id)
-        incident_rows = self.incidents.list_rows(from_=from_, to=to, endpoint_id=endpoint_id)
+        alert_summary = self._alert_summary(
+            from_=from_, to=to, endpoint_id=endpoint_id, interval_seconds=86400
+        )
+        incident_summary = self._incident_summary(
+            from_=from_, to=to, endpoint_id=endpoint_id, interval_seconds=86400
+        )
         summary = summarize_endpoint_risks([item.risk for item in endpoint_items], calculated_at=calculated_at)
         sensor_counter = Counter(
             (item.sensor, item.status) for endpoint in endpoint_items for item in endpoint.sensor_health
@@ -254,14 +286,18 @@ class SummaryService:
                 calculated_at=calculated_at,
             ),
             alerts=EndpointSummaryAlertsDto(
-                total_count=len(alert_rows),
-                by_severity=_enum_counts(alert_rows, "severity", Severity, SeverityCountDto, "severity"),
+                total_count=alert_summary["total"],
+                by_severity=_enum_count_map(
+                    alert_summary["by_severity"], Severity, SeverityCountDto, "severity"
+                ),
             ),
             incidents=EndpointSummaryIncidentsDto(
-                total_count=len(incident_rows),
-                open_count=sum(row["status"] == "OPEN" for row in incident_rows),
-                closed_count=sum(row["status"] == "CLOSED" for row in incident_rows),
-                by_severity=_enum_counts(incident_rows, "severity", Severity, SeverityCountDto, "severity"),
+                total_count=sum(incident_summary["by_status"].values()),
+                open_count=incident_summary["by_status"].get("OPEN", 0),
+                closed_count=incident_summary["by_status"].get("CLOSED", 0),
+                by_severity=_enum_count_map(
+                    incident_summary["by_severity"], Severity, SeverityCountDto, "severity"
+                ),
             ),
         )
 
@@ -275,8 +311,8 @@ class SummaryService:
         event_count, latest_ingested_at = self.events.ingest_summary(
             from_=from_, to=to, endpoint_id=endpoint_id
         )
-        failures = self.failures.current_rows(from_=from_, to=to, endpoint_id=endpoint_id)
-        storage = _filter_endpoint_rows(self.metadata.all_current(), endpoint_id)
+        failures = self._failure_summary(from_=from_, to=to, endpoint_id=endpoint_id)
+        storage = self._storage_summary(endpoint_id=endpoint_id)
         duration_minutes = max((to - from_).total_seconds() / 60, 1 / 60)
         return IngestSummaryDto(
             time_range=TimeRangeDto(from_=from_, to=to),
@@ -286,28 +322,152 @@ class SummaryService:
                 latest_ingested_at=_aware(latest_ingested_at),
             ),
             event_failures=IngestEventFailuresDto(
-                failed_count=sum(row["status"] == "FAILED" for row in failures),
-                rate_per_minute=len(failures) / duration_minutes,
-                reprocessed_count=sum(row["status"] == "REPROCESSED" for row in failures),
-                reprocess_failed_count=sum(row["status"] == "REPROCESS_FAILED" for row in failures),
-                oldest_failed_at=min(
-                    (_aware(row["failed_at"]) for row in failures if row["status"] == "FAILED"),
-                    default=None,
-                ),
+                failed_count=failures["by_status"].get("FAILED", 0),
+                rate_per_minute=failures["total"] / duration_minutes,
+                reprocessed_count=failures["by_status"].get("REPROCESSED", 0),
+                reprocess_failed_count=failures["by_status"].get("REPROCESS_FAILED", 0),
+                oldest_failed_at=_aware(failures["oldest_failed_at"]),
             ),
             storage=IngestStorageDto(
-                clickhouse_hot_bucket_count=_storage_count(storage, "CLICKHOUSE", "HOT"),
-                restored_bucket_count=_storage_count(storage, "S3", "RESTORED"),
-                glacier_archived_bucket_count=_storage_count(storage, "S3", "ARCHIVED"),
-                restoring_bucket_count=_storage_count(storage, "S3", "RESTORE_REQUESTED"),
-                failed_bucket_count=_storage_count(storage, "S3", "RESTORE_FAILED"),
-                expired_bucket_count=_storage_count(storage, "S3", "EXPIRED"),
+                clickhouse_hot_bucket_count=storage["by_status"].get("HOT", 0),
+                restored_bucket_count=storage["by_status"].get("RESTORED", 0),
+                glacier_archived_bucket_count=storage["by_status"].get("ARCHIVED", 0),
+                restoring_bucket_count=storage["by_status"].get("RESTORE_REQUESTED", 0),
+                failed_bucket_count=storage["by_status"].get("RESTORE_FAILED", 0),
+                expired_bucket_count=storage["by_status"].get("EXPIRED", 0),
             ),
         )
 
-    def _response_guidance(self, alert_rows) -> ResponseGuidanceSummaryDto:
-        active = [row for row in alert_rows if str(row["status"]) in {"OPEN", "IN_PROGRESS"}]
-        identities = {(str(row["rule_code"]), int(row["rule_version"])) for row in active}
+    def _alert_summary(
+        self,
+        *,
+        from_: datetime,
+        to: datetime,
+        endpoint_id: int | None,
+        interval_seconds: int,
+    ) -> dict:
+        aggregate = getattr(self.alerts, "summary", None)
+        if callable(aggregate):
+            return aggregate(
+                from_=from_,
+                to=to,
+                endpoint_id=endpoint_id,
+                interval_seconds=interval_seconds,
+            )
+        rows = self.alerts.list_rows(from_=from_, to=to, endpoint_id=endpoint_id)
+        active = [row for row in rows if str(row["status"]) in {"OPEN", "IN_PROGRESS"}]
+        active_rules = Counter(
+            (str(row["rule_code"]), int(row["rule_version"]), str(row["severity"]))
+            for row in active
+        )
+        return {
+            "total": len(rows),
+            "by_severity": dict(Counter(str(row["severity"]) for row in rows)),
+            "by_status": dict(Counter(str(row["status"]) for row in rows)),
+            "top_rules": [
+                {"rule_code": code, "rule_name": name, "event_count": count}
+                for (code, name), count in _rank(
+                    Counter((row["rule_code"], row["rule_name"]) for row in rows)
+                )
+            ],
+            "mitre_tactics": [
+                {
+                    "mitre_tactic_code": code,
+                    "mitre_tactic_name": name,
+                    "event_count": count,
+                }
+                for (code, name), count in _rank(
+                    Counter((row["mitre_tactic_code"], row["mitre_tactic_name"]) for row in rows)
+                )
+            ],
+            "mitre_techniques": [
+                {
+                    "mitre_technique_code": code,
+                    "mitre_technique_name": name,
+                    "event_count": count,
+                }
+                for (code, name), count in _rank(
+                    Counter((row["mitre_technique_code"], row["mitre_technique_name"]) for row in rows)
+                )
+            ],
+            "time_series": dict(Counter(_bucket(row["detected_at"], interval_seconds) for row in rows)),
+            "active_rules": [
+                {
+                    "rule_code": code,
+                    "rule_version": version,
+                    "severity": severity,
+                    "count": count,
+                }
+                for (code, version, severity), count in active_rules.items()
+            ],
+        }
+
+    def _incident_summary(
+        self,
+        *,
+        from_: datetime,
+        to: datetime,
+        endpoint_id: int | None,
+        interval_seconds: int,
+    ) -> dict:
+        aggregate = getattr(self.incidents, "summary", None)
+        if callable(aggregate):
+            return aggregate(
+                from_=from_,
+                to=to,
+                endpoint_id=endpoint_id,
+                interval_seconds=interval_seconds,
+            )
+        rows = self.incidents.list_rows(from_=from_, to=to, endpoint_id=endpoint_id)
+        time_counts = Counter(
+            (_bucket(row["last_detected_at"], interval_seconds), str(row["status"]))
+            for row in rows
+        )
+        return {
+            "by_status": dict(Counter(str(row["status"]) for row in rows)),
+            "by_severity": dict(Counter(str(row["severity"]) for row in rows)),
+            "time_series": [
+                {
+                    "bucket_start_at": bucket,
+                    "status": status,
+                    "count": count,
+                }
+                for (bucket, status), count in time_counts.items()
+            ],
+        }
+
+    def _failure_summary(self, *, from_: datetime, to: datetime, endpoint_id: int | None) -> dict:
+        aggregate = getattr(self.failures, "summary", None)
+        if callable(aggregate):
+            return aggregate(from_=from_, to=to, endpoint_id=endpoint_id)
+        rows = self.failures.current_rows(from_=from_, to=to, endpoint_id=endpoint_id)
+        return {
+            "total": len(rows),
+            "oldest_failed_at": min(
+                (_aware(row["failed_at"]) for row in rows if row["status"] == "FAILED"),
+                default=None,
+            ),
+            "by_stage": dict(
+                Counter(str(row["failure_stage"]) for row in rows if row.get("failure_stage"))
+            ),
+            "by_code": dict(Counter(row.get("failure_code") for row in rows if row.get("failure_code"))),
+            "by_status": dict(Counter(str(row["status"]) for row in rows)),
+        }
+
+    def _storage_summary(self, *, endpoint_id: int | None) -> dict:
+        aggregate = getattr(self.metadata, "summary", None)
+        if callable(aggregate):
+            return aggregate(endpoint_id=endpoint_id)
+        rows = _filter_endpoint_rows(self.metadata.all_current(), endpoint_id)
+        return {
+            "total": len(rows),
+            "by_backend": dict(Counter(str(row["storage_backend"]) for row in rows)),
+            "by_class": dict(Counter(str(row.get("storage_class")) for row in rows if row.get("storage_class"))),
+            "by_status": dict(Counter(str(row["storage_status"]) for row in rows)),
+        }
+
+    def _response_guidance_summary(self, active_rules: list[dict]) -> ResponseGuidanceSummaryDto:
+        identities = {(str(row["rule_code"]), int(row["rule_version"])) for row in active_rules}
         candidates: list[tuple[int, int, object]] = []
         severity_rank = {Severity.LOW: 0, Severity.MEDIUM: 1, Severity.HIGH: 2, Severity.CRITICAL: 3}
         for identity in identities:
@@ -329,9 +489,13 @@ class SummaryService:
             manual_action_count += int(step.requires_manual_action)
             if len(steps) < 8:
                 steps.append(ResponseGuidanceStepDto.model_validate(step.model_dump()))
-        highest = max((Severity(str(row["severity"])) for row in active), key=severity_rank.get, default=None)
+        highest = max(
+            (Severity(str(row["severity"])) for row in active_rules),
+            key=severity_rank.get,
+            default=None,
+        )
         return ResponseGuidanceSummaryDto(
-            affected_alert_count=len(active),
+            affected_alert_count=sum(int(row["count"]) for row in active_rules),
             rule_count=len(identities),
             manual_action_step_count=manual_action_count,
             highest_severity=highest,
@@ -340,6 +504,20 @@ class SummaryService:
 
     def _endpoint_items(self, calculated_at: datetime, *, endpoint_id: int | None = None):
         endpoint_ids = [endpoint_id] if endpoint_id is not None else None
+        risk_page = getattr(self.endpoints, "risk_page", None)
+        if callable(risk_page):
+            rows, total = risk_page(
+                endpoint_ids=endpoint_ids,
+                limit=MAX_SUMMARY_ENDPOINTS + 1,
+                offset=0,
+            )
+            if total > MAX_SUMMARY_ENDPOINTS:
+                raise ApplicationError(
+                    400,
+                    "VALIDATION_ERROR",
+                    f"Endpoint summary exceeds {MAX_SUMMARY_ENDPOINTS} endpoints; select an Endpoint filter.",
+                )
+            return [endpoint_dto(row, calculated_at=calculated_at) for row in rows]
         return [
             endpoint_dto(row, calculated_at=calculated_at)
             for row in self.endpoints.risk_snapshot(endpoint_ids=endpoint_ids)
@@ -355,19 +533,23 @@ class SummaryService:
         risks = [item.risk for item in endpoints]
         risk_summary = summarize_endpoint_risks(risks, calculated_at=calculated_at)
         open_incidents = sum(item.risk.open_incident_count for item in endpoints)
-        critical_alerts = sum(
-            sum(alert["severity"] == "CRITICAL" for alert in row["active_alerts"])
-            for row in self.endpoints.risk_snapshot(
-                endpoint_ids=[endpoint_id] if endpoint_id is not None else None
+        active_severity_count = getattr(self.alerts, "active_severity_count", None)
+        if callable(active_severity_count):
+            critical_alerts = active_severity_count(endpoint_id=endpoint_id, severity="CRITICAL")
+        else:
+            critical_alerts = sum(
+                sum(alert["severity"] == "CRITICAL" for alert in row["active_alerts"])
+                for row in self.endpoints.risk_snapshot(
+                    endpoint_ids=[endpoint_id] if endpoint_id is not None else None
+                )
             )
-        )
         latest_ingest = self.events.latest_ingested_at(endpoint_id=endpoint_id)
-        recent_failures = self.failures.current_rows(
+        recent_failures = self._failure_summary(
             from_=calculated_at.replace(microsecond=0) - timedelta(minutes=15),
             to=calculated_at,
             endpoint_id=endpoint_id,
         )
-        storage = _filter_endpoint_rows(self.metadata.all_current(), endpoint_id)
+        storage = self._storage_summary(endpoint_id=endpoint_id)
         sensors = [
             sensor for endpoint in endpoints if endpoint.status != "RETIRED" for sensor in endpoint.sensor_health
         ]
@@ -386,9 +568,9 @@ class SummaryService:
                 unavailable_sensor_count=sum(item.status == "UNAVAILABLE" for item in sensors),
                 non_retired_endpoint_count=sum(item.status != "RETIRED" for item in endpoints),
                 latest_ingested_at=_aware(latest_ingest),
-                failed_count_15m=sum(row["status"] == "FAILED" for row in recent_failures),
-                reprocess_failed_count_15m=sum(row["status"] == "REPROCESS_FAILED" for row in recent_failures),
-                restore_failed_bucket_count=sum(row["storage_status"] == "RESTORE_FAILED" for row in storage),
+                failed_count_15m=recent_failures["by_status"].get("FAILED", 0),
+                reprocess_failed_count_15m=recent_failures["by_status"].get("REPROCESS_FAILED", 0),
+                restore_failed_bucket_count=storage["by_status"].get("RESTORE_FAILED", 0),
             ),
             calculated_at=calculated_at,
         )
@@ -430,6 +612,14 @@ def _enum_counts(rows, field, enum_type, dto_type, dto_field):
     ]
 
 
+def _enum_count_map(counts, enum_type, dto_type, dto_field):
+    return [
+        dto_type(**{dto_field: value, "count": int(counts.get(value.value, 0))})
+        for value in enum_type
+        if counts.get(value.value, 0)
+    ]
+
+
 def _object_enum_counts(rows, field, enum_type, dto_type, dto_field):
     counter = Counter(getattr(row, field) for row in rows)
     return [dto_type(**{dto_field: value, "count": counter[value]}) for value in enum_type if counter[value]]
@@ -437,6 +627,13 @@ def _object_enum_counts(rows, field, enum_type, dto_type, dto_field):
 
 def _string_counts(rows, field, dto_type, dto_field):
     return [dto_type(**{dto_field: value, "count": count}) for value, count in _rank_values(row[field] for row in rows)]
+
+
+def _string_count_map(counts, dto_type, dto_field):
+    return [
+        dto_type(**{dto_field: value, "count": int(count)})
+        for value, count in _rank(Counter(counts))
+    ]
 
 
 def _rank(counter):

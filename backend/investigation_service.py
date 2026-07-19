@@ -37,6 +37,10 @@ from .storage.postgres import AlertRepository, EndpointRepository, IncidentRepos
 
 MAX_INVESTIGATION_NODES = 250
 MAX_INVESTIGATION_EDGES = 500
+MAX_INVESTIGATION_ALERTS = 250
+MAX_PROCESS_TREE_EVENTS = 10_000
+MAX_TOPOLOGY_EVENTS = 10_000
+MAX_TIMELINE_ALERTS = 5_000
 
 _NODE_TYPE_ORDER = {
     InvestigationNodeType.INCIDENT: 0,
@@ -58,18 +62,22 @@ class FailureService:
         self.repository = repository
 
     def list(self, query: FailureListQuery, *, from_: datetime, to: datetime) -> PagedData[EventFailureDto]:
-        rows = self.repository.current_rows(
+        filters = dict(
             from_=from_,
             to=to,
             status=query.status.value if query.status else None,
             failure_stage=query.failure_stage,
             retryable=query.retryable,
-            sort_order=query.sort_order,
         )
-        total = len(rows)
-        start = (query.page - 1) * query.size
+        rows = self.repository.current_rows(
+            **filters,
+            sort_order=query.sort_order,
+            limit=query.size,
+            offset=(query.page - 1) * query.size,
+        )
+        total = self.repository.count_current(**filters)
         return PagedData(
-            items=[_failure_dto(row) for row in rows[start : start + query.size]],
+            items=[_failure_dto(row) for row in rows],
             page=query.page,
             size=query.size,
             total=total,
@@ -103,6 +111,8 @@ class InvestigationService:
             from_=from_,
             to=to,
             event_type=EventType.PROCESS_EXECUTION,
+            max_items=MAX_PROCESS_TREE_EVENTS,
+            overflow_label="Process tree",
         )
         grouped: dict[int, list[Any]] = {}
         for event in events:
@@ -150,16 +160,16 @@ class InvestigationService:
                 incident_id=incident_id,
             )
         ]
-        for alert in self.incidents.alerts_for_incident(incident_id):
-            event = None
-            try:
-                event = self.events.detail(
-                    event_id=UUID(str(alert["event_id"])),
-                    endpoint_id=endpoint_id,
-                    occurred_at=alert["event_occurred_at"],
-                )
-            except ApplicationError:
-                event = None
+        alerts = self.incidents.alerts_for_incident(incident_id, limit=MAX_TIMELINE_ALERTS + 1)
+        if len(alerts) > MAX_TIMELINE_ALERTS:
+            raise ApplicationError(
+                400,
+                "VALIDATION_ERROR",
+                f"Incident timeline contains more than {MAX_TIMELINE_ALERTS} alerts.",
+            )
+        event_rows, _unavailable = self._alert_events(alerts, default_endpoint_id=endpoint_id)
+        for alert in alerts:
+            event = event_rows.get(str(alert["event_id"]))
             if event is not None:
                 items.append(
                     AttackTimelineItemDto(
@@ -229,11 +239,14 @@ class InvestigationService:
             )
         )
 
+        fetched_alert_rows = self.incidents.alerts_for_incident(incident_id, limit=MAX_INVESTIGATION_ALERTS + 1)
+        alerts_truncated = len(fetched_alert_rows) > MAX_INVESTIGATION_ALERTS
         alert_rows = sorted(
-            self.incidents.alerts_for_incident(incident_id),
+            fetched_alert_rows[:MAX_INVESTIGATION_ALERTS],
             key=lambda row: (_utc_timestamp(row["event_occurred_at"]), int(row["alert_id"])),
         )
-        archive_not_ready = False
+        event_rows, unavailable_event_ids = self._alert_events(alert_rows, default_endpoint_id=endpoint_id)
+        archive_not_ready = bool(unavailable_event_ids)
         for alert in alert_rows:
             alert_id = int(alert["alert_id"])
             alert_endpoint_id = int(alert["endpoint_id"])
@@ -267,19 +280,10 @@ class InvestigationService:
                 )
             )
 
-            try:
-                event = self.events.detail(
-                    event_id=UUID(event_id),
-                    endpoint_id=alert_endpoint_id,
-                    occurred_at=event_occurred_at,
-                )
-            except ApplicationError as error:
-                if error.code != "ARCHIVE_NOT_READY":
-                    raise
-                archive_not_ready = True
+            event = event_rows.get(event_id)
+            if event_id in unavailable_event_ids:
                 warning_code = InvestigationWarningCode.ARCHIVE_NOT_READY
                 warning_message = "Event evidence is in an archive bucket that is not ready."
-                event = None
             else:
                 warning_code = InvestigationWarningCode.EVENT_NOT_FOUND
                 warning_message = "Event evidence is not present in HOT or RESTORED storage."
@@ -436,7 +440,11 @@ class InvestigationService:
             if edge.source_node_id in returned_node_ids and edge.target_node_id in returned_node_ids
         ]
         returned_edges = reference_safe_edges[:MAX_INVESTIGATION_EDGES]
-        truncated = len(returned_nodes) < len(ordered_nodes) or len(returned_edges) < len(ordered_edges)
+        truncated = (
+            alerts_truncated
+            or len(returned_nodes) < len(ordered_nodes)
+            or len(returned_edges) < len(ordered_edges)
+        )
         ordered_warnings = sorted(warnings.values(), key=lambda item: (item.code.value, item.event_id or ""))
 
         return IncidentInvestigationDto(
@@ -467,16 +475,37 @@ class InvestigationService:
         endpoint_ids: list[int] | None,
         calculated_at: datetime,
     ) -> EgressTopologyDto:
-        events = self._event_items(endpoint_id=None, from_=from_, to=to)
         endpoint_filter = set(endpoint_ids or [])
         if endpoint_filter:
-            events = [event for event in events if event.endpoint_id in endpoint_filter]
-        alert_rows = self.alerts.list_rows(from_=from_, to=to)
-        alert_counts = Counter(
-            str(row["event_id"])
-            for row in alert_rows
-            if not endpoint_filter or int(row["endpoint_id"]) in endpoint_filter
-        )
+            events = []
+            for endpoint_id in sorted(endpoint_filter):
+                events.extend(
+                    self._event_items(
+                        endpoint_id=endpoint_id,
+                        from_=from_,
+                        to=to,
+                        max_items=MAX_TOPOLOGY_EVENTS - len(events),
+                    )
+                )
+        else:
+            events = self._event_items(
+                endpoint_id=None,
+                from_=from_,
+                to=to,
+                max_items=MAX_TOPOLOGY_EVENTS,
+            )
+        event_ids = [str(event.event_id) for event in events]
+        counts_by_event = getattr(self.alerts, "counts_by_event_ids", None)
+        if callable(counts_by_event):
+            alert_counts = Counter(counts_by_event(event_ids, from_=from_, to=to))
+        else:
+            alert_rows = self.alerts.list_rows(from_=from_, to=to)
+            alert_counts = Counter(
+                str(row["event_id"])
+                for row in alert_rows
+                if str(row["event_id"]) in event_ids
+                and (not endpoint_filter or int(row["endpoint_id"]) in endpoint_filter)
+            )
         grouped: dict[tuple[int, str, str], dict[str, Any]] = {}
         for event in events:
             target = event.remote_domain or event.http_host or event.tls_sni or event.remote_ip or event.dns_query
@@ -530,6 +559,8 @@ class InvestigationService:
         from_: datetime,
         to: datetime,
         event_type: EventType | None = None,
+        max_items: int | None = None,
+        overflow_label: str = "Topology",
     ):
         values: dict[str, Any] = {
             "timePreset": "CUSTOM",
@@ -545,12 +576,58 @@ class InvestigationService:
             values["eventType"] = event_type.value
         query = EventListQuery.model_validate(values)
         items, total = self.events.list_rows(query, from_=from_, to=to)
+        if max_items is not None and total > max_items:
+            raise ApplicationError(
+                400,
+                "VALIDATION_ERROR",
+                (
+                    f"{overflow_label} range contains more than {max_items} events; "
+                    "narrow the time range or Endpoint filter."
+                ),
+            )
         page = 2
         while len(items) < total:
             page_items, _ = self.events.list_rows(query.model_copy(update={"page": page}), from_=from_, to=to)
+            if not page_items:
+                break
             items.extend(page_items)
             page += 1
         return items
+
+    def _alert_events(
+        self,
+        alert_rows: list[dict[str, Any]],
+        *,
+        default_endpoint_id: int,
+    ) -> tuple[dict[str, Any], set[str]]:
+        identities = [
+            (
+                UUID(str(alert["event_id"])),
+                int(alert.get("endpoint_id", default_endpoint_id)),
+                _utc_timestamp(alert["event_occurred_at"]),
+            )
+            for alert in alert_rows
+        ]
+        bulk = getattr(self.events, "details_bulk", None)
+        if callable(bulk):
+            return bulk(identities)
+        found: dict[str, Any] = {}
+        unavailable: set[str] = set()
+        for event_id, endpoint_id, occurred_at in identities:
+            try:
+                event = self.events.detail(
+                    event_id=event_id,
+                    endpoint_id=endpoint_id,
+                    occurred_at=occurred_at,
+                )
+            except ApplicationError as error:
+                if error.code != "ARCHIVE_NOT_READY":
+                    raise
+                unavailable.add(str(event_id))
+                continue
+            if event is not None:
+                found[str(event_id)] = event
+        return found, unavailable
 
 
 def _investigation_node(

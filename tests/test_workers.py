@@ -1,12 +1,14 @@
+import gzip
 import json
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import UUID
 
 from backend.contracts.enums import AlertStatus, IncidentStatus
 from backend.detection import DetectionEngine
-from backend.failure import deterministic_failure_payload, failure_id_for
+from backend.failure import FailureSink, deterministic_failure_payload, failure_id_for
 from backend.kafka import RAW_TOPIC, VALIDATED_TOPIC, ConsumedMessage
 from backend.rule_loader import RuleLoader
 from backend.storage.models import EventIdentity, StoredAlert, StoredIncident
@@ -46,7 +48,7 @@ class QueueConsumer:
     def __init__(self, messages: list[ConsumedMessage]) -> None:
         self.messages = messages
         self.committed: list[int] = []
-        self.paused: list[int] = []
+        self.rewound: list[int] = []
 
     def consume_one(self, timeout=1.0):
         return self.messages.pop(0) if self.messages else None
@@ -54,8 +56,8 @@ class QueueConsumer:
     def commit(self, item):
         self.committed.append(item.offset)
 
-    def pause(self, item):
-        self.paused.append(item.offset)
+    def rewind(self, item):
+        self.rewound.append(item.offset)
 
 
 class CapturingProducer:
@@ -164,7 +166,47 @@ def test_identity_conflict_is_durable_failure_and_sink_failure_does_not_commit()
         now=lambda: NOW,
     ).run_once()
     assert failed_consumer.committed == []
-    assert failed_consumer.paused == [4]
+    assert failed_consumer.rewound == [4]
+
+
+def test_storage_worker_quarantines_invalid_message_without_retrying() -> None:
+    consumer = QueueConsumer([message(b"not-json", offset=5)])
+    sink = Sink()
+    sleeps: list[float] = []
+    worker = EventStorageWorker(
+        consumer=consumer,
+        producer=CapturingProducer(),
+        events=MemoryEvents(),
+        metadata=Metadata(),
+        failure_sink=sink,
+        sleep=sleeps.append,
+        now=lambda: NOW,
+    )
+
+    assert worker.run_once() is True
+    assert sleeps == []
+    assert consumer.committed == [5]
+    assert sink.records[0][1]["failure_code"] == "INVALID_MESSAGE"
+    assert sink.records[0][1]["retryable"] is False
+    assert sink.records[0][1]["retry_count"] == 0
+
+
+def test_storage_worker_requests_connection_reset_after_retry_exhaustion() -> None:
+    class BrokenEvents:
+        def identity(self, _event_id):
+            raise RuntimeError("database connection lost")
+
+    worker = EventStorageWorker(
+        consumer=QueueConsumer([message(raw_message(), offset=7)]),
+        producer=CapturingProducer(),
+        events=BrokenEvents(),
+        metadata=Metadata(),
+        failure_sink=Sink(),
+        sleep=lambda _delay: None,
+        now=lambda: NOW,
+    )
+    assert worker.run_once() is True
+    assert worker.reset_requested is True
 
 
 class MemoryAlerts:
@@ -234,6 +276,57 @@ def test_detection_worker_creates_idempotent_alert_and_incident_with_first_snaps
     assert len(incidents.links) == 1
 
 
+def test_detection_worker_quarantines_invalid_message_without_retrying() -> None:
+    consumer = QueueConsumer([message(b"[]", topic=VALIDATED_TOPIC, offset=6)])
+    sink = Sink()
+    sleeps: list[float] = []
+    worker = DetectionWorker(
+        consumer=consumer,
+        engine=SimpleNamespace(),
+        alerts=SimpleNamespace(),
+        incidents=SimpleNamespace(),
+        failure_sink=sink,
+        sleep=sleeps.append,
+        now=lambda: NOW,
+    )
+
+    assert worker.run_once() is True
+    assert sleeps == []
+    assert consumer.committed == [6]
+    assert sink.records[0][1]["failure_code"] == "INVALID_MESSAGE"
+    assert sink.records[0][1]["retryable"] is False
+
+
+def test_detection_worker_requests_connection_reset_after_retry_exhaustion() -> None:
+    validated = json.dumps(
+        {
+            "event": {
+                "event_id": str(EVENT_ID),
+                "endpoint_id": 1001,
+                "agent_id": "agent-win-001",
+                "event_type": "PROCESS_EXECUTION",
+                "occurred_at": "2026-07-12T00:59:59Z",
+            }
+        }
+    ).encode()
+
+    class BrokenEngine:
+        def evaluate(self, *_args, **_kwargs):
+            raise RuntimeError("database connection lost")
+
+    worker = DetectionWorker(
+        consumer=QueueConsumer([message(validated, topic=VALIDATED_TOPIC, offset=8)]),
+        engine=BrokenEngine(),
+        alerts=SimpleNamespace(),
+        incidents=SimpleNamespace(),
+        failure_sink=Sink(),
+        sleep=lambda _delay: None,
+        now=lambda: NOW,
+    )
+    assert worker.run_once() is True
+    assert worker.reset_requested is True
+
+
 def test_lifecycle_uses_two_minute_cutoff() -> None:
     class Endpoints:
         def mark_offline(self, *, cutoff, updated_at):
@@ -256,3 +349,51 @@ def test_failure_identity_and_gzip_are_deterministic() -> None:
     assert first_id == second_id
     assert deterministic_failure_payload(envelope) == deterministic_failure_payload(envelope)
     assert b"pcap" not in deterministic_failure_payload(envelope).lower()
+
+
+def test_failure_sink_preserves_malformed_poison_message() -> None:
+    class MissingObject(Exception):
+        response = {"ResponseMetadata": {"HTTPStatusCode": 404}}
+
+    class S3:
+        objects: dict[str, bytes] = {}
+
+        def head_object(self, *, Bucket, Key):
+            if Key not in self.objects:
+                raise MissingObject()
+            return {"ContentLength": len(self.objects[Key]), "Metadata": {}}
+
+        def put_object(self, *, Bucket, Key, Body, **_kwargs):
+            self.objects[Key] = Body
+
+        def get_object(self, *, Bucket, Key):
+            raise AssertionError("existing payload lookup was not expected")
+
+    class Failures:
+        rows: list[dict[str, object]] = []
+
+        def insert(self, rows):
+            self.rows.extend(rows)
+
+        def latest_status(self, _failure_id):
+            return "FAILED"
+
+    s3 = S3()
+    failures = Failures()
+    poison = message(b"\xffnot-json", offset=99)
+
+    stored = FailureSink(s3_client=s3, bucket="failures", repository=failures).record(
+        poison,
+        consumer_name="event-storage-worker",
+        failure_stage="EVENT_STORAGE",
+        failure_code=None,
+        error_message="invalid message",
+        retryable=False,
+        retry_count=0,
+        failed_at=NOW,
+    )
+
+    payload = json.loads(gzip.decompress(s3.objects[stored.object_key]))
+    assert payload["message"] == {"encoding": "base64", "raw": "/25vdC1qc29u"}
+    assert failures.rows[0]["event_id"] is None
+    assert failures.rows[0]["endpoint_id"] is None

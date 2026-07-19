@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -17,9 +18,14 @@ from .storage.models import IncidentInsert
 from .storage.postgres import AlertRepository, EndpointRepository, IncidentRepository, IngestMetadataRepository
 
 RETRY_DELAYS_SECONDS = (1, 5, 30)
+LOGGER = logging.getLogger(__name__)
 
 
 class EventIdentityConflictError(Exception):
+    pass
+
+
+class PermanentMessageError(Exception):
     pass
 
 
@@ -37,7 +43,7 @@ def run_with_retries(
     try:
         operation()
         return None
-    except (ArchivedDayImmutableError, EventIdentityConflictError):
+    except (ArchivedDayImmutableError, EventIdentityConflictError, PermanentMessageError):
         raise
     except Exception as error:
         last_error = error
@@ -46,7 +52,7 @@ def run_with_retries(
         try:
             operation()
             return None
-        except (ArchivedDayImmutableError, EventIdentityConflictError):
+        except (ArchivedDayImmutableError, EventIdentityConflictError, PermanentMessageError):
             raise
         except Exception as error:
             last_error = error
@@ -76,8 +82,10 @@ class EventStorageWorker:
         self.validated_topic = validated_topic
         self.sleep = sleep
         self.now = now
+        self.reset_requested = False
 
     def run_once(self, timeout: float = 1.0) -> bool:
+        self.reset_requested = False
         message = self.consumer.consume_one(timeout)
         if message is None:
             return False
@@ -91,6 +99,7 @@ class EventStorageWorker:
                 return True
             error = retry_failure.error
             retry_count = retry_failure.retry_count
+            self.reset_requested = True
         except ArchivedDayImmutableError as caught:
             error = caught
             failure_code = "ARCHIVED_DAY_IMMUTABLE"
@@ -99,6 +108,21 @@ class EventStorageWorker:
             error = caught
             failure_code = "EVENT_IDENTITY_CONFLICT"
             retryable = False
+        except PermanentMessageError as caught:
+            error = caught
+            failure_code = "INVALID_MESSAGE"
+            retryable = False
+
+        LOGGER.warning(
+            "worker message failed topic=%s partition=%s offset=%s consumer=%s code=%s retryable=%s retries=%s",
+            message.topic,
+            message.partition,
+            message.offset,
+            self.consumer_name,
+            failure_code or "PROCESSING_ERROR",
+            retryable,
+            retry_count,
+        )
 
         try:
             self.failure_sink.record(
@@ -112,14 +136,27 @@ class EventStorageWorker:
                 failed_at=self.now(),
             )
         except Exception:
-            self.consumer.pause(message)
+            self.reset_requested = True
+            LOGGER.exception(
+                "failure persistence failed; rewinding topic=%s partition=%s offset=%s consumer=%s",
+                message.topic,
+                message.partition,
+                message.offset,
+                self.consumer_name,
+            )
+            self.consumer.rewind(message)
             return False
         self.consumer.commit(message)
         return True
 
     def _process(self, message: ConsumedMessage) -> None:
-        raw = json.loads(message.value)
-        record = normalize_event(raw, ingested_at=self.now())
+        try:
+            raw = json.loads(message.value)
+            if not isinstance(raw, dict):
+                raise TypeError("message root must be an object")
+            record = normalize_event(raw, ingested_at=self.now())
+        except (UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
+            raise PermanentMessageError("Kafka message payload is invalid") from error
         event_id = record["event_id"]
         existing = self.events.identity(event_id)
         if existing is not None:
@@ -169,39 +206,79 @@ class DetectionWorker:
         self.failure_sink = failure_sink
         self.sleep = sleep
         self.now = now
+        self.reset_requested = False
 
     def run_once(self, timeout: float = 1.0) -> bool:
+        self.reset_requested = False
         message = self.consumer.consume_one(timeout)
         if message is None:
             return False
-        retry_failure = run_with_retries(lambda: self._process(message), sleep=self.sleep)
-        if retry_failure is None:
-            self.consumer.commit(message)
-            return True
+        failure_code: str | None = None
+        retryable = True
+        retry_count = 0
+        try:
+            retry_failure = run_with_retries(lambda: self._process(message), sleep=self.sleep)
+            if retry_failure is None:
+                self.consumer.commit(message)
+                return True
+            error = retry_failure.error
+            retry_count = retry_failure.retry_count
+            self.reset_requested = True
+        except PermanentMessageError as caught:
+            error = caught
+            failure_code = "INVALID_MESSAGE"
+            retryable = False
+
+        LOGGER.warning(
+            "worker message failed topic=%s partition=%s offset=%s consumer=%s code=%s retryable=%s retries=%s",
+            message.topic,
+            message.partition,
+            message.offset,
+            self.consumer_name,
+            failure_code or "PROCESSING_ERROR",
+            retryable,
+            retry_count,
+        )
         try:
             self.failure_sink.record(
                 message,
                 consumer_name=self.consumer_name,
                 failure_stage="DETECTION",
-                failure_code=None,
-                error_message=str(retry_failure.error),
-                retryable=True,
-                retry_count=retry_failure.retry_count,
+                failure_code=failure_code,
+                error_message=str(error),
+                retryable=retryable,
+                retry_count=retry_count,
                 failed_at=self.now(),
             )
         except Exception:
-            self.consumer.pause(message)
+            self.reset_requested = True
+            LOGGER.exception(
+                "failure persistence failed; rewinding topic=%s partition=%s offset=%s consumer=%s",
+                message.topic,
+                message.partition,
+                message.offset,
+                self.consumer_name,
+            )
+            self.consumer.rewind(message)
             return False
         self.consumer.commit(message)
         return True
 
     def _process(self, message: ConsumedMessage) -> None:
-        validated = json.loads(message.value)
-        event = dict(validated["event"])
-        event["occurred_at"] = parse_timestamp(event["occurred_at"])
-        event["event_id"] = UUID(event["event_id"])
-        if event.get("batch_id") is not None:
-            event["batch_id"] = UUID(event["batch_id"])
+        try:
+            validated = json.loads(message.value)
+            if not isinstance(validated, dict):
+                raise TypeError("message root must be an object")
+            event = dict(validated["event"])
+            event["occurred_at"] = parse_timestamp(event["occurred_at"])
+            event["event_id"] = UUID(event["event_id"])
+            event["endpoint_id"] = int(event["endpoint_id"])
+            event["agent_id"] = str(event["agent_id"])
+            event["event_type"] = str(event["event_type"])
+            if event.get("batch_id") is not None:
+                event["batch_id"] = UUID(event["batch_id"])
+        except (UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
+            raise PermanentMessageError("Kafka message payload is invalid") from error
         detected_at = self.now()
         for match in self.engine.evaluate(event, detected_at=detected_at):
             stored_alert = self.alerts.insert_if_absent(match.alert)

@@ -1,3 +1,4 @@
+import base64
 import gzip
 import hashlib
 import json
@@ -66,7 +67,7 @@ class FailureSink:
     ) -> StoredFailure:
         failure_id = failure_id_for(message, consumer_name, failure_stage)
         object_key = f"failures/{failure_id}/payload.json.gz"
-        source_message = json.loads(message.value)
+        source_message = _failure_message(message.value)
         envelope = {
             "consumerName": consumer_name,
             "failureCode": failure_code,
@@ -80,18 +81,20 @@ class FailureSink:
         checksum = hashlib.sha256(payload).hexdigest()
         self._put_idempotent(object_key, payload, checksum)
 
-        event = source_message.get("event", source_message)
-        event_id = event.get("eventId") or event.get("event_id")
+        source_mapping = source_message if isinstance(source_message, dict) else {}
+        event_value = source_mapping.get("event", source_mapping)
+        event = event_value if isinstance(event_value, dict) else {}
+        event_id = _optional_uuid(event.get("eventId") or event.get("event_id"))
         endpoint_id = (
-            source_message.get("endpointId")
-            or source_message.get("endpoint_id")
+            source_mapping.get("endpointId")
+            or source_mapping.get("endpoint_id")
             or event.get("endpointId")
             or event.get("endpoint_id")
         )
         row = {
             "failure_id": failure_id,
-            "event_id": UUID(str(event_id)) if event_id else None,
-            "endpoint_id": int(endpoint_id) if endpoint_id is not None else None,
+            "event_id": event_id,
+            "endpoint_id": _optional_int(endpoint_id),
             "source_topic": message.topic,
             "source_partition": message.partition,
             "source_offset": message.offset,
@@ -166,3 +169,28 @@ class FailureSink:
 
 def _fixed_string(value: Any) -> str:
     return value.decode("ascii") if isinstance(value, bytes) else str(value)
+
+
+def _failure_message(value: bytes) -> Any:
+    try:
+        return json.loads(value)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return {"encoding": "base64", "raw": base64.b64encode(value).decode("ascii")}
+
+
+def _optional_uuid(value: Any) -> UUID | None:
+    if value is None:
+        return None
+    try:
+        return UUID(str(value))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def _optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None

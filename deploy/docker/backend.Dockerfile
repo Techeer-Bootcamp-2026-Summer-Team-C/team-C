@@ -31,4 +31,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 ENV PATH="/app/.venv/bin:$PATH"
 
+RUN groupadd --system app \
+    && useradd --system --gid app --home-dir /app --no-create-home app
+
+USER app
+
 CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

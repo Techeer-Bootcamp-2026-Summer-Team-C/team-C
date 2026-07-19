@@ -26,6 +26,7 @@ def test_local_compose_contains_the_complete_development_stack() -> None:
         "backend",
         "event-storage-worker",
         "detection-worker",
+        "storage-lifecycle-worker",
         "frontend",
         "nginx",
     }
@@ -57,6 +58,7 @@ def test_production_compose_contains_only_the_required_runtime_services() -> Non
         "backend",
         "event-storage-worker",
         "detection-worker",
+        "storage-lifecycle-worker",
         "nginx",
     }
     assert "minio" not in services
@@ -102,12 +104,26 @@ def test_production_init_is_safe_and_does_not_call_local_demo_or_s3() -> None:
 def test_production_workers_default_to_one_scalable_service_each() -> None:
     services = _production_compose()["services"]
 
-    for worker_name in ("event-storage-worker", "detection-worker"):
+    for worker_name in ("event-storage-worker", "detection-worker", "storage-lifecycle-worker"):
         worker = services[worker_name]
         assert "container_name" not in worker
         assert "deploy" not in worker
     assert services["event-storage-worker"]["command"] == ["python", "-m", "tools.run_event_storage_worker"]
     assert services["detection-worker"]["command"] == ["python", "-m", "tools.run_detection_worker"]
+    assert services["storage-lifecycle-worker"]["command"] == [
+        "python",
+        "-m",
+        "tools.run_storage_lifecycle_worker",
+    ]
+
+
+def test_backend_image_and_app_services_drop_root_privileges() -> None:
+    dockerfile = (ROOT / "deploy/docker/backend.Dockerfile").read_text(encoding="utf-8")
+    assert "USER app" in dockerfile
+    for compose in (_compose(), _production_compose()):
+        app = compose["x-app-service"]
+        assert app["security_opt"] == ["no-new-privileges:true"]
+        assert app["cap_drop"] == ["ALL"]
 
 
 def test_production_example_has_no_access_key_fields() -> None:

@@ -6,3 +6,4 @@ DROP TABLE IF EXISTS audit_logs;
 DROP TABLE IF EXISTS agent_auth_keys;
 DROP TABLE IF EXISTS endpoints;
 DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS schema_migrations;

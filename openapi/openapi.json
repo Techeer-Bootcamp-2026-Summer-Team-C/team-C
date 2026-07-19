@@ -654,6 +654,8 @@
               "minimum": 1.0,
               "type": "integer"
             },
+            "maxItems": 100,
+            "minItems": 1,
             "title": "Endpointids",
             "type": "array"
           },
@@ -7093,6 +7095,8 @@
                 "minimum": 1,
                 "type": "integer"
               },
+              "maxItems": 100,
+              "minItems": 1,
               "title": "Endpointids",
               "type": "array"
             }
@@ -8169,6 +8173,8 @@
                 "minimum": 1,
                 "type": "integer"
               },
+              "maxItems": 100,
+              "minItems": 1,
               "title": "Endpointids",
               "type": "array"
             }
@@ -8263,6 +8269,8 @@
                 "minimum": 1,
                 "type": "integer"
               },
+              "maxItems": 100,
+              "minItems": 1,
               "title": "Endpointids",
               "type": "array"
             }
@@ -9470,6 +9478,8 @@
                 "minimum": 1,
                 "type": "integer"
               },
+              "maxItems": 100,
+              "minItems": 1,
               "title": "Endpointids",
               "type": "array"
             }

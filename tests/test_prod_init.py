@@ -93,11 +93,12 @@ def test_retry_dependency_stops_after_the_configured_attempts() -> None:
                 "0003_user_locale.up.sql",
                 "0004_user_dashboard_layouts.up.sql",
                 "0005_query_search_sort_indexes.up.sql",
+                "0006_backend_hardening.up.sql",
             ],
         ),
         (
             ["users", True, True, "user_dashboard_layouts", 64],
-            ["0005_query_search_sort_indexes.up.sql"],
+            ["0005_query_search_sort_indexes.up.sql", "0006_backend_hardening.up.sql"],
         ),
     ],
     ids=("fresh-database", "existing-database"),
@@ -122,6 +123,7 @@ def test_initialize_postgres_applies_only_missing_migrations(
         "apply_postgres_file",
         lambda _connection, path: applied.append(path.name),
     )
+    monkeypatch.setattr(prod_init, "_apply_versioned_postgres_migrations", lambda _connection: None)
 
     prod_init.initialize_postgres(settings)
 

@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import backend.event_service as event_service_module
 from backend.event_service import EventService
 from backend.storage.clickhouse import DASHBOARD_TOP_LIMIT, DashboardEventAggregate, EventRepository
 
@@ -106,7 +107,7 @@ def test_event_service_merges_restored_events_into_clickhouse_aggregate() -> Non
         "dns_query": "restored.example.test",
         "l7_protocol": None,
     }
-    restored = SimpleNamespace(read_rows=lambda _path: [restored_event, restored_event])
+    restored = SimpleNamespace(read_rows=lambda _path, **_filters: [restored_event, restored_event])
 
     result = EventService(events=events, metadata=metadata, restored=restored).dashboard_summary(
         from_=NOW,
@@ -119,3 +120,27 @@ def test_event_service_merges_restored_events_into_clickhouse_aggregate() -> Non
     assert result.top_processes == {"powershell.exe": 1, "chrome.exe": 1}
     assert result.top_domains == {"restored.example.test": 1}
     assert result.time_series == {NOW: 2}
+
+
+def test_restored_dashboard_rejects_metadata_count_above_hard_limit(monkeypatch) -> None:
+    monkeypatch.setattr(event_service_module, "MAX_RESTORED_DASHBOARD_EVENTS", 1)
+    metadata = SimpleNamespace(
+        overlapping_all=lambda **_filters: [
+            {
+                "endpoint_id": 2,
+                "bucket_start_at": NOW,
+                "storage_backend": "S3",
+                "storage_status": "RESTORED",
+                "storage_path": "restored/endpoint-2.parquet",
+                "event_count": 2,
+            }
+        ]
+    )
+    service = EventService(
+        events=SimpleNamespace(dashboard_summary=lambda **_filters: DashboardEventAggregate()),
+        metadata=metadata,
+        restored=SimpleNamespace(read_rows=lambda *_args, **_filters: pytest.fail("scan must be rejected")),
+    )
+
+    with pytest.raises(Exception, match="too large"):
+        service.dashboard_summary(from_=NOW, to=NOW + timedelta(hours=1), interval_seconds=3600)

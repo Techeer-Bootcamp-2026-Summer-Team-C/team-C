@@ -1,10 +1,15 @@
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Any
+from uuid import uuid4
 
-from backend.api_services import AlertService, EndpointService
+import pytest
+
+from backend.api_services import AlertService, EndpointService, IncidentService
 from backend.contracts.enums import AlertSortBy
-from backend.contracts.requests import AlertListQuery, EndpointListQuery
-from backend.storage.postgres import AlertRepository, EndpointRepository, _alert_order_by
+from backend.contracts.requests import AlertListQuery, EndpointListQuery, IncidentListQuery
+from backend.errors import ServiceUnavailableError
+from backend.storage.postgres import AlertRepository, EndpointRepository, IncidentRepository, _alert_order_by
 
 NOW = datetime(2026, 7, 15, 12, tzinfo=UTC)
 
@@ -55,6 +60,30 @@ class EndpointRows:
         self.arguments = kwargs
         return self.rows
 
+    def risk_page(self, **kwargs: Any) -> tuple[list[dict[str, Any]], int]:
+        self.arguments = kwargs
+        rows = list(self.rows)
+        if kwargs["q"] is not None:
+            query = kwargs["q"].casefold()
+            status_rank = {"ONLINE": 0, "OFFLINE": 1, "RETIRED": 2}
+            rows.sort(
+                key=lambda row: (
+                    0 if query in {row["hostname"].casefold(), row["agent_id"].casefold()} else 1,
+                    status_rank[row["status"]],
+                    -row["active_alerts"][0]["risk_score"],
+                    row["hostname"].casefold(),
+                    row["endpoint_id"],
+                )
+            )
+        else:
+            rows.sort(key=lambda row: row["endpoint_id"])
+            rows.sort(
+                key=lambda row: row["active_alerts"][0]["risk_score"],
+                reverse=kwargs["sort_order"] == "desc",
+            )
+        offset = kwargs["offset"]
+        return rows[offset : offset + kwargs["limit"]], len(rows)
+
 
 def test_endpoint_search_ranking_and_pagination_are_global_and_stable() -> None:
     repository = EndpointRows(
@@ -72,6 +101,8 @@ def test_endpoint_search_ranking_and_pagination_are_global_and_stable() -> None:
     )
 
     assert repository.arguments["q"] == "soc"
+    assert repository.arguments["limit"] == 2
+    assert repository.arguments["offset"] == 2
     assert page.total == 4
     assert [item.endpoint_id for item in page.items] == [5, 3]
 
@@ -94,6 +125,7 @@ class CapturingCursor:
     def __init__(self) -> None:
         self.query = ""
         self.parameters: tuple[Any, ...] = ()
+        self.executions: list[tuple[str, tuple[Any, ...]]] = []
 
     def __enter__(self) -> "CapturingCursor":
         return self
@@ -104,6 +136,7 @@ class CapturingCursor:
     def execute(self, query: str, parameters: tuple[Any, ...]) -> None:
         self.query = query
         self.parameters = parameters
+        self.executions.append((query, parameters))
 
     def fetchall(self) -> list[Any]:
         return []
@@ -136,6 +169,26 @@ def test_endpoint_repository_numeric_query_uses_endpoint_id_exact_match() -> Non
     assert connection.cursor_instance.parameters[-3:] == (None, None, None)
 
 
+def test_endpoint_repository_pages_and_sorts_risk_in_database() -> None:
+    connection = CapturingConnection()
+
+    rows, total = EndpointRepository(connection).risk_page(
+        risk_level=None,
+        sort_by="riskScore",
+        sort_order="desc",
+        limit=25,
+        offset=50,
+    )
+
+    assert rows == []
+    assert total == 0
+    assert "COUNT(*) OVER() AS total_count" in connection.cursor_instance.query
+    assert "ORDER BY calculated_risk_score DESC, endpoint_id ASC" in connection.cursor_instance.query
+    assert "LIMIT %s OFFSET %s" in connection.cursor_instance.query
+    assert connection.cursor_instance.executions[0][1][-2:] == (25, 50)
+    assert connection.cursor_instance.executions[1][1][-2:] == (1, 0)
+
+
 def test_alert_ordering_contract_uses_global_priority_and_stable_tiebreak() -> None:
     priority = _alert_order_by(AlertSortBy.PRIORITY, "asc")
 
@@ -154,6 +207,9 @@ def test_alert_service_passes_allowed_sort_to_repository() -> None:
             self.arguments = kwargs
             return []
 
+        def count_rows(self, **_kwargs: Any) -> int:
+            return 0
+
     repository = Rows()
     query = AlertListQuery.model_validate({"sortBy": "status", "sortOrder": "asc"})
 
@@ -166,6 +222,45 @@ def test_alert_service_passes_allowed_sort_to_repository() -> None:
     assert result.total == 0
     assert repository.arguments["sort_by"] is AlertSortBy.STATUS
     assert repository.arguments["sort_order"] == "asc"
+    assert repository.arguments["limit"] == 50
+    assert repository.arguments["offset"] == 0
+
+
+def test_alert_detail_does_not_hide_infrastructure_failure() -> None:
+    event_id = uuid4()
+    repository = SimpleNamespace(
+        detail=lambda _alert_id: {"event_id": event_id, "endpoint_id": 1, "event_occurred_at": NOW}
+    )
+    event_service = SimpleNamespace(
+        detail=lambda **_identity: (_ for _ in ()).throw(ServiceUnavailableError("archive unavailable"))
+    )
+
+    with pytest.raises(ServiceUnavailableError):
+        AlertService(repository, event_service=event_service, rules=[]).detail(1)
+
+
+def test_incident_service_pages_in_repository_and_counts_separately() -> None:
+    class Rows:
+        arguments: dict[str, Any]
+        count_arguments: dict[str, Any]
+
+        def list_rows(self, **kwargs: Any) -> list[dict[str, Any]]:
+            self.arguments = kwargs
+            return []
+
+        def count_rows(self, **kwargs: Any) -> int:
+            self.count_arguments = kwargs
+            return 125
+
+    repository = Rows()
+    query = IncidentListQuery(page=3, size=20)
+
+    result = IncidentService(repository).list(query, from_=NOW - timedelta(days=1), to=NOW)
+
+    assert result.total == 125
+    assert repository.arguments["limit"] == 20
+    assert repository.arguments["offset"] == 40
+    assert "limit" not in repository.count_arguments
 
 
 def test_alert_repository_embeds_requested_order_before_fetching_rows() -> None:
@@ -180,3 +275,21 @@ def test_alert_repository_embeds_requested_order_before_fetching_rows() -> None:
 
     assert "CASE severity" in connection.cursor_instance.query
     assert "DESC, alert_id ASC" in connection.cursor_instance.query
+
+
+def test_alert_repository_applies_limit_and_offset_in_sql() -> None:
+    connection = CapturingConnection()
+
+    AlertRepository(connection).list_rows(from_=NOW - timedelta(days=1), to=NOW, limit=25, offset=50)
+
+    assert "LIMIT %s OFFSET %s" in connection.cursor_instance.query
+    assert connection.cursor_instance.parameters[-2:] == (25, 50)
+
+
+def test_incident_repository_applies_limit_and_offset_in_sql() -> None:
+    connection = CapturingConnection()
+
+    IncidentRepository(connection).list_rows(from_=NOW - timedelta(days=1), to=NOW, limit=10, offset=20)
+
+    assert "LIMIT %s OFFSET %s" in connection.cursor_instance.query
+    assert connection.cursor_instance.parameters[-2:] == (10, 20)

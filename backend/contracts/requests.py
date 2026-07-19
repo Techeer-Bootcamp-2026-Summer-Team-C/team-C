@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from pydantic import Field, StringConstraints, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
-from .common import ContractModel, NonNegativeInt, PositiveId, UtcDateTime, validate_max_31_day_range
+from .common import ContractModel, EndpointIdList, NonNegativeInt, PositiveId, UtcDateTime, validate_max_31_day_range
 from .enums import (
     AlertSortBy,
     AlertStatus,
@@ -43,7 +43,7 @@ class TimeRangeQuery(ContractModel):
 
 
 class EndpointListQuery(PaginationQuery):
-    endpoint_ids: list[PositiveId] | SkipJsonSchema[None] = None
+    endpoint_ids: EndpointIdList | SkipJsonSchema[None] = None
     q: EndpointSearchQuery | SkipJsonSchema[None] = None
     status: Literal["ONLINE", "OFFLINE", "RETIRED"] | SkipJsonSchema[None] = None
     os_type: OsType | SkipJsonSchema[None] = None
@@ -74,7 +74,7 @@ class ProcessTreeQuery(TimeRangeQuery):
 
 
 class TopologyQuery(TimeRangeQuery):
-    endpoint_ids: list[PositiveId] | SkipJsonSchema[None] = None
+    endpoint_ids: EndpointIdList | SkipJsonSchema[None] = None
 
 
 class FailureListQuery(PaginationQuery, TimeRangeQuery):
@@ -85,7 +85,7 @@ class FailureListQuery(PaginationQuery, TimeRangeQuery):
 
 
 class ArchiveRestoreListQuery(PaginationQuery):
-    endpoint_ids: list[PositiveId]
+    endpoint_ids: EndpointIdList
     from_: UtcDateTime = Field(alias="from")
     to: UtcDateTime
 
@@ -122,4 +122,4 @@ class DashboardTimeQuery(TimeRangeQuery):
 
 class CorrelationQuery(TimeRangeQuery):
     value: str
-    endpoint_ids: list[PositiveId] | SkipJsonSchema[None] = None
+    endpoint_ids: EndpointIdList | SkipJsonSchema[None] = None

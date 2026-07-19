@@ -1,3 +1,4 @@
+import psycopg
 from fastapi.testclient import TestClient
 
 from backend.contracts.api_manifest import PRODUCT_API_CONTRACTS
@@ -37,3 +38,22 @@ def test_readiness_fails_closed() -> None:
     response = TestClient(create_app(NotReadyRuntime())).get("/health/ready")
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "SERVICE_UNAVAILABLE"
+
+
+def test_infrastructure_exception_uses_declared_503_envelope() -> None:
+    app = create_app(ReadyRuntime())
+
+    @app.get("/_test/infrastructure")
+    def fail() -> None:
+        raise psycopg.OperationalError("database unavailable")
+
+    response = TestClient(app).get("/_test/infrastructure", headers={"X-Request-ID": "req_infra_test"})
+
+    assert response.status_code == 503
+    assert response.headers["X-Request-ID"] == "req_infra_test"
+    assert response.json()["error"] == {
+        "code": "SERVICE_UNAVAILABLE",
+        "message": "A required dependency is temporarily unavailable.",
+        "retryable": True,
+        "details": [],
+    }

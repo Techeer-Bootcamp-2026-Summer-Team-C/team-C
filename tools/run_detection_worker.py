@@ -28,40 +28,51 @@ def main(argv: list[str] | None = None) -> int:
         allowed_topics=runtime.settings.kafka_topics,
     )
     try:
-        with runtime.postgres() as connection:
-            incidents = IncidentRepository(connection)
-            worker = DetectionWorker(
-                consumer=consumer,
-                engine=DetectionEngine(runtime.rules),
-                alerts=AlertRepository(connection),
-                incidents=incidents,
-                failure_sink=FailureSink(
-                    s3_client=runtime.s3,
-                    bucket=runtime.settings.s3_bucket,
-                    repository=FailureRepository(runtime.clickhouse),
-                ),
-            )
-            lifecycle = LifecycleTasks(EndpointRepository(connection), incidents)
-            if args.once:
+        if args.once:
+            with runtime.postgres() as connection:
+                incidents = IncidentRepository(connection)
+                worker = _worker(runtime, consumer, connection, incidents)
+                lifecycle = LifecycleTasks(EndpointRepository(connection), incidents)
                 consumed = worker.run_once(10)
                 lifecycle.run_once(now=datetime.now(UTC))
                 return 0 if consumed else 1
-            next_endpoint_sweep = time.monotonic()
-            next_incident_sweep = time.monotonic()
-            while True:
-                worker.run_once(1)
-                monotonic_now = time.monotonic()
-                utc_now = datetime.now(UTC)
-                if monotonic_now >= next_endpoint_sweep:
-                    lifecycle.mark_offline(now=utc_now)
-                    next_endpoint_sweep = monotonic_now + 30
-                if monotonic_now >= next_incident_sweep:
-                    lifecycle.close_incidents(now=utc_now)
-                    next_incident_sweep = monotonic_now + 60
+        next_endpoint_sweep = time.monotonic()
+        next_incident_sweep = time.monotonic()
+        while True:
+            with runtime.postgres() as connection:
+                incidents = IncidentRepository(connection)
+                worker = _worker(runtime, consumer, connection, incidents)
+                lifecycle = LifecycleTasks(EndpointRepository(connection), incidents)
+                while not worker.reset_requested:
+                    worker.run_once(1)
+                    if worker.reset_requested:
+                        break
+                    monotonic_now = time.monotonic()
+                    utc_now = datetime.now(UTC)
+                    if monotonic_now >= next_endpoint_sweep:
+                        lifecycle.mark_offline(now=utc_now)
+                        next_endpoint_sweep = monotonic_now + 30
+                    if monotonic_now >= next_incident_sweep:
+                        lifecycle.close_incidents(now=utc_now)
+                        next_incident_sweep = monotonic_now + 60
     except KeyboardInterrupt:
         return 0
     finally:
         consumer.close()
+
+
+def _worker(runtime, consumer, connection, incidents) -> DetectionWorker:
+    return DetectionWorker(
+        consumer=consumer,
+        engine=DetectionEngine(runtime.rules),
+        alerts=AlertRepository(connection),
+        incidents=incidents,
+        failure_sink=FailureSink(
+            s3_client=runtime.s3,
+            bucket=runtime.settings.s3_bucket,
+            repository=FailureRepository(runtime.clickhouse),
+        ),
+    )
 
 
 if __name__ == "__main__":

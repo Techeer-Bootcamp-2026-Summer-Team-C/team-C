@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS edr_events (
     schema_version UInt16,
     created_at DateTime64(3, 'UTC'),
     updated_at DateTime64(3, 'UTC'),
-    is_delete UInt8 DEFAULT 0
+    is_delete UInt8 DEFAULT 0,
+    INDEX idx_edr_events_event_id event_id TYPE bloom_filter(0.001) GRANULARITY 1
 )
 ENGINE = ReplacingMergeTree(updated_at)
 PARTITION BY toDate(occurred_at)

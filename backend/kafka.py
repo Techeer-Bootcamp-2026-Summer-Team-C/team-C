@@ -51,13 +51,20 @@ class ConsumerPort(Protocol):
 
     def commit(self, message: ConsumedMessage) -> None: ...
 
-    def pause(self, message: ConsumedMessage) -> None: ...
+    def rewind(self, message: ConsumedMessage) -> None: ...
 
 
 class KafkaProducer:
     def __init__(self, bootstrap_servers: str, *, allowed_topics: tuple[str, ...] = TOPICS) -> None:
         self._allowed_topics = allowed_topics
-        self._producer = Producer({"bootstrap.servers": bootstrap_servers, "enable.idempotence": True})
+        self._producer = Producer(
+            {
+                "bootstrap.servers": bootstrap_servers,
+                "enable.idempotence": True,
+                "socket.timeout.ms": 10_000,
+                "message.timeout.ms": 10_000,
+            }
+        )
 
     def publish(
         self,
@@ -103,6 +110,7 @@ class KafkaConsumer:
                 "group.id": group_id,
                 "enable.auto.commit": False,
                 "auto.offset.reset": "earliest",
+                "socket.timeout.ms": 10_000,
             }
         )
         self._consumer.subscribe([topic])
@@ -133,10 +141,10 @@ class KafkaConsumer:
             raise ValueError("native Kafka message is required")
         self._consumer.commit(message=message.native, asynchronous=False)
 
-    def pause(self, message: ConsumedMessage) -> None:
+    def rewind(self, message: ConsumedMessage) -> None:
         if message.native is None:
             return
-        self._consumer.pause([TopicPartition(message.topic, message.partition)])
+        self._consumer.seek(TopicPartition(message.topic, message.partition, message.offset))
 
     def close(self) -> None:
         self._consumer.close()

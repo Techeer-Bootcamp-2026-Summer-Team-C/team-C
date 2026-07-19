@@ -26,6 +26,11 @@ UtcDateTime = Annotated[
 ]
 NonNegativeInt = Annotated[int, Field(ge=0)]
 PositiveId = Annotated[int, Field(ge=1)]
+EndpointIdList = Annotated[
+    list[PositiveId],
+    Field(min_length=1, max_length=100),
+    AfterValidator(lambda values: list(dict.fromkeys(values))),
+]
 ScoreInt = Annotated[int, Field(ge=0, le=100)]
 ScoreNumber = Annotated[float, Field(ge=0, le=100)]
 

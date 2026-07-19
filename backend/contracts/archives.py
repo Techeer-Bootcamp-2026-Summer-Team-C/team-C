@@ -2,12 +2,12 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from .common import ContractModel, NonNegativeInt, PositiveId, UtcDateTime, validate_max_31_day_range
+from .common import ContractModel, EndpointIdList, NonNegativeInt, PositiveId, UtcDateTime, validate_max_31_day_range
 from .enums import StorageBackend, StorageClass, StorageStatus
 
 
 class ArchiveRestoreRequest(ContractModel):
-    endpoint_ids: list[PositiveId]
+    endpoint_ids: EndpointIdList
     from_: UtcDateTime = Field(alias="from")
     to: UtcDateTime
 

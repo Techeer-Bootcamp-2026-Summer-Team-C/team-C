@@ -6,10 +6,11 @@ from typing import Any
 import boto3
 import clickhouse_connect
 import psycopg
+from botocore.config import Config
 
 from .archive_service import BotoRestoreObjectClient
 from .event_service import RestoredEventReader
-from .kafka import KafkaProducer, ensure_topics
+from .kafka import KafkaProducer
 from .rule_loader import LoadedRule, RuleLoader
 from .settings import Settings
 
@@ -18,18 +19,14 @@ class RuntimeServices:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         bootstrap_servers = settings.kafka_bootstrap_servers
-        ensure_topics(
-            bootstrap_servers,
-            topics=settings.kafka_topics,
-            partitions_per_topic=settings.kafka_partitions_per_topic,
-            replication_factor=settings.kafka_replication_factor,
-        )
         self.raw_topic = settings.kafka_raw_topic
         self.validated_topic = settings.kafka_validated_topic
         self.producer = KafkaProducer(bootstrap_servers, allowed_topics=settings.kafka_topics)
         self.clickhouse = clickhouse_connect.get_client(
             dsn=settings.clickhouse_dsn.get_secret_value(),
             autogenerate_session_id=False,
+            connect_timeout=5,
+            send_receive_timeout=10,
         )
         self.s3 = create_s3_client(settings)
         self.restored_events = RestoredEventReader(
@@ -44,7 +41,10 @@ class RuntimeServices:
 
     @contextmanager
     def postgres(self) -> Iterator[Any]:
-        with psycopg.connect(self.settings.postgres_dsn.get_secret_value()) as connection:
+        with psycopg.connect(
+            self.settings.postgres_dsn.get_secret_value(),
+            connect_timeout=5,
+        ) as connection:
             yield connection
 
     def check_ready(self) -> None:
@@ -66,7 +66,13 @@ class RuntimeServices:
 
 
 def create_s3_client(settings: Settings) -> Any:
-    options: dict[str, Any] = {}
+    options: dict[str, Any] = {
+        "config": Config(
+            connect_timeout=5,
+            read_timeout=10,
+            retries={"max_attempts": 2, "mode": "standard"},
+        )
+    }
     if settings.aws_region is not None:
         options["region_name"] = settings.aws_region
     if settings.s3_endpoint_url is not None:
