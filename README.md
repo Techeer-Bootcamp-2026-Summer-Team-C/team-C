@@ -108,6 +108,71 @@ py -3.13 -m tools.local_demo down
 | Frontend | Vercel | 로컬에서만 `frontend` 컨테이너 |
 | Object Storage | Amazon S3 | 로컬에서는 `minio` |
 
+### 실제 Endpoint 상시 연결
+
+Agent는 실행될 때 중앙 Collector에 자동 등록·재등록하고, 실행 중 수집한 Event와 heartbeat를 중앙 서버로 전송한다. `--once`는 1회 검증용이므로 상시 운영에서는 사용하지 않는다. 인증서 발급, 설정 파일과 권한 준비는 [중앙 Endpoint 실제 데이터 검증](docs/operations/CENTRAL_ENDPOINT_REAL_DATA_VALIDATION.md)을 먼저 따른다.
+
+설정의 `collectorBaseUrl`은 로컬 주소가 아니라 중앙 Collector를 지정해야 한다.
+
+```text
+https://<COLLECTOR_HOST>:8443/api/v1
+```
+
+#### Windows Service
+
+Release 실행파일과 필요한 runtime DLL을 `C:\Program Files\EDR-C-Agent`에 배치하고, 설정과 인증서는 `C:\ProgramData\EDR-C-Agent`에 둔다. 관리자 PowerShell에서 서비스를 등록한다.
+
+```powershell
+New-Service `
+  -Name 'EDR-C-Agent' `
+  -BinaryPathName '"C:\Program Files\EDR-C-Agent\edr-windows-agent.exe" --service' `
+  -DisplayName 'EDR-C Agent' `
+  -StartupType Automatic
+
+Start-Service EDR-C-Agent
+Get-Service EDR-C-Agent
+```
+
+중지하거나 서비스 등록을 제거할 때는 다음 명령을 사용한다.
+
+```powershell
+Stop-Service EDR-C-Agent
+sc.exe delete EDR-C-Agent
+```
+
+#### macOS LaunchDaemon
+
+Release binary를 plist가 가리키는 위치에 설치한다.
+
+```bash
+cd agents/macos
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build -c release
+
+sudo install -d -m 755 /usr/local/libexec
+sudo install -m 755 .build/release/edr-macos-agent /usr/local/libexec/edr-macos-agent
+sudo install -o root -g wheel -m 644 \
+  com.edr-c.agent.plist \
+  /Library/LaunchDaemons/com.edr-c.agent.plist
+
+sudo launchctl bootstrap system /Library/LaunchDaemons/com.edr-c.agent.plist
+sudo launchctl kickstart -k system/com.edr-c.agent
+sudo launchctl print system/com.edr-c.agent
+```
+
+`/Library/Application Support/EDR-C-Agent/config.json`과 인증서 경로는 LaunchDaemon이 읽을 수 있는 절대 경로로 설정한다. 등록을 제거할 때는 다음 명령을 사용한다.
+
+```bash
+sudo launchctl bootout system /Library/LaunchDaemons/com.edr-c.agent.plist
+sudo rm /Library/LaunchDaemons/com.edr-c.agent.plist
+```
+
+설치 후 [운영 Dashboard](https://tukproject.dev)에 로그인해 다음을 확인한다.
+
+- `Endpoints`에서 Agent ID가 `ONLINE`인지 확인
+- `Events`에서 실행 직후 실제 Event가 들어오는지 확인
+- Agent 재시작 후 동일 Endpoint로 재등록되는지 확인
+- Agent를 중지했을 때 2분 뒤 `OFFLINE`이 되고 기존 Event는 유지되는지 확인
+
 ## 시연 데이터
 
 대시보드 확인에 사용할 데이터를 생성합니다.
