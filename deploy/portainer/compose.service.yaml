@@ -57,6 +57,12 @@ services:
     depends_on:
       app-init:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "tools.check_worker_health", "event-storage-worker", "--max-age", "15"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
 
   detection-worker:
     <<: *app-service
@@ -64,6 +70,12 @@ services:
     depends_on:
       app-init:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "tools.check_worker_health", "detection-worker", "--max-age", "15"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
 
   storage-lifecycle-worker:
     <<: *app-service
@@ -71,6 +83,12 @@ services:
     depends_on:
       app-init:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "tools.check_worker_health", "storage-lifecycle-worker", "--max-age", "75"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
 
   nginx:
     image: ghcr.io/techeer-bootcamp-2026-summer-team-c/team-c-nginx:${EDR_IMAGE_TAG:?EDR_IMAGE_TAG is required}

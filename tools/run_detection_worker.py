@@ -9,6 +9,7 @@ from backend.runtime import RuntimeServices
 from backend.settings import get_settings
 from backend.storage.clickhouse import FailureRepository
 from backend.storage.postgres import AlertRepository, EndpointRepository, IncidentRepository
+from backend.worker_health import mark_worker_heartbeat
 from backend.workers import DetectionWorker, LifecycleTasks
 
 
@@ -55,6 +56,7 @@ def main(argv: list[str] | None = None) -> int:
                     if monotonic_now >= next_incident_sweep:
                         lifecycle.close_incidents(now=utc_now)
                         next_incident_sweep = monotonic_now + 60
+                    mark_worker_heartbeat("detection-worker")
     except KeyboardInterrupt:
         return 0
     finally:

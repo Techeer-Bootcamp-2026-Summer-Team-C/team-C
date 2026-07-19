@@ -117,6 +117,28 @@ def test_service_stack_uses_the_shared_data_network_and_waits_for_init() -> None
         assert services[name]["depends_on"]["app-init"]["condition"] == "service_completed_successfully"
 
 
+def test_workers_expose_loop_heartbeat_healthchecks() -> None:
+    services = _load("compose.service.yaml")["services"]
+
+    expected_max_age = {
+        "event-storage-worker": "15",
+        "detection-worker": "15",
+        "storage-lifecycle-worker": "75",
+    }
+    for name, max_age in expected_max_age.items():
+        healthcheck = services[name]["healthcheck"]
+        assert healthcheck["test"] == [
+            "CMD",
+            "python",
+            "-m",
+            "tools.check_worker_health",
+            name,
+            "--max-age",
+            max_age,
+        ]
+        assert healthcheck["retries"] == 3
+
+
 def test_nginx_uses_a_fixed_existing_ec2_certificate_directory() -> None:
     nginx = _load("compose.service.yaml")["services"]["nginx"]
     mount = nginx["volumes"][0]
@@ -151,6 +173,8 @@ def test_production_images_are_built_for_ec2_and_tagged_with_the_commit() -> Non
     validation = parsed_workflow["jobs"]["validate"]
     validation_commands = "\n".join(step.get("run", "") for step in validation["steps"])
     assert "uv run ruff check ." in validation_commands
+    assert "bash -n tools/backup_production_data.sh" in validation_commands
+    assert "uv run pip-audit --local --skip-editable" in validation_commands
     assert 'uv run pytest -m "not integration"' in validation_commands
     assert "compose.prod.yaml config --quiet" in validation_commands
 
@@ -162,6 +186,8 @@ def test_pull_request_ci_covers_backend_frontend_and_compose_gates() -> None:
     assert set(parsed_workflow["jobs"]) == {"validate"}
     assert "pull_request:" in workflow
     assert "uv run ruff check ." in workflow
+    assert "bash -n tools/backup_production_data.sh" in workflow
+    assert "uv run pip-audit --local --skip-editable" in workflow
     assert 'uv run pytest -m "not integration"' in workflow
     assert "npm run openapi:check" in workflow
     assert "npm run typecheck" in workflow
@@ -179,6 +205,19 @@ def test_nginx_resolves_recreated_backend_containers_through_docker_dns() -> Non
     assert "resolver 127.0.0.11" in nginx
     assert "zone backend_upstream" in nginx
     assert "server backend:8000 resolve;" in nginx
+
+
+def test_production_nginx_hides_docs_and_sets_security_headers() -> None:
+    nginx = (ROOT / "deploy/nginx/nginx.prod.conf").read_text(encoding="utf-8")
+
+    assert "server_tokens off;" in nginx
+    assert "location ~ ^/(docs(?:/|$)|redoc(?:/|$)|openapi\\.json$)" in nginx
+    assert "location ^~ /health/" in nginx
+    assert 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;' in nginx
+    assert 'add_header X-Content-Type-Options "nosniff" always;' in nginx
+    assert 'add_header X-Frame-Options "DENY" always;' in nginx
+    assert 'add_header Referrer-Policy "no-referrer" always;' in nginx
+    assert 'add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;' in nginx
 
 
 def test_observability_stack_runs_pinned_alloy_without_public_ports() -> None:

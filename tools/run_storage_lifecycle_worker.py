@@ -8,6 +8,7 @@ from backend.runtime import RuntimeServices
 from backend.settings import get_settings
 from backend.storage.clickhouse import EventRepository
 from backend.storage.postgres import IngestMetadataRepository
+from backend.worker_health import mark_worker_heartbeat
 
 LOGGER = logging.getLogger(__name__)
 SWEEP_INTERVAL_SECONDS = 30
@@ -42,6 +43,7 @@ def main(argv: list[str] | None = None) -> int:
                 result.expired_bucket_count,
                 result.deleted_partition_count,
             )
+            mark_worker_heartbeat("storage-lifecycle-worker")
             if args.once:
                 return 0
             time.sleep(SWEEP_INTERVAL_SECONDS)

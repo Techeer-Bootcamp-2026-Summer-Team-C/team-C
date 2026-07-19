@@ -6,6 +6,7 @@ from backend.runtime import RuntimeServices
 from backend.settings import get_settings
 from backend.storage.clickhouse import EventRepository, FailureRepository
 from backend.storage.postgres import IngestMetadataRepository
+from backend.worker_health import mark_worker_heartbeat
 from backend.workers import EventStorageWorker
 
 
@@ -34,6 +35,7 @@ def main(argv: list[str] | None = None) -> int:
                 worker = _worker(runtime, consumer, connection)
                 while not worker.reset_requested:
                     worker.run_once(1)
+                    mark_worker_heartbeat("event-storage-worker")
     except KeyboardInterrupt:
         return 0
     finally:

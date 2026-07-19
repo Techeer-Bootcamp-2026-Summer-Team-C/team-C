@@ -92,7 +92,7 @@ Portainer에서 다음을 확인한다.
 | 스택 | 정상 상태 |
 | --- | --- |
 | `edr-c-infra` | PostgreSQL·ClickHouse·Kafka `healthy` |
-| `edr-c-service` | Backend·Nginx `healthy`, Worker 2개 `running`, `app-init` `Exited (0)` |
+| `edr-c-service` | Backend·Nginx·Worker 3개 `healthy`, `app-init` `Exited (0)` |
 
 중앙 API 상태는 저장소가 있는 관리 PC에서 다음 스크립트로 확인할 수 있다.
 
@@ -776,7 +776,7 @@ Agent state directory에는 ACK 전 SQLite buffer가 있으므로 전송 완료 
 
 - [ ] EC2 `8080`, `8443`이 tailnet에서 접근 가능하다.
 - [ ] 인터넷 전체에 `8080`, `8443`이 공개되지 않았다.
-- [ ] Backend/Nginx가 `healthy`, Worker가 `running`이다.
+- [ ] Backend/Nginx와 Event Storage·Detection·Storage Lifecycle Worker가 모두 `healthy`다.
 - [ ] 서버 인증서 SAN이 `<COLLECTOR_HOST>`와 일치한다.
 - [ ] mTLS handshake가 `Verify return code: 0`이다.
 

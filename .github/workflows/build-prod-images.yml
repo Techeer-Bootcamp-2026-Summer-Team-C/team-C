@@ -52,6 +52,8 @@ jobs:
       - name: Backend lint and tests
         run: |
           uv run ruff check .
+          bash -n tools/backup_production_data.sh
+          uv run pip-audit --local --skip-editable
           uv run pytest -m "not integration"
 
       - name: Production Compose checks

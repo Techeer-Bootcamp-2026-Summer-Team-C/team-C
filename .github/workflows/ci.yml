@@ -28,7 +28,12 @@ jobs:
           uv sync --locked --dev
 
       - name: Backend lint
-        run: uv run ruff check .
+        run: |
+          uv run ruff check .
+          bash -n tools/backup_production_data.sh
+
+      - name: Backend dependency audit
+        run: uv run pip-audit --local --skip-editable
 
       - name: Backend tests
         run: uv run pytest -m "not integration"

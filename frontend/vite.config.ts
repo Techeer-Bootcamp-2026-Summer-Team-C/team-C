@@ -6,6 +6,15 @@ export default defineConfig(({ mode }) => ({
     "process.env.NODE_ENV": JSON.stringify(mode === "production" ? "production" : "development"),
   },
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("/node_modules/zrender/")) return "zrender";
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

@@ -68,7 +68,7 @@ Dashboard ──> Dashboard API ──────┘
 docker compose up -d --build --wait
 ```
 
-이 명령 하나로 PostgreSQL, ClickHouse, Kafka, MinIO, 초기화 작업, FastAPI, 두 Worker, React 개발 서버와 Nginx를 같은 Compose 프로젝트에서 실행한다. Backend·Worker·Frontend를 호스트 프로세스로 따로 실행하지 않는다.
+이 명령 하나로 PostgreSQL, ClickHouse, Kafka, MinIO, 초기화 작업, FastAPI, 세 Worker, React 개발 서버와 Nginx를 같은 Compose 프로젝트에서 실행한다. Backend·Worker·Frontend를 호스트 프로세스로 따로 실행하지 않는다.
 
 접속 주소:
 

@@ -133,7 +133,12 @@ NGINX_MTLS_HOST_PORT=8443
 
 1. GitHub Actions의 `Build production images`에서 `validate`, backend/Nginx build, `promote`가 모두 성공했는지 확인한다.
 2. `production` 브랜치의 `compose.service.yaml`에 고정된 backend/Nginx 이미지 SHA가 성공한 `Build production images` 실행의 source commit SHA와 같은지 확인한다. 프런트엔드 전용 `main` 커밋은 이 워크플로를 실행하지 않으므로 최신 `main` SHA와 직접 비교하지 않는다.
-3. Portainer에서 `app-init=Exited (0)`, backend/Nginx=`healthy`, worker 2개=`running`이고 재시작을 반복하지 않는지 확인한다.
+3. Portainer에서 `app-init=Exited (0)`, backend/Nginx와 아래 worker 3개가 모두 `healthy`이고 재시작을 반복하지 않는지 확인한다.
+   - `event-storage-worker`
+   - `detection-worker`
+   - `storage-lifecycle-worker`
+
+Worker healthcheck는 단순 PID가 아니라 처리 loop heartbeat를 확인한다. Kafka worker는 15초, Storage Lifecycle Worker는 75초 넘게 heartbeat가 갱신되지 않으면 `unhealthy`가 된다.
 
 EC2에서는 Nginx health를 확인한다.
 
@@ -161,6 +166,8 @@ EC2에 저장소 checkout과 PowerShell이 실제로 설치된 경우에만 `-Ss
 `edr-c-service`는 2026-07-16부터 자동 배포된다: `main` push → GitHub Actions 이미지 빌드 → `promote` job이 `production` 브랜치에 이미지 SHA 고정 → Portainer가 `production`을 5분마다 polling해 자동 re-pull·재배포. 수동으로 `EDR_IMAGE_TAG`를 바꿀 필요가 없다.
 
 배포 후 `/nginx-health`, `/health/ready`와 컨테이너 로그로 확인한다. 롤백이 필요하면 이전 이미지 SHA가 GHCR에 남아 있으므로 Portainer에서 해당 SHA로 재배포하면 된다.
+
+운영 Nginx는 `/docs`, `/redoc`, `/openapi.json`을 외부에 공개하지 않고 404를 반환한다. OpenAPI artifact 생성과 Swagger 검증은 개발 환경에서 FastAPI에 직접 접근해 수행한다. `/health/*`는 운영 readiness 확인을 위해 계속 프록시한다.
 
 외부 볼륨은 스택 수명주기와 분리되어 있어 스택을 다시 배포해도 자동 삭제되지 않는다. 그래도 기존 스택을 처음 전환하는 날에는 별도 백업 없이 삭제 작업을 진행하지 않는다.
 

@@ -1,5 +1,17 @@
 # 운영 데이터 백업·복구
 
+## 0. 현재 스택 원클릭 백업
+
+EC2에서 아래 명령을 실행하면 PostgreSQL custom dump, ClickHouse native backup, Kafka metadata snapshot과 SHA-256을 같은 시각의 디렉터리에 생성한다. 이어서 PostgreSQL과 ClickHouse를 고유한 임시 DB로 복원해 table 수를 확인하고 임시 DB를 삭제한다. 운영 DB에는 restore하지 않는다.
+
+```bash
+cd /home/ubuntu/team-C
+EDR_BACKUP_S3_URI=s3://<운영-백업-버킷>/archives/ec2-backups \
+  bash tools/backup_production_data.sh
+```
+
+기본 저장 위치는 `/home/ubuntu/backups/<UTC timestamp>`다. `EDR_BACKUP_S3_URI`를 생략하면 EC2에만 저장하고 경고한다. 컨테이너 이름이 기본 Portainer 이름과 다르면 `EDR_POSTGRES_CONTAINER`, `EDR_CLICKHOUSE_CONTAINER`, `EDR_KAFKA_CONTAINER`로 지정한다. 스크립트가 성공하면 `MANIFEST.txt`, `SHA256SUMS`, S3 업로드 사용 시 `S3_OBJECTS.txt`가 남는다.
+
 ## 1. 현재 백업 증적
 
 2026-07-15 운영 데이터의 무중단 백업을 EC2에 생성했다.
