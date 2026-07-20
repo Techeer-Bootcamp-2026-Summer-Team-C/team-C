@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "../src/api/client";
-import { intervalFor, numberParam, updateParams, validEventDetailQuery } from "../src/lib/url";
+import { intervalFor, navigationDestination, navigationTimeScope, numberParam, updateParams, validEventDetailQuery } from "../src/lib/url";
 import { canMutate, pollingInterval, retryDelay, shouldRetry } from "../src/query/policy";
 
 describe("request lifecycle policy", () => {
@@ -43,5 +43,13 @@ describe("URL and role contracts", () => {
     expect(intervalFor("LATEST_15M")).toBe("1m");
     expect(intervalFor("LATEST_24H")).toBe("1h");
     expect(intervalFor("CUSTOM", "2026-07-12T00:00:00Z", "2026-07-12T04:00:00Z")).toBe("5m");
+  });
+
+  it("copies only valid time scope to time-aware navigation routes", () => {
+    const custom = navigationTimeScope("timePreset=CUSTOM&from=2026-07-12T00%3A00%3A00Z&to=2026-07-13T00%3A00%3A00Z&status=OPEN");
+    expect(custom).toBe("timePreset=CUSTOM&from=2026-07-12T00%3A00%3A00Z&to=2026-07-13T00%3A00%3A00Z");
+    expect(navigationDestination("/incidents", custom!)).toContain("/incidents?timePreset=CUSTOM");
+    expect(navigationDestination("/operations/archives", custom!)).toBe("/operations/archives");
+    expect(navigationTimeScope("timePreset=CUSTOM&from=2026-07-13T00%3A00%3A00Z&to=2026-07-12T00%3A00%3A00Z")).toBeNull();
   });
 });

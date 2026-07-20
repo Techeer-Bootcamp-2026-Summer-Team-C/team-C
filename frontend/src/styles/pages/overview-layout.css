@@ -1,4 +1,8 @@
 .overview-dashboard-workspace { min-width: 0; display: flex; flex-direction: column; gap: var(--space-8); }
+.dashboard-applied-layout { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); padding: var(--space-5) var(--space-6); background: var(--surface-panel); border: 1px solid var(--border-panel); border-radius: var(--radius-panel); }
+.dashboard-applied-layout > div { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: var(--space-1) var(--space-4); }
+.dashboard-applied-layout strong { min-width: 0; overflow-wrap: anywhere; }
+.dashboard-applied-layout p { grid-column: 2; color: var(--text-secondary); font-size: var(--type-meta); }
 
 .dashboard-layout-identity { min-width: 0; display: flex; align-items: baseline; gap: var(--space-4); padding-bottom: var(--space-4); border-bottom: 1px solid var(--border-subtle); }
 .dashboard-layout-identity h2 { font-size: var(--type-section-title); }
@@ -44,9 +48,11 @@
 .dashboard-builder-header { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-8); }
 .dashboard-builder-header h2 { margin-top: var(--space-2); font-size: var(--type-section-title); }
 .dashboard-builder-header p { max-width: 680px; margin-top: var(--space-3); color: var(--text-secondary); }
-.dashboard-builder-actions { display: flex; align-items: center; gap: var(--space-3); }
-.dashboard-builder > .field { width: min(480px, 100%); }
-.dashboard-builder > .field input { width: 100%; max-width: none; }
+.dashboard-builder-actions { display: flex; align-items: flex-end; gap: var(--space-4); }
+.dashboard-builder-name { width: min(320px, 32vw); }
+.dashboard-builder-name input { width: 100%; max-width: none; }
+.dashboard-builder-name small { max-width: 320px; }
+.dashboard-builder-buttons { min-height: 36px; display: flex; align-items: center; gap: var(--space-3); margin-bottom: calc(var(--space-6) + var(--space-5)); }
 .dashboard-builder-body { min-width: 0; display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: var(--space-6); align-items: start; }
 
 .dashboard-widget-palette {

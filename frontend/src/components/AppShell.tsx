@@ -26,6 +26,7 @@ import { SERVICE_MARK, SERVICE_NAME } from "../config/branding";
 import { useI18n } from "../i18n/LocaleContext";
 import type { TranslationKey } from "../i18n/translations";
 import { useTheme } from "../theme/ThemeProvider";
+import { navigationDestination, navigationTimeScope } from "../lib/url";
 import { Badge, Button, Dialog, Drawer, Popover, SelectField, Tooltip } from "./primitives";
 
 interface NavigationItem {
@@ -105,12 +106,17 @@ export function AppShell() {
   const [localeError, setLocaleError] = useState(false);
   const [search, setSearch] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
+  const [navigationTime, setNavigationTime] = useState(() => navigationTimeScope(location.search) ?? "timePreset=LATEST_24H");
   const breadcrumbs = buildBreadcrumbs(location.pathname, t);
   const pageTitleText = breadcrumbs.at(-1)?.label ?? t("navigation.console");
   const overviewRoute = location.pathname === "/";
   const themeToggleLabel = theme === "dark" ? t("theme.switchToLight") : t("theme.switchToDark");
 
   useEffect(() => { setMobileNavigationOpen(false); }, [location.pathname]);
+  useEffect(() => {
+    const nextTime = navigationTimeScope(location.search);
+    if (nextTime) setNavigationTime(nextTime);
+  }, [location.search]);
 
   function toggleCompact(): void {
     setCompact((current) => {
@@ -147,7 +153,7 @@ export function AppShell() {
     <div className={compact ? "app-shell compact" : "app-shell"}>
       <a className="skip-link" href="#main-content">{t("navigation.skipToContent")}</a>
       <aside className="nav-rail desktop-navigation">
-        <PrimaryNavigation compact={compact} onNavigate={() => undefined} onToggleCompact={toggleCompact} />
+        <PrimaryNavigation compact={compact} onNavigate={() => undefined} onToggleCompact={toggleCompact} timeScope={navigationTime} />
       </aside>
       <Drawer
         closeLabel={t("navigation.close")}
@@ -156,7 +162,7 @@ export function AppShell() {
         open={mobileNavigationOpen}
         returnFocusRef={mobileMenuButtonRef}
       >
-        <PrimaryNavigation compact={false} mobile onNavigate={() => setMobileNavigationOpen(false)} onToggleCompact={toggleCompact} />
+        <PrimaryNavigation compact={false} mobile onNavigate={() => setMobileNavigationOpen(false)} onToggleCompact={toggleCompact} timeScope={navigationTime} />
       </Drawer>
       <section className="console-shell">
         <header className="top-bar">
@@ -248,11 +254,12 @@ export function AppShell() {
   );
 }
 
-function PrimaryNavigation({ compact, mobile = false, onNavigate, onToggleCompact }: {
+function PrimaryNavigation({ compact, mobile = false, onNavigate, onToggleCompact, timeScope }: {
   compact: boolean;
   mobile?: boolean;
   onNavigate: () => void;
   onToggleCompact: () => void;
+  timeScope: string;
 }) {
   const { t } = useI18n();
   const compactLabel = compact ? t("navigation.expand") : t("navigation.compact");
@@ -273,7 +280,7 @@ function PrimaryNavigation({ compact, mobile = false, onNavigate, onToggleCompac
             key={to}
             onClick={onNavigate}
             title={compact ? label : undefined}
-            to={to}
+            to={navigationDestination(to, timeScope)}
           >
             <Icon aria-hidden="true" size={18} />
             <span>{label}</span>

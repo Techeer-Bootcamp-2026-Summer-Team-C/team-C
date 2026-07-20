@@ -31,6 +31,10 @@
   --divider: var(--border-subtle);
   --chart-grid: #24252a;
   --chart-axis: #8d8f98;
+  --graph-control-background: #ffffff;
+  --graph-control-foreground: #101318;
+  --graph-control-border: #d0d5dd;
+  --graph-control-hover: #f2f4f7;
   --focus-ring-color: #4c85ff;
   --focus-ring: 0 0 0 2px var(--focus-ring-color);
 

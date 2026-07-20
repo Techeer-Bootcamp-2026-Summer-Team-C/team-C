@@ -9,6 +9,21 @@
 .triage-row-heading small { flex: 0 0 auto; }
 .triage-row:focus-visible { position: relative; z-index: 1; }
 .triage-detail .page-header { padding-bottom: var(--space-2); }
+.triage-complete-state {
+  min-height: 320px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-12);
+  color: var(--text-secondary);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--radius-panel);
+}
+.triage-complete-state > svg { color: var(--status-success); }
+.triage-complete-state strong { color: var(--text-primary); font-size: var(--type-section-title); }
+.triage-complete-state p { margin-top: var(--space-2); }
 .workflow-actions > .button { min-width: 132px; justify-content: center; }
 .guidance-list { counter-reset: guidance; gap: var(--space-4); }
 .guidance-list > li { align-items: start; padding: var(--space-5); background: var(--surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); }

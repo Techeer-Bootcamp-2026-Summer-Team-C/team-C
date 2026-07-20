@@ -55,6 +55,22 @@ describe("WP-05 alert workbench", () => {
     expect(screen.getByText("Manual action")).toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
+
+  it("replaces the last resolved Alert with the queue-complete state", async () => {
+    const update = arrangeSingleQueueApi();
+    renderDetail("ADMIN");
+    await screen.findByRole("heading", { name: "Alert 1" });
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Alert status" }), { target: { value: "RESOLVED" } });
+    const submit = screen.getByRole("button", { name: "Submit & Next" });
+    expect(submit).toBeEnabled();
+    fireEvent.click(submit);
+
+    await waitFor(() => expect(update).toHaveBeenCalledWith(1, { status: "RESOLVED" }));
+    expect(await screen.findByText("Queue cleared")).toBeInTheDocument();
+    expect(screen.getByText(/No unresolved Alerts match the current time/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Alert 1" })).not.toBeInTheDocument();
+  });
 });
 
 function arrangeApi() {
@@ -67,6 +83,22 @@ function arrangeApi() {
     totalPages: 1,
   }));
   return vi.spyOn(api, "updateAlert").mockImplementation(async (alertId, body) => envelope(summary(alertId, body.status)));
+}
+
+function arrangeSingleQueueApi() {
+  let status: AlertDto["status"] = "OPEN";
+  vi.spyOn(api, "alert").mockImplementation(async (alertId) => envelope(detail(alertId, status)));
+  vi.spyOn(api, "alerts").mockImplementation(async () => envelope({
+    items: status === "RESOLVED" ? [] : [summary(1, status)],
+    page: 1,
+    size: 500,
+    total: status === "RESOLVED" ? 0 : 1,
+    totalPages: status === "RESOLVED" ? 0 : 1,
+  }));
+  return vi.spyOn(api, "updateAlert").mockImplementation(async (alertId, body) => {
+    status = body.status;
+    return envelope(summary(alertId, status));
+  });
 }
 
 function renderDetail(role: UserDto["role"]) {
@@ -84,9 +116,9 @@ function LocationProbe() {
   return <output data-testid="location">{location.pathname}{location.search}</output>;
 }
 
-function detail(alertId: number): AlertDetailDto {
+function detail(alertId: number, status: AlertDto["status"] = "OPEN"): AlertDetailDto {
   return {
-    ...summary(alertId, "OPEN"),
+    ...summary(alertId, status),
     sourceEvent: null,
     incidents: [],
     responseGuidance: [{ order: 1, title: "Preserve evidence", description: "Capture the process tree before remediation.", requiresManualAction: true }],

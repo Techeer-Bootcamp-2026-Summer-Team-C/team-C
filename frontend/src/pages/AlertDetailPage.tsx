@@ -82,7 +82,13 @@ function AlertDetail({ alert, canUpdate, mutation, nextAlert, params, queue, que
 }) {
   const { t } = useI18n();
   const [draftStatus, setDraftStatus] = useState<AlertStatus>(alert.status);
-  const activeQueue = queue.filter((item) => item.status !== "RESOLVED" || item.alertId === alert.alertId);
+  const activeQueue = queue.filter((item) => item.status !== "RESOLVED");
+  const queueCleared = !queuePending && !queueError && alert.status === "RESOLVED" && activeQueue.length === 0;
+  if (queueCleared) return <section aria-live="polite" className="triage-complete-state" role="status">
+    <CheckCircle2 aria-hidden="true" size={28} />
+    <div><strong>{t("alert.queueCleared")}</strong><p>{t("alert.queueClearedDescription")}</p></div>
+    <Link className="button" to={`/alerts${params.size ? `?${params.toString()}` : ""}`}>{t("alerts.queue")}</Link>
+  </section>;
   return <section className="triage-workspace">
     <Panel className="triage-queue-panel" title={t("alert.activeQueue")} subtitle={t("alert.requiresAction", { total: queue.filter((item) => item.status !== "RESOLVED").length })}>
       {queuePending ? <Skeleton rows={8} /> : null}
@@ -128,7 +134,7 @@ function AlertDetail({ alert, canUpdate, mutation, nextAlert, params, queue, que
           <Field label={t("alert.status")}><select disabled={mutation.isPending} onChange={(event) => setDraftStatus(event.target.value as AlertStatus)} value={draftStatus}><option>OPEN</option><option>IN_PROGRESS</option><option>RESOLVED</option></select></Field>
           <div className="workflow-actions">
             <button className="button ghost" disabled={mutation.isPending || draftStatus === alert.status} onClick={() => mutation.mutate({ status: draftStatus })} type="button"><Save aria-hidden="true" size={15} />{t("alert.saveStatus")}</button>
-            <button className="button" disabled={mutation.isPending || !nextAlert} onClick={() => mutation.mutate({ status: draftStatus, ...(nextAlert ? { nextAlertId: nextAlert.alertId } : {}) })} type="button">{t("alert.submitNext")}</button>
+            <button className="button" disabled={mutation.isPending || (!nextAlert && draftStatus === alert.status)} onClick={() => mutation.mutate({ status: draftStatus, ...(nextAlert ? { nextAlertId: nextAlert.alertId } : {}) })} type="button">{t("alert.submitNext")}</button>
           </div>
           <small className="workflow-next">{nextAlert ? t("alert.nextItem", { ruleCode: nextAlert.ruleCode, title: nextAlert.title }) : t("alert.noNextItem")}</small>
         </div> : <div className="read-only-note"><StatusPill value={alert.status} /><span>{t("alert.viewerControlsHidden")}</span></div>}</Panel>

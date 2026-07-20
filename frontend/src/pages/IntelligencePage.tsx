@@ -29,8 +29,10 @@ import {
   filterTopology,
   selectedCorrelationRelationship,
   selectedTopologyEdge,
+  selectedTopologyEdgeGroup,
   targetNodeId,
   topologyEdgeId,
+  topologyEdgeGroupId,
   topologyGraphEnabled,
   type CorrelationSelection,
   type TopologySelection,
@@ -320,6 +322,16 @@ export function TopologyWorkspace({ topology, graphEnabled }: { topology: Egress
 
 function TopologyInspector({ topology, selection }: { topology: EgressTopologyDto; selection: TopologySelection | null }) {
   const { t } = useI18n();
+  const edgeGroup = selectedTopologyEdgeGroup(topology, selection);
+  if (edgeGroup) return <Inspector actions={<Badge tone={edgeGroup.alertCount ? "warning" : "success"}>{t("intelligence.observedOnly")}</Badge>} description={`${edgeGroup.sourceLabel} → ${edgeGroup.target}`} title={`${edgeGroup.protocols.join(" + ")} ${t("intelligence.relationship")}`}>
+    <DefinitionGrid items={[
+      { label: "Protocols", value: edgeGroup.protocols.join(", ") },
+      { label: t("intelligence.eventCount"), value: edgeGroup.eventCount },
+      { label: t("intelligence.alertCount"), value: edgeGroup.alertCount },
+      { label: t("intelligence.lastObserved"), value: formatDateTime(edgeGroup.lastSeenAt) },
+    ]} />
+    <div className="context-links"><Link to={evidenceListUrl("events", edgeGroup, topology)}>Events</Link><Link to={evidenceListUrl("alerts", edgeGroup, topology)}>Alerts</Link></div>
+  </Inspector>;
   const edge = selectedTopologyEdge(topology, selection);
   if (edge) return <Inspector actions={<Badge tone={edge.alertCount ? "warning" : "success"}>{t("intelligence.observedOnly")}</Badge>} description={`${edge.sourceLabel} → ${edge.target}`} title={`${edge.protocol} ${t("intelligence.relationship")}`}>
     <DefinitionGrid items={[
@@ -345,12 +357,13 @@ function TopologyEvidenceTable({ topology, selection, onSelect }: { topology: Eg
   const { t } = useI18n();
   return <DataTable label={t("intelligence.relationships")}><thead><tr><th scope="col">{t("intelligence.source")}</th><th scope="col">{t("intelligence.target")}</th><th scope="col">Protocol</th><th scope="col">Events</th><th scope="col">Alerts</th><th scope="col">{t("intelligence.lastObserved")}</th></tr></thead><tbody>{topology.edges.map((edge) => {
     const id = topologyEdgeId(edge.endpointId, edge.target, edge.protocol);
-    const selected = selection?.kind === "EDGE" && selection.id === id;
+    const selected = (selection?.kind === "EDGE" && selection.id === id)
+      || (selection?.kind === "EDGE_GROUP" && selection.id === topologyEdgeGroupId(edge.endpointId, edge.target));
     return <tr className={selected ? "selected-row" : undefined} key={id}><td><button aria-pressed={selected} className="evidence-select" onClick={() => onSelect({ kind: "EDGE", id })} type="button">{edge.sourceLabel}</button></td><td><code>{edge.target}</code></td><td>{edge.protocol}</td><td><Link to={evidenceListUrl("events", edge, topology)}>{edge.eventCount}</Link></td><td><Link to={evidenceListUrl("alerts", edge, topology)}>{edge.alertCount}</Link></td><td>{formatDateTime(edge.lastSeenAt)}</td></tr>;
   })}</tbody></DataTable>;
 }
 
-function evidenceListUrl(route: "events" | "alerts", edge: EgressTopologyDto["edges"][number], topology: EgressTopologyDto): string {
+function evidenceListUrl(route: "events" | "alerts", edge: { endpointId: number }, topology: EgressTopologyDto): string {
   const query = new URLSearchParams({ from: topology.from, to: topology.to });
   query.set(route === "events" ? "endpointIds" : "endpointId", String(edge.endpointId));
   return `/${route}?${query.toString()}`;
