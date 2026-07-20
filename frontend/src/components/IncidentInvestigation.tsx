@@ -50,11 +50,13 @@ export function IncidentInvestigation({
     </li>)}</ul> : null}
     <Panel className="investigation-panel" title={t("incident.investigation")} subtitle={t("incident.investigationSubtitle")} meta={<Badge tone="info">{t("incident.observedOnly")}</Badge>}>
       <InvestigationStage counts={counts} graphEnabled={graphEnabled} investigation={investigation} onExpand={() => setExpanded(true)} onSelect={onSelect} selection={selection} showGraph={showGraph} />
+      <div className="investigation-evidence-table">
+        <EvidenceTable investigation={investigation} onSelect={onSelect} selection={selection} />
+      </div>
     </Panel>
     <Dialog className="investigation-dialog" closeLabel={t("incident.closeExpandedInvestigation")} eyebrow={t("incident.observedOnly")} onClose={() => setExpanded(false)} open={expanded} title={t("incident.expandedInvestigation")}>
       <InvestigationStage counts={counts} expanded graphEnabled={graphEnabled} investigation={investigation} onSelect={onSelect} selection={selection} showGraph={showGraph} />
     </Dialog>
-    <EvidenceTable investigation={investigation} onSelect={onSelect} selection={selection} />
   </div>;
 }
 
@@ -126,11 +128,10 @@ function EvidenceTable({
   onSelect: (selection: InvestigationSelection) => void;
 }) {
   const { t } = useI18n();
-  if (!investigation.edges.length) return <Panel title={t("incident.evidenceList")} subtitle={t("incident.evidenceSubtitle")}><EmptyState title={t("incident.noGraphEvidence")} message={t("incident.graphFallbackDescription")} /></Panel>;
+  if (!investigation.edges.length) return <EmptyState title={t("incident.noGraphEvidence")} message={t("incident.graphFallbackDescription")} />;
   const nodeById = new Map(investigation.nodes.map((node) => [node.nodeId, node]));
   const selectedIds = selectionNodeIds(selection, investigation);
-  return <Panel title={t("incident.evidenceList")} subtitle={t("incident.evidenceSubtitle")} meta={<Badge tone="success">OBSERVED</Badge>}>
-    <DataTable label={t("incident.evidenceList")}><thead><tr><th scope="col">{t("incident.relation")}</th><th scope="col">{t("incident.source")}</th><th scope="col">{t("incident.target")}</th><th scope="col">{t("incident.evidence")}</th><th scope="col">{t("incident.observedAt")}</th><th scope="col">{t("incident.sourceRecord")}</th></tr></thead><tbody>
+  return <DataTable className="relationship-evidence-table" label={t("incident.evidenceList")}><thead><tr><th scope="col">{t("incident.relation")}</th><th scope="col">{t("incident.source")}</th><th scope="col">{t("incident.target")}</th><th scope="col">{t("incident.evidence")}</th><th scope="col">{t("incident.observedAt")}</th><th scope="col">{t("incident.sourceRecord")}</th></tr></thead><tbody>
       {investigation.edges.map((edge) => {
         const selected = selection?.kind === "EDGE" && selection.id === edge.edgeId;
         const connected = selectedIds.has(edge.sourceNodeId) || selectedIds.has(edge.targetNodeId);
@@ -143,8 +144,7 @@ function EvidenceTable({
           <td><EvidenceLinks compact edge={edge} investigation={investigation} /></td>
         </tr>;
       })}
-    </tbody></DataTable>
-  </Panel>;
+    </tbody></DataTable>;
 }
 
 function NodeLinks({ node }: { node: InvestigationNodeDto }) {

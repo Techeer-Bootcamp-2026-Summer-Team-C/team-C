@@ -51,7 +51,7 @@ describe("overview fixed dashboard", () => {
       "incident-queue",
     ]);
     expect(OVERVIEW_BLOCK_IDS).toHaveLength(10);
-    expect(screen.queryByRole("button", { name: /edit dashboard|reset default|save dashboard/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /edit dashboard|reset default|save/i })).not.toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: /Threat level: 78 \/ 100, Red/i })).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: /Collection health: 61 \/ 100, Yellow/i })).toBeInTheDocument();
     expect(screen.getByText("High Endpoint Risk")).toBeInTheDocument();

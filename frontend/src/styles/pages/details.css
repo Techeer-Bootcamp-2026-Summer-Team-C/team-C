@@ -216,6 +216,7 @@
 .incident-queue-cleared > span { min-width: 0; display: flex; flex-wrap: wrap; gap: var(--space-3); overflow-wrap: anywhere; }
 .incident-queue-cleared a { flex: 0 0 auto; color: var(--text-link); }
 .investigation-panel > .panel-body { padding: 0; }
+.investigation-evidence-table { padding: var(--space-6); border-top: 1px solid var(--border-subtle); }
 .investigation-stage {
   grid-template-columns: 136px minmax(360px, 1fr) minmax(224px, 268px);
   gap: 0;

@@ -69,6 +69,7 @@ describe("WP-08 Intelligence, Operations, and Archives", () => {
     await userEvent.click(screen.getByRole("tab", { name: "Signals" }));
     expect(screen.getByText("Domain · example.com")).toBeInTheDocument();
     expect(screen.getByText("Topology graph is disabled")).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "Endpoint egress relationships" }).closest(".relationship-evidence-table")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "SOC-WIN-01" }));
     expect(screen.getByText("TCP relationship")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "2" })).toHaveAttribute("href", expect.stringContaining("/alerts?"));
@@ -102,6 +103,7 @@ describe("WP-08 Intelligence, Operations, and Archives", () => {
     expect(selectedCorrelationRelationship(correlationFixture, selection)).toEqual(edge);
     renderWithProviders(<CorrelationResult correlation={correlationFixture} graphEnabled={false} />);
     expect(screen.getByText("Correlation graph is disabled")).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "IP and Domain relationship evidence" }).closest(".relationship-evidence-table")).toBeInTheDocument();
     expect(screen.getAllByText("8.8.8.8").length).toBeGreaterThan(0);
     expect(screen.getAllByText("dns.google").length).toBeGreaterThan(0);
     await userEvent.click(screen.getByRole("button", { name: "8.8.8.8" }));

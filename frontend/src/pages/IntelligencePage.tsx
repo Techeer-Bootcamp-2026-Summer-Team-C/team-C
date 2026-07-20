@@ -190,7 +190,7 @@ function CorrelationInspector({ correlation, selection }: { correlation: Correla
 
 function CorrelationEvidenceTable({ correlation, selection, onSelect }: { correlation: CorrelationDto; selection: CorrelationSelection | null; onSelect: (selection: CorrelationSelection) => void }) {
   const { t } = useI18n();
-  return <DataTable label={t("intelligence.correlationTable")}><thead><tr><th scope="col">{t("intelligence.source")}</th><th scope="col">{t("intelligence.relationship")}</th><th scope="col">{t("intelligence.target")}</th><th scope="col">{t("intelligence.evidenceSource")}</th></tr></thead><tbody>{correlation.relationships.map((edge) => {
+  return <DataTable className="relationship-evidence-table" label={t("intelligence.correlationTable")}><thead><tr><th scope="col">{t("intelligence.source")}</th><th scope="col">{t("intelligence.relationship")}</th><th scope="col">{t("intelligence.target")}</th><th scope="col">{t("intelligence.evidenceSource")}</th></tr></thead><tbody>{correlation.relationships.map((edge) => {
     const id = correlationEdgeId(edge);
     const selected = selection?.kind === "EDGE" && selection.id === id;
     return <tr className={selected ? "selected-row" : undefined} key={id}><td><button aria-pressed={selected} className="evidence-select" onClick={() => onSelect({ kind: "EDGE", id })} type="button"><code>{edge.sourceValue}</code></button></td><td>{edge.relation}</td><td><code>{edge.targetValue}</code></td><td>{edge.sources.map((source) => <Badge key={source} tone={source === "LIVE_DNS" ? "info" : "neutral"}>{source}</Badge>)}</td></tr>;
@@ -355,7 +355,7 @@ function TopologyInspector({ topology, selection }: { topology: EgressTopologyDt
 
 function TopologyEvidenceTable({ topology, selection, onSelect }: { topology: EgressTopologyDto; selection: TopologySelection | null; onSelect: (selection: TopologySelection) => void }) {
   const { t } = useI18n();
-  return <DataTable label={t("intelligence.relationships")}><thead><tr><th scope="col">{t("intelligence.source")}</th><th scope="col">{t("intelligence.target")}</th><th scope="col">Protocol</th><th scope="col">Events</th><th scope="col">Alerts</th><th scope="col">{t("intelligence.lastObserved")}</th></tr></thead><tbody>{topology.edges.map((edge) => {
+  return <DataTable className="relationship-evidence-table" label={t("intelligence.relationships")}><thead><tr><th scope="col">{t("intelligence.source")}</th><th scope="col">{t("intelligence.target")}</th><th scope="col">Protocol</th><th scope="col">Events</th><th scope="col">Alerts</th><th scope="col">{t("intelligence.lastObserved")}</th></tr></thead><tbody>{topology.edges.map((edge) => {
     const id = topologyEdgeId(edge.endpointId, edge.target, edge.protocol);
     const selected = (selection?.kind === "EDGE" && selection.id === id)
       || (selection?.kind === "EDGE_GROUP" && selection.id === topologyEdgeGroupId(edge.endpointId, edge.target));
