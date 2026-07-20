@@ -10,14 +10,13 @@ import { useI18n } from "../i18n/LocaleContext";
 import { formatDateTime, humanize } from "../lib/format";
 import { allowedValue } from "../lib/params";
 import { numberParam, updateParams } from "../lib/url";
-import { pollingInterval } from "../query/policy";
 
 export function OperationsPage() {
   const { t } = useI18n();
   const [params, setParams] = useSearchParams();
   const time = readTimeFilter(params);
-  const ingest = useQuery({ queryKey: ["ingest-summary", time.query], queryFn: ({ signal }) => api.ingestSummary(time.query, signal), enabled: time.valid, staleTime: 15_000, refetchInterval: pollingInterval(15_000) });
-  const health = useQuery({ queryKey: ["operations-health"], queryFn: ({ signal }) => api.operationsHealth(signal), staleTime: 15_000, refetchInterval: pollingInterval(30_000) });
+  const ingest = useQuery({ queryKey: ["ingest-summary", time.query], queryFn: ({ signal }) => api.ingestSummary(time.query, signal), enabled: time.valid, staleTime: 15_000 });
+  const health = useQuery({ queryKey: ["operations-health"], queryFn: ({ signal }) => api.operationsHealth(signal), staleTime: 15_000 });
   const failureStatus = allowedValue(params.get("failureStatus"), ["FAILED", "REPROCESSED", "REPROCESS_FAILED"] as const);
   const retryable = allowedValue(params.get("retryable"), ["true", "false"] as const);
   const failureQuery: FailureListQuery = { ...time.query, page: numberParam(params, "page", 1), size: 50, sortOrder: "desc" };
@@ -25,11 +24,11 @@ export function OperationsPage() {
   const failureStage = params.get("failureStage");
   if (failureStage) failureQuery.failureStage = failureStage;
   if (retryable) failureQuery.retryable = retryable === "true";
-  const failures = useQuery({ queryKey: ["event-failures", failureQuery], queryFn: ({ signal }) => api.failures(failureQuery, signal), enabled: time.valid, staleTime: 15_000, refetchInterval: pollingInterval(30_000) });
+  const failures = useQuery({ queryKey: ["event-failures", failureQuery], queryFn: ({ signal }) => api.failures(failureQuery, signal), enabled: time.valid, staleTime: 15_000 });
   const refreshing = ingest.isFetching || health.isFetching || failures.isFetching;
   const refresh = () => void Promise.all([ingest.refetch(), health.refetch(), failures.refetch()]);
   return <div className="page-stack">
-    <PageHeader eyebrow={t("operations.eyebrow")} title={t("operations.title")} description={t("operations.description")} actions={<>
+    <PageHeader title={t("operations.title")} actions={<>
       <button className="button ghost" disabled={refreshing} onClick={refresh} type="button"><RefreshCcw aria-hidden="true" size={16} />{refreshing ? t("operations.refreshing") : t("operations.refreshLive")}</button>
       <Link className="button" to="/operations/archives"><Archive aria-hidden="true" size={16} />{t("operations.archiveAction")}</Link>
     </>} />

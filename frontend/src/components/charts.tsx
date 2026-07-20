@@ -9,7 +9,7 @@ export function CountBars({ rows, mode = "standard" }: { rows: readonly { label:
   const { t } = useI18n();
   if (!rows.length) return <EmptyState title={t("charts.noDistributionTitle")} message={t("charts.noDistributionDescription")} />;
   const maximum = Math.max(...rows.map((row) => row.count), 1);
-  const visibleRows = mode === "compact" ? rows.slice(0, 3) : mode === "standard" ? rows.slice(0, 4) : rows;
+  const visibleRows = mode === "compact" ? rows.slice(0, 3) : rows;
   return <div className="count-bars"><DistributionRows maximum={maximum} rows={visibleRows} />{visibleRows.length < rows.length ? <details className="distribution-details"><summary>{t("charts.viewMore", { count: rows.length - visibleRows.length })}</summary><div className="count-bars"><DistributionRows maximum={maximum} rows={rows} /></div></details> : null}</div>;
 }
 

@@ -72,6 +72,7 @@ export function EndpointScopePicker({ selectedEndpointId, onChange }: {
   };
 
   return <div className="overview-endpoint-picker" ref={rootRef}>
+    <span className="overview-endpoint-label">{t("overview.endpointScope")}</span>
     <button aria-expanded={open} aria-haspopup="dialog" aria-label={t("overview.endpointScope")} className="overview-endpoint-trigger" onClick={() => setOpen((value) => !value)} ref={triggerRef} type="button">
       <Monitor aria-hidden="true" size={15} />
       <span>{selectedEndpoint ? `${selectedEndpoint.hostname} · ID ${selectedEndpoint.endpointId}` : selectedEndpointId ? `Endpoint ${selectedEndpointId}` : t("overview.allEndpoints")}</span>

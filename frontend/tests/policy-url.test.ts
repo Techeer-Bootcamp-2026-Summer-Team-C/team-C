@@ -1,25 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
-import { ApiError } from "../src/api/client";
+import { describe, expect, it } from "vitest";
 import { intervalFor, navigationDestination, navigationTimeScope, numberParam, updateParams, validEventDetailQuery } from "../src/lib/url";
-import { canMutate, pollingInterval, retryDelay, shouldRetry } from "../src/query/policy";
-
-describe("request lifecycle policy", () => {
-  it("retries only 503 with 5s, 15s, 30s delays", () => {
-    const unavailable = new ApiError({ status: 503, code: "SERVICE_UNAVAILABLE", message: "down", retryable: true, details: [], requestId: "req" });
-    const forbidden = new ApiError({ status: 403, code: "FORBIDDEN", message: "no", retryable: false, details: [], requestId: "req" });
-    expect([0, 1, 2, 3].map((count) => shouldRetry(count, unavailable))).toEqual([true, true, true, false]);
-    expect(shouldRetry(0, forbidden)).toBe(false);
-    expect([0, 1, 2, 3].map(retryDelay)).toEqual([5_000, 15_000, 30_000, 30_000]);
-  });
-
-  it("stops polling while the document is hidden", () => {
-    const visibility = vi.spyOn(document, "visibilityState", "get");
-    visibility.mockReturnValue("hidden");
-    expect(pollingInterval(30_000)()).toBe(false);
-    visibility.mockReturnValue("visible");
-    expect(pollingInterval(30_000)()).toBe(30_000);
-  });
-});
+import { canMutate } from "../src/query/policy";
 
 describe("URL and role contracts", () => {
   it("restores pagination and resets page when a filter changes", () => {

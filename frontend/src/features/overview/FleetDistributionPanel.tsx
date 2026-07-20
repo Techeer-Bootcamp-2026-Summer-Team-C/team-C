@@ -96,7 +96,6 @@ export function FleetDistributionPanel({ summary }: { summary: EndpointSummaryDt
         </> : <p className="fleet-empty">{t("overview.noSensorHealthSnapshots")}</p>}
       </section>
     </div>
-    <p className="fleet-snapshot-note">{t("overview.fleetSnapshotNote")}</p>
   </Panel>;
 }
 

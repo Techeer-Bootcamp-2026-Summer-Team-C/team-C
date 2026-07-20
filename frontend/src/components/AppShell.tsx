@@ -183,13 +183,6 @@ export function AppShell() {
               <strong>{pageTitleText}</strong>
             </>}
           </div>
-          <div aria-label={t("navigation.investigationPath")} className="investigation-path">
-            <span><Activity aria-hidden="true" size={14} />{t("navigation.pathSignal")}</span>
-            <i aria-hidden="true" />
-            <span><Search aria-hidden="true" size={14} />{t("navigation.pathEvidence")}</span>
-            <i aria-hidden="true" />
-            <span><ShieldCheck aria-hidden="true" size={14} />{t("navigation.pathDecision")}</span>
-          </div>
           <form className="global-search" onSubmit={submitSearch} role="search">
             <Search aria-hidden="true" size={16} />
             <input aria-label={t("search.aria")} onChange={(event) => setSearch(event.target.value)} placeholder={t("search.placeholder")} value={search} />
@@ -266,11 +259,11 @@ function PrimaryNavigation({ compact, mobile = false, onNavigate, onToggleCompac
   return <div className="navigation-content" id={mobile ? "mobile-primary-navigation" : undefined}>
     <div className="brand-mark" aria-label={SERVICE_NAME}>
       <span aria-hidden="true">{SERVICE_MARK}</span>
-      <div><strong title={SERVICE_NAME}>{SERVICE_NAME}</strong><small>{t("navigation.endpointDefense")}</small></div>
+      <div><strong title={SERVICE_NAME}>{SERVICE_NAME}</strong></div>
     </div>
     <nav aria-label={t("navigation.primary")}>
       {NAVIGATION_GROUPS.map((group) => <section className="nav-group" key={group.labelKey}>
-        <h2>{t(group.labelKey)}</h2>
+        {group.labelKey !== "navigation.groupOverview" ? <h2>{t(group.labelKey)}</h2> : null}
         {group.items.map(({ to, labelKey, icon: Icon, end, child }) => {
           const label = t(labelKey);
           return <NavLink
@@ -288,7 +281,6 @@ function PrimaryNavigation({ compact, mobile = false, onNavigate, onToggleCompac
         })}
       </section>)}
     </nav>
-    <div className="navigation-mode" aria-hidden="true"><span>EDR / SOC</span><small>{t("navigation.evidenceFirst")}</small></div>
     {!mobile ? <Tooltip label={compactLabel}>
       <button aria-label={compactLabel} className="nav-compact" onClick={onToggleCompact} type="button">
         {compact ? <PanelLeftOpen aria-hidden="true" size={18} /> : <PanelLeftClose aria-hidden="true" size={18} />}

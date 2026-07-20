@@ -8,6 +8,7 @@ import { readTimeFilter } from "../components/filters";
 import { DetailLedger, DetailLedgerSection, EmptyState, ErrorState, Field, PageHeader, Panel, ResponseGuidance, Skeleton, SourceEvent, StatusPill } from "../components/ui";
 import type { AlertDto, AlertStatus, SuccessEnvelope } from "../contracts";
 import { useI18n } from "../i18n/LocaleContext";
+import { detectionSummary, detectionTitle } from "../i18n/detectionCopy";
 import { alertDetailUrl, alertTriageQueueQuery, nextActionableAlert } from "../features/alertTriage";
 import { formatDateTime } from "../lib/format";
 import { canMutate } from "../query/policy";
@@ -101,7 +102,7 @@ function AlertDetail({ alert, canUpdate, mutation, nextAlert, params, queue, que
           to={alertDetailUrl(item.alertId, params)}
         >
           <span className="triage-row-heading"><span><StatusPill value={item.severity} /><StatusPill value={item.status} /></span><small>{t("alert.riskValue", { score: item.riskScore })}</small></span>
-          <strong>{item.title}</strong>
+          <strong>{detectionTitle(t, item.title, item.ruleCode)}</strong>
           <code>{item.ruleCode} · {item.agentId}</code>
           <small>{formatDateTime(item.detectedAt)}</small>
         </Link>)}
@@ -109,7 +110,7 @@ function AlertDetail({ alert, canUpdate, mutation, nextAlert, params, queue, que
       </div> : null}
     </Panel>
     <div className="triage-detail page-stack">
-      <PageHeader eyebrow={`${alert.ruleCode} · RULE V${alert.ruleVersion}`} title={alert.title} description={alert.summary} actions={<><StatusPill value={alert.severity} /><StatusPill value={alert.status} /></>} />
+      <PageHeader eyebrow={`${alert.ruleCode} · RULE V${alert.ruleVersion}`} title={detectionTitle(t, alert.title, alert.ruleCode)} description={detectionSummary(t, alert.summary, "")} actions={<><StatusPill value={alert.severity} /><StatusPill value={alert.status} /></>} />
       <AlertEvidenceChain alert={alert} />
       {mutation.error ? <ErrorState error={mutation.error} /> : null}
       {mutation.isSuccess ? <div className="mutation-success"><CheckCircle2 aria-hidden="true" size={16} />{t("alert.workflowSaved")}</div> : null}
@@ -136,7 +137,6 @@ function AlertDetail({ alert, canUpdate, mutation, nextAlert, params, queue, que
             <button className="button ghost" disabled={mutation.isPending || draftStatus === alert.status} onClick={() => mutation.mutate({ status: draftStatus })} type="button"><Save aria-hidden="true" size={15} />{t("alert.saveStatus")}</button>
             <button className="button" disabled={mutation.isPending || (!nextAlert && draftStatus === alert.status)} onClick={() => mutation.mutate({ status: draftStatus, ...(nextAlert ? { nextAlertId: nextAlert.alertId } : {}) })} type="button">{t("alert.submitNext")}</button>
           </div>
-          <small className="workflow-next">{nextAlert ? t("alert.nextItem", { ruleCode: nextAlert.ruleCode, title: nextAlert.title }) : t("alert.noNextItem")}</small>
         </div> : <div className="read-only-note"><StatusPill value={alert.status} /><span>{t("alert.viewerControlsHidden")}</span></div>}</Panel>
       </section>
     </div>

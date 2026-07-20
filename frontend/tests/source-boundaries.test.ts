@@ -35,6 +35,32 @@ describe("Frontend responsibility boundaries", () => {
       expect(content).not.toMatch(/build(?:Alert|Event|Risk|Time).*Bucket/i);
     }
   });
+
+  it("keeps screen refresh user-triggered throughout the app", () => {
+    for (const file of sourceFiles(SOURCE)) {
+      const content = readFileSync(file, "utf8");
+      expect(content).not.toContain("refetchInterval:");
+      expect(content).not.toMatch(/(?:window\.)?location\.(?:reload|href\s*=)/);
+      expect(content).not.toMatch(/\b(?:WebSocket|EventSource)\b/);
+      expect(content).not.toContain("serviceWorker");
+      expect(content).not.toContain("setInterval(");
+    }
+
+    const main = readFileSync(resolve("src/main.tsx"), "utf8");
+    expect(main).toContain("retry: false");
+    expect(main).toContain("retryOnMount: false");
+    expect(main).toContain("refetchOnMount: false");
+    expect(main).toContain("refetchOnWindowFocus: false");
+    expect(main).toContain("refetchOnReconnect: false");
+    expect(main).toContain('networkMode: "always"');
+
+    const viteConfig = readFileSync(resolve("vite.config.ts"), "utf8");
+    expect(viteConfig).toContain("hmr: false");
+
+    const overview = readFileSync(resolve("src/pages/OverviewPage.tsx"), "utf8");
+    expect(overview).not.toContain("overview.autoRefresh");
+    expect(overview).toContain("onRefresh={refreshManually}");
+  });
 });
 
 function sourceFiles(directory: string): string[] {

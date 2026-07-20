@@ -6,7 +6,6 @@ import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import { App } from "./App";
 import { AuthProvider } from "./auth/AuthContext";
 import { LocaleProvider } from "./i18n/LocaleContext";
-import { retryDelay, shouldRetry } from "./query/policy";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import "./styles/fonts.css";
 import "./styles.css";
@@ -28,10 +27,13 @@ import "./styles/pages/details.css";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: shouldRetry,
-      retryDelay,
-      refetchOnWindowFocus: true,
+      retry: false,
+      retryOnMount: false,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
       refetchIntervalInBackground: false,
+      networkMode: "always",
     },
     mutations: { retry: false },
   },

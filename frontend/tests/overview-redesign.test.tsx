@@ -252,6 +252,7 @@ describe("overview fixed dashboard", () => {
       <EndpointScopePicker onChange={onChange} selectedEndpointId={undefined} />
     </LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
 
+    expect(screen.getByText("Endpoint scope", { selector: ".overview-endpoint-label" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Endpoint scope" }));
     expect(await screen.findByRole("option", { name: /FINANCE-MAC-02/ })).toBeInTheDocument();
     expect(endpointsSpy).toHaveBeenCalledWith({ page: 1, size: 20, sortBy: "riskScore", sortOrder: "desc" }, expect.any(AbortSignal));

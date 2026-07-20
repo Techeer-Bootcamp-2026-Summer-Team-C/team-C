@@ -607,6 +607,25 @@ Bundle 변화:
 - 남은 위험: 없음. 모바일은 사용자 요청에 따라 이번 시각 판정에서 제외했다.
 - 다음 Package: 없음.
 
+### REF-14. 최종 UI annotation 반영
+
+- 상태: 완료
+- 입력: 2026-07-20 브라우저 annotation으로 수집한 Overview의 조회 기간 조작, EDR 수치 위계, 설명 문구, Detection Activity 공간 사용, Fleet/위험 Endpoint copy와 공통 화면의 최종 UI 정리 요청.
+- 범위: Default Overview와 해당 화면을 둘러싼 공통 shell, list/detail 화면의 표시 copy·레이아웃·현지화·접기 interaction만 수정한다. API·DTO·OpenAPI·URL query·polling·권한·Backend lifecycle은 변경하지 않는다.
+- 설계 원칙: 중복 eyebrow·설명·상태 badge는 제거하고 화면 제목과 실제 데이터에 시선을 집중시킨다. Overview 조회 기간은 상단의 단일 dropdown에서 바로 변경한다. Incident ledger와 graph/table은 한 줄 정보 보존, 동일한 table surface, Inspector 내부 overflow 방지를 우선한다.
+- 예상 변경 파일: 공통 shell/component, Overview/Alerts/Incidents/Endpoints/Events/Intelligence/Operations/Archives page, 관련 page CSS·i18n·test와 이 실행계획. 새 runtime dependency는 추가하지 않는다.
+- 검증 계획: 관련 Vitest, 전체 typecheck·lint·test·build·OpenAPI check·`git diff --check`, 실제 Backend를 연결한 1088·1280·1440px 브라우저 QA와 console/overflow 검사를 수행한다.
+- 다음 Package: 검증 결과에 따라 없음 또는 잔여 결함 보정.
+
+- 최종 요청 반영: Overview 조회 기간은 별도 popover 없이 상단 단일 dropdown에서 최근 15분·1시간·24시간·7일·UTC 직접 설정을 바로 선택하도록 확정했다.
+- 구현 결과: 공통 shell과 list page의 중복 문구를 정리하고 Overview 수치·그래프·Fleet copy를 보정했다. Alerts/Incidents/Events/Intelligence/Operations/Archives annotation을 반영했으며 알려진 Detection 제목·설명·Incident graph node를 locale별로 표시한다. Incident ledger 설명 2개는 desktop 한 줄로 보존하고, 1088px Alert 상세는 queue/detail을 상하 배치해 증거 값의 세로 글자 깨짐을 제거했다.
+- 자동 검증: `npm run typecheck`, `npm run lint`, 전체 `npm run test -- --run` 25 files / 144 tests, `npm run build` passed. 변경 전 API 계약 검증인 `npm run openapi:check`도 passed 상태를 유지한다.
+- 브라우저 QA: 실제 local Backend와 seed data를 연결한 `http://127.0.0.1:5173`에서 KO 1088×731 및 Incident 1440×1000을 검증했다. 모든 대상 route의 document horizontal overflow 0px, console/page error 0건, 삭제 문구 재노출 0건이었다. Lifecycle 정책과 연결된 Alert 설명은 1088px에서 각각 16px 한 줄, `clientWidth === scrollWidth === 267px`, `white-space: nowrap`이었다.
+- 증거: `frontend/output/playwright/final-ui-polish/overview-time-dropdown-1088.png`, `alert-detail-1088.png`, `incident-detail-ledger-1088.png`, `incident-detail-1440.png`, `intelligence-1088.png`.
+- Bundle 변화: 새 runtime dependency 없음. production `OverviewPage` 115.90 kB / 35.37 kB gzip, `IncidentDetailPage` 17.33 kB / 5.15 kB gzip, 기존 route-local `DetectionActivityPanel` 326.07 kB / 113.10 kB gzip.
+- 남은 위험: React Flow canvas는 내부 좌표계 특성상 viewport element의 scrollWidth가 clientWidth보다 크지만 document overflow는 0px이며 시각적 clipping·page overflow는 재현되지 않았다.
+- 다음 Package: 없음.
+
 ### REF-10. 대형 관제 Overview 정보 밀도 복원
 
 - 상태: 완료

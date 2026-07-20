@@ -7,6 +7,7 @@ import { AuthProvider, RequireAuth } from "../src/auth/AuthContext";
 import { AppShell } from "../src/components/AppShell";
 import { TimeSeriesChart } from "../src/components/charts";
 import { LocaleProvider, useI18n } from "../src/i18n/LocaleContext";
+import { detectionSummary, detectionTitle } from "../src/i18n/detectionCopy";
 import { translate } from "../src/i18n/translations";
 import { formatDateTime } from "../src/lib/format";
 import { LoginPage } from "../src/pages/LoginPage";
@@ -165,6 +166,13 @@ it("preserves the English regression copy and uses the agreed mixed Korean termi
   expect(translate("KO", "event.processTree")).toBe("Process Tree");
   expect(translate("KO", "operations.failureQueue")).toBe("Failure Queue");
   expect(translate("KO", "intelligence.mitreTactics")).toBe("MITRE Tactic");
+});
+
+it("localizes known Backend detection copy without changing unknown values", () => {
+  const ko = (key: Parameters<typeof translate>[1]) => translate("KO", key);
+  expect(detectionTitle(ko, "Encoded PowerShell command detected", "PROC_POWERSHELL_ENCODED")).toBe("인코딩된 PowerShell 명령 실행 탐지");
+  expect(detectionSummary(ko, "PowerShell was executed with an encoded command argument.", "")).toBe("인코딩된 명령 인자로 PowerShell이 실행되었습니다.");
+  expect(detectionTitle(ko, "Unknown detector")).toBe("Unknown detector");
 });
 
 it("preserves Event capitalization in Korean time-series copy", async () => {

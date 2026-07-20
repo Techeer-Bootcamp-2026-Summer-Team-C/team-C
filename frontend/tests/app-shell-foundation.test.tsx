@@ -34,12 +34,16 @@ describe("application shell foundation", () => {
   it("renders approved navigation groups, child hierarchy, and route breadcrumbs", async () => {
     renderShell();
     expect(await screen.findByRole("heading", { name: "Archive destination" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Overview" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Overview" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Overview" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Triage" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Evidence" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Analysis" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Platform" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Dashboards" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Endpoint Defense")).not.toBeInTheDocument();
+    expect(screen.queryByText("EDR / SOC")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Investigation path")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Archives" })).toHaveClass("nav-child", "active");
 
     const breadcrumb = screen.getByRole("navigation", { name: "Breadcrumb" });

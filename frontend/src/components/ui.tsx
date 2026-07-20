@@ -17,14 +17,14 @@ import { Badge, Button, Drawer, IconButton } from "./primitives";
 export { Field } from "./primitives";
 
 export function PageHeader({ eyebrow, title, description, actions }: {
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
-  description: string;
+  description?: string;
   actions?: ReactNode;
 }) {
   return (
     <header className="page-header">
-      <div><span>{eyebrow}</span><h1>{title}</h1><p>{description}</p></div>
+      <div>{eyebrow ? <span>{eyebrow}</span> : null}<h1>{title}</h1>{description ? <p>{description}</p> : null}</div>
       {actions ? <div className="page-actions">{actions}</div> : null}
     </header>
   );

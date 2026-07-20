@@ -191,6 +191,8 @@
 
 @media (max-width: 1279px) {
   .intelligence-analysis-grid { grid-template-columns: 1fr; }
+  .mitre-layout { grid-template-columns: 1fr; }
+  .mitre-cells { grid-template-columns: 1fr; }
   .topology-stage { grid-template-columns: minmax(140px, .35fr) minmax(0, 1.3fr); }
   .topology-stage > .inspector { grid-column: 1 / -1; }
   .archive-lifecycle { grid-template-columns: repeat(3, minmax(0, 1fr)); }

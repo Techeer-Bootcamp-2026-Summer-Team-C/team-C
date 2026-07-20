@@ -10,7 +10,7 @@ import { appliedFilterDescriptors, hasInvalidPagination, removeListFilter } from
 import { useI18n } from "../i18n/LocaleContext";
 import { formatDateTime } from "../lib/format";
 import { localDateTimeValue, numberParam, updateParams, utcFromLocal } from "../lib/url";
-import { archivePollingInterval, canMutate } from "../query/policy";
+import { canMutate } from "../query/policy";
 
 export function ArchivesPage() {
   const { t } = useI18n();
@@ -27,14 +27,14 @@ export function ArchivesPage() {
   const ready = endpointIdsValid && endpointIds.length > 0 && validRange && !hasInvalidPagination(params);
   const invalid = hasCriteria && !ready;
   const query: ArchiveRestoreListQuery = { endpointIds, from, to, page: numberParam(params, "page", 1), size: numberParam(params, "size", 50) };
-  const result = useQuery({ queryKey: ["archives", query], queryFn: ({ signal }) => api.archives(query, signal), enabled: ready, staleTime: 10_000, refetchInterval: archivePollingInterval });
+  const result = useQuery({ queryKey: ["archives", query], queryFn: ({ signal }) => api.archives(query, signal), enabled: ready, staleTime: 10_000 });
   const mutation = useMutation({ mutationFn: (request: ArchiveRestoreRequest) => api.startRestore(request), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["archives"] }); } });
   const writeAllowed = auth.user ? canMutate(auth.user.role) : false;
   const appliedFilters = appliedFilterDescriptors(params, [{ key: "endpointIds", label: t("filter.endpointIds") }, { key: "from", label: t("filter.from") }, { key: "to", label: t("filter.to") }]);
 
   return <div className="page-stack archives-page">
     <Link className="back-link" to="/operations"><ArrowLeft aria-hidden="true" size={15} />{t("navigation.operations")}</Link>
-    <PageHeader eyebrow={t("archive.eyebrow")} title={t("archive.title")} description={t("archive.description")} />
+    <PageHeader title={t("archive.title")} />
     <FilterBar appliedFilters={appliedFilters} hasFilters={appliedFilters.length > 0} onClear={() => setParams({})} onRemoveFilter={(key) => setParams(removeListFilter(params, key))} primary={<><Field label={t("filter.endpointIds")}><input aria-describedby="endpoint-id-help" onChange={(event) => setParams(updateParams(params, { endpointIds: event.target.value }))} placeholder="1001, 1002" value={rawEndpointIds} /><small id="endpoint-id-help">{t("archive.endpointHelp")}</small></Field><Field label={t("filter.from")}><input onChange={(event) => setParams(updateParams(params, { from: event.target.value ? utcFromLocal(event.target.value) : null }))} type="datetime-local" value={from ? localDateTimeValue(from) : ""} /></Field><Field label={t("filter.to")}><input onChange={(event) => setParams(updateParams(params, { to: event.target.value ? utcFromLocal(event.target.value) : null }))} type="datetime-local" value={to ? localDateTimeValue(to) : ""} /></Field></>} />
     <ArchiveReadinessLedger endpointCount={endpointIds.length} from={from} hasCriteria={hasCriteria} ready={ready} to={to} />
     {hasCriteria ? <QueryFeedback error={result.error} fetching={result.isFetching} hasData={Boolean(result.data)} invalid={invalid} invalidMessage={t("archive.chooseRangeDescription")} onRetry={() => void result.refetch()} pending={result.isPending && ready} refetchError={result.isRefetchError} rows={7} /> : null}

@@ -27,26 +27,40 @@ export function readTimeFilter(params: URLSearchParams): TimeFilterState {
   return { preset, from, to, valid, query, interval: intervalFor(preset, from, to) };
 }
 
-export function TimeFilterFields({ params, setParams }: {
+const TIME_PRESETS: readonly TimePreset[] = ["LATEST_15M", "LATEST_1H", "LATEST_24H", "LATEST_7D", "CUSTOM"];
+
+export function TimeFilterFields({ params, setParams, variant = "select" }: {
   params: URLSearchParams;
   setParams: (next: URLSearchParams) => void;
+  variant?: "select" | "presets";
 }) {
   const { t } = useI18n();
   const state = readTimeFilter(params);
+  const labels: Record<TimePreset, string> = {
+    LATEST_15M: t("filter.latest15Minutes"),
+    LATEST_1H: t("filter.latestHour"),
+    LATEST_24H: t("filter.latest24Hours"),
+    LATEST_7D: t("filter.latest7Days"),
+    CUSTOM: t("filter.customUtcRange"),
+  };
   return (
     <>
-      <Field label={t("filter.timeRange")}>
+      {variant === "presets" ? <div aria-label={t("filter.timeRange")} className="time-preset-list" role="group">
+        {TIME_PRESETS.map((preset) => <button
+          aria-pressed={state.preset === preset}
+          className={state.preset === preset ? "active" : undefined}
+          key={preset}
+          onClick={() => setParams(updateParams(params, { timePreset: preset, ...(preset === "CUSTOM" ? {} : { from: null, to: null }) }))}
+          type="button"
+        >{labels[preset]}</button>)}
+      </div> : <Field label={t("filter.timeRange")}>
         <select
           onChange={(event) => setParams(updateParams(params, { timePreset: event.target.value }))}
           value={state.preset}
         >
-          <option value="LATEST_15M">{t("filter.latest15Minutes")}</option>
-          <option value="LATEST_1H">{t("filter.latestHour")}</option>
-          <option value="LATEST_24H">{t("filter.latest24Hours")}</option>
-          <option value="LATEST_7D">{t("filter.latest7Days")}</option>
-          <option value="CUSTOM">{t("filter.customUtcRange")}</option>
+          {TIME_PRESETS.map((preset) => <option key={preset} value={preset}>{labels[preset]}</option>)}
         </select>
-      </Field>
+      </Field>}
       {state.preset === "CUSTOM" ? (
         <>
           <Field label={t("filter.from")}>

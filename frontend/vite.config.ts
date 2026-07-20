@@ -16,6 +16,9 @@ export default defineConfig(({ mode }) => ({
     },
   },
   server: {
+    // Keep the annotation/review viewport stable while source files change.
+    // Developers opt in to updates by refreshing the browser themselves.
+    hmr: false,
     port: 5173,
     proxy: {
       "/api": {

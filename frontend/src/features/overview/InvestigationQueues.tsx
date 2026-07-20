@@ -17,7 +17,7 @@ export function RiskEndpointRanking({ endpoints }: { endpoints: EndpointDto[] })
       <div className="risk-ranking-metrics">
         <div className={`risk-ledger-score tone-${endpoint.risk.level.toLowerCase()}`}><span>{t("overview.riskScore")}</span><strong>{endpoint.risk.score}</strong><small>{humanize(endpoint.risk.level)}</small></div>
         <div><span>{t("navigation.alerts")}</span><strong>{endpoint.risk.activeAlertCount}</strong></div>
-        <div><span>{t("navigation.incidents")}</span><strong>{endpoint.risk.openIncidentCount}</strong></div>
+        <div><span>{t("overview.openIncidents")}</span><strong>{endpoint.risk.openIncidentCount}</strong></div>
       </div>
     </li>)}
   </ol>;

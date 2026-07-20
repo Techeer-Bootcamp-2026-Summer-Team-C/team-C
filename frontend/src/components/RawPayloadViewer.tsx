@@ -1,4 +1,4 @@
-import { Check, Copy, Search } from "lucide-react";
+import { Check, ChevronDown, Copy, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useI18n } from "../i18n/LocaleContext";
 
@@ -18,7 +18,7 @@ export function RawPayloadViewer({ payload }: { payload: Record<string, unknown>
     }
   };
   return <details className="raw-payload-panel">
-    <summary><span>{t("event.rawPayload")}</span><small>{t("event.rawPayloadCollapsed")}</small></summary>
+    <summary><span>{t("event.rawPayload")}</span><ChevronDown aria-hidden="true" size={17} /></summary>
     <div className="raw-payload-content">
       <div className="raw-payload-toolbar"><label><Search aria-hidden="true" size={15} /><span className="sr-only">{t("event.searchPayload")}</span><input onChange={(event) => setQuery(event.target.value)} placeholder={t("event.searchPayload")} type="search" value={query} /></label><span aria-live="polite">{query ? t("event.payloadMatches", { count: matchCount }) : ""}</span><button className="button secondary" onClick={() => void copy()} type="button">{copied ? <Check aria-hidden="true" size={15} /> : <Copy aria-hidden="true" size={15} />}{copied ? t("event.copied") : t("event.copyPayload")}</button></div>
       <pre aria-label={t("event.rawPayload")} className="json-view">{lines.map((line, index) => <span className={query && line.toLowerCase().includes(query.toLowerCase()) ? "json-line match" : "json-line"} key={`${index}-${line}`}>{highlight(line, query)}{"\n"}</span>)}</pre>

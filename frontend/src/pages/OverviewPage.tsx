@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, Clock3, RefreshCw, Settings2 } from "lucide-react";
-import { useState } from "react";
+import { RefreshCw, Settings2 } from "lucide-react";
+import { memo, useCallback, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/endpoints";
 import { readTimeFilter, TimeFilterFields } from "../components/filters";
-import { Button, Popover } from "../components/primitives";
+import { Button } from "../components/primitives";
 import { ErrorState, PageHeader, PartialFailureWarning, StaleWarning } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 import { OverviewLayoutProvider } from "../features/overviewLayout/OverviewLayoutContext";
@@ -13,9 +13,6 @@ import { EndpointScopePicker } from "../features/overview/EndpointScopePicker";
 import { useI18n } from "../i18n/LocaleContext";
 import { formatDateTime } from "../lib/format";
 import { updateParams } from "../lib/url";
-import { pollingInterval } from "../query/policy";
-
-type Translate = ReturnType<typeof useI18n>["t"];
 
 export function readOverviewEndpointId(params: URLSearchParams): number | undefined {
   const endpointId = Number(params.get("endpointId"));
@@ -39,6 +36,7 @@ function AuthenticatedOverviewRoute({ mode }: { mode: "overview" | "manage" }) {
 function OverviewPageContent({ mode }: { mode: "overview" | "manage" }) {
   const { t } = useI18n();
   const [dashboardSettingsOpen, setDashboardSettingsOpen] = useState(false);
+  const [manualRefreshing, setManualRefreshing] = useState(false);
   const [params, setParams] = useSearchParams();
   const time = readTimeFilter(params);
   const selectedEndpointId = readOverviewEndpointId(params);
@@ -47,18 +45,26 @@ function OverviewPageContent({ mode }: { mode: "overview" | "manage" }) {
     ...(selectedEndpointId ? { endpointId: selectedEndpointId } : {}),
   };
   const summaryQuery = { ...scopedTimeQuery, interval: time.interval };
-  const dashboard = useQuery({ queryKey: ["dashboard", summaryQuery], queryFn: ({ signal }) => api.dashboard(summaryQuery, signal), enabled: time.valid, staleTime: 30_000, refetchInterval: pollingInterval(30_000) });
-  const endpoints = useQuery({ queryKey: ["endpoint-summary", scopedTimeQuery], queryFn: ({ signal }) => api.endpointSummary(scopedTimeQuery, signal), enabled: time.valid, staleTime: 30_000, refetchInterval: pollingInterval(30_000) });
-  const ingest = useQuery({ queryKey: ["ingest-summary", scopedTimeQuery], queryFn: ({ signal }) => api.ingestSummary(scopedTimeQuery, signal), enabled: time.valid, staleTime: 30_000, refetchInterval: pollingInterval(30_000) });
+  const dashboard = useQuery({ queryKey: ["dashboard", summaryQuery], queryFn: ({ signal }) => api.dashboard(summaryQuery, signal), enabled: time.valid, staleTime: 30_000 });
+  const endpoints = useQuery({ queryKey: ["endpoint-summary", scopedTimeQuery], queryFn: ({ signal }) => api.endpointSummary(scopedTimeQuery, signal), enabled: time.valid, staleTime: 30_000 });
+  const ingest = useQuery({ queryKey: ["ingest-summary", scopedTimeQuery], queryFn: ({ signal }) => api.ingestSummary(scopedTimeQuery, signal), enabled: time.valid, staleTime: 30_000 });
   const endpointRankingQuery = { page: 1, size: 5, ...(selectedEndpointId ? { endpointIds: [selectedEndpointId] } : {}), sortBy: "riskScore" as const, sortOrder: "desc" as const };
-  const endpointRanking = useQuery({ queryKey: ["overview-risk-endpoints", endpointRankingQuery], queryFn: ({ signal }) => api.endpoints(endpointRankingQuery, signal), enabled: time.valid, staleTime: 30_000, refetchInterval: pollingInterval(30_000) });
+  const endpointRanking = useQuery({ queryKey: ["overview-risk-endpoints", endpointRankingQuery], queryFn: ({ signal }) => api.endpoints(endpointRankingQuery, signal), enabled: time.valid, staleTime: 30_000 });
   const incidentQuery = { ...scopedTimeQuery, status: "OPEN" as const, page: 1, size: 5, sortOrder: "desc" as const };
-  const incidentQueue = useQuery({ queryKey: ["overview-incidents", incidentQuery], queryFn: ({ signal }) => api.incidents(incidentQuery, signal), enabled: time.valid, staleTime: 30_000, refetchInterval: pollingInterval(30_000) });
+  const incidentQueue = useQuery({ queryKey: ["overview-incidents", incidentQuery], queryFn: ({ signal }) => api.incidents(incidentQuery, signal), enabled: time.valid, staleTime: 30_000 });
   const allQueries = [dashboard, endpoints, ingest, endpointRanking, incidentQueue];
   const panelQueries = [dashboard, endpoints, endpointRanking, incidentQueue];
-  const refreshing = allQueries.some((query) => query.isFetching);
   const lastRefreshedAt = Math.max(...allQueries.map((query) => query.dataUpdatedAt));
   const refreshData = () => Promise.all(allQueries.map((query) => query.refetch()));
+  const refreshManually = async () => {
+    if (manualRefreshing) return;
+    setManualRefreshing(true);
+    try {
+      await refreshData();
+    } finally {
+      setManualRefreshing(false);
+    }
+  };
   const hasPanelData = panelQueries.some((query) => Boolean(query.data));
   const totalFailure = panelQueries.every((query) => Boolean(query.error && !query.data));
   const initialError = totalFailure ? panelQueries.map((query) => query.error).find(Boolean) ?? null : null;
@@ -88,13 +94,11 @@ function OverviewPageContent({ mode }: { mode: "overview" | "manage" }) {
       {time.valid ? <OverviewToolbar
         dashboardSettingsTo={mode === "overview" ? `/dashboards${params.toString() ? `?${params.toString()}` : ""}` : undefined}
         lastRefreshedAt={lastRefreshedAt}
-        onEndpointChange={(endpointId) => setParams(updateParams(params, { endpointId }))}
-        onRefresh={refreshData}
+        onRefresh={refreshManually}
         params={params}
-        refreshing={refreshing}
+        refreshing={manualRefreshing}
         selectedEndpointId={selectedEndpointId}
         setParams={setParams}
-        timePreset={time.preset}
       /> : null}
       {partialFailure ? <PartialFailureWarning message={t("overview.partialFailure")} /> : null}
       {staleError && hasPanelData ? <StaleWarning error={staleError} onRetry={() => void refreshData()} /> : null}
@@ -110,35 +114,37 @@ function OverviewPageContent({ mode }: { mode: "overview" | "manage" }) {
   );
 }
 
-function OverviewToolbar({ dashboardSettingsTo, lastRefreshedAt, onEndpointChange, onRefresh, params, refreshing, selectedEndpointId, setParams, timePreset }: {
+function OverviewToolbar({ dashboardSettingsTo, lastRefreshedAt, onRefresh, params, refreshing, selectedEndpointId, setParams }: {
   dashboardSettingsTo?: string | undefined;
   lastRefreshedAt: number;
-  onEndpointChange: (endpointId: number | undefined) => void;
   onRefresh: () => Promise<unknown>;
   params: URLSearchParams;
   refreshing: boolean;
   selectedEndpointId: number | undefined;
   setParams: (next: URLSearchParams) => void;
-  timePreset: string;
 }) {
   const { t } = useI18n();
   return <section className="overview-toolbar" aria-label={t("overview.toolbarAria")}>
     <div className="overview-toolbar-controls">
-      <EndpointScopePicker onChange={onEndpointChange} selectedEndpointId={selectedEndpointId} />
-      <Popover className="overview-toolbar-popover time" label={t("filter.timeRange")} trigger={<><Clock3 aria-hidden="true" size={15} /><span>{timePresetLabel(timePreset, t)}</span><ChevronDown aria-hidden="true" size={14} /></>}>
-        <div className="overview-time-fields"><TimeFilterFields params={params} setParams={setParams} /></div>
-      </Popover>
+      <OverviewScopeControls params={params} selectedEndpointId={selectedEndpointId} setParams={setParams} />
       <button aria-busy={refreshing} className="button ghost overview-refresh" disabled={refreshing} onClick={() => void onRefresh()} type="button"><RefreshCw aria-hidden="true" className={refreshing ? "spin" : ""} size={15} />{refreshing ? t("overview.refreshing") : t("overview.refresh")}</button>
       {dashboardSettingsTo ? <Link className="button ghost overview-refresh" to={dashboardSettingsTo}><Settings2 aria-hidden="true" size={15} />{t("dashboard.settings")}</Link> : null}
     </div>
-    <span className="overview-refresh-meta">{t("overview.lastRefreshed", { time: lastRefreshedAt ? formatDateTime(new Date(lastRefreshedAt).toISOString()) : t("overview.notYet") })}<small>{t("overview.autoRefresh")}</small></span>
+    <span className="overview-refresh-meta">{t("overview.lastRefreshed", { time: lastRefreshedAt ? formatDateTime(new Date(lastRefreshedAt).toISOString()) : t("overview.notYet") })}</span>
   </section>;
 }
 
-function timePresetLabel(preset: string, t: Translate): string {
-  if (preset === "LATEST_15M") return t("filter.latest15Minutes");
-  if (preset === "LATEST_1H") return t("filter.latestHour");
-  if (preset === "LATEST_7D") return t("filter.latest7Days");
-  if (preset === "CUSTOM") return t("filter.customUtcRange");
-  return t("filter.latest24Hours");
-}
+const OverviewScopeControls = memo(function OverviewScopeControls({ params, selectedEndpointId, setParams }: {
+  params: URLSearchParams;
+  selectedEndpointId: number | undefined;
+  setParams: (next: URLSearchParams) => void;
+}) {
+  const onEndpointChange = useCallback((endpointId: number | undefined) => {
+    setParams(updateParams(params, { endpointId }));
+  }, [params, setParams]);
+
+  return <>
+    <EndpointScopePicker onChange={onEndpointChange} selectedEndpointId={selectedEndpointId} />
+    <div className="overview-time-select"><TimeFilterFields params={params} setParams={setParams} /></div>
+  </>;
+});

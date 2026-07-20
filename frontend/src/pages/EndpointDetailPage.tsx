@@ -32,15 +32,15 @@ export function EndpointDetail({ endpoint }: { endpoint: EndpointDetailDto }) {
     {endpoint.isStale ? <div className="stale-warning" role="alert">{t("endpoint.staleWarning", { time: formatDateTime(endpoint.lastSeenAt) })}</div> : null}
     <section aria-label={t("endpoint.relatedEvidence")} className="endpoint-command-strip">
       <div className="endpoint-command-identity"><span>Endpoint</span><strong>{endpoint.hostname}</strong><small>{displayNullable(endpoint.ipAddress)} · {endpoint.osType} {displayNullable(endpoint.osVersion)}</small></div>
-      <div className="endpoint-command-risk"><span>Risk</span><strong>{endpoint.risk.score} / 100</strong><small>{endpoint.risk.level} · {formatDateTime(endpoint.risk.calculatedAt)}</small></div>
+      <div className="endpoint-command-risk"><span>Risk</span><strong>{endpoint.risk.score} / 100</strong><small>{endpoint.risk.level}</small></div>
       <div className="endpoint-command-evidence"><span>{t("endpoint.relatedEvidence")}</span><div className="endpoint-evidence-links">
         <Link to={`/alerts?endpointId=${endpoint.endpointId}&status=OPEN`}><strong>{endpoint.risk.activeAlertCount}</strong><span>{t("endpoints.activeAlerts")}</span></Link>
         <Link to={`/incidents?endpointId=${endpoint.endpointId}&status=OPEN`}><strong>{endpoint.risk.openIncidentCount}</strong><span>{t("endpoints.openIncidents")}</span></Link>
-        <Link to={`/events?endpointId=${endpoint.endpointId}`}><strong>Event</strong><span>{t("endpoint.recentEvents")}</span></Link>
+        <Link className="event-link" to={`/events?endpointId=${endpoint.endpointId}`}><strong>{t("endpoint.openRecentEvents")}</strong></Link>
       </div><Link className="endpoint-process-entry" to={`/events?endpointId=${endpoint.endpointId}`}>{t("event.processTree")} · {t("endpoint.chooseEvent")}</Link></div>
     </section>
     <DetailLedger className="endpoint-detail-ledger">
-      <DetailLedgerSection title="Endpoint Risk" subtitle={t("endpoint.calculated", { time: formatDateTime(endpoint.risk.calculatedAt) })} items={[
+      <DetailLedgerSection title="Endpoint Risk" items={[
         { label: t("endpoint.level"), value: <StatusPill value={endpoint.risk.level} /> },
         { label: t("endpoints.activeAlerts"), value: endpoint.risk.activeAlertCount },
         { label: t("endpoints.openIncidents"), value: endpoint.risk.openIncidentCount },

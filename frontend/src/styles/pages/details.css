@@ -64,6 +64,9 @@
   grid-template-columns: minmax(136px, 168px) minmax(0, 1fr);
   border-bottom: 1px solid var(--border-subtle);
 }
+.incident-summary-ledger .detail-ledger-section { grid-template-columns: minmax(248px, 292px) minmax(0, 1fr); }
+.incident-summary-ledger .detail-ledger-section > header h2,
+.incident-summary-ledger .detail-ledger-section > header p { white-space: nowrap; }
 
 .detail-ledger-section:last-child { border-bottom: 0; }
 .detail-ledger-section > header {
@@ -155,8 +158,9 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(244px, 292px);
   gap: var(--space-6);
-  align-items: start;
+  align-items: stretch;
 }
+.alert-action-grid > .panel { height: 100%; }
 .alert-guidance-panel .panel-body { padding-block: var(--space-3); }
 .alert-guidance-panel .guidance-list { gap: 0; }
 .alert-guidance-panel .guidance-list > li {
@@ -175,7 +179,7 @@
   font-family: var(--font-mono);
   font-size: var(--type-meta);
 }
-.alert-decision-panel { position: sticky; top: var(--space-5); }
+.alert-decision-panel { position: static; }
 .alert-decision-panel .field,
 .alert-decision-panel .field select { width: 100%; max-width: none; }
 .workflow-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
@@ -266,6 +270,10 @@
   border-left: 1px solid var(--border-subtle);
   border-radius: 0;
 }
+.inspector header > div { min-width: 0; }
+.inspector h2,
+.inspector header p { max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
+.inspector-actions { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .investigation-node-label strong {
   display: -webkit-box;
   overflow: hidden;
@@ -340,7 +348,8 @@
   border-radius: 0;
 }
 .endpoint-command-evidence .endpoint-evidence-links a:hover { background: var(--surface-hover); }
-.endpoint-command-evidence .endpoint-evidence-links strong { color: var(--text-primary); font-size: var(--type-body); }
+.endpoint-command-evidence .endpoint-evidence-links strong { color: var(--text-primary); font-family: var(--font-data); font-size: var(--type-kpi-secondary); font-variant-numeric: tabular-nums; }
+.endpoint-command-evidence .endpoint-evidence-links .event-link strong { font-family: inherit; font-size: var(--type-label); line-height: 1.35; }
 .endpoint-command-evidence .endpoint-evidence-links span { font-size: var(--type-meta); }
 .endpoint-process-entry { display: inline-block; margin-top: var(--space-3); color: var(--text-link); font-size: var(--type-meta); }
 .endpoint-detail-ledger .risk-factor-list { gap: 0; margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border-subtle); }
@@ -377,7 +386,7 @@
 .sensor-ledger { display: flex; flex-direction: column; }
 .sensor-ledger-row {
   display: grid;
-  grid-template-columns: minmax(110px, 1fr) auto repeat(3, minmax(100px, .7fr));
+  grid-template-columns: minmax(116px, 140px) minmax(96px, 116px) repeat(3, minmax(100px, 1fr));
   gap: var(--space-5);
   align-items: center;
   padding: var(--space-5) 0;
@@ -407,13 +416,24 @@
 .event-evidence-ledger + .raw-payload-panel { margin-top: var(--space-6); }
 
 @media (max-width: 1180px) {
+  .triage-workspace { grid-template-columns: minmax(0, 1fr); gap: var(--space-6); }
+  .triage-queue-panel { position: static; max-height: none; }
   .alert-action-grid { grid-template-columns: minmax(0, 1fr) 244px; }
   .investigation-stage { grid-template-columns: 132px minmax(0, 1fr); }
   .investigation-stage > .inspector { grid-column: 1 / -1; height: auto; max-height: 420px; border-top: 1px solid var(--border-subtle); border-left: 0; }
   .investigation-stage.expanded { grid-template-columns: 144px minmax(0, 1fr) 260px; }
   .investigation-stage.expanded > .inspector { grid-column: auto; height: 100%; border-top: 0; border-left: 1px solid var(--border-subtle); }
   .endpoint-command-strip { grid-template-columns: minmax(190px, 1fr) 140px minmax(320px, 1.5fr); }
-  .sensor-ledger-row { grid-template-columns: minmax(100px, 1fr) auto repeat(3, minmax(86px, .7fr)); gap: var(--space-3); }
+  .sensor-ledger-row { grid-template-columns: minmax(108px, 140px) minmax(92px, 108px) repeat(3, minmax(86px, 1fr)); gap: var(--space-3); }
+}
+
+@media (max-width: 767px) {
+  .incident-summary-ledger .detail-ledger-section { grid-template-columns: 1fr; }
+  .incident-summary-ledger .detail-ledger-section > header { border-right: 0; border-bottom: 1px solid var(--border-subtle); }
+  .incident-summary-ledger .detail-ledger-section > header h2,
+  .incident-summary-ledger .detail-ledger-section > header p { white-space: normal; }
+  .sensor-ledger-row { grid-template-columns: minmax(100px, 1fr) auto; }
+  .sensor-ledger-row > span:not(.badge) { grid-column: 1 / -1; }
 }
 
 @media print {

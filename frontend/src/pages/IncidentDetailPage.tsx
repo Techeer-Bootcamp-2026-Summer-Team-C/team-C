@@ -17,6 +17,7 @@ import {
   type InvestigationSelection,
 } from "../features/incidentInvestigation";
 import { useI18n } from "../i18n/LocaleContext";
+import { detectionSummary, detectionTitle } from "../i18n/detectionCopy";
 import { formatDateTime } from "../lib/format";
 
 export function IncidentDetailPage() {
@@ -86,7 +87,7 @@ function IncidentQueue({ currentIncidentId, error, incidents, loading, params }:
     {loading ? <Skeleton rows={7} /> : error ? <ErrorState error={error} /> : incidents.length ? <nav aria-label={t("incident.activeQueue")} className="incident-queue">
       {incidents.map((incident) => <Link aria-current={incident.incidentId === currentIncidentId ? "page" : undefined} className={incident.incidentId === currentIncidentId ? "incident-queue-row selected" : "incident-queue-row"} key={incident.incidentId} to={incidentDetailUrl(incident.incidentId, params)}>
         <span><StatusPill value={incident.severity} /><StatusPill value={incident.status} /></span>
-        <strong>{incident.title}</strong>
+        <strong>{detectionTitle(t, incident.title)}</strong>
         <code>{incident.correlationKey}</code>
         <small>{t("incident.queueMeta", { alerts: incident.alertCount, time: formatDateTime(incident.lastDetectedAt) })}</small>
       </Link>)}
@@ -97,7 +98,7 @@ function IncidentQueue({ currentIncidentId, error, incidents, loading, params }:
 function IncidentDetail({ incident }: { incident: IncidentDetailDto }) {
   const { t } = useI18n();
   return <>
-    <PageHeader eyebrow={`INCIDENT ${incident.incidentId}`} title={incident.title} description={incident.description ?? t("incident.noDescription")} actions={<><StatusPill value={incident.severity} /><StatusPill value={incident.status} /></>} />
+    <PageHeader eyebrow={`INCIDENT ${incident.incidentId}`} title={detectionTitle(t, incident.title)} description={detectionSummary(t, incident.description, t("incident.noDescription"))} actions={<><StatusPill value={incident.severity} /><StatusPill value={incident.status} /></>} />
     <DetailLedger className="incident-summary-ledger">
       <DetailLedgerSection title={t("incident.context")} subtitle={t("incident.contextSubtitle")} items={[
         { label: t("incident.correlationKey"), value: <code>{incident.correlationKey}</code> },
@@ -110,7 +111,7 @@ function IncidentDetail({ incident }: { incident: IncidentDetailDto }) {
         { label: t("incident.closed"), value: formatDateTime(incident.closedAt) },
       ]} />
       <DetailLedgerSection title={t("incident.lifecycle")} subtitle={t("incident.noManualControls")}><div className="read-only-note"><StatusPill value={incident.status} /><span>{t("incident.backendLifecycle")}</span></div></DetailLedgerSection>
-      <DetailLedgerSection title={t("incident.connectedAlerts")} subtitle={t("incident.connectedSubtitle")}>{incident.alerts.length ? <DataTable label={t("incident.connectedAlerts")}><thead><tr><th scope="col">Alert</th><th scope="col">{t("filter.severity")}</th><th scope="col">{t("filter.status")}</th><th scope="col">{t("alerts.detected")}</th></tr></thead><tbody>{incident.alerts.map((alert) => <tr key={alert.alertId}><td><Link className="table-primary" to={`/alerts/${alert.alertId}`}><strong>{alert.title}</strong><code>{alert.ruleCode} · v{alert.ruleVersion}</code></Link></td><td><StatusPill value={alert.severity} /></td><td><StatusPill value={alert.status} /></td><td>{formatDateTime(alert.detectedAt)}</td></tr>)}</tbody></DataTable> : <EmptyState title={t("incident.noConnectedAlerts")} message={t("incident.noConnectedAlertsDescription")} />}</DetailLedgerSection>
+      <DetailLedgerSection title={t("incident.connectedAlerts")} subtitle={t("incident.connectedSubtitle")}>{incident.alerts.length ? <DataTable label={t("incident.connectedAlerts")}><thead><tr><th scope="col">Alert</th><th scope="col">{t("filter.severity")}</th><th scope="col">{t("filter.status")}</th><th scope="col">{t("alerts.detected")}</th></tr></thead><tbody>{incident.alerts.map((alert) => <tr key={alert.alertId}><td><Link className="table-primary" to={`/alerts/${alert.alertId}`}><strong>{detectionTitle(t, alert.title, alert.ruleCode)}</strong><code>{alert.ruleCode} · v{alert.ruleVersion}</code></Link></td><td><StatusPill value={alert.severity} /></td><td><StatusPill value={alert.status} /></td><td>{formatDateTime(alert.detectedAt)}</td></tr>)}</tbody></DataTable> : <EmptyState title={t("incident.noConnectedAlerts")} message={t("incident.noConnectedAlertsDescription")} />}</DetailLedgerSection>
     </DetailLedger>
   </>;
 }
@@ -125,8 +126,8 @@ export function AttackTimeline({ timeline, investigation, selection, onSelect }:
       <span className={`timeline-marker tone-${item.itemType.toLowerCase()}`} />
       <div>
         <div className="timeline-heading"><StatusPill value={item.itemType} />{item.severity ? <StatusPill value={item.severity} /> : null}<time>{formatDateTime(item.occurredAt)}</time>{nextSelection ? <button aria-pressed={selected} className="timeline-select-control" onClick={() => onSelect(nextSelection)} type="button">{t("incident.selectEvidence")}</button> : null}</div>
-        <strong>{item.alertId ? <Link to={`/alerts/${item.alertId}`}>{item.title}</Link> : item.eventId ? <Link to={`/events/${item.eventId}?endpointId=${item.endpointId}&occurredAt=${encodeURIComponent(item.occurredAt)}`}>{item.title}</Link> : item.title}</strong>
-        <p>{item.summary}</p>
+        <strong>{item.alertId ? <Link to={`/alerts/${item.alertId}`}>{detectionTitle(t, item.title)}</Link> : item.eventId ? <Link to={`/events/${item.eventId}?endpointId=${item.endpointId}&occurredAt=${encodeURIComponent(item.occurredAt)}`}>{item.title}</Link> : item.title}</strong>
+        <p>{item.alertId ? detectionSummary(t, item.summary, item.summary) : item.summary}</p>
       </div>
     </li>;
   })}</ol>;

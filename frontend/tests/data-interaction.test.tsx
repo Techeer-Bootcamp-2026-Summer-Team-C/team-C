@@ -190,6 +190,15 @@ describe("list pages share the filter, table, state, and URL contract", () => {
     expect(row?.querySelector(".risk-cell strong")).toHaveTextContent("87");
   });
 
+  it("keeps the Endpoints page header title-only", async () => {
+    renderPage(<EndpointsPage />, "/endpoints");
+    const heading = await screen.findByRole("heading", { level: 1, name: "Endpoints" });
+    const header = heading.closest("header");
+    expect(header).not.toBeNull();
+    expect(header?.querySelector(".eyebrow")).toBeNull();
+    expect(header?.querySelector("p")).toBeNull();
+  });
+
   it("keeps Archives at three required filters and distinguishes incomplete from invalid", async () => {
     const view = renderPage(<ArchivesPage />, "/operations/archives");
     const filters = await screen.findByRole("region", { name: "Filters" });

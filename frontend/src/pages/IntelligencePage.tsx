@@ -69,7 +69,7 @@ export function IntelligencePage() {
   const error = summary.error ?? topology.error;
 
   return <div className="page-stack intelligence-page">
-    <PageHeader eyebrow="THREAT INTELLIGENCE" title={t("intelligence.title")} description={t("intelligence.description")} />
+    <PageHeader title={t("intelligence.title")} />
     <GlobalFilterBar hasFilters={params.size > 0} onClear={() => setParams({})}>
       <TimeFilterFields params={params} setParams={setParams} />
       <Field label={t("filter.endpointIds")}><input onChange={(event) => setParams(updateParams(params, { endpointIds: event.target.value }))} placeholder="1, 2, 7" value={params.get("endpointIds") ?? ""} /></Field>
@@ -238,7 +238,7 @@ function MitreAndSignals({ dashboard }: { dashboard: DashboardSummaryDto }) {
   ].sort((left, right) => right.count - left.count).slice(0, 10);
 
   return <section className="intelligence-analysis-grid">
-    <Panel className="mitre-workspace" title={t("intelligence.mitreMatrix")} subtitle={t("intelligence.mitreMatrixSubtitle")} meta={<Badge tone="info">{t("intelligence.currentAlertSnapshot")}</Badge>}>
+    <Panel className="mitre-workspace" title={t("intelligence.mitreMatrix")}>
       <div className="mitre-status-strip" role="status">
         <div><span>{t("intelligence.observedTactics")}</span><strong>{tactics.length}</strong></div>
         <div><span>{t("intelligence.observedTechniques")}</span><strong>{techniques.length}</strong></div>
@@ -323,7 +323,7 @@ export function TopologyWorkspace({ topology, graphEnabled }: { topology: Egress
 function TopologyInspector({ topology, selection }: { topology: EgressTopologyDto; selection: TopologySelection | null }) {
   const { t } = useI18n();
   const edgeGroup = selectedTopologyEdgeGroup(topology, selection);
-  if (edgeGroup) return <Inspector actions={<Badge tone={edgeGroup.alertCount ? "warning" : "success"}>{t("intelligence.observedOnly")}</Badge>} description={`${edgeGroup.sourceLabel} → ${edgeGroup.target}`} title={`${edgeGroup.protocols.join(" + ")} ${t("intelligence.relationship")}`}>
+  if (edgeGroup) return <Inspector description={`${edgeGroup.sourceLabel} → ${edgeGroup.target}`} title={`${edgeGroup.protocols.join(" + ")} ${t("intelligence.relationship")}`}>
     <DefinitionGrid items={[
       { label: "Protocols", value: edgeGroup.protocols.join(", ") },
       { label: t("intelligence.eventCount"), value: edgeGroup.eventCount },
@@ -333,7 +333,7 @@ function TopologyInspector({ topology, selection }: { topology: EgressTopologyDt
     <div className="context-links"><Link to={evidenceListUrl("events", edgeGroup, topology)}>Events</Link><Link to={evidenceListUrl("alerts", edgeGroup, topology)}>Alerts</Link></div>
   </Inspector>;
   const edge = selectedTopologyEdge(topology, selection);
-  if (edge) return <Inspector actions={<Badge tone={edge.alertCount ? "warning" : "success"}>{t("intelligence.observedOnly")}</Badge>} description={`${edge.sourceLabel} → ${edge.target}`} title={`${edge.protocol} ${t("intelligence.relationship")}`}>
+  if (edge) return <Inspector description={`${edge.sourceLabel} → ${edge.target}`} title={`${edge.protocol} ${t("intelligence.relationship")}`}>
     <DefinitionGrid items={[
       { label: "Protocol", value: edge.protocol },
       { label: t("intelligence.eventCount"), value: edge.eventCount },

@@ -15,6 +15,7 @@ import {
   type InvestigationSelection,
 } from "../features/incidentInvestigation";
 import { useI18n } from "../i18n/LocaleContext";
+import { detectionTitle } from "../i18n/detectionCopy";
 import { displayNullable, formatDateTime, humanize } from "../lib/format";
 import { Badge, Dialog } from "./primitives";
 import { DataTable, DefinitionGrid, EmptyState, Inspector, Panel, PartialFailureWarning, Skeleton, StatusPill } from "./ui";
@@ -39,23 +40,27 @@ export function IncidentInvestigation({
 }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
-  const fallback = graphRequiresFallback(investigation);
+  const localizedInvestigation = {
+    ...investigation,
+    nodes: investigation.nodes.map((node) => ({ ...node, label: detectionTitle(t, node.label) })),
+  };
+  const fallback = graphRequiresFallback(localizedInvestigation);
   const showGraph = graphEnabled && !fallback;
-  const counts = new Map(NODE_TYPES.map((type) => [type, investigation.nodes.filter((node) => node.nodeType === type).length]));
+  const counts = new Map(NODE_TYPES.map((type) => [type, localizedInvestigation.nodes.filter((node) => node.nodeType === type).length]));
 
   return <div className="investigation-stack">
     {investigation.partial || investigation.truncated ? <PartialFailureWarning message={t("incident.investigationPartial")} /> : null}
     {investigation.warnings.length ? <ul aria-label={t("incident.investigationWarnings")} className="investigation-warnings">{investigation.warnings.map((warning, index) => <li key={`${warning.code}-${warning.eventId ?? index}`}>
       <StatusPill value={warning.code} /><span>{warning.message}</span>{warning.code === "ARCHIVE_NOT_READY" ? <Link to="/operations/archives">{t("error.archiveAction")}</Link> : null}
     </li>)}</ul> : null}
-    <Panel className="investigation-panel" title={t("incident.investigation")} subtitle={t("incident.investigationSubtitle")} meta={<Badge tone="info">{t("incident.observedOnly")}</Badge>}>
-      <InvestigationStage counts={counts} graphEnabled={graphEnabled} investigation={investigation} onExpand={() => setExpanded(true)} onSelect={onSelect} selection={selection} showGraph={showGraph} />
+    <Panel className="investigation-panel" title={t("incident.investigation")} subtitle={t("incident.investigationSubtitle")}>
+      <InvestigationStage counts={counts} graphEnabled={graphEnabled} investigation={localizedInvestigation} onExpand={() => setExpanded(true)} onSelect={onSelect} selection={selection} showGraph={showGraph} />
       <div className="investigation-evidence-table">
-        <EvidenceTable investigation={investigation} onSelect={onSelect} selection={selection} />
+        <EvidenceTable investigation={localizedInvestigation} onSelect={onSelect} selection={selection} />
       </div>
     </Panel>
-    <Dialog className="investigation-dialog" closeLabel={t("incident.closeExpandedInvestigation")} eyebrow={t("incident.observedOnly")} onClose={() => setExpanded(false)} open={expanded} title={t("incident.expandedInvestigation")}>
-      <InvestigationStage counts={counts} expanded graphEnabled={graphEnabled} investigation={investigation} onSelect={onSelect} selection={selection} showGraph={showGraph} />
+    <Dialog className="investigation-dialog" closeLabel={t("incident.closeExpandedInvestigation")} eyebrow={t("incident.investigation")} onClose={() => setExpanded(false)} open={expanded} title={t("incident.expandedInvestigation")}>
+      <InvestigationStage counts={counts} expanded graphEnabled={graphEnabled} investigation={localizedInvestigation} onSelect={onSelect} selection={selection} showGraph={showGraph} />
     </Dialog>
   </div>;
 }

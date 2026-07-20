@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/endpoints";
-import { Badge } from "../components/primitives";
 import { readTimeFilter, TimeFilterFields } from "../components/filters";
 import { DataTable, EmptyState, Field, FilterBar, PageHeader, Pagination, Panel, QueryFeedback, SortableHeader, StatusPill } from "../components/ui";
 import type { AlertListQuery } from "../contracts";
 import { appliedFilterDescriptors, hasInvalidEnum, hasInvalidPagination, hasInvalidPositiveInteger, isSelected, removeListFilter, selectedSearch } from "../features/listInteractions";
 import { useI18n } from "../i18n/LocaleContext";
+import { detectionTitle } from "../i18n/detectionCopy";
 import { formatDateTime, humanize } from "../lib/format";
 import { allowedValue, positiveInteger } from "../lib/params";
 import { numberParam, stringParam, updateParams } from "../lib/url";
@@ -55,7 +55,7 @@ export function AlertsPage() {
   };
 
   return <div className="page-stack">
-    <PageHeader eyebrow={t("alerts.eyebrow")} title={t("alerts.title")} description={t("alerts.description")} />
+    <PageHeader title={t("alerts.title")} />
     <FilterBar
       advanced={<>
         <Field label={t("filter.endpointId")}><input inputMode="numeric" onChange={(event) => setParams(updateParams(params, { endpointId: event.target.value }))} value={params.get("endpointId") ?? ""} /></Field>
@@ -74,10 +74,10 @@ export function AlertsPage() {
       </>}
     />
     <QueryFeedback error={result.error} fetching={result.isFetching} hasData={Boolean(result.data)} invalid={invalid} onRetry={() => void result.refetch()} pending={result.isPending && !invalid} refetchError={result.isRefetchError} rows={8} />
-    {!invalid && result.data ? <Panel meta={sortBy === "priority" ? <Badge tone="info">{t("filter.priority")}</Badge> : null} title={t("alerts.queue")} subtitle={sortBy === "priority" ? `${t("alerts.records", { total: result.data.data.total })} · ${t("alerts.priorityOrder")}` : t("alerts.records", { total: result.data.data.total })}>
+    {!invalid && result.data ? <Panel title={t("alerts.queue")}>
       {result.data.data.items.length ? <><DataTable busy={result.isFetching} label={t("alerts.queue")}><thead><tr><th scope="col">{t("alerts.rule")}</th><SortableHeader active={sortBy === "severity"} direction={sortOrder} label={t("filter.severity")} onSort={() => updateSort("severity")} /><SortableHeader active={sortBy === "riskScore"} direction={sortOrder} label={t("alerts.risk")} onSort={() => updateSort("riskScore")} /><SortableHeader active={sortBy === "status"} direction={sortOrder} label={t("filter.status")} onSort={() => updateSort("status")} /><th scope="col">{t("alerts.agent")}</th><SortableHeader active={sortBy === "detectedAt"} direction={sortOrder} label={t("alerts.detected")} onSort={() => updateSort("detectedAt")} /></tr></thead><tbody>{result.data.data.items.map((alert) => {
         const selected = isSelected(params, alert.alertId);
-        return <tr className={selected ? "selected-row" : undefined} key={alert.alertId}><td><Link aria-current={selected ? "true" : undefined} className="table-primary" to={{ pathname: `/alerts/${alert.alertId}`, search: selectedSearch(params, alert.alertId) }}><strong>{alert.ruleName}</strong><code>{alert.ruleCode} · v{alert.ruleVersion}</code></Link></td><td><StatusPill value={alert.severity} /></td><td>{alert.riskScore}</td><td><StatusPill value={alert.status} /></td><td><code>{alert.agentId}</code></td><td>{formatDateTime(alert.detectedAt)}</td></tr>;
+        return <tr className={selected ? "selected-row" : undefined} key={alert.alertId}><td><Link aria-current={selected ? "true" : undefined} className="table-primary" to={{ pathname: `/alerts/${alert.alertId}`, search: selectedSearch(params, alert.alertId) }}><strong>{detectionTitle(t, alert.ruleName, alert.ruleCode)}</strong><code>{alert.ruleCode} · v{alert.ruleVersion}</code></Link></td><td><StatusPill value={alert.severity} /></td><td>{alert.riskScore}</td><td><StatusPill value={alert.status} /></td><td><code>{alert.agentId}</code></td><td>{formatDateTime(alert.detectedAt)}</td></tr>;
       })}</tbody></DataTable><Pagination page={result.data.data} /></> : <EmptyState actions={<><button className="button ghost" disabled={!appliedFilters.length} onClick={() => setParams({})} type="button">{t("filter.clear")}</button><button className="button primary" onClick={() => setParams(updateParams(params, { timePreset: "LATEST_7D", from: null, to: null, page: null }))} type="button">{t("filter.latest7Days")}</button></>} compact message={appliedFilters.length ? t("alerts.noFilterMatch") : t("alerts.noneInRange")} title={t("alerts.noResults")} />}
     </Panel> : null}
   </div>;
