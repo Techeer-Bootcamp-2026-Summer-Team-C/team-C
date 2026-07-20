@@ -47,6 +47,20 @@ def test_app_containers_use_compose_internal_service_addresses() -> None:
     assert environment["EDR_KAFKA_PARTITIONS_PER_TOPIC"] == "${EDR_KAFKA_PARTITIONS_PER_TOPIC:-2}"
 
 
+def test_local_init_permissions_are_scoped_to_bootstrap_services() -> None:
+    services = _compose()["services"]
+    cert_init = services["cert-init"]
+    app_init = services["app-init"]
+
+    assert cert_init["user"] == "0:0"
+    assert cert_init["environment"]["EDR_ALLOW_CHMOD_EPERM"] == "1"
+    assert cert_init["security_opt"] == ["no-new-privileges:true"]
+    assert cert_init["cap_drop"] == ["ALL"]
+    assert "user" not in app_init
+    assert app_init["environment"]["EDR_ENV"] == "local"
+    assert app_init["environment"]["EDR_ALLOW_CHMOD_EPERM"] == "1"
+
+
 def test_production_compose_contains_only_the_required_runtime_services() -> None:
     services = _production_compose()["services"]
 

@@ -1,5 +1,8 @@
+import errno
 from pathlib import Path
 from subprocess import CompletedProcess
+
+import pytest
 
 from tools import secure_files
 
@@ -56,3 +59,51 @@ def test_windows_sid_command_replaces_undecodable_output(monkeypatch) -> None:
 
     assert secure_files._current_windows_sid() == "S-1-5-21-1234"
     assert captured["errors"] == "replace"
+
+
+def test_posix_eperm_can_be_allowed_for_local_bind_mount(monkeypatch, tmp_path: Path, caplog) -> None:
+    secret = tmp_path / "secret"
+    secret.write_text("secret", encoding="utf-8")
+
+    monkeypatch.setattr(secure_files, "_is_windows", lambda: False)
+    monkeypatch.setenv("EDR_ALLOW_CHMOD_EPERM", "1")
+
+    def chmod(_path: Path, _mode: int) -> None:
+        raise PermissionError(errno.EPERM, "operation not permitted", secret)
+
+    monkeypatch.setattr(type(secret), "chmod", chmod)
+
+    secure_files.protect_private_path(secret)
+
+    assert "chmod unsupported on local bind mount" in caplog.text
+
+
+def test_posix_permission_errors_remain_strict_by_default(monkeypatch, tmp_path: Path) -> None:
+    secret = tmp_path / "secret"
+    secret.write_text("secret", encoding="utf-8")
+
+    monkeypatch.setattr(secure_files, "_is_windows", lambda: False)
+
+    def chmod(_path: Path, _mode: int) -> None:
+        raise PermissionError(errno.EPERM, "operation not permitted", secret)
+
+    monkeypatch.setattr(type(secret), "chmod", chmod)
+
+    with pytest.raises(PermissionError):
+        secure_files.protect_private_path(secret)
+
+
+def test_posix_non_eperm_errors_are_not_ignored(monkeypatch, tmp_path: Path) -> None:
+    secret = tmp_path / "secret"
+    secret.write_text("secret", encoding="utf-8")
+
+    monkeypatch.setattr(secure_files, "_is_windows", lambda: False)
+    monkeypatch.setenv("EDR_ALLOW_CHMOD_EPERM", "1")
+
+    def chmod(_path: Path, _mode: int) -> None:
+        raise PermissionError(errno.EACCES, "permission denied", secret)
+
+    monkeypatch.setattr(type(secret), "chmod", chmod)
+
+    with pytest.raises(PermissionError):
+        secure_files.protect_private_path(secret)

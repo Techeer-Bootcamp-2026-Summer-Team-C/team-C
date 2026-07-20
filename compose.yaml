@@ -124,6 +124,9 @@ services:
     build:
       context: .
       dockerfile: deploy/docker/backend.Dockerfile
+    user: "0:0"
+    environment:
+      EDR_ALLOW_CHMOD_EPERM: "1"
     command:
       - python
       - -m
@@ -137,11 +140,18 @@ services:
     volumes:
       - ./runtime/compose/cert-authority:/authority
       - nginx-certs:/nginx-certs
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     network_mode: none
     restart: "no"
 
   app-init:
     <<: *app-service
+    environment:
+      <<: *app-environment
+      EDR_ALLOW_CHMOD_EPERM: "1"
     command: ["python", "-m", "tools.local_demo", "_initialize"]
     depends_on:
       postgres:

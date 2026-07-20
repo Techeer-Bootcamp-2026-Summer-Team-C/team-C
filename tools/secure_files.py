@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import csv
+import errno
+import logging
 import os
 import subprocess
 from pathlib import Path
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _is_windows() -> bool:
@@ -25,10 +29,20 @@ def _current_windows_sid() -> str:
     return sid
 
 
+def _set_posix_mode(path: Path, mode: int) -> None:
+    try:
+        path.chmod(mode)
+    except PermissionError as error:
+        allow_unsupported_chmod = os.getenv("EDR_ALLOW_CHMOD_EPERM") == "1"
+        if not allow_unsupported_chmod or error.errno != errno.EPERM:
+            raise
+        LOGGER.warning("chmod unsupported on local bind mount: %s", path)
+
+
 def protect_private_path(path: Path, *, directory: bool = False) -> None:
     """Restrict a local secret to the current account (and SYSTEM on Windows)."""
     if not _is_windows():
-        path.chmod(0o700 if directory else 0o600)
+        _set_posix_mode(path, 0o700 if directory else 0o600)
         return
 
     sid = _current_windows_sid()
@@ -50,4 +64,4 @@ def protect_private_path(path: Path, *, directory: bool = False) -> None:
 
 def set_public_file_mode(path: Path) -> None:
     if not _is_windows():
-        path.chmod(0o644)
+        _set_posix_mode(path, 0o644)
