@@ -1,5 +1,7 @@
 import type { DashboardInterval, TimePreset } from "../contracts";
 
+const TIME_SCOPED_ROUTES = new Set(["/", "/alerts", "/incidents", "/events", "/intelligence"]);
+
 export function stringParam(params: URLSearchParams, key: string, fallback = ""): string {
   return params.get(key) ?? fallback;
 }
@@ -28,6 +30,25 @@ export function timePreset(params: URLSearchParams): TimePreset {
   return value === "LATEST_15M" || value === "LATEST_1H" || value === "LATEST_7D" || value === "CUSTOM"
     ? value
     : "LATEST_24H";
+}
+
+export function navigationTimeScope(search: string | URLSearchParams): string | null {
+  const params = typeof search === "string" ? new URLSearchParams(search) : search;
+  const rawPreset = params.get("timePreset");
+  if (!rawPreset || !["LATEST_15M", "LATEST_1H", "LATEST_24H", "LATEST_7D", "CUSTOM"].includes(rawPreset)) return null;
+  const scope = new URLSearchParams({ timePreset: rawPreset });
+  if (rawPreset === "CUSTOM") {
+    const from = params.get("from");
+    const to = params.get("to");
+    if (!from || !to || Number.isNaN(Date.parse(from)) || Number.isNaN(Date.parse(to)) || Date.parse(from) >= Date.parse(to)) return null;
+    scope.set("from", from);
+    scope.set("to", to);
+  }
+  return scope.toString();
+}
+
+export function navigationDestination(path: string, timeScope: string): string {
+  return TIME_SCOPED_ROUTES.has(path) ? `${path}?${timeScope}` : path;
 }
 
 export function intervalFor(preset: TimePreset, from?: string, to?: string): DashboardInterval {

@@ -12,7 +12,20 @@ import type {
 
 export type TopologySelection =
   | { kind: "NODE"; id: string }
-  | { kind: "EDGE"; id: string };
+  | { kind: "EDGE"; id: string }
+  | { kind: "EDGE_GROUP"; id: string };
+
+export interface TopologyEdgeGroup {
+  id: string;
+  endpointId: number;
+  sourceLabel: string;
+  target: string;
+  protocols: string[];
+  eventCount: number;
+  alertCount: number;
+  lastSeenAt: string;
+  edges: TopologyEdgeDto[];
+}
 
 export type CorrelationSelection =
   | { kind: "NODE"; id: string }
@@ -46,6 +59,38 @@ export function topologyGraphEnabled(value = import.meta.env.VITE_TOPOLOGY_GRAPH
 
 export function topologyEdgeId(endpointId: number, target: string, protocol: string): string {
   return `${endpointId}|${target}|${protocol}`;
+}
+
+export function topologyEdgeGroupId(endpointId: number, target: string): string {
+  return `topology-group:${endpointId}:${encodeURIComponent(target)}`;
+}
+
+export function groupTopologyEdges(topology: Pick<EgressTopologyDto, "edges">): TopologyEdgeGroup[] {
+  const groups = new Map<string, TopologyEdgeGroup>();
+  for (const edge of topology.edges) {
+    const id = topologyEdgeGroupId(edge.endpointId, edge.target);
+    const current = groups.get(id);
+    if (!current) {
+      groups.set(id, {
+        id,
+        endpointId: edge.endpointId,
+        sourceLabel: edge.sourceLabel,
+        target: edge.target,
+        protocols: [edge.protocol],
+        eventCount: edge.eventCount,
+        alertCount: edge.alertCount,
+        lastSeenAt: edge.lastSeenAt,
+        edges: [edge],
+      });
+      continue;
+    }
+    current.edges.push(edge);
+    if (!current.protocols.includes(edge.protocol)) current.protocols.push(edge.protocol);
+    current.eventCount += edge.eventCount;
+    current.alertCount += edge.alertCount;
+    if (Date.parse(edge.lastSeenAt) > Date.parse(current.lastSeenAt)) current.lastSeenAt = edge.lastSeenAt;
+  }
+  return [...groups.values()].map((group) => ({ ...group, protocols: group.protocols.slice().sort() }));
 }
 
 export function endpointNodeId(endpointId: number): string {
@@ -93,6 +138,14 @@ export function selectedTopologyEdge(
 ): TopologyEdgeDto | null {
   if (selection?.kind !== "EDGE") return null;
   return topology.edges.find((edge) => topologyEdgeId(edge.endpointId, edge.target, edge.protocol) === selection.id) ?? null;
+}
+
+export function selectedTopologyEdgeGroup(
+  topology: EgressTopologyDto,
+  selection: TopologySelection | null,
+): TopologyEdgeGroup | null {
+  if (selection?.kind !== "EDGE_GROUP") return null;
+  return groupTopologyEdges(topology).find((group) => group.id === selection.id) ?? null;
 }
 
 export function buildPipelineSnapshot(

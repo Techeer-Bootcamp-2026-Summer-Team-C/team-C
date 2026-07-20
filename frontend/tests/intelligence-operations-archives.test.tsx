@@ -17,7 +17,10 @@ import {
   buildPipelineSnapshot,
   correlationEdgeId,
   filterTopology,
+  groupTopologyEdges,
   selectedCorrelationRelationship,
+  selectedTopologyEdgeGroup,
+  topologyEdgeGroupId,
   topologyGraphEnabled,
 } from "../src/features/intelligenceOperations";
 import { LocaleProvider } from "../src/i18n/LocaleContext";
@@ -38,6 +41,21 @@ describe("WP-08 Intelligence, Operations, and Archives", () => {
     expect(topologyGraphEnabled("0")).toBe(false);
     expect(topologyGraphEnabled("true")).toBe(true);
     expect(filterTopology(topologyFixture, "missing-target", 10).edges).toEqual([]);
+  });
+
+  it("groups parallel protocol edges into one honest visual relationship", () => {
+    const parallelTopology: EgressTopologyDto = {
+      ...topologyFixture,
+      edges: [
+        topologyFixture.edges[0]!,
+        { ...topologyFixture.edges[0]!, protocol: "TLS", eventCount: 3, alertCount: 1, lastSeenAt: "2026-07-15T04:00:00Z" },
+      ],
+    };
+    const groups = groupTopologyEdges(parallelTopology);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ endpointId: 1001, target: "203.0.113.10", protocols: ["TCP", "TLS"], eventCount: 8, alertCount: 3, lastSeenAt: "2026-07-15T04:00:00Z" });
+    const selection = { kind: "EDGE_GROUP" as const, id: topologyEdgeGroupId(1001, "203.0.113.10") };
+    expect(selectedTopologyEdgeGroup(parallelTopology, selection)).toEqual(groups[0]);
   });
 
   it("renders MITRE selection, Rules/Signals tabs, and a synchronized table fallback without bytesOut", async () => {

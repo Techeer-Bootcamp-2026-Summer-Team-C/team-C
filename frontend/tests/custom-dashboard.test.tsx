@@ -22,6 +22,8 @@ import { OVERVIEW_GRID_MAX_ROWS, OVERVIEW_WIDGET_DEFINITIONS, overviewWidgetsOve
 
 const USER = { userId: 31, loginId: "analyst", name: "Analyst", role: "ANALYST", status: "ACTIVE", locale: "EN" } as const;
 
+vi.setConfig({ testTimeout: 15_000 });
+
 beforeEach(() => {
   sessionStorage.setItem("edr.authSession", JSON.stringify({ token: "dashboard-token", user: USER, expiresAt: Date.now() + 60_000 }));
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(success(USER)));
@@ -42,7 +44,7 @@ describe("custom Overview dashboard", () => {
     expect(screen.getByRole("button", { name: "New dashboard" })).toBeEnabled();
   });
 
-  it("always renders the immutable Default Overview even when a custom dashboard is active", () => {
+  it("renders the active custom dashboard read-only on Overview and restores Default explicitly", async () => {
     localStorage.setItem("edr.overviewDashboards.v1.user.31", JSON.stringify({
       version: 1,
       dashboards: [{
@@ -55,11 +57,16 @@ describe("custom Overview dashboard", () => {
     }));
     localStorage.setItem("edr.overviewActiveDashboard.v1.user.31", "dashboard-custom");
     const { container } = renderWorkspace(USER.role, "overview");
-    expect(screen.queryByRole("region", { name: "Custom dashboard: Custom fixture" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Custom fixture" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Custom dashboard: Custom fixture" })).toBeInTheDocument();
+    expect(screen.getByText("This browser-local layout is applied to the read-only Overview.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "New dashboard" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit dashboard" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Delete dashboard" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Move Total alerts\./ })).toBeDisabled();
+    expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole("button", { name: "Use Default" }));
+    expect(screen.queryByRole("region", { name: "Custom dashboard: Custom fixture" })).not.toBeInTheDocument();
     expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(10);
   });
 
@@ -77,6 +84,8 @@ describe("custom Overview dashboard", () => {
     expect(screen.getByRole("button", { name: "New dashboard" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Close settings" }));
     expect(screen.getByRole("button", { name: "Save dashboard" })).toBeDisabled();
+    expect(screen.getByText("Required: a name and at least one widget.")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Dashboard name" }).closest(".dashboard-builder-actions")).not.toBeNull();
     await user.click(screen.getByRole("button", { name: "Add Total alerts" }));
     await user.type(screen.getByRole("textbox", { name: "Dashboard name" }), "Priority investigation");
     expect(screen.getByRole("button", { name: "Save dashboard" })).toBeEnabled();

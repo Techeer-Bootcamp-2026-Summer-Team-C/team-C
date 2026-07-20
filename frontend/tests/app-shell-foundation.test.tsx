@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, RequireAuth } from "../src/auth/AuthContext";
 import { AppShell } from "../src/components/AppShell";
 import { LocaleProvider } from "../src/i18n/LocaleContext";
@@ -56,6 +56,18 @@ describe("application shell foundation", () => {
     expect(screen.queryByRole("link", { name: "Dashboards" })).not.toBeInTheDocument();
     const breadcrumb = screen.getByRole("navigation", { name: "Breadcrumb" });
     expect(within(breadcrumb).getByText("Dashboards")).toHaveAttribute("aria-current", "page");
+  });
+
+  it("carries the current time scope between time-aware primary routes", async () => {
+    const user = userEvent.setup();
+    renderTimeScopeShell();
+    expect(await screen.findByTestId("location")).toHaveTextContent("/alerts?timePreset=LATEST_7D");
+    expect(screen.getByRole("link", { name: "Incidents" })).toHaveAttribute("href", "/incidents?timePreset=LATEST_7D");
+    expect(screen.getByRole("link", { name: "Archives" })).toHaveAttribute("href", "/operations/archives");
+
+    await user.click(screen.getByRole("link", { name: "Endpoints" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/endpoints");
+    await waitFor(() => expect(screen.getByRole("link", { name: "Events" })).toHaveAttribute("href", "/events?timePreset=LATEST_7D"));
   });
 
   it("operates the mobile Drawer and account/report surfaces by keyboard", async () => {
@@ -178,6 +190,32 @@ function renderDashboardShell() {
       </ThemeProvider>
     </QueryClientProvider>,
   );
+}
+
+function renderTimeScopeShell() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <AuthProvider>
+          <LocaleProvider>
+            <MemoryRouter initialEntries={["/alerts?timePreset=LATEST_7D"]}>
+              <Routes>
+                <Route element={<RequireAuth><AppShell /></RequireAuth>}>
+                  <Route path="*" element={<LocationProbe />} />
+                </Route>
+              </Routes>
+            </MemoryRouter>
+          </LocaleProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>,
+  );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location">{location.pathname}{location.search}</output>;
 }
 
 function success(data: unknown): Response {

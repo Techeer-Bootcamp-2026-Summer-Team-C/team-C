@@ -115,6 +115,14 @@
 .react-flow__edge.selected .react-flow__edge-path { stroke: var(--accent-primary); stroke-width: 3; }
 .react-flow__edge-text { fill: var(--text-secondary); font-size: 11px; }
 .react-flow__edge-textbg { fill: var(--surface-inset); }
+.topology-flow .react-flow__controls,
+.correlation-flow .react-flow__controls { overflow: hidden; background: var(--graph-control-background); border: 1px solid var(--graph-control-border); border-radius: var(--radius-control); box-shadow: none; }
+.topology-flow .react-flow__controls-button,
+.correlation-flow .react-flow__controls-button { color: var(--graph-control-foreground); background: var(--graph-control-background); border-bottom-color: var(--graph-control-border); }
+.topology-flow .react-flow__controls-button:hover,
+.correlation-flow .react-flow__controls-button:hover { background: var(--graph-control-hover); }
+.topology-flow .react-flow__controls-button svg,
+.correlation-flow .react-flow__controls-button svg { fill: currentColor; }
 .topology-fallback { min-height: 420px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--space-4); padding: var(--space-8); background: var(--surface-inset); border: 1px dashed var(--border-default); border-radius: var(--radius-control); }
 .topology-fallback p { color: var(--text-secondary); }
 .context-links { display: flex; gap: var(--space-4); flex-wrap: wrap; margin-top: var(--space-5); }
@@ -150,6 +158,9 @@
 .snapshot-caveat { margin-top: var(--space-5); font-size: var(--type-meta); }
 
 .archive-lifecycle { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
+.archives-page .filter-bar-main { align-items: flex-start; }
+.archives-page .filter-bar-main > .filter-fields { align-items: start; }
+.archives-page .filter-actions { margin-top: calc(var(--space-6) + var(--space-4)); }
 .archive-lifecycle li { min-width: 0; min-height: 116px; display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); background: var(--surface-inset); border: 1px solid var(--border-subtle); border-top: 3px solid var(--text-tertiary); border-radius: var(--radius-control); }
 .archive-lifecycle li.tone-restore_requested,
 .archive-lifecycle li.tone-archived { border-top-color: var(--status-warning); }

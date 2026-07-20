@@ -131,7 +131,13 @@ export function OverviewDashboardWorkspace({ mode = "overview", onSettingsClose 
       onNew={openNewDashboard}
       onSelect={layout.selectDashboard}
       props={props}
-    /> : <OverviewDashboard {...props} />}
+    /> : activeDashboard ? <>
+      <header className="dashboard-applied-layout">
+        <div><span className="eyebrow">{t("dashboard.activeLayout")}</span><strong>{activeDashboard.name}</strong><p>{t("dashboard.activeCustomDescription")}</p></div>
+        <Button onClick={() => layout.selectDashboard(DEFAULT_DASHBOARD_ID)} type="button" variant="ghost">{t("dashboard.restoreDefault")}</Button>
+      </header>
+      <CustomDashboardView dashboard={activeDashboard} desktopLayout={editingAvailable} props={props} />
+    </> : <OverviewDashboard {...props} />}
 
     {managementMode ? <Dialog
       closeLabel={t("dashboard.closeSettings")}
@@ -274,11 +280,13 @@ function DashboardBuilder({ builder, editingAvailable, onCancel, onChange, onSav
     <header className="dashboard-builder-header">
       <div><span className="eyebrow">CUSTOM OVERVIEW</span><h2>{builder.dashboardId ? t("dashboard.editTitle") : t("dashboard.newTitle")}</h2><p>{t("dashboard.builderDescription")}</p></div>
       <div className="dashboard-builder-actions">
-        <Button onClick={onCancel} type="button" variant="ghost">{t("dashboard.cancel")}</Button>
-        <Button disabled={!editingAvailable || !valid} onClick={onSave} type="button" variant="primary">{t("dashboard.save")}</Button>
+        <TextField className="dashboard-builder-name" disabled={!editingAvailable} helper={t("dashboard.saveRequirements")} label={t("dashboard.nameLabel")} maxLength={80} onChange={(event) => onChange({ ...builder, name: event.target.value })} placeholder={t("dashboard.namePlaceholder")} value={builder.name} />
+        <div className="dashboard-builder-buttons">
+          <Button onClick={onCancel} type="button" variant="ghost">{t("dashboard.cancel")}</Button>
+          <Button disabled={!editingAvailable || !valid} onClick={onSave} type="button" variant="primary">{t("dashboard.save")}</Button>
+        </div>
       </div>
     </header>
-    <TextField disabled={!editingAvailable} label={t("dashboard.nameLabel")} maxLength={80} onChange={(event) => onChange({ ...builder, name: event.target.value })} placeholder={t("dashboard.namePlaceholder")} value={builder.name} />
     <div className="dashboard-builder-body">
       <aside aria-label={t("dashboard.palette")} className="dashboard-widget-palette">
         <h3>{t("dashboard.palette")}</h3>
