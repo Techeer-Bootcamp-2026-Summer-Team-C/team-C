@@ -1,0 +1,31 @@
+schema_version: 1
+rule_code: NET_SUSPICIOUS_EGRESS
+rule_name: Suspicious Egress Destination
+alert_title: Suspicious encrypted egress detected
+alert_summary: A monitored process connected to a rare external destination.
+version: 1
+enabled: true
+event_type: NETWORK_CONNECTION
+conditions:
+  all:
+    - field: remote_domain
+      operator: regex
+      value: '(?i)(update-cache|api\.corp|rare-beacon)'
+severity: CRITICAL
+risk_score: 92
+mitre:
+  tactic_code: TA0011
+  technique_code: T1071.001
+incident:
+  enabled: true
+  correlation_key: suspicious-egress
+  window_seconds: 1800
+response_guidance:
+  - order: 1
+    title: Review destination and source process
+    description: 원격 IP와 Domain의 평판을 확인하고 연결을 생성한 프로세스의 실행 경로와 명령줄을 검토합니다.
+    requires_manual_action: false
+  - order: 2
+    title: Contain unauthorized egress
+    description: 승인되지 않은 통신으로 판단되면 외부 방화벽에서 목적지를 차단하고 Endpoint 격리가 필요한지 검토합니다.
+    requires_manual_action: true

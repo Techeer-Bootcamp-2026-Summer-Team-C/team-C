@@ -7,11 +7,19 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 from pydantic import ValidationError
 
+from backend.rule_loader import RuleLoader
 from backend.rules import RuleV1
 
 ROOT = Path(__file__).parents[1]
 SCHEMA_PATH = ROOT / "schemas" / "rule-v1.schema.json"
 RULE_PATH = ROOT / "rules" / "process" / "proc_powershell_encoded.v1.yaml"
+DEMO_RULE_IDENTITIES = {
+    ("PROC_POWERSHELL_ENCODED", 1),
+    ("NET_SUSPICIOUS_EGRESS", 1),
+    ("DNS_RARE_DOMAIN", 1),
+    ("FILE_SUSPICIOUS_DROP", 1),
+    ("L7_UPLOAD_ANOMALY", 1),
+}
 
 
 def load_rule() -> dict[str, object]:
@@ -27,6 +35,21 @@ def test_sample_rule_matches_json_schema_and_pydantic_model() -> None:
     assert parsed.rule_name == "PowerShell Encoded Command"
     assert parsed.alert_title == "Encoded PowerShell command detected"
     assert parsed.response_guidance[0].requires_manual_action is False
+
+
+def test_all_demo_rule_versions_load_with_response_guidance() -> None:
+    loader = RuleLoader(
+        schema_path=SCHEMA_PATH,
+        mapping_path=ROOT / "mappings" / "mitre_attack.yaml",
+    )
+    loaded = loader.load_directory(ROOT / "rules")
+    by_identity = {(item.rule.rule_code, item.rule.version): item.rule for item in loaded}
+
+    assert DEMO_RULE_IDENTITIES <= by_identity.keys()
+    for identity in DEMO_RULE_IDENTITIES:
+        guidance = by_identity[identity].response_guidance
+        assert guidance
+        assert [step.order for step in guidance] == list(range(1, len(guidance) + 1))
 
 
 def test_enabled_rule_requires_mitre_codes() -> None:

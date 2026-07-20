@@ -1,0 +1,41 @@
+schema_version: 1
+rule_code: L7_UPLOAD_ANOMALY
+rule_name: Unusual HTTPS Upload
+alert_title: Unusual HTTPS upload detected
+alert_summary: An unusual upload request was observed to an external host.
+version: 1
+enabled: true
+event_type: L7_EVENT
+conditions:
+  all:
+    - field: l7_protocol
+      operator: in
+      value:
+        - HTTP
+        - HTTPS
+    - field: http_method
+      operator: in
+      value:
+        - POST
+        - PUT
+    - field: http_host
+      operator: regex
+      value: '(?i)(update-cache|storage)\.'
+severity: CRITICAL
+risk_score: 94
+mitre:
+  tactic_code: TA0010
+  technique_code: T1048.003
+incident:
+  enabled: true
+  correlation_key: unusual-l7-upload
+  window_seconds: 1800
+response_guidance:
+  - order: 1
+    title: Review upload context
+    description: 요청 Host와 method, URL path, TLS 정보 및 같은 시간대의 프로세스와 네트워크 이벤트를 함께 확인합니다.
+    requires_manual_action: false
+  - order: 2
+    title: Restrict unauthorized upload path
+    description: 승인되지 않은 전송으로 판단되면 증거를 보존하고 해당 목적지 또는 업로드 경로 차단을 검토합니다.
+    requires_manual_action: true

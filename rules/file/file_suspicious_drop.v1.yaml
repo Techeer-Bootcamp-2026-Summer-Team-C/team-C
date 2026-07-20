@@ -1,0 +1,34 @@
+schema_version: 1
+rule_code: FILE_SUSPICIOUS_DROP
+rule_name: Suspicious File Drop
+alert_title: Suspicious file drop detected
+alert_summary: A process created a suspicious payload or artifact file.
+version: 1
+enabled: true
+event_type: FILE_EVENT
+conditions:
+  all:
+    - field: file_action
+      operator: eq
+      value: CREATE
+    - field: file_path
+      operator: regex
+      value: '(?i)(payload|artifact)-'
+severity: HIGH
+risk_score: 76
+mitre:
+  tactic_code: TA0003
+  technique_code: T1547.001
+incident:
+  enabled: true
+  correlation_key: suspicious-file-drop
+  window_seconds: 1800
+response_guidance:
+  - order: 1
+    title: Validate file origin and hash
+    description: 파일 경로와 SHA-256, 생성 프로세스, 서명 및 배포 출처를 확인해 정상 파일인지 판단합니다.
+    requires_manual_action: false
+  - order: 2
+    title: Quarantine confirmed malicious file
+    description: 악성으로 확인되면 증거를 보존한 뒤 파일을 격리하고 동일 hash가 다른 Endpoint에 존재하는지 조사합니다.
+    requires_manual_action: true
