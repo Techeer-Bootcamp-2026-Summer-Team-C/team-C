@@ -44,6 +44,8 @@ describe("Incident investigation contract", () => {
     expect(screen.getByText("Graph rendering is disabled by feature flag")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open archive operations" })).toHaveAttribute("href", "/operations/archives");
     const evidence = screen.getByRole("table", { name: "Observed evidence" });
+    expect(evidence.closest(".relationship-evidence-table")).toBeInTheDocument();
+    expect(evidence.closest(".investigation-panel")).toBeInTheDocument();
     expect(within(evidence).getAllByRole("row")).toHaveLength(2);
     expect(within(evidence).getByText("Observed")).toBeInTheDocument();
     fireEvent.click(within(evidence).getByRole("button", { name: "Contains" }));

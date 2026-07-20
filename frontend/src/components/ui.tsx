@@ -136,8 +136,8 @@ export function FilterBar({ primary, advanced, appliedFilters = [], onRemoveFilt
   </section>;
 }
 
-export function DataTable({ label, caption = label, children, busy = false }: { label: string; caption?: string; children: ReactNode; busy?: boolean }) {
-  return <div aria-busy={busy || undefined} aria-label={`${label} table`} className="table-scroll" role="region" tabIndex={0}><table><caption className="sr-only">{caption}</caption>{children}</table></div>;
+export function DataTable({ label, caption = label, children, busy = false, className = "" }: { label: string; caption?: string; children: ReactNode; busy?: boolean; className?: string }) {
+  return <div aria-busy={busy || undefined} aria-label={`${label} table`} className={`table-scroll ${className}`.trim()} role="region" tabIndex={0}><table><caption className="sr-only">{caption}</caption>{children}</table></div>;
 }
 
 export function SortableHeader({ label, active, direction, onSort }: {

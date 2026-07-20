@@ -105,6 +105,8 @@
 .table-primary strong,
 .table-primary code { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .table-scroll td > a:not(.table-primary) { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: top; }
+.relationship-evidence-table { background: var(--surface-panel); }
+.relationship-evidence-table table { min-width: 720px; }
 .sort-header { width: 100%; min-height: 28px; display: inline-flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: 0; color: inherit; background: transparent; border: 0; font: inherit; font-weight: var(--weight-semibold); letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
 .sort-header:hover { color: var(--text-primary); }
 tbody tr.selected-row { color: var(--selection-text); background: var(--surface-selected); box-shadow: inset 2px 0 0 var(--focus-ring-color); }

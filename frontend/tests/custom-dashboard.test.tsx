@@ -83,12 +83,12 @@ describe("custom Overview dashboard", () => {
     expect(screen.getByRole("combobox", { name: "Dashboard" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "New dashboard" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Close settings" }));
-    expect(screen.getByRole("button", { name: "Save dashboard" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     expect(screen.getByText("Required: a name and at least one widget.")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Dashboard name" }).closest(".dashboard-builder-actions")).not.toBeNull();
     await user.click(screen.getByRole("button", { name: "Add Total alerts" }));
     await user.type(screen.getByRole("textbox", { name: "Dashboard name" }), "Priority investigation");
-    expect(screen.getByRole("button", { name: "Save dashboard" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(localStorage.getItem("edr.overviewDashboards.v1.user.31")).toBeNull();
@@ -110,7 +110,7 @@ describe("custom Overview dashboard", () => {
     expect(container.querySelectorAll(".dashboard-widget-palette-icon")).toHaveLength(8);
     await user.click(screen.getByRole("button", { name: "Add Critical alerts" }));
     await user.type(screen.getByRole("textbox", { name: "Dashboard name" }), "Priority investigation");
-    await user.click(screen.getByRole("button", { name: "Save dashboard" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(screen.getByRole("region", { name: "Custom dashboard: Priority investigation" })).toBeInTheDocument();
     expect(container.querySelectorAll('[data-widget-type="kpi-alerts"]')).toHaveLength(1);
@@ -136,7 +136,7 @@ describe("custom Overview dashboard", () => {
     expect(screen.getByRole("button", { name: "Add Total alerts" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Add Total alerts" }));
     expect(screen.queryByRole("button", { name: "Add Total alerts" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Save dashboard" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
     expect(screen.getByRole("region", { name: "Custom dashboard: Triage focus" })).toBeInTheDocument();
     expect(container.querySelectorAll('[data-widget-type="kpi-alerts"]')).toHaveLength(1);
     expect(container.querySelectorAll('[data-widget-type="kpi-critical-alerts"]')).toHaveLength(1);
@@ -206,13 +206,13 @@ describe("custom Overview dashboard", () => {
     await user.click(screen.getByRole("button", { name: "New dashboard" }));
     await user.click(screen.getByRole("button", { name: "Add Total alerts" }));
     await user.type(screen.getByRole("textbox", { name: "Dashboard name" }), "Breakpoint guard");
-    expect(screen.getByRole("button", { name: "Save dashboard" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
 
     act(() => editing.set(false));
 
     expect(screen.getByRole("textbox", { name: "Dashboard name" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Add Critical alerts" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Save dashboard" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     expect(screen.getByRole("button", { name: /^Move Total alerts\./ })).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Remove Total alerts" })).not.toBeInTheDocument();
     expect(container.querySelector('[data-dashboard-editing="disabled"]')).toBeInTheDocument();
@@ -265,7 +265,7 @@ describe("custom Overview dashboard", () => {
     await user.click(screen.getByRole("button", { name: "New dashboard" }));
     await user.click(screen.getByRole("button", { name: "Add Total alerts" }));
     await user.type(screen.getByRole("textbox", { name: "Dashboard name" }), "Keyboard layout");
-    await user.click(screen.getByRole("button", { name: "Save dashboard" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(screen.getByRole("button", { name: /^Move Total alerts\./ })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Open dashboard settings" }));
@@ -283,7 +283,7 @@ describe("custom Overview dashboard", () => {
       expect(gridItem?.style.transform).toMatch(/, ?56px\)$/);
     });
     expect(screen.getByRole("button", { name: /Total alerts: column 2, row 2, width 4, height 3/ })).toHaveFocus();
-    await user.click(screen.getByRole("button", { name: "Save dashboard" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
     const stored = JSON.parse(localStorage.getItem("edr.overviewDashboards.v1.user.31") ?? "{}");
     expect(stored.dashboards[0].widgets[0]).toMatchObject({ x: 1, y: 1, w: 4, h: 3 });
   });
