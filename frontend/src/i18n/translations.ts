@@ -1,6 +1,6 @@
 import type { Locale, TranslationParams } from "./types";
 
-export const english = {
+const english = {
   "common.retry": "Retry",
   "common.notAvailable": "Not available",
   "common.none": "None",

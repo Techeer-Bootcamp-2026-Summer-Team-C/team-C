@@ -13,8 +13,8 @@ import {
   type OverviewWidgetType,
 } from "./overviewLayoutModel";
 
-export const DASHBOARDS_STORAGE_PREFIX = "edr.overviewDashboards.v1.user.";
-export const ACTIVE_DASHBOARD_STORAGE_PREFIX = "edr.overviewActiveDashboard.v1.user.";
+const DASHBOARDS_STORAGE_PREFIX = "edr.overviewDashboards.v1.user.";
+const ACTIVE_DASHBOARD_STORAGE_PREFIX = "edr.overviewActiveDashboard.v1.user.";
 
 interface StorageLike {
   getItem: (key: string) => string | null;

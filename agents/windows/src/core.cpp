@@ -10,6 +10,7 @@
 #include <set>
 #include <sstream>
 #include <stdexcept>
+#include <string_view>
 
 #include <sqlite3.h>
 
@@ -273,25 +274,25 @@ std::optional<Batch> make_batch(const std::string& agent_id, const std::vector<B
     if (rows.empty()) return std::nullopt;
     const auto existing_batch_id = rows.front().batch_id;
     Batch result{existing_batch_id.value_or(uuid_string()), {}, {}};
+    const std::string prefix = "{\"schemaVersion\":1,\"batchId\":\"" + result.batch_id + "\",\"agentId\":\"" +
+                               json_escape(agent_id) + "\",\"sentAt\":\"" + utc_now() + "\",\"events\":[";
+    constexpr std::string_view suffix = "]}";
+    std::string events;
     std::set<std::string> seen;
     for (const auto& row : rows) {
         if ((existing_batch_id && row.batch_id != existing_batch_id) || (!existing_batch_id && row.batch_id)) continue;
         if (result.rows.size() >= max_events || !seen.insert(row.event_id).second) continue;
-        const auto candidate_rows = result.rows.size() + 1;
-        std::string events;
-        for (const auto& selected : result.rows) { if (!events.empty()) events += ','; events += selected.event_json; }
-        if (!events.empty()) events += ',';
-        events += row.event_json;
-        const std::string candidate = "{\"schemaVersion\":1,\"batchId\":\"" + result.batch_id + "\",\"agentId\":\"" +
-                                      json_escape(agent_id) + "\",\"sentAt\":\"" + utc_now() + "\",\"events\":[" + events + "]}";
-        if (candidate.size() > max_bytes) {
+        const auto separator_size = events.empty() ? 0U : 1U;
+        const auto candidate_size = prefix.size() + events.size() + separator_size + row.event_json.size() + suffix.size();
+        if (candidate_size > max_bytes) {
             if (result.rows.empty()) throw std::length_error("single event exceeds 5MiB batch limit");
             break;
         }
-        (void)candidate_rows;
+        if (!events.empty()) events += ',';
+        events += row.event_json;
         result.rows.push_back(row);
-        result.body = candidate;
     }
+    if (!result.rows.empty()) result.body = prefix + events + std::string(suffix);
     return result;
 }
 

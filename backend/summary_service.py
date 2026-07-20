@@ -114,7 +114,12 @@ class SummaryService:
         )
         failure_summary = self._failure_summary(from_=from_, to=to, endpoint_id=endpoint_id)
         storage_summary = self._storage_summary(endpoint_id=endpoint_id)
-        edr_state = self._edr_state(endpoint_items, calculated_at=calculated_at, endpoint_id=endpoint_id)
+        edr_state = self._edr_state(
+            endpoint_items,
+            storage_summary=storage_summary,
+            calculated_at=calculated_at,
+            endpoint_id=endpoint_id,
+        )
         incident_time: dict[datetime, Counter[str]] = {}
         for row in incident_summary["time_series"]:
             incident_time.setdefault(_aware(row["bucket_start_at"]), Counter())[str(row["status"])] += int(
@@ -527,6 +532,7 @@ class SummaryService:
         self,
         endpoints,
         *,
+        storage_summary: dict,
         calculated_at: datetime,
         endpoint_id: int | None = None,
     ) -> EdrStateDto:
@@ -549,7 +555,6 @@ class SummaryService:
             to=calculated_at,
             endpoint_id=endpoint_id,
         )
-        storage = self._storage_summary(endpoint_id=endpoint_id)
         sensors = [
             sensor for endpoint in endpoints if endpoint.status != "RETIRED" for sensor in endpoint.sensor_health
         ]
@@ -570,7 +575,7 @@ class SummaryService:
                 latest_ingested_at=_aware(latest_ingest),
                 failed_count_15m=recent_failures["by_status"].get("FAILED", 0),
                 reprocess_failed_count_15m=recent_failures["by_status"].get("REPROCESS_FAILED", 0),
-                restore_failed_bucket_count=storage["by_status"].get("RESTORE_FAILED", 0),
+                restore_failed_bucket_count=storage_summary["by_status"].get("RESTORE_FAILED", 0),
             ),
             calculated_at=calculated_at,
         )
@@ -605,28 +610,12 @@ def _endpoint_counts(items) -> DashboardEndpointsDto:
     )
 
 
-def _enum_counts(rows, field, enum_type, dto_type, dto_field):
-    counter = Counter(str(row[field]) for row in rows)
-    return [
-        dto_type(**{dto_field: value, "count": counter[value.value]}) for value in enum_type if counter[value.value]
-    ]
-
-
 def _enum_count_map(counts, enum_type, dto_type, dto_field):
     return [
         dto_type(**{dto_field: value, "count": int(counts.get(value.value, 0))})
         for value in enum_type
         if counts.get(value.value, 0)
     ]
-
-
-def _object_enum_counts(rows, field, enum_type, dto_type, dto_field):
-    counter = Counter(getattr(row, field) for row in rows)
-    return [dto_type(**{dto_field: value, "count": counter[value]}) for value in enum_type if counter[value]]
-
-
-def _string_counts(rows, field, dto_type, dto_field):
-    return [dto_type(**{dto_field: value, "count": count}) for value, count in _rank_values(row[field] for row in rows)]
 
 
 def _string_count_map(counts, dto_type, dto_field):
@@ -644,10 +633,6 @@ def _rank_values(values):
     return _rank(Counter(value for value in values if value is not None and value != ""))
 
 
-def _rank_nullable(values):
-    return sorted(Counter(values).items(), key=lambda item: (-item[1], str(item[0])))
-
-
 def _bucket(value, seconds):
     timestamp = _aware(value)
     epoch = int(timestamp.timestamp())
@@ -658,10 +643,6 @@ def _aware(value):
     if value is None:
         return None
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
-
-
-def _storage_count(rows, backend, status):
-    return sum(row["storage_backend"] == backend and row["storage_status"] == status for row in rows)
 
 
 def _filter_endpoint_rows(rows, endpoint_id: int | None):

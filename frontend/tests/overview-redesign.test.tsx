@@ -201,7 +201,7 @@ describe("overview fixed dashboard", () => {
     expect(screen.getByRole("combobox", { name: "Detection activity time buckets" })).toHaveValue("");
   });
 
-  it("recreates ECharts options from semantic tokens when the theme changes", async () => {
+  it("updates ECharts options from semantic tokens without recreating the chart", async () => {
     setAuthSession();
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const initMock = vi.mocked(initECharts);
@@ -212,8 +212,11 @@ describe("overview fixed dashboard", () => {
 
     await waitFor(() => expect(initMock.mock.calls.length).toBeGreaterThan(callsBeforeRender));
     const callsAfterMount = initMock.mock.calls.length;
+    const setOptionMock = vi.mocked(initMock.mock.results.at(-1)!.value.setOption);
+    const optionCallsAfterMount = setOptionMock.mock.calls.length;
     fireEvent.click(screen.getByRole("button", { name: "change chart theme" }));
-    await waitFor(() => expect(initMock.mock.calls.length).toBeGreaterThan(callsAfterMount));
+    await waitFor(() => expect(setOptionMock.mock.calls.length).toBeGreaterThan(optionCallsAfterMount));
+    expect(initMock.mock.calls.length).toBe(callsAfterMount);
   });
 
   it("renders a fixed-order severity donut with count, percentage, and safe zero totals", () => {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -18,6 +19,7 @@ def _certificate_text(path: Path) -> str:
     ).stdout
 
 
+@pytest.mark.skipif(shutil.which("openssl") is None, reason="openssl is not installed")
 def test_provisions_single_san_client_certificate_and_reuses_ca(tmp_path: Path) -> None:
     first = provision("agent-mac-001", tmp_path)
     first_fingerprint = first.fingerprint_sha256

@@ -1,9 +1,7 @@
 import type {
   EndpointDetailDto,
-  ErrorEnvelope,
   EventDetailDto,
   SuccessEnvelope,
-  TelemetryBatchRequest,
 } from "../src/contracts";
 
 const timestamp = "2026-07-11T00:00:00Z";
@@ -85,26 +83,3 @@ export const eventFixture = {
   },
   meta: { requestId: "req_contract_fixture" },
 } satisfies SuccessEnvelope<EventDetailDto>;
-
-export const telemetryFixture = {
-  schemaVersion: 1,
-  batchId: "018ff8f4-86de-7b25-9b8a-2d22f6a3e000",
-  agentId: "agent-win-001",
-  sentAt: timestamp,
-  events: [{
-    eventId: "018ff8f4-86de-7b25-9b8a-2d22f6a3e001",
-    eventType: "DNS_QUERY",
-    occurredAt: timestamp,
-    payload: { query: "example.com", recordType: "A", answers: [] },
-  }],
-} satisfies TelemetryBatchRequest;
-
-export const errorFixture = {
-  error: {
-    code: "VALIDATION_ERROR",
-    message: "요청 값이 올바르지 않습니다.",
-    retryable: false,
-    details: [{ field: "size", message: "1 이상이어야 합니다.", context: null }],
-  },
-  meta: { requestId: "req_contract_fixture" },
-} satisfies ErrorEnvelope;

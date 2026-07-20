@@ -492,72 +492,50 @@ class EventRepository:
             parameters["endpoint_id"] = endpoint_id
         where = " AND ".join(conditions)
 
-        total = self.client.query(
-            f"SELECT count() FROM edr_events FINAL WHERE {where}",
-            parameters=parameters,
-        )
-        aggregate = DashboardEventAggregate(total_count=int(total.result_rows[0][0]))
-
-        by_event_type = self.client.query(
-            f"""
-            SELECT event_type, count()
-            FROM edr_events FINAL
-            WHERE {where}
-            GROUP BY event_type
-            """,
-            parameters=parameters,
-        )
-        aggregate.by_event_type.update(
-            {str(value): int(count) for value, count in by_event_type.result_rows}
-        )
-
-        time_series = self.client.query(
+        activity = self.client.query(
             f"""
             SELECT
+                event_type,
                 toStartOfInterval(occurred_at, INTERVAL {interval_seconds} SECOND, 'UTC') AS bucket_start_at,
-                count()
+                count() AS event_count
             FROM edr_events FINAL
             WHERE {where}
-            GROUP BY bucket_start_at
-            ORDER BY bucket_start_at
+            GROUP BY event_type, bucket_start_at
+            ORDER BY bucket_start_at, event_type
             """,
             parameters=parameters,
         )
-        aggregate.time_series.update(
-            {
-                _utc_datetime(bucket_start_at): int(count)
-                for bucket_start_at, count in time_series.result_rows
-            }
-        )
+        aggregate = DashboardEventAggregate()
+        for event_type, bucket_start_at, count in activity.result_rows:
+            event_count = int(count)
+            aggregate.total_count += event_count
+            aggregate.by_event_type[str(event_type)] += event_count
+            aggregate.time_series[_utc_datetime(bucket_start_at)] += event_count
 
-        top_dimensions = (
-            ("top_processes", "process_name"),
-            ("top_remote_ips", "remote_ip"),
-            (
-                "top_domains",
-                "coalesce(nullIf(remote_domain, ''), nullIf(http_host, ''))",
-            ),
-            ("top_file_hashes", "file_hash_sha256"),
-            ("top_dns_queries", "dns_query"),
-            ("top_l7_protocols", "l7_protocol"),
+        dimensions = self.client.query(
+            f"""
+            SELECT dimension.1 AS target, dimension.2 AS value, count() AS event_count
+            FROM edr_events FINAL
+            ARRAY JOIN [
+                tuple('top_processes', coalesce(process_name, '')),
+                tuple('top_remote_ips', coalesce(remote_ip, '')),
+                tuple(
+                    'top_domains',
+                    coalesce(nullIf(remote_domain, ''), nullIf(http_host, ''), '')
+                ),
+                tuple('top_file_hashes', coalesce(file_hash_sha256, '')),
+                tuple('top_dns_queries', coalesce(dns_query, '')),
+                tuple('top_l7_protocols', coalesce(l7_protocol, ''))
+            ] AS dimension
+            WHERE {where} AND value != ''
+            GROUP BY target, value
+            ORDER BY target ASC, event_count DESC, value ASC
+            LIMIT {DASHBOARD_TOP_LIMIT} BY target
+            """,
+            parameters=parameters,
         )
-        for target, expression in top_dimensions:
-            result = self.client.query(
-                f"""
-                SELECT {expression} AS value, count() AS event_count
-                FROM edr_events FINAL
-                WHERE {where}
-                  AND isNotNull({expression})
-                  AND {expression} != ''
-                GROUP BY value
-                ORDER BY event_count DESC, value ASC
-                LIMIT {DASHBOARD_TOP_LIMIT}
-                """,
-                parameters=parameters,
-            )
-            getattr(aggregate, target).update(
-                {str(value): int(count) for value, count in result.result_rows}
-            )
+        for target, value, count in dimensions.result_rows:
+            getattr(aggregate, str(target)).update({str(value): int(count)})
 
         return aggregate
 

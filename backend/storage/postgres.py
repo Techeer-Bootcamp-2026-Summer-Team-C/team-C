@@ -1959,16 +1959,3 @@ class IngestMetadataRepository:
                 (now, now),
             )
             return int(cursor.rowcount)
-
-    def invalidate_verified_archive(self, endpoint_id: int, bucket_start_at: datetime, now: datetime) -> None:
-        with self.connection.transaction():
-            self.connection.execute(
-                """
-                UPDATE ingest_metadata
-                SET archive_verified_at = NULL, checksum_sha256 = NULL, updated_at = %s
-                WHERE endpoint_id = %s AND bucket_start_at = %s
-                  AND storage_backend = 'S3' AND storage_class = 'GLACIER_FLEXIBLE_RETRIEVAL'
-                  AND is_delete = FALSE
-                """,
-                (now, endpoint_id, bucket_start_at),
-            )

@@ -24,15 +24,6 @@ export function TimeSeriesChart({ rows, label, mode = "standard" }: { rows: Time
   return <div className={`time-chart ${mode}`}><svg role="img" aria-label={t("charts.seriesAria", { label })} viewBox="0 0 520 180"><path className="chart-grid" d="M20 30H500 M20 90H500 M20 150H500" /><path className="chart-line" d={path} />{points.map((point, index) => <circle cx={point.x} cy={point.y} key={chartRows[index]?.bucketStartAt} r={mode === "compact" ? "3" : "4"}><title>{chartRows[index] ? `${formatCompactDate(chartRows[index].bucketStartAt)}: ${chartRows[index].count}` : ""}</title></circle>)}</svg>{mode === "expanded" ? <dl className="chart-stats"><div><dt>{t("charts.minimum")}</dt><dd>{Math.min(...counts)}</dd></div><div><dt>{t("charts.average")}</dt><dd>{Math.round(counts.reduce((sum, count) => sum + count, 0) / counts.length)}</dd></div><div><dt>{t("charts.maximum")}</dt><dd>{Math.max(...counts)}</dd></div></dl> : null}<details><summary>{t("charts.viewData", { label: copyLabel })}</summary><table><thead><tr><th scope="col">{t("charts.bucket")}</th><th scope="col">{t("charts.count")}</th></tr></thead><tbody>{rows.map((row) => <tr key={row.bucketStartAt}><td>{formatCompactDate(row.bucketStartAt)}</td><td>{row.count}</td></tr>)}</tbody></table></details></div>;
 }
 
-export function IncidentSeriesChart({ rows, mode = "standard" }: { rows: IncidentTimeSeriesPointDto[]; mode?: ChartDensity }) {
-  const { t } = useI18n();
-  if (!rows.length) return <EmptyState title={t("charts.noIncidentSeries")} message={t("charts.noIncidentSeriesDescription")} />;
-  const chartRows = mode === "compact" ? sampleRows(rows, 8) : rows;
-  const open = coordinates(chartRows.map((row) => row.openCount));
-  const closed = coordinates(chartRows.map((row) => row.closedCount));
-  return <div className={`time-chart ${mode}`}><svg role="img" aria-label={t("charts.incidentSeriesAria")} viewBox="0 0 520 180"><path className="chart-grid" d="M20 30H500 M20 90H500 M20 150H500" /><path className="chart-line alert" d={linePath(open)} /><path className="chart-line closed" d={linePath(closed)} /></svg><div className="inline-legend"><span><i className="open" />{t("charts.open")}</span><span><i className="closed" />{t("charts.closed")}</span></div><details><summary>{t("charts.viewIncidentData")}</summary><table><thead><tr><th scope="col">{t("charts.bucket")}</th><th scope="col">{t("charts.open")}</th><th scope="col">{t("charts.closed")}</th></tr></thead><tbody>{rows.map((row) => <tr key={row.bucketStartAt}><td>{formatCompactDate(row.bucketStartAt)}</td><td>{row.openCount}</td><td>{row.closedCount}</td></tr>)}</tbody></table></details></div>;
-}
-
 export function DetectionActivityTable({ events, alerts, incidents }: {
   events: TimeSeriesPointDto[];
   alerts: TimeSeriesPointDto[];
@@ -70,10 +61,6 @@ function coordinates(values: number[]): { x: number; y: number }[] {
     x: values.length === 1 ? 260 : 20 + (index * 480) / Math.max(values.length - 1, 1),
     y: 150 - (value / maximum) * 120,
   }));
-}
-
-function linePath(points: { x: number; y: number }[]): string {
-  return points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x},${point.y}`).join(" ");
 }
 
 function sortByBucket<Row extends { bucketStartAt: string }>(rows: readonly Row[]): Row[] {

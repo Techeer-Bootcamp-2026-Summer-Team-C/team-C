@@ -161,47 +161,13 @@ def _initialize() -> None:
     from backend.kafka import ensure_topics
     from backend.runtime import create_s3_client
     from backend.settings import get_settings
-    from backend.storage.migrations import apply_clickhouse_file, apply_postgres_file, apply_postgres_migrations
+    from backend.storage.migrations import apply_clickhouse_file
     from backend.storage.postgres import UserRepository
+    from tools.prod_init import initialize_postgres
 
     settings = get_settings()
+    initialize_postgres(settings)
     with psycopg.connect(settings.postgres_dsn.get_secret_value()) as connection:
-        exists = connection.execute("SELECT to_regclass('public.users')").fetchone()[0]
-        if exists is None:
-            apply_postgres_migrations(connection, ROOT / "migrations/postgresql")
-        else:
-            login_id_exists = connection.execute(
-                """
-                SELECT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'login_id'
-                )
-                """
-            ).fetchone()[0]
-            if not login_id_exists:
-                apply_postgres_file(connection, ROOT / "migrations/postgresql/0002_user_login_id.up.sql")
-            locale_exists = connection.execute(
-                """
-                SELECT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'locale'
-                )
-                """
-            ).fetchone()[0]
-            if not locale_exists:
-                apply_postgres_file(connection, ROOT / "migrations/postgresql/0003_user_locale.up.sql")
-            if connection.execute("SELECT to_regclass('public.user_dashboard_layouts')").fetchone()[0] is None:
-                apply_postgres_file(connection, ROOT / "migrations/postgresql/0004_user_dashboard_layouts.up.sql")
-        apply_postgres_file(connection, ROOT / "migrations/postgresql/0005_query_search_sort_indexes.up.sql")
-        login_id_length = connection.execute(
-            """
-            SELECT character_maximum_length
-            FROM information_schema.columns
-            WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'login_id'
-            """
-        ).fetchone()[0]
-        if login_id_length != 64:
-            connection.execute("ALTER TABLE users ALTER COLUMN login_id TYPE VARCHAR(64)")
         credentials = _ensure_credentials()
         existing_admin = connection.execute(
             "SELECT 1 FROM users WHERE LOWER(login_id)=LOWER(%s) AND is_delete=FALSE", (credentials["loginId"],)

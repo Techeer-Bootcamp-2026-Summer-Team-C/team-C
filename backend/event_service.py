@@ -132,20 +132,7 @@ class EventService:
             to=to,
             endpoint_ids=[query.endpoint_id] if query.endpoint_id is not None else None,
         )
-        hot_keys = {
-            (int(row["endpoint_id"]), _utc(row["bucket_start_at"]))
-            for row in metadata_rows
-            if row["storage_backend"] == "CLICKHOUSE" and row["storage_status"] == "HOT"
-        }
-        unready = [
-            row
-            for row in metadata_rows
-            if row["storage_backend"] == "S3"
-            and row["storage_status"] in UNREADY_STATUSES
-            and (int(row["endpoint_id"]), _utc(row["bucket_start_at"])) not in hot_keys
-        ]
-        if unready:
-            raise _archive_not_ready(unready)
+        hot_keys = _ensure_archive_rows_ready(metadata_rows)
 
         filters = dict(
             from_=from_,
@@ -257,20 +244,7 @@ class EventService:
             to=to,
             endpoint_ids=[endpoint_id] if endpoint_id is not None else None,
         )
-        hot_keys = {
-            (int(row["endpoint_id"]), _utc(row["bucket_start_at"]))
-            for row in metadata_rows
-            if row["storage_backend"] == "CLICKHOUSE" and row["storage_status"] == "HOT"
-        }
-        unready = [
-            row
-            for row in metadata_rows
-            if row["storage_backend"] == "S3"
-            and row["storage_status"] in UNREADY_STATUSES
-            and (int(row["endpoint_id"]), _utc(row["bucket_start_at"])) not in hot_keys
-        ]
-        if unready:
-            raise _archive_not_ready(unready)
+        hot_keys = _ensure_archive_rows_ready(metadata_rows)
 
         aggregate = self.events.dashboard_summary(
             from_=from_,
@@ -651,3 +625,21 @@ def _archive_not_ready(rows: list[dict[str, Any]]) -> ApplicationError:
         for row in rows
     ]
     return ApplicationError(409, "ARCHIVE_NOT_READY", "One or more archive buckets are not ready.", details=details)
+
+
+def _ensure_archive_rows_ready(metadata_rows: list[dict[str, Any]]) -> set[tuple[int, datetime]]:
+    hot_keys = {
+        (int(row["endpoint_id"]), _utc(row["bucket_start_at"]))
+        for row in metadata_rows
+        if row["storage_backend"] == "CLICKHOUSE" and row["storage_status"] == "HOT"
+    }
+    unready = [
+        row
+        for row in metadata_rows
+        if row["storage_backend"] == "S3"
+        and row["storage_status"] in UNREADY_STATUSES
+        and (int(row["endpoint_id"]), _utc(row["bucket_start_at"])) not in hot_keys
+    ]
+    if unready:
+        raise _archive_not_ready(unready)
+    return hot_keys

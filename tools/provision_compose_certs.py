@@ -7,7 +7,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from tools.provision_agent_cert import _openssl, provision
+from tools.provision_agent_cert import _openssl, _sign_certificate, provision
 from tools.secure_files import protect_private_path, set_public_file_mode
 
 
@@ -69,28 +69,13 @@ def _write_nginx_certificate(authority_directory: Path, nginx_directory: Path) -
             "-out",
             str(csr),
         )
-        serial = ca_certificate.with_suffix(".srl")
-        serial_arguments = ("-CAserial", str(serial)) if serial.exists() else ("-CAcreateserial",)
-        _run(
-            _openssl(),
-            "x509",
-            "-req",
-            "-in",
-            str(csr),
-            "-CA",
-            str(ca_certificate),
-            "-CAkey",
-            str(ca_key),
-            *serial_arguments,
-            "-days",
-            "365",
-            "-sha256",
-            "-extfile",
-            str(extensions),
-            "-extensions",
-            "server",
-            "-out",
-            str(generated_certificate),
+        _sign_certificate(
+            csr=csr,
+            ca_certificate=ca_certificate,
+            ca_key=ca_key,
+            extensions=extensions,
+            extension_section="server",
+            output=generated_certificate,
         )
         shutil.copyfile(generated_key, server_key)
         shutil.copyfile(generated_certificate, server_certificate)

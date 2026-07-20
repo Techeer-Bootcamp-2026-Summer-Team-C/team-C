@@ -26,19 +26,38 @@ export default function DetectionActivityPanel({ events, alerts, incidents, reco
   const renderedRef = useRef(false);
   const [selectedTimestamp, setSelectedTimestamp] = useState<number | null>(null);
   const model = useMemo(() => buildDetectionActivityModel(events, alerts, incidents), [alerts, events, incidents]);
-  const [selectionModel, setSelectionModel] = useState(model.timestamps);
+  const hasDomain = model.domain !== null;
   const labels = useMemo(() => [t("overview.events"), t("overview.alerts"), t("overview.openIncidents")], [t]);
 
-  if (selectionModel !== model.timestamps) {
-    setSelectionModel(model.timestamps);
-    if (selectedTimestamp !== null && !model.timestamps.includes(selectedTimestamp)) setSelectedTimestamp(null);
-  }
+  useEffect(() => {
+    setSelectedTimestamp((current) => current !== null && !model.timestamps.includes(current) ? null : current);
+  }, [model.timestamps]);
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || !model.domain) return;
+    if (!container || !hasDomain) return;
     const chart = init(container, undefined, { renderer: "canvas" });
     chartRef.current = chart;
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => chart.resize());
+    observer?.observe(container);
+    const resizeForPrint = () => chart.resize();
+    window.addEventListener("resize", resizeForPrint);
+    window.addEventListener("beforeprint", resizeForPrint);
+    window.addEventListener("afterprint", resizeForPrint);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", resizeForPrint);
+      window.removeEventListener("beforeprint", resizeForPrint);
+      window.removeEventListener("afterprint", resizeForPrint);
+      chart.dispose();
+      chartRef.current = null;
+    };
+  }, [hasDomain]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    const container = containerRef.current;
+    if (!chart || !container || !model.domain) return;
     const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     const animate = !renderedRef.current && !reducedMotion;
     container.dataset.animation = animate ? "enabled" : "disabled";
@@ -117,20 +136,6 @@ export default function DetectionActivityPanel({ events, alerts, incidents, reco
       })),
     });
     renderedRef.current = true;
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => chart.resize());
-    observer?.observe(container);
-    const resizeForPrint = () => chart.resize();
-    window.addEventListener("resize", resizeForPrint);
-    window.addEventListener("beforeprint", resizeForPrint);
-    window.addEventListener("afterprint", resizeForPrint);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener("resize", resizeForPrint);
-      window.removeEventListener("beforeprint", resizeForPrint);
-      window.removeEventListener("afterprint", resizeForPrint);
-      chart.dispose();
-      chartRef.current = null;
-    };
   }, [labels, model, theme]);
 
   if (!model.domain) return <EmptyState actions={recoveryTo ? <Link className="button" to={recoveryTo}>{t("filter.latest7Days")}</Link> : undefined} compact title={t("charts.noDetectionActivity")} message={t("charts.noSeriesDescription")} />;

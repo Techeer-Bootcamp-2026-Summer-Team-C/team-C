@@ -218,12 +218,12 @@ export function ErrorState({ error, onRetry, archiveAction = false }: {
   );
 }
 
-export function InvalidFilterState({ message }: { message?: string }) {
+function InvalidFilterState({ message }: { message?: string }) {
   const { t } = useI18n();
   return <div className="state-card invalid" role="alert"><CircleAlert aria-hidden="true" size={22} /><strong>{t("filter.invalidTitle")}</strong><p>{message ?? t("filter.invalidDescription")}</p></div>;
 }
 
-export function RefetchingIndicator() {
+function RefetchingIndicator() {
   const { t } = useI18n();
   return <div aria-live="polite" className="refetching-indicator" role="status"><RefreshCw aria-hidden="true" size={14} /><span>{t("common.refreshing")}</span></div>;
 }

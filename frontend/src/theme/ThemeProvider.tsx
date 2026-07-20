@@ -8,9 +8,9 @@ interface ThemeValue {
   toggleTheme: () => void;
 }
 
-export const THEME_STORAGE_KEY = "edr.theme";
-export const DEFAULT_THEME: Theme = "dark";
-export const THEME_COLOR: Record<Theme, string> = {
+const THEME_STORAGE_KEY = "edr.theme";
+const DEFAULT_THEME: Theme = "dark";
+const THEME_COLOR: Record<Theme, string> = {
   dark: "#09090b",
   light: "#f4f6f8",
 };

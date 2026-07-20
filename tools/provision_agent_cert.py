@@ -81,6 +81,40 @@ def _ensure_ca(root: Path) -> tuple[Path, Path]:
     return ca_key, ca_certificate
 
 
+def _sign_certificate(
+    *,
+    csr: Path,
+    ca_certificate: Path,
+    ca_key: Path,
+    extensions: Path,
+    extension_section: str,
+    output: Path,
+) -> None:
+    serial = ca_certificate.with_suffix(".srl")
+    serial_arguments = ("-CAserial", str(serial)) if serial.exists() else ("-CAcreateserial",)
+    _run(
+        _openssl(),
+        "x509",
+        "-req",
+        "-in",
+        str(csr),
+        "-CA",
+        str(ca_certificate),
+        "-CAkey",
+        str(ca_key),
+        *serial_arguments,
+        "-days",
+        "365",
+        "-sha256",
+        "-extfile",
+        str(extensions),
+        "-extensions",
+        extension_section,
+        "-out",
+        str(output),
+    )
+
+
 def provision(agent_id: str, output_directory: Path) -> ProvisionedCertificate:
     if AGENT_ID_PATTERN.fullmatch(agent_id) is None:
         raise ValueError("agentId must match [a-z0-9][a-z0-9._-]{0,63}")
@@ -129,28 +163,13 @@ def provision(agent_id: str, output_directory: Path) -> ProvisionedCertificate:
             "-out",
             str(csr),
         )
-        serial = ca_certificate.with_suffix(".srl")
-        serial_arguments = ("-CAserial", str(serial)) if serial.exists() else ("-CAcreateserial",)
-        _run(
-            _openssl(),
-            "x509",
-            "-req",
-            "-in",
-            str(csr),
-            "-CA",
-            str(ca_certificate),
-            "-CAkey",
-            str(ca_key),
-            *serial_arguments,
-            "-days",
-            "365",
-            "-sha256",
-            "-extfile",
-            str(extensions),
-            "-extensions",
-            "agent",
-            "-out",
-            str(agent_certificate),
+        _sign_certificate(
+            csr=csr,
+            ca_certificate=ca_certificate,
+            ca_key=ca_key,
+            extensions=extensions,
+            extension_section="agent",
+            output=agent_certificate,
         )
 
     shutil.copyfile(ca_certificate, deployed_ca)

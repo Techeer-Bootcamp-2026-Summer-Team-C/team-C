@@ -59,6 +59,79 @@ def run_with_retries(
     return RetryFailure(last_error, len(RETRY_DELAYS_SECONDS))
 
 
+def _run_worker_once(
+    *,
+    consumer: ConsumerPort,
+    consumer_name: str,
+    failure_sink: FailureSink,
+    failure_stage: str,
+    process: Callable[[ConsumedMessage], None],
+    permanent_errors: tuple[tuple[type[Exception], str], ...],
+    timeout: float,
+    sleep: Callable[[float], None],
+    now: Callable[[], datetime],
+) -> tuple[bool, bool]:
+    message = consumer.consume_one(timeout)
+    if message is None:
+        return False, False
+
+    failure_code: str | None = None
+    retryable = True
+    retry_count = 0
+    reset_requested = False
+    try:
+        retry_failure = run_with_retries(lambda: process(message), sleep=sleep)
+        if retry_failure is None:
+            consumer.commit(message)
+            return True, False
+        error = retry_failure.error
+        retry_count = retry_failure.retry_count
+        reset_requested = True
+    except Exception as caught:
+        failure_code = next(
+            (code for error_type, code in permanent_errors if isinstance(caught, error_type)),
+            None,
+        )
+        if failure_code is None:
+            raise
+        error = caught
+        retryable = False
+
+    LOGGER.warning(
+        "worker message failed topic=%s partition=%s offset=%s consumer=%s code=%s retryable=%s retries=%s",
+        message.topic,
+        message.partition,
+        message.offset,
+        consumer_name,
+        failure_code or "PROCESSING_ERROR",
+        retryable,
+        retry_count,
+    )
+    try:
+        failure_sink.record(
+            message,
+            consumer_name=consumer_name,
+            failure_stage=failure_stage,
+            failure_code=failure_code,
+            error_message=str(error),
+            retryable=retryable,
+            retry_count=retry_count,
+            failed_at=now(),
+        )
+    except Exception:
+        LOGGER.exception(
+            "failure persistence failed; rewinding topic=%s partition=%s offset=%s consumer=%s",
+            message.topic,
+            message.partition,
+            message.offset,
+            consumer_name,
+        )
+        consumer.rewind(message)
+        return False, True
+    consumer.commit(message)
+    return True, reset_requested
+
+
 class EventStorageWorker:
     consumer_name = "event-storage-worker"
 
@@ -85,69 +158,22 @@ class EventStorageWorker:
         self.reset_requested = False
 
     def run_once(self, timeout: float = 1.0) -> bool:
-        self.reset_requested = False
-        message = self.consumer.consume_one(timeout)
-        if message is None:
-            return False
-        failure_code: str | None = None
-        retryable = True
-        retry_count = 0
-        try:
-            retry_failure = run_with_retries(lambda: self._process(message), sleep=self.sleep)
-            if retry_failure is None:
-                self.consumer.commit(message)
-                return True
-            error = retry_failure.error
-            retry_count = retry_failure.retry_count
-            self.reset_requested = True
-        except ArchivedDayImmutableError as caught:
-            error = caught
-            failure_code = "ARCHIVED_DAY_IMMUTABLE"
-            retryable = False
-        except EventIdentityConflictError as caught:
-            error = caught
-            failure_code = "EVENT_IDENTITY_CONFLICT"
-            retryable = False
-        except PermanentMessageError as caught:
-            error = caught
-            failure_code = "INVALID_MESSAGE"
-            retryable = False
-
-        LOGGER.warning(
-            "worker message failed topic=%s partition=%s offset=%s consumer=%s code=%s retryable=%s retries=%s",
-            message.topic,
-            message.partition,
-            message.offset,
-            self.consumer_name,
-            failure_code or "PROCESSING_ERROR",
-            retryable,
-            retry_count,
+        completed, self.reset_requested = _run_worker_once(
+            consumer=self.consumer,
+            consumer_name=self.consumer_name,
+            failure_sink=self.failure_sink,
+            failure_stage="EVENT_STORAGE",
+            process=self._process,
+            permanent_errors=(
+                (ArchivedDayImmutableError, "ARCHIVED_DAY_IMMUTABLE"),
+                (EventIdentityConflictError, "EVENT_IDENTITY_CONFLICT"),
+                (PermanentMessageError, "INVALID_MESSAGE"),
+            ),
+            timeout=timeout,
+            sleep=self.sleep,
+            now=self.now,
         )
-
-        try:
-            self.failure_sink.record(
-                message,
-                consumer_name=self.consumer_name,
-                failure_stage="EVENT_STORAGE",
-                failure_code=failure_code,
-                error_message=str(error),
-                retryable=retryable,
-                retry_count=retry_count,
-                failed_at=self.now(),
-            )
-        except Exception:
-            self.reset_requested = True
-            LOGGER.exception(
-                "failure persistence failed; rewinding topic=%s partition=%s offset=%s consumer=%s",
-                message.topic,
-                message.partition,
-                message.offset,
-                self.consumer_name,
-            )
-            self.consumer.rewind(message)
-            return False
-        self.consumer.commit(message)
-        return True
+        return completed
 
     def _process(self, message: ConsumedMessage) -> None:
         try:
@@ -209,60 +235,18 @@ class DetectionWorker:
         self.reset_requested = False
 
     def run_once(self, timeout: float = 1.0) -> bool:
-        self.reset_requested = False
-        message = self.consumer.consume_one(timeout)
-        if message is None:
-            return False
-        failure_code: str | None = None
-        retryable = True
-        retry_count = 0
-        try:
-            retry_failure = run_with_retries(lambda: self._process(message), sleep=self.sleep)
-            if retry_failure is None:
-                self.consumer.commit(message)
-                return True
-            error = retry_failure.error
-            retry_count = retry_failure.retry_count
-            self.reset_requested = True
-        except PermanentMessageError as caught:
-            error = caught
-            failure_code = "INVALID_MESSAGE"
-            retryable = False
-
-        LOGGER.warning(
-            "worker message failed topic=%s partition=%s offset=%s consumer=%s code=%s retryable=%s retries=%s",
-            message.topic,
-            message.partition,
-            message.offset,
-            self.consumer_name,
-            failure_code or "PROCESSING_ERROR",
-            retryable,
-            retry_count,
+        completed, self.reset_requested = _run_worker_once(
+            consumer=self.consumer,
+            consumer_name=self.consumer_name,
+            failure_sink=self.failure_sink,
+            failure_stage="DETECTION",
+            process=self._process,
+            permanent_errors=((PermanentMessageError, "INVALID_MESSAGE"),),
+            timeout=timeout,
+            sleep=self.sleep,
+            now=self.now,
         )
-        try:
-            self.failure_sink.record(
-                message,
-                consumer_name=self.consumer_name,
-                failure_stage="DETECTION",
-                failure_code=failure_code,
-                error_message=str(error),
-                retryable=retryable,
-                retry_count=retry_count,
-                failed_at=self.now(),
-            )
-        except Exception:
-            self.reset_requested = True
-            LOGGER.exception(
-                "failure persistence failed; rewinding topic=%s partition=%s offset=%s consumer=%s",
-                message.topic,
-                message.partition,
-                message.offset,
-                self.consumer_name,
-            )
-            self.consumer.rewind(message)
-            return False
-        self.consumer.commit(message)
-        return True
+        return completed
 
     def _process(self, message: ConsumedMessage) -> None:
         try:

@@ -544,7 +544,7 @@ function startPaletteDrag(event: ReactDragEvent<HTMLButtonElement>, type: Overvi
   event.dataTransfer.setData("text/plain", type);
 }
 
-export function useDesktopDashboardEditing(): boolean {
+function useDesktopDashboardEditing(): boolean {
   return useSyncExternalStore(subscribeDesktopDashboardEditing, desktopDashboardEditingSnapshot, () => true);
 }
 

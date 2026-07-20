@@ -2,7 +2,7 @@ import type { Query } from "@tanstack/react-query";
 import type { SuccessEnvelope, UserRole } from "../contracts";
 import { ApiError } from "../api/client";
 
-export const RETRY_DELAYS_MS = [5_000, 15_000, 30_000] as const;
+const RETRY_DELAYS_MS = [5_000, 15_000, 30_000] as const;
 
 export function shouldRetry(failureCount: number, error: unknown): boolean {
   return error instanceof ApiError && error.status === 503 && failureCount < 3;

@@ -25,6 +25,9 @@ from tools.replay_failure import FailureNotFoundError, replay_failure
 ROOT = Path(__file__).parents[1]
 RUN_INTEGRATION = os.getenv("EDR_RUN_INGEST_INTEGRATION") == "1"
 pytestmark = [pytest.mark.integration, pytest.mark.skipif(not RUN_INTEGRATION, reason="ingest integration disabled")]
+CERTIFICATE_REFERENCE_TIME = datetime.now(UTC).replace(microsecond=0)
+CERTIFICATE_NOT_BEFORE = (CERTIFICATE_REFERENCE_TIME - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+CERTIFICATE_NOT_AFTER = (CERTIFICATE_REFERENCE_TIME + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def cert_headers(agent_id: str, fingerprint: str) -> dict[str, str]:
@@ -33,8 +36,8 @@ def cert_headers(agent_id: str, fingerprint: str) -> dict[str, str]:
         "X-EDR-Certificate-Subject": f"CN={agent_id}",
         "X-EDR-Certificate-SAN-Agent-ID": agent_id,
         "X-EDR-Certificate-Fingerprint-SHA256": fingerprint,
-        "X-EDR-Certificate-Not-Before": "Jul 11 00:00:00 2026 GMT",
-        "X-EDR-Certificate-Not-After": "Jul 20 00:00:00 2026 GMT",
+        "X-EDR-Certificate-Not-Before": CERTIFICATE_NOT_BEFORE,
+        "X-EDR-Certificate-Not-After": CERTIFICATE_NOT_AFTER,
     }
 
 

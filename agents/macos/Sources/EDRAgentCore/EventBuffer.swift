@@ -193,11 +193,15 @@ public final class EventBuffer: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         try execute("BEGIN IMMEDIATE")
         do {
+            let statement = try prepare(sql)
+            defer { sqlite3_finalize(statement) }
             for rowId in rowIds {
-                let statement = try prepare(sql)
                 binder(statement, rowId)
                 try stepDone(statement)
-                sqlite3_finalize(statement)
+                guard sqlite3_reset(statement) == SQLITE_OK else {
+                    throw AgentError.transport("SQLite statement reset failed")
+                }
+                sqlite3_clear_bindings(statement)
             }
             try execute("COMMIT")
         } catch {
@@ -272,21 +276,42 @@ public enum MicroBatcher {
             return row.batchId == nil
         }
         let batchId = existingBatchId ?? UUID().uuidString.lowercased()
-        var selected: [BufferedEvent] = []
-        var body = Data()
         var seen = Set<String>()
-        for row in eligibleRows.prefix(maxEvents) where seen.insert(row.event.eventId).inserted {
-            let candidate = selected + [row]
-            let candidateBatch = TelemetryBatch(batchId: batchId, agentId: agentId, events: candidate.map(\.event))
-            let encoded = try contractEncoder().encode(candidateBatch)
-            if encoded.count > maxBodyBytes {
-                if selected.isEmpty { throw AgentError.eventTooLarge }
-                break
-            }
-            selected = candidate
-            body = encoded
+        let candidates = eligibleRows.prefix(maxEvents).filter { seen.insert($0.event.eventId).inserted }
+        let sentAt = utcNow()
+        guard !candidates.isEmpty else {
+            let batch = TelemetryBatch(batchId: batchId, agentId: agentId, sentAt: sentAt, events: [])
+            return BatchSelection(batch: batch, rows: [], body: Data())
         }
-        let batch = TelemetryBatch(batchId: batchId, agentId: agentId, events: selected.map(\.event))
-        return BatchSelection(batch: batch, rows: selected, body: body)
+
+        let encoder = contractEncoder()
+        func encode(_ count: Int) throws -> (TelemetryBatch, Data) {
+            let batch = TelemetryBatch(
+                batchId: batchId,
+                agentId: agentId,
+                sentAt: sentAt,
+                events: candidates.prefix(count).map(\.event)
+            )
+            return (batch, try encoder.encode(batch))
+        }
+
+        let first = try encode(1)
+        guard first.1.count <= maxBodyBytes else { throw AgentError.eventTooLarge }
+        var bestCount = 1
+        var best = first
+        var lowerBound = 2
+        var upperBound = candidates.count
+        while lowerBound <= upperBound {
+            let candidateCount = lowerBound + (upperBound - lowerBound) / 2
+            let encoded = try encode(candidateCount)
+            if encoded.1.count <= maxBodyBytes {
+                bestCount = candidateCount
+                best = encoded
+                lowerBound = candidateCount + 1
+            } else {
+                upperBound = candidateCount - 1
+            }
+        }
+        return BatchSelection(batch: best.0, rows: Array(candidates.prefix(bestCount)), body: best.1)
     }
 }

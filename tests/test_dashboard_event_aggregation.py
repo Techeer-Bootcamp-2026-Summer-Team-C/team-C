@@ -18,24 +18,21 @@ class RecordingClient:
     def query(self, query: str, parameters: dict[str, object] | None = None):
         normalized = " ".join(query.split())
         self.queries.append((normalized, dict(parameters or {})))
-        if normalized.startswith("SELECT count() FROM"):
-            rows = [(12,)]
-        elif normalized.startswith("SELECT event_type"):
-            rows = [("PROCESS_EXECUTION", 7), ("DNS_QUERY", 5)]
-        elif "toStartOfInterval" in normalized:
-            rows = [(NOW, 4), (NOW + timedelta(hours=1), 8)]
-        elif "process_name AS value" in normalized:
-            rows = [("powershell.exe", 7)]
-        elif "remote_ip AS value" in normalized:
-            rows = [("203.0.113.10", 4)]
-        elif "coalesce(nullIf(remote_domain" in normalized:
-            rows = [("example.test", 6)]
-        elif "file_hash_sha256 AS value" in normalized:
-            rows = [("a" * 64, 3)]
-        elif "dns_query AS value" in normalized:
-            rows = [("example.test", 5)]
-        elif "l7_protocol AS value" in normalized:
-            rows = [("HTTPS", 2)]
+        if normalized.startswith("SELECT event_type, toStartOfInterval"):
+            rows = [
+                ("PROCESS_EXECUTION", NOW, 4),
+                ("PROCESS_EXECUTION", NOW + timedelta(hours=1), 3),
+                ("DNS_QUERY", NOW + timedelta(hours=1), 5),
+            ]
+        elif "ARRAY JOIN" in normalized:
+            rows = [
+                ("top_processes", "powershell.exe", 7),
+                ("top_remote_ips", "203.0.113.10", 4),
+                ("top_domains", "example.test", 6),
+                ("top_file_hashes", "a" * 64, 3),
+                ("top_dns_queries", "example.test", 5),
+                ("top_l7_protocols", "HTTPS", 2),
+            ]
         else:
             raise AssertionError(f"unexpected query: {normalized}")
         return SimpleNamespace(result_rows=rows)
@@ -56,10 +53,10 @@ def test_dashboard_summary_aggregates_in_clickhouse_without_raw_event_projection
     assert result.top_processes == {"powershell.exe": 7}
     assert result.top_domains == {"example.test": 6}
     assert result.time_series == {NOW: 4, NOW + timedelta(hours=1): 8}
-    assert len(client.queries) == 9
+    assert len(client.queries) == 2
     assert all("raw_payload" not in query for query, _parameters in client.queries)
     assert all(parameters["endpoint_id"] == 7 for _query, parameters in client.queries)
-    assert all(f"LIMIT {DASHBOARD_TOP_LIMIT}" in query for query, _ in client.queries[3:])
+    assert f"LIMIT {DASHBOARD_TOP_LIMIT} BY target" in client.queries[1][0]
 
 
 def test_dashboard_summary_rejects_an_unknown_interval_before_querying() -> None:

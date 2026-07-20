@@ -22,7 +22,7 @@ export interface OverviewDashboardData {
   timeRange: TimeRangeQuery;
 }
 
-export interface OverviewPanelState {
+interface OverviewPanelState {
   pending: boolean;
   error: unknown;
   stale: boolean;
