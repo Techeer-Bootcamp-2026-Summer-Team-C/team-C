@@ -103,13 +103,13 @@ export function CollectionPath({ health }: { health: OperationsHealthDto }) {
   const nodes = [
     { label: t("operations.pathAgent"), detail: t("operations.noHealthProbe"), status: "NO PROBE", icon: <MonitorDot size={17} /> },
     { label: "Nginx / mTLS", detail: t("operations.noHealthProbe"), status: "NO PROBE", icon: <ShieldCheck size={17} /> },
-    { label: t("operations.pathCollector"), detail: backend ? `${backend.latencyMs} ms · ${backend.detail}` : t("operations.noHealthProbe"), status: backend?.status ?? "NO PROBE", icon: <Server size={17} /> },
-    { label: "Kafka telemetry.raw", detail: kafka?.detail ?? t("operations.noHealthProbe"), status: kafka?.status ?? "NO PROBE", icon: <Radio size={17} /> },
-    { label: t("operations.pathStorageWorker"), detail: workerDetail(storageWorker, t("operations.unknown")), status: storageWorker?.status ?? "NO PROBE", icon: <Cpu size={17} /> },
-    { label: "ClickHouse", detail: clickhouse ? `${clickhouse.latencyMs} ms · ${clickhouse.detail}` : t("operations.noHealthProbe"), status: clickhouse?.status ?? "NO PROBE", icon: <Database size={17} /> },
-    { label: "Kafka telemetry.validated", detail: kafka?.detail ?? t("operations.noHealthProbe"), status: kafka?.status ?? "NO PROBE", icon: <Radio size={17} /> },
-    { label: t("operations.pathDetectionWorker"), detail: workerDetail(detectionWorker, t("operations.unknown")), status: detectionWorker?.status ?? "NO PROBE", icon: <Cpu size={17} /> },
-    { label: "PostgreSQL", detail: postgres ? `${postgres.latencyMs} ms · ${postgres.detail}` : t("operations.noHealthProbe"), status: postgres?.status ?? "NO PROBE", icon: <Database size={17} /> },
+    { label: t("operations.pathCollector"), detail: backend ? `${backend.latencyMs} ms · ${operationsDetail(t, backend.detail)}` : t("operations.noHealthProbe"), status: backend?.status ?? "NO PROBE", icon: <Server size={17} /> },
+    { label: "Kafka telemetry.raw", detail: kafka ? operationsDetail(t, kafka.detail) : t("operations.noHealthProbe"), status: kafka?.status ?? "NO PROBE", icon: <Radio size={17} /> },
+    { label: t("operations.pathStorageWorker"), detail: workerDetail(t, storageWorker, t("operations.unknown")), status: storageWorker?.status ?? "NO PROBE", icon: <Cpu size={17} /> },
+    { label: "ClickHouse", detail: clickhouse ? `${clickhouse.latencyMs} ms · ${operationsDetail(t, clickhouse.detail)}` : t("operations.noHealthProbe"), status: clickhouse?.status ?? "NO PROBE", icon: <Database size={17} /> },
+    { label: "Kafka telemetry.validated", detail: kafka ? operationsDetail(t, kafka.detail) : t("operations.noHealthProbe"), status: kafka?.status ?? "NO PROBE", icon: <Radio size={17} /> },
+    { label: t("operations.pathDetectionWorker"), detail: workerDetail(t, detectionWorker, t("operations.unknown")), status: detectionWorker?.status ?? "NO PROBE", icon: <Cpu size={17} /> },
+    { label: "PostgreSQL", detail: postgres ? `${postgres.latencyMs} ms · ${operationsDetail(t, postgres.detail)}` : t("operations.noHealthProbe"), status: postgres?.status ?? "NO PROBE", icon: <Database size={17} /> },
   ];
   return <section aria-label={t("operations.collectionPath")} className="collection-path-board">
     <header><div><span>{t("operations.collectionPath")}</span><strong>{t("operations.collectionPathSubtitle")}</strong></div><StatusPill value={health.status} /></header>
@@ -123,9 +123,9 @@ export function CollectionPath({ health }: { health: OperationsHealthDto }) {
   </section>;
 }
 
-function workerDetail(worker: OperationsHealthDto["workers"][number] | undefined, unknown: string): string {
+function workerDetail(t: ReturnType<typeof useI18n>["t"], worker: OperationsHealthDto["workers"][number] | undefined, unknown: string): string {
   if (!worker) return unknown;
-  return `${worker.memberCount ?? unknown} member · lag ${worker.lag ?? unknown}`;
+  return t("operations.memberLag", { count: worker.memberCount ?? unknown, lag: worker.lag ?? unknown });
 }
 
 function LiveHealth({ data }: { data: OperationsHealthDto }) {
@@ -136,11 +136,11 @@ function LiveHealth({ data }: { data: OperationsHealthDto }) {
       <small>{t("operations.checked", { time: formatDateTime(data.checkedAt) })}</small>
     </section>
     <Panel title={t("operations.serviceHealth")} subtitle={t("operations.serviceHealthSubtitle")}>
-      <DataTable label={t("operations.serviceHealth")}><thead><tr><th scope="col">Service</th><th scope="col">{t("filter.status")}</th><th scope="col">Latency</th><th scope="col">{t("operations.brokerState")}</th></tr></thead><tbody>{data.services.map((service) => <tr key={service.service}><td><strong>{service.service}</strong></td><td><span className={`service-state-text tone-${service.status.toLowerCase()}`}>{humanize(service.status)}</span></td><td>{service.latencyMs} ms</td><td>{service.detail}</td></tr>)}</tbody></DataTable>
+      <DataTable label={t("operations.serviceHealth")}><thead><tr><th scope="col">Service</th><th scope="col">{t("filter.status")}</th><th scope="col">Latency</th><th scope="col">{t("operations.brokerState")}</th></tr></thead><tbody>{data.services.map((service) => <tr key={service.service}><td><strong>{service.service}</strong></td><td><span className={`service-state-text tone-${service.status.toLowerCase()}`}>{humanize(service.status)}</span></td><td>{service.latencyMs} ms</td><td>{operationsDetail(t, service.detail)}</td></tr>)}</tbody></DataTable>
     </Panel>
     <Panel title={t("operations.pipelineWorkers")} subtitle={t("operations.pipelineWorkersSubtitle")}>
       <DataTable label={t("operations.pipelineWorkerHealth")}><thead><tr><th scope="col">Worker</th><th scope="col">Topic</th><th scope="col">{t("filter.status")}</th><th scope="col">{t("operations.members")}</th><th scope="col">Lag</th><th scope="col">{t("operations.brokerState")}</th></tr></thead><tbody>
-        {data.workers.map((worker) => <tr key={worker.groupId}><td><strong>{worker.worker}</strong><code className="table-code">{worker.groupId}</code></td><td><code>{worker.topic}</code></td><td><StatusPill value={worker.status} /></td><td>{worker.memberCount ?? t("operations.unknown")}</td><td>{worker.lag ?? t("operations.unknown")}</td><td>{worker.detail}</td></tr>)}
+        {data.workers.map((worker) => <tr key={worker.groupId}><td><strong>{worker.worker}</strong><code className="table-code">{worker.groupId}</code></td><td><code>{worker.topic}</code></td><td><StatusPill value={worker.status} /></td><td>{worker.memberCount ?? t("operations.unknown")}</td><td>{worker.lag ?? t("operations.unknown")}</td><td>{operationsDetail(t, worker.detail)}</td></tr>)}
       </tbody></DataTable>
     </Panel>
   </>;
@@ -176,4 +176,20 @@ function freshness(timestamp: string | null): { time: string; minutes: number } 
 
 function StorageCount({ label, value }: { label: string; value: number }) {
   return <article><span>{label}</span><strong>{value}</strong></article>;
+}
+
+export function operationsDetail(t: ReturnType<typeof useI18n>["t"], detail: string): string {
+  if (detail === "The authenticated operations endpoint is responding.") return t("operations.backendResponding");
+  if (detail === "Live dependency probe succeeded.") return t("operations.liveProbeSucceeded");
+  if (detail === "Live dependency probe failed.") return t("operations.liveProbeFailedPlain");
+  if (detail === "Worker probe failed.") return t("operations.workerProbeFailedPlain");
+  const liveFailure = /^Live dependency probe failed \((.+)\)\.$/.exec(detail);
+  const liveError = liveFailure?.[1];
+  if (liveError) return t("operations.liveProbeFailed", { error: liveError });
+  const workerFailure = /^Worker probe failed \((.+)\)\.$/.exec(detail);
+  const workerError = workerFailure?.[1];
+  if (workerError) return t("operations.workerProbeFailed", { error: workerError });
+  const brokerState = /^Broker group state:? (.+?)[.]?$/.exec(detail)?.[1];
+  if (brokerState) return t("operations.brokerGroupState", { state: brokerState });
+  return detail;
 }

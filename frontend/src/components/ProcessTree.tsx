@@ -32,8 +32,8 @@ export function ProcessTree({ nodes }: { nodes: readonly ProcessTreeNodeDto[] })
         <small>{t("processTree.metadata", { time: formatDateTime(node.lastSeenAt), pid: node.pid, ppid: node.ppid ?? t("common.none"), count: node.eventCount })}</small>
       </span>
       <span className="process-flags">
-        {node.selected ? <StatusPill value="SELECTED PID" /> : null}
-        {node.ppid !== null && !node.parentCaptured ? <StatusPill value="PARENT NOT CAPTURED" /> : null}
+        {node.selected ? <StatusPill label={t("processTree.selectedPid")} value="SELECTED PID" /> : null}
+        {node.ppid !== null && !node.parentCaptured ? <StatusPill label={t("processTree.parentNotCaptured")} value="PARENT NOT CAPTURED" /> : null}
       </span>
     </article>)}
   </div>;

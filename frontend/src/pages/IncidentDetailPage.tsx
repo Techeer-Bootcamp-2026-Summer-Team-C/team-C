@@ -122,12 +122,17 @@ export function AttackTimeline({ timeline, investigation, selection, onSelect }:
   return <ol className="attack-timeline">{timeline.items.map((item, index) => {
     const nextSelection = investigation ? selectionForTimelineItem(investigation, item) : null;
     const selected = investigation ? selectionMatchesTimelineItem(selection, investigation, item) : false;
+    const isEvent = item.itemType === "EVENT";
+    const title = isEvent ? item.title : detectionTitle(t, item.title);
+    const summary = isEvent
+      ? (item.eventType && item.summary === `${item.eventType} observed` ? t("event.observedFallback", { eventType: item.eventType }) : item.summary)
+      : detectionSummary(t, item.summary, item.summary);
     return <li aria-current={selected ? "true" : undefined} className={selected ? "selected" : undefined} key={`${item.itemType}-${item.occurredAt}-${index}`}>
       <span className={`timeline-marker tone-${item.itemType.toLowerCase()}`} />
       <div>
         <div className="timeline-heading"><StatusPill value={item.itemType} />{item.severity ? <StatusPill value={item.severity} /> : null}<time>{formatDateTime(item.occurredAt)}</time>{nextSelection ? <button aria-pressed={selected} className="timeline-select-control" onClick={() => onSelect(nextSelection)} type="button">{t("incident.selectEvidence")}</button> : null}</div>
-        <strong>{item.alertId ? <Link to={`/alerts/${item.alertId}`}>{detectionTitle(t, item.title)}</Link> : item.eventId ? <Link to={`/events/${item.eventId}?endpointId=${item.endpointId}&occurredAt=${encodeURIComponent(item.occurredAt)}`}>{item.title}</Link> : item.title}</strong>
-        <p>{item.alertId ? detectionSummary(t, item.summary, item.summary) : item.summary}</p>
+        <strong>{item.alertId ? <Link to={`/alerts/${item.alertId}`}>{title}</Link> : item.eventId ? <Link to={`/events/${item.eventId}?endpointId=${item.endpointId}&occurredAt=${encodeURIComponent(item.occurredAt)}`}>{title}</Link> : title}</strong>
+        <p>{summary}</p>
       </div>
     </li>;
   })}</ol>;

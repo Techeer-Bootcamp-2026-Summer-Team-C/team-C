@@ -51,7 +51,7 @@ export function IncidentInvestigation({
   return <div className="investigation-stack">
     {investigation.partial || investigation.truncated ? <PartialFailureWarning message={t("incident.investigationPartial")} /> : null}
     {investigation.warnings.length ? <ul aria-label={t("incident.investigationWarnings")} className="investigation-warnings">{investigation.warnings.map((warning, index) => <li key={`${warning.code}-${warning.eventId ?? index}`}>
-      <StatusPill value={warning.code} /><span>{warning.message}</span>{warning.code === "ARCHIVE_NOT_READY" ? <Link to="/operations/archives">{t("error.archiveAction")}</Link> : null}
+      <StatusPill value={warning.code} /><span>{investigationWarning(t, warning.code, warning.message)}</span>{warning.code === "ARCHIVE_NOT_READY" ? <Link to="/operations/archives">{t("error.archiveAction")}</Link> : null}
     </li>)}</ul> : null}
     <Panel className="investigation-panel" title={t("incident.investigation")} subtitle={t("incident.investigationSubtitle")}>
       <InvestigationStage counts={counts} graphEnabled={graphEnabled} investigation={localizedInvestigation} onExpand={() => setExpanded(true)} onSelect={onSelect} selection={selection} showGraph={showGraph} />
@@ -111,7 +111,7 @@ function SelectedContext({ investigation, selection }: { investigation: Incident
   </Inspector>;
   const source = investigation.nodes.find((candidate) => candidate.nodeId === edge!.sourceNodeId);
   const target = investigation.nodes.find((candidate) => candidate.nodeId === edge!.targetNodeId);
-  return <Inspector actions={<Badge tone="success">{edge!.evidence}</Badge>} description={t("incident.observedRelationDescription")} title={humanize(edge!.relation)}>
+  return <Inspector actions={<Badge tone="success">{edge!.evidence}</Badge>} description={t("incident.observedRelationDescription")} title={relationLabel(t, edge!.relation)}>
     <DefinitionGrid items={[
       { label: t("incident.source"), value: source?.label ?? edge!.sourceNodeId },
       { label: t("incident.target"), value: target?.label ?? edge!.targetNodeId },
@@ -141,7 +141,7 @@ function EvidenceTable({
         const selected = selection?.kind === "EDGE" && selection.id === edge.edgeId;
         const connected = selectedIds.has(edge.sourceNodeId) || selectedIds.has(edge.targetNodeId);
         return <tr className={selected || connected ? "selected-row" : undefined} key={edge.edgeId}>
-          <td><button aria-pressed={selected} className="evidence-select" onClick={() => onSelect({ kind: "EDGE", id: edge.edgeId })} type="button">{humanize(edge.relation)}</button></td>
+          <td><button aria-pressed={selected} className="evidence-select" onClick={() => onSelect({ kind: "EDGE", id: edge.edgeId })} type="button">{relationLabel(t, edge.relation)}</button></td>
           <td>{nodeById.get(edge.sourceNodeId)?.label ?? edge.sourceNodeId}</td>
           <td>{nodeById.get(edge.targetNodeId)?.label ?? edge.targetNodeId}</td>
           <td><StatusPill value={edge.evidence} /></td>
@@ -170,6 +170,22 @@ function EvidenceLinks({ edge, investigation, compact = false }: { edge: Investi
   if (edge.incidentId !== null) links.push(<Link key="incident" to={`/incidents/${edge.incidentId}`}>Incident</Link>);
   if (!links.length) return <span>—</span>;
   return <div className={compact ? "evidence-links compact" : "evidence-links"}>{links}</div>;
+}
+
+function relationLabel(t: ReturnType<typeof useI18n>["t"], relation: InvestigationEdgeDto["relation"]): string {
+  const keys = {
+    CONTAINS: "incident.relation.contains",
+    TRIGGERED_BY: "incident.relation.triggeredBy",
+    PARENT_OF: "incident.relation.parentOf",
+    CONNECTED_TO: "incident.relation.connectedTo",
+  } as const;
+  return t(keys[relation]);
+}
+
+function investigationWarning(t: ReturnType<typeof useI18n>["t"], code: IncidentInvestigationDto["warnings"][number]["code"], fallback: string): string {
+  if (code === "ARCHIVE_NOT_READY") return t("incident.warningArchiveNotReady");
+  if (code === "EVENT_NOT_FOUND") return t("incident.warningEventNotFound");
+  return fallback;
 }
 
 function nodeDefinitionItems(node: InvestigationNodeDto, t: ReturnType<typeof useI18n>["t"]) {

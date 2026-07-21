@@ -9,6 +9,7 @@ import type {
   PagedData,
   ResponseGuidanceStepDto,
 } from "../contracts";
+import { detectionTitle, responseGuidanceTitle, riskFactorDescription } from "../i18n/detectionCopy";
 import { useI18n } from "../i18n/LocaleContext";
 import type { TranslationKey } from "../i18n/translations";
 import { formatDateTime, humanize } from "../lib/format";
@@ -61,8 +62,8 @@ export function KpiCard({ label, value, detail, icon, to, tone = "neutral" }: {
   return to ? <Link className={`kpi-card ${tone}`} to={to}>{content}</Link> : <article className={`kpi-card ${tone}`}>{content}</article>;
 }
 
-export function StatusPill({ value }: { value: string }) {
-  return <Badge className={`status-pill tone-${value.toLowerCase().replaceAll(" ", "-")}`}><i aria-hidden="true" />{humanize(value)}</Badge>;
+export function StatusPill({ value, label }: { value: string; label?: string }) {
+  return <Badge className={`status-pill tone-${value.toLowerCase().replaceAll(" ", "-")}`}><i aria-hidden="true" />{label ?? humanize(value)}</Badge>;
 }
 
 export function EdrStateSummary({ state }: { state: EdrStateDto }) {
@@ -80,7 +81,10 @@ export function EdrStateSummary({ state }: { state: EdrStateDto }) {
       </div>
       <div className="edr-reason-block">
         <h3>{t("edrState.reasonCodes")}</h3>
-        {state.reasonCodes.length ? <ul>{state.reasonCodes.map((reason) => <li key={reason}>{humanize(reason)}</li>)}</ul> : <p>{t("edrState.noReasons")}</p>}
+        {state.reasonCodes.length ? <ul>{state.reasonCodes.map((reason) => {
+          const key = EDR_REASON_KEYS[reason];
+          return <li key={reason}>{key ? t(key) : humanize(reason)}</li>;
+        })}</ul> : <p>{t("edrState.noReasons")}</p>}
         <footer>{t("edrState.calculated", { time: formatDateTime(state.calculatedAt) })}</footer>
       </div>
     </section>
@@ -137,7 +141,8 @@ export function FilterBar({ primary, advanced, appliedFilters = [], onRemoveFilt
 }
 
 export function DataTable({ label, caption = label, children, busy = false, className = "" }: { label: string; caption?: string; children: ReactNode; busy?: boolean; className?: string }) {
-  return <div aria-busy={busy || undefined} aria-label={`${label} table`} className={`table-scroll ${className}`.trim()} role="region" tabIndex={0}><table><caption className="sr-only">{caption}</caption>{children}</table></div>;
+  const { t } = useI18n();
+  return <div aria-busy={busy || undefined} aria-label={t("table.aria", { label })} className={`table-scroll ${className}`.trim()} role="region" tabIndex={0}><table><caption className="sr-only">{caption}</caption>{children}</table></div>;
 }
 
 export function SortableHeader({ label, active, direction, onSort }: {
@@ -204,7 +209,7 @@ export function ErrorState({ error, onRetry, archiveAction = false }: {
   const translatedErrorKey = apiError ? API_ERROR_KEYS[apiError.code] : undefined;
   const stateClass = apiError?.code === "FORBIDDEN" ? "forbidden" : apiError?.code === "ARCHIVE_NOT_READY" ? "archive-not-ready" : "error";
   const errorMessage = apiError
-    ? locale === "KO" && translatedErrorKey ? t(translatedErrorKey) : apiError.message
+    ? locale === "KO" ? (translatedErrorKey ? t(translatedErrorKey) : t("error.dataLoad")) : apiError.message
     : t("error.dataLoad");
   return (
     <div className={`state-card ${stateClass}`} role="alert">
@@ -212,7 +217,7 @@ export function ErrorState({ error, onRetry, archiveAction = false }: {
       <strong>{errorMessage}</strong>
       <p>{apiError?.retryable ? t("error.retryableHelp") : t("error.actionHelp")}</p>
       {apiError?.requestId ? <code>{t("common.requestId", { requestId: apiError.requestId })}</code> : <span>{t("common.requestIdUnavailable")}</span>}
-      {apiError?.details.length ? <ul>{apiError.details.map((detail, index) => <li key={`${detail.field ?? "state"}-${index}`}>{detail.message}{detail.context ? ` · ${JSON.stringify(detail.context)}` : ""}</li>)}</ul> : null}
+      {apiError?.details.length ? <ul>{apiError.details.map((detail, index) => <li key={`${detail.field ?? "state"}-${index}`}>{locale === "KO" ? (detail.field ? t("error.detailField", { field: detail.field }) : t("error.detailUnknown")) : detail.message}{detail.context ? ` · ${JSON.stringify(detail.context)}` : ""}</li>)}</ul> : null}
       <div className="state-actions">{onRetry ? <button className="button" onClick={onRetry} type="button"><RefreshCw aria-hidden="true" size={15} />{t("common.retry")}</button> : null}{archiveAction || apiError?.code === "ARCHIVE_NOT_READY" ? <Link className="button" to="/operations/archives">{t("error.archiveAction")}</Link> : null}</div>
     </div>
   );
@@ -287,13 +292,13 @@ export function DetailLedgerSection({ title, subtitle, items, children, classNam
 export function ResponseGuidance({ steps }: { steps: ResponseGuidanceStepDto[] }) {
   const { t } = useI18n();
   if (!steps.length) return <EmptyState title={t("empty.noResponseGuidance")} message={t("empty.responseGuidanceDescription")} />;
-  return <ol aria-label={t("alert.guidanceSteps")} className="guidance-list">{steps.map((step) => <li key={step.order}><span>{step.order}</span><div><div className="guidance-title"><strong>{step.title}</strong>{step.requiresManualAction ? <Badge tone="warning">{t("alert.manualAction")}</Badge> : null}</div><p>{step.description}</p></div></li>)}</ol>;
+  return <ol aria-label={t("alert.guidanceSteps")} className="guidance-list">{steps.map((step) => <li key={step.order}><span>{step.order}</span><div><div className="guidance-title"><strong>{responseGuidanceTitle(t, step.title)}</strong>{step.requiresManualAction ? <Badge tone="warning">{t("alert.manualAction")}</Badge> : null}</div><p>{step.description}</p></div></li>)}</ol>;
 }
 
 export function RiskFactorList({ risk }: { risk: EndpointRiskDto }) {
   const { locale, t } = useI18n();
   if (!risk.riskFactors.length) return <EmptyState title={t("empty.noRiskFactors")} message={t("empty.riskFactorsDescription")} />;
-  return <ul className="risk-factor-list">{risk.riskFactors.map((factor) => <li key={`${factor.sourceType}-${factor.sourceId}-${factor.code}`}><span className="factor-score">+{factor.contribution}</span><div><strong>{factor.title}</strong><p>{factor.description}</p><Link to={factor.sourceType === "ALERT" ? `/alerts/${factor.sourceId}` : `/incidents/${factor.sourceId}`}>{t("risk.openSource", { sourceType: locale === "KO" ? (factor.sourceType === "ALERT" ? "Alert" : "Incident") : factor.sourceType.toLowerCase() })}</Link></div></li>)}</ul>;
+  return <ul className="risk-factor-list">{risk.riskFactors.map((factor) => <li key={`${factor.sourceType}-${factor.sourceId}-${factor.code}`}><span className="factor-score">+{factor.contribution}</span><div><strong>{detectionTitle(t, factor.title)}</strong><p>{riskFactorDescription(t, factor.description)}</p><Link to={factor.sourceType === "ALERT" ? `/alerts/${factor.sourceId}` : `/incidents/${factor.sourceId}`}>{t("risk.openSource", { sourceType: locale === "KO" ? (factor.sourceType === "ALERT" ? "Alert" : "Incident") : factor.sourceType.toLowerCase() })}</Link></div></li>)}</ul>;
 }
 
 export function SourceEvent({ alert }: { alert: AlertDetailDto }) {
@@ -330,4 +335,22 @@ const API_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
   ARCHIVE_NOT_READY: "error.archiveNotReady",
   NETWORK_ERROR: "error.network",
   INVALID_ENVELOPE: "error.invalidEnvelope",
+  DASHBOARD_LAYOUT_REVISION_CONFLICT: "error.dashboardRevisionConflict",
+  DASHBOARD_LAYOUT_NOT_FOUND: "error.dashboardNotFound",
+  INVALID_DASHBOARD_LAYOUT: "error.invalidDashboardLayout",
+};
+
+const EDR_REASON_KEYS: Readonly<Record<string, TranslationKey>> = {
+  MEDIUM_ENDPOINT_RISK: "edrState.reason.mediumEndpointRisk",
+  HIGH_ENDPOINT_RISK: "edrState.reason.highEndpointRisk",
+  CRITICAL_ENDPOINT_RISK: "edrState.reason.criticalEndpointRisk",
+  OPEN_INCIDENT: "edrState.reason.openIncident",
+  CRITICAL_ALERT: "edrState.reason.criticalAlert",
+  OFFLINE_ENDPOINT: "edrState.reason.offlineEndpoint",
+  STALE_ENDPOINT: "edrState.reason.staleEndpoint",
+  DEGRADED_SENSOR: "edrState.reason.degradedSensor",
+  UNAVAILABLE_SENSOR: "edrState.reason.unavailableSensor",
+  INGEST_FAILURE: "edrState.reason.ingestFailure",
+  INGEST_DELAYED: "edrState.reason.ingestDelayed",
+  STORAGE_FAILURE: "edrState.reason.storageFailure",
 };

@@ -38,6 +38,7 @@ import {
   type TopologySelection,
 } from "../features/intelligenceOperations";
 import { useI18n } from "../i18n/LocaleContext";
+import { detectionRuleName } from "../i18n/detectionCopy";
 import { parseEndpointIds } from "../lib/endpointIds";
 import { formatDateTime } from "../lib/format";
 import { updateParams } from "../lib/url";
@@ -269,7 +270,7 @@ function MitreAndSignals({ dashboard }: { dashboard: DashboardSummaryDto }) {
         {(["RULES", "SIGNALS"] as const).map((tab) => <button aria-selected={topTab === tab} className={topTab === tab ? "active" : undefined} key={tab} onClick={() => setTopTab(tab)} role="tab" type="button">{tab === "RULES" ? t("intelligence.rules") : t("intelligence.signals")}</button>)}
       </div>
       <div aria-label={topTab === "RULES" ? t("intelligence.rules") : t("intelligence.signals")} className="tab-panel" role="tabpanel">
-        {topTab === "RULES" ? <CountBars rows={dashboard.alerts.topRules.slice(0, 10).map((row) => ({ label: `${row.ruleCode} · ${row.ruleName}`, count: row.count }))} /> : <CountBars rows={signalRows} />}
+        {topTab === "RULES" ? <CountBars rows={dashboard.alerts.topRules.slice(0, 10).map((row) => ({ label: `${row.ruleCode} · ${detectionRuleName(t, row.ruleName, row.ruleCode)}`, count: row.count }))} /> : <CountBars rows={signalRows} />}
       </div>
     </Panel>
   </section>;

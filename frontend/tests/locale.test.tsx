@@ -6,11 +6,20 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, RequireAuth } from "../src/auth/AuthContext";
 import { AppShell } from "../src/components/AppShell";
 import { TimeSeriesChart } from "../src/components/charts";
+import type { AttackTimelineDto } from "../src/contracts";
 import { LocaleProvider, useI18n } from "../src/i18n/LocaleContext";
-import { detectionSummary, detectionTitle } from "../src/i18n/detectionCopy";
+import {
+  detectionRuleName,
+  detectionSummary,
+  detectionTitle,
+  responseGuidanceTitle,
+  riskFactorDescription,
+} from "../src/i18n/detectionCopy";
 import { translate } from "../src/i18n/translations";
 import { formatDateTime } from "../src/lib/format";
 import { LoginPage } from "../src/pages/LoginPage";
+import { AttackTimeline } from "../src/pages/IncidentDetailPage";
+import { operationsDetail } from "../src/pages/OperationsPage";
 import { ThemeProvider } from "../src/theme/ThemeProvider";
 
 const EN_USER = { userId: 1, loginId: "analyst", name: "Analyst", role: "ANALYST", status: "ACTIVE", locale: "EN" } as const;
@@ -169,10 +178,70 @@ it("preserves the English regression copy and uses the agreed mixed Korean termi
 });
 
 it("localizes known Backend detection copy without changing unknown values", () => {
-  const ko = (key: Parameters<typeof translate>[1]) => translate("KO", key);
+  const ko = (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => translate("KO", key, params);
   expect(detectionTitle(ko, "Encoded PowerShell command detected", "PROC_POWERSHELL_ENCODED")).toBe("인코딩된 PowerShell 명령 실행 탐지");
   expect(detectionSummary(ko, "PowerShell was executed with an encoded command argument.", "")).toBe("인코딩된 명령 인자로 PowerShell이 실행되었습니다.");
+  expect(detectionTitle(ko, "Rare Domain Query on ENG-WIN-038")).toBe(translate("KO", "detection.dnsRareDomain.titleOnEndpoint", { endpoint: "ENG-WIN-038" }));
+  expect(detectionTitle(ko, "Unusual HTTPS Upload", "L7_UPLOAD_ANOMALY")).toBe(translate("KO", "detection.l7UploadAnomaly.ruleName"));
+  expect(detectionRuleName(ko, "Suspicious File Drop", "FILE_SUSPICIOUS_DROP")).toBe(translate("KO", "detection.fileSuspiciousDrop.ruleName"));
+  expect(detectionSummary(ko, "A process created a suspicious payload or artifact file.", "")).toBe(translate("KO", "detection.fileSuspiciousDrop.summary"));
+  expect(detectionSummary(ko, "Deterministic long-range QA alert for ENG-WIN-038.", "")).toBe(translate("KO", "detection.qaLongRange.summary", { agentId: "ENG-WIN-038" }));
+  expect(responseGuidanceTitle(ko, "Block confirmed malicious domain")).toBe(translate("KO", "guidance.blockMaliciousDomain"));
+  expect(riskFactorDescription(ko, "OPEN correlation Incident contribution")).toBe(translate("KO", "risk.openIncidentContribution"));
   expect(detectionTitle(ko, "Unknown detector")).toBe("Unknown detector");
+  expect(detectionRuleName(ko, "Unknown rule")).toBe("Unknown rule");
+  expect(responseGuidanceTitle(ko, "Unknown response")).toBe("Unknown response");
+  expect(riskFactorDescription(ko, "Unknown factor")).toBe("Unknown factor");
+});
+
+it("localizes known Operations Backend detail sentences without rewriting unknown evidence", () => {
+  const ko = (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => translate("KO", key, params);
+  expect(operationsDetail(ko, "The authenticated operations endpoint is responding.")).toBe(translate("KO", "operations.backendResponding"));
+  expect(operationsDetail(ko, "Live dependency probe succeeded.")).toBe(translate("KO", "operations.liveProbeSucceeded"));
+  expect(operationsDetail(ko, "Live dependency probe failed.")).toBe(translate("KO", "operations.liveProbeFailedPlain"));
+  expect(operationsDetail(ko, "Worker probe failed.")).toBe(translate("KO", "operations.workerProbeFailedPlain"));
+  expect(operationsDetail(ko, "Broker group state: Stable")).toBe(translate("KO", "operations.brokerGroupState", { state: "Stable" }));
+  expect(operationsDetail(ko, "Unknown operational evidence")).toBe("Unknown operational evidence");
+});
+
+it("localizes Alert timeline copy even when the Alert carries a source Event ID", async () => {
+  storeSession(KO_USER);
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(success(KO_USER)));
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const timeline: AttackTimelineDto = {
+    incidentId: 1,
+    endpointId: 1,
+    items: [{
+      itemType: "ALERT",
+      occurredAt: "2026-07-16T13:51:14Z",
+      title: "Encoded PowerShell command detected",
+      summary: "PowerShell was executed with an encoded command argument.",
+      severity: "HIGH",
+      eventType: "PROCESS_EXECUTION",
+      eventId: "source-event-1",
+      alertId: 11,
+      incidentId: 1,
+      endpointId: 1,
+    }],
+  };
+
+  render(
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <AuthProvider>
+          <LocaleProvider>
+            <MemoryRouter>
+              <AttackTimeline investigation={null} onSelect={() => undefined} selection={null} timeline={timeline} />
+            </MemoryRouter>
+          </LocaleProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>,
+  );
+
+  expect(await screen.findByText(translate("KO", "detection.procPowershellEncoded.title"))).toBeInTheDocument();
+  expect(screen.getByText(translate("KO", "detection.procPowershellEncoded.summary"))).toBeInTheDocument();
+  expect(screen.queryByText("PowerShell was executed with an encoded command argument.")).not.toBeInTheDocument();
 });
 
 it("preserves Event capitalization in Korean time-series copy", async () => {

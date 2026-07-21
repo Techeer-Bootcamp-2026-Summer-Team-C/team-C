@@ -8,7 +8,7 @@ import { readTimeFilter } from "../components/filters";
 import { DetailLedger, DetailLedgerSection, EmptyState, ErrorState, Field, PageHeader, Panel, ResponseGuidance, Skeleton, SourceEvent, StatusPill } from "../components/ui";
 import type { AlertDto, AlertStatus, SuccessEnvelope } from "../contracts";
 import { useI18n } from "../i18n/LocaleContext";
-import { detectionSummary, detectionTitle } from "../i18n/detectionCopy";
+import { detectionRuleName, detectionSummary, detectionTitle } from "../i18n/detectionCopy";
 import { alertDetailUrl, alertTriageQueueQuery, nextActionableAlert } from "../features/alertTriage";
 import { formatDateTime } from "../lib/format";
 import { canMutate } from "../query/policy";
@@ -118,7 +118,7 @@ function AlertDetail({ alert, canUpdate, mutation, nextAlert, params, queue, que
         <DetailLedgerSection title={t("alert.evidence")} subtitle={t("alert.detectedAt", { time: formatDateTime(alert.detectedAt) })} items={[
           { label: t("alert.id"), value: alert.alertId },
           { label: t("alert.riskScore"), value: `${alert.riskScore} / 100` },
-          { label: "Rule", value: `${alert.ruleName} · ${alert.ruleCode}` },
+          { label: "Rule", value: `${detectionRuleName(t, alert.ruleName, alert.ruleCode)} · ${alert.ruleCode}` },
           { label: "Endpoint", value: <Link to={`/endpoints/${alert.endpointId}`}>Endpoint {alert.endpointId}</Link> },
           { label: t("alert.agentId"), value: <code>{alert.agentId}</code> },
           { label: t("alert.eventId"), value: <code>{alert.eventId}</code> },
@@ -127,7 +127,7 @@ function AlertDetail({ alert, canUpdate, mutation, nextAlert, params, queue, que
           { label: t("alert.updated"), value: formatDateTime(alert.updatedAt) },
         ]} />
         <DetailLedgerSection title={t("alert.sourceEvent")} subtitle={t("alert.sourceEventSubtitle")}><SourceEvent alert={alert} /></DetailLedgerSection>
-        <DetailLedgerSection title={t("alert.connectedIncidents")} subtitle={t("alert.correlationReferences")}>{alert.incidents.length ? <div className="link-list">{alert.incidents.map((incident) => <Link key={incident.incidentId} to={`/incidents/${incident.incidentId}`}><span><strong>{incident.title}</strong><small>{formatDateTime(incident.windowStartAt)} – {formatDateTime(incident.windowEndAt)}</small></span><span><StatusPill value={incident.severity} /><StatusPill value={incident.status} /></span></Link>)}</div> : <EmptyState title={t("alert.noConnectedIncidents")} message={t("alert.noConnectedDescription")} />}</DetailLedgerSection>
+        <DetailLedgerSection title={t("alert.connectedIncidents")} subtitle={t("alert.correlationReferences")}>{alert.incidents.length ? <div className="link-list">{alert.incidents.map((incident) => <Link key={incident.incidentId} to={`/incidents/${incident.incidentId}`}><span><strong>{detectionTitle(t, incident.title)}</strong><small>{formatDateTime(incident.windowStartAt)} – {formatDateTime(incident.windowEndAt)}</small></span><span><StatusPill value={incident.severity} /><StatusPill value={incident.status} /></span></Link>)}</div> : <EmptyState title={t("alert.noConnectedIncidents")} message={t("alert.noConnectedDescription")} />}</DetailLedgerSection>
       </DetailLedger>
       <section className="alert-action-grid">
         <Panel className="alert-guidance-panel" title={t("alert.responseGuidance")} subtitle={t("alert.guidanceRuleVersion", { ruleCode: alert.ruleCode, version: alert.ruleVersion })}><ResponseGuidance steps={alert.responseGuidance} /></Panel>

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { StatusPill, EmptyState } from "../../components/ui";
 import type { EndpointDto, IncidentDto } from "../../contracts";
+import { detectionTitle } from "../../i18n/detectionCopy";
 import { useI18n } from "../../i18n/LocaleContext";
 import { formatDateTime, formatQueueDateTime, humanize } from "../../lib/format";
 
@@ -27,9 +28,11 @@ export function IncidentQueueList({ incidents }: { incidents: IncidentDto[] }) {
   const { t } = useI18n();
   if (!incidents.length) return <EmptyState title={t("overview.noOpenIncidents")} message={t("overview.noOpenIncidentsDescription")} />;
   return <ol aria-label={t("overview.incidentQueueWidget")} className="investigation-list incident-queue-list">
-    {incidents.map((incident) => <li key={incident.incidentId}>
+    {incidents.map((incident) => {
+      const title = detectionTitle(t, incident.title);
+      return <li key={incident.incidentId}>
       <div className="queue-primary">
-        <Link title={incident.title} to={`/incidents/${incident.incidentId}`}>{incident.title}</Link>
+        <Link title={title} to={`/incidents/${incident.incidentId}`}>{title}</Link>
         <small>ID {incident.incidentId}</small>
       </div>
       <div className="incident-queue-meta">
@@ -38,6 +41,7 @@ export function IncidentQueueList({ incidents }: { incidents: IncidentDto[] }) {
         <span className="incident-alert-count"><span className="sr-only">{t("navigation.alerts")}: </span>{incident.alertCount}</span>
         <time dateTime={incident.lastDetectedAt} title={formatDateTime(incident.lastDetectedAt)}>{formatQueueDateTime(incident.lastDetectedAt)}</time>
       </div>
-    </li>)}
+    </li>;
+    })}
   </ol>;
 }

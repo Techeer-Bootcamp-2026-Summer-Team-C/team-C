@@ -11,6 +11,7 @@ import {
 import type { ReactNode } from "react";
 import type { IncidentInvestigationDto, InvestigationNodeDto } from "../contracts";
 import type { InvestigationSelection } from "../features/incidentInvestigation";
+import { useI18n } from "../i18n/LocaleContext";
 import "@xyflow/react/dist/style.css";
 
 const NODE_WIDTH = 160;
@@ -30,6 +31,7 @@ export function IncidentGraph({
   selection: InvestigationSelection | null;
   onSelect: (selection: InvestigationSelection) => void;
 }) {
+  const { t } = useI18n();
   const positions = layoutInvestigationNodes(investigation);
   const nodes: Node<GraphNodeData>[] = investigation.nodes.map((node) => ({
     id: node.nodeId,
@@ -44,19 +46,27 @@ export function IncidentGraph({
     draggable: false,
     selectable: true,
   }));
-  const edges: Edge[] = investigation.edges.map((edge) => ({
-    id: edge.edgeId,
-    source: edge.sourceNodeId,
-    target: edge.targetNodeId,
-    label: edge.relation.replaceAll("_", " "),
-    ariaLabel: `${edge.relation}, ${edge.evidence}`,
-    markerEnd: { type: MarkerType.ArrowClosed },
-    selected: selection?.kind === "EDGE" && selection.id === edge.edgeId,
-    className: "investigation-edge",
-    animated: false,
-  }));
+  const edges: Edge[] = investigation.edges.map((edge) => {
+    const relation = t(({
+      CONTAINS: "incident.relation.contains",
+      TRIGGERED_BY: "incident.relation.triggeredBy",
+      PARENT_OF: "incident.relation.parentOf",
+      CONNECTED_TO: "incident.relation.connectedTo",
+    } as const)[edge.relation]);
+    return {
+      id: edge.edgeId,
+      source: edge.sourceNodeId,
+      target: edge.targetNodeId,
+      label: relation,
+      ariaLabel: `${relation}, ${edge.evidence}`,
+      markerEnd: { type: MarkerType.ArrowClosed },
+      selected: selection?.kind === "EDGE" && selection.id === edge.edgeId,
+      className: "investigation-edge",
+      animated: false,
+    };
+  });
 
-  return <div aria-label="Incident investigation graph" className="investigation-graph" role="application">
+  return <div aria-label={t("incident.investigation")} className="investigation-graph" role="application">
     <ReactFlow
       edges={edges}
       fitView
