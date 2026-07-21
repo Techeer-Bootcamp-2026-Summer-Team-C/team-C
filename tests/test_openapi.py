@@ -74,9 +74,9 @@ def test_openapi_documentation_is_koreanized_without_contract_renames() -> None:
     schema = create_app().openapi()
 
     assert schema["info"]["title"] == "EDR_C API"
-    assert HANGUL.search(schema["info"]["description"])
+    assert "description" not in schema["info"]
     assert {tag["name"] for tag in schema["tags"]} == TAGS
-    assert all(HANGUL.search(tag["description"]) for tag in schema["tags"])
+    assert all("description" not in tag for tag in schema["tags"])
 
     for _path, _method, operation in operations(schema):
         assert HANGUL.search(operation["summary"])

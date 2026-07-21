@@ -84,17 +84,17 @@ from .summary_service import SummaryService
 from .time_range import resolve_time_range
 
 OPENAPI_TAGS = [
-    {"name": "Auth", "description": "대시보드 사용자 인증과 JWT 액세스 토큰 발급 기능입니다."},
-    {"name": "Users", "description": "인증된 대시보드 사용자의 프로필과 환경설정을 관리합니다."},
-    {"name": "Endpoints", "description": "엔드포인트 목록, 상태, 백엔드 산정 위험도와 프로세스 트리를 조회합니다."},
-    {"name": "Events", "description": "ClickHouse HOT 데이터와 복원된 Parquet 이벤트 증거를 조회합니다."},
-    {"name": "Archives", "description": "아카이브 버킷의 복원 요청과 진행 상태를 관리합니다."},
-    {"name": "Alerts", "description": "RuleV1 탐지 결과와 Alert 처리 상태를 조회하고 변경합니다."},
-    {"name": "Incidents", "description": "상관분석으로 생성된 Incident와 조사 정보를 읽기 전용으로 제공합니다."},
-    {"name": "Dashboard", "description": "백엔드가 계산한 보안, 수집, 토폴로지 요약과 대시보드 레이아웃을 제공합니다."},
-    {"name": "Operations", "description": "의존 서비스, 파이프라인 워커와 실패 이벤트의 운영 상태를 제공합니다."},
-    {"name": "Intelligence", "description": "DNS 조회와 IP·Domain·이벤트 간 상관분석 기능을 제공합니다."},
-    {"name": "Collector", "description": "mTLS로 인증된 Agent 등록, heartbeat, 텔레메트리 수집 기능입니다."},
+    {"name": "Auth"},
+    {"name": "Users"},
+    {"name": "Endpoints"},
+    {"name": "Events"},
+    {"name": "Archives"},
+    {"name": "Alerts"},
+    {"name": "Incidents"},
+    {"name": "Dashboard"},
+    {"name": "Operations"},
+    {"name": "Intelligence"},
+    {"name": "Collector"},
 ]
 
 ERROR_DESCRIPTIONS = {
@@ -143,10 +143,6 @@ def current_user(
 def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
     app = FastAPI(
         title="EDR_C API",
-        description=(
-            "EDR_C 대시보드와 수집 Agent가 사용하는 API입니다. "
-            "대시보드 API는 Bearer JWT, Collector API는 mTLS 클라이언트 인증서를 사용합니다."
-        ),
         version="0.1.0",
         docs_url="/docs",
         openapi_url="/openapi.json",
