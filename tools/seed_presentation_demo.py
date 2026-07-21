@@ -1,0 +1,1092 @@
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import ssl
+import time
+from collections import Counter
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from functools import lru_cache
+from pathlib import Path
+from urllib.parse import urlparse
+from uuid import NAMESPACE_URL, UUID, uuid5
+
+import clickhouse_connect
+import httpx
+import psycopg
+from psycopg.types.json import Jsonb
+
+from backend.auth import hash_password
+from backend.contracts.enums import OsType
+from backend.detection import DetectionEngine
+from backend.rule_loader import RuleLoader
+from backend.storage.clickhouse import EventRepository
+from backend.storage.migrations import apply_clickhouse_file, apply_postgres_migrations
+from backend.storage.models import EndpointInsert, IncidentInsert
+from backend.storage.postgres import AlertRepository, EndpointRepository, IncidentRepository, UserRepository
+from backend.workers import normalize_event
+
+ROOT = Path(__file__).parents[1]
+ENV_FILE = ROOT / ".env"
+DEFAULT_MANIFESTS = {
+    "presentation": ROOT / "runtime" / "demo" / "presentation-manifest.json",
+    "dns-correctness": ROOT / "runtime" / "demo" / "dns-correctness-manifest.json",
+}
+PROFILES = ("presentation", "dns-correctness")
+CAPABILITIES = ["PROCESS_EXECUTION", "NETWORK_CONNECTION", "FILE_EVENT", "DNS_QUERY", "L7_EVENT"]
+LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1", "postgres", "clickhouse"}
+ALLOWED_DATABASES = {"edr", "edr_qa", "test_edr"}
+
+
+@dataclass(frozen=True, slots=True)
+class SeedTarget:
+    environment: str
+    postgres_dsn: str
+    clickhouse_dsn: str
+    dashboard_base_url: str
+    collector_base_url: str
+
+
+@dataclass(frozen=True, slots=True)
+class EndpointPlan:
+    hostname: str
+    agent_id: str
+    os_type: str
+    os_version: str
+    ip_address: str
+    status: str
+    event_count: int
+    agent_arch: str
+
+
+@dataclass(frozen=True, slots=True)
+class EventPlan:
+    hostname: str
+    event_id: UUID
+    batch_id: UUID
+    event_type: str
+    occurred_at: datetime
+    payload: dict[str, object]
+
+
+@dataclass(frozen=True, slots=True)
+class ProfilePlan:
+    profile: str
+    seed: int
+    anchor: datetime
+    endpoints: tuple[EndpointPlan, ...]
+    events: tuple[EventPlan, ...]
+
+    @property
+    def counts(self) -> dict[str, int]:
+        alert_count = 3 if self.profile == "presentation" else 0
+        incident_count = 2 if self.profile == "presentation" else 0
+        return {
+            "endpoints": len(self.endpoints),
+            "events": len(self.events),
+            "alerts": alert_count,
+            "incidents": incident_count,
+        }
+
+
+def _rfc3339(value: datetime) -> str:
+    return value.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def parse_anchor(value: str, *, now: datetime | None = None) -> datetime:
+    if value.lower() == "now":
+        return (now or datetime.now(UTC)).astimezone(UTC).replace(microsecond=0)
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError("anchor must be 'now' or an RFC 3339 timestamp") from error
+    if parsed.tzinfo is None:
+        raise ValueError("anchor must include an RFC 3339 UTC offset")
+    return parsed.astimezone(UTC).replace(microsecond=0)
+
+
+def load_environment_values() -> dict[str, str]:
+    values: dict[str, str] = {}
+    if ENV_FILE.exists():
+        for raw_line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip()
+    values.update({key: value for key, value in os.environ.items() if value is not None})
+    return values
+
+
+def seed_target(values: dict[str, str] | None = None) -> SeedTarget:
+    values = values or load_environment_values()
+    postgres_password = values.get("POSTGRES_PASSWORD", "edr-local-postgres")
+    clickhouse_password = values.get("CLICKHOUSE_PASSWORD", "edr-local-clickhouse")
+    postgres_port = values.get("POSTGRES_HOST_PORT", "55432")
+    clickhouse_port = values.get("CLICKHOUSE_HTTP_HOST_PORT", "58123")
+    dashboard_port = values.get("NGINX_HTTP_HOST_PORT", "8080")
+    collector_port = values.get("NGINX_MTLS_HOST_PORT", "8443")
+    return SeedTarget(
+        environment=values.get("EDR_ENV", "local").strip().lower(),
+        postgres_dsn=values.get(
+            "EDR_POSTGRES_DSN",
+            f"postgresql://edr:{postgres_password}@127.0.0.1:{postgres_port}/edr",
+        ),
+        clickhouse_dsn=values.get(
+            "EDR_CLICKHOUSE_DSN",
+            f"http://edr:{clickhouse_password}@127.0.0.1:{clickhouse_port}/edr",
+        ),
+        dashboard_base_url=f"http://127.0.0.1:{dashboard_port}",
+        collector_base_url=f"https://127.0.0.1:{collector_port}/api/v1/collector",
+    )
+
+
+def _database_name(dsn: str) -> str:
+    return urlparse(dsn).path.strip("/").split("/", 1)[0]
+
+
+def _safe_host(environment: str, host: str | None) -> bool:
+    if host in LOCAL_HOSTS:
+        return True
+    lowered = (host or "").lower()
+    return environment == "qa" and ("qa" in lowered or "test" in lowered)
+
+
+def assert_safe_reset_target(target: SeedTarget) -> None:
+    if target.environment not in {"local", "qa"}:
+        raise RuntimeError("destructive demo seed is allowed only when EDR_ENV is local or qa")
+    for label, dsn in (("PostgreSQL", target.postgres_dsn), ("ClickHouse", target.clickhouse_dsn)):
+        parsed = urlparse(dsn)
+        database = _database_name(dsn)
+        if not _safe_host(target.environment, parsed.hostname):
+            raise RuntimeError(f"{label} host is not an allowlisted local/QA target: {parsed.hostname or '<missing>'}")
+        if database not in ALLOWED_DATABASES:
+            raise RuntimeError(f"{label} database is not an allowlisted demo database: {database or '<missing>'}")
+
+
+def describe_target(target: SeedTarget) -> dict[str, str]:
+    postgres = urlparse(target.postgres_dsn)
+    clickhouse = urlparse(target.clickhouse_dsn)
+    return {
+        "environment": target.environment,
+        "postgres": f"{postgres.hostname}:{postgres.port or 5432}/{_database_name(target.postgres_dsn)}",
+        "clickhouse": f"{clickhouse.hostname}:{clickhouse.port or 8123}/{_database_name(target.clickhouse_dsn)}",
+    }
+
+
+def _stable_uuid(plan: str, seed: int, anchor: datetime, hostname: str, index: int, kind: str) -> UUID:
+    name = f"edr-c:{plan}:{seed}:{_rfc3339(anchor)}:{hostname}:{index}:{kind}"
+    return uuid5(NAMESPACE_URL, name)
+
+
+def _event(
+    profile: str,
+    seed: int,
+    anchor: datetime,
+    hostname: str,
+    index: int,
+    event_type: str,
+    occurred_at: datetime,
+    payload: dict[str, object],
+) -> EventPlan:
+    return EventPlan(
+        hostname=hostname,
+        event_id=_stable_uuid(profile, seed, anchor, hostname, index, "event"),
+        batch_id=_stable_uuid(profile, seed, anchor, hostname, index, "batch"),
+        event_type=event_type,
+        occurred_at=occurred_at,
+        payload=payload,
+    )
+
+
+def _background_payload(event_type: str, endpoint: EndpointPlan, index: int) -> dict[str, object]:
+    if event_type == "PROCESS_EXECUTION":
+        process = "launchd" if endpoint.os_type == "MACOS" else ("code.exe" if index % 2 else "chrome.exe")
+        return {
+            "processName": process,
+            "processPath": f"/usr/bin/{process}"
+            if endpoint.os_type == "MACOS"
+            else rf"C:\Program Files\Demo\{process}",
+            "pid": 2000 + index,
+            "ppid": 1000 + index,
+            "commandLine": f"{process} --demo-session {index}",
+            "userName": "DEMO\\student" if endpoint.os_type == "WINDOWS" else "demo.student",
+        }
+    if event_type == "NETWORK_CONNECTION":
+        return {
+            "protocol": "TCP",
+            "remoteIp": f"192.0.2.{20 + index % 100}",
+            "remotePort": 443,
+            "remoteDomain": "cdn.example.test",
+            "processName": "chrome.exe" if endpoint.os_type == "WINDOWS" else "launchd",
+            "pid": 2000 + index,
+        }
+    if event_type == "FILE_EVENT":
+        path = (
+            rf"C:\Users\DEMO\Documents\lesson-{index}.txt"
+            if endpoint.os_type == "WINDOWS"
+            else f"/Users/demo/Documents/lesson-{index}.txt"
+        )
+        return {
+            "filePath": path,
+            "action": "MODIFY",
+            "sha256": f"{index % 16:x}" * 64,
+            "processName": "code.exe" if endpoint.os_type == "WINDOWS" else "launchd",
+            "pid": 2000 + index,
+        }
+    if event_type == "DNS_QUERY":
+        return {
+            "query": "docs.example.test",
+            "recordType": "A",
+            "responseCode": "NOERROR",
+            "answers": [f"198.51.100.{20 + index % 100}"],
+            "processName": "chrome.exe" if endpoint.os_type == "WINDOWS" else "launchd",
+            "pid": 2000 + index,
+        }
+    return {
+        "l7Protocol": "HTTPS",
+        "httpMethod": "GET",
+        "httpHost": "docs.example.test",
+        "url": f"https://docs.example.test/lesson/{index}",
+        "httpStatusCode": 200,
+        "httpUserAgent": "EDR-C-Safe-Demo/1.0",
+        "tlsSni": "docs.example.test",
+        "tlsVersion": "TLS1.3",
+    }
+
+
+def _background_events(
+    profile: str,
+    seed: int,
+    anchor: datetime,
+    endpoint: EndpointPlan,
+    count: int,
+    *,
+    first_index: int = 0,
+    end_at: datetime | None = None,
+) -> list[EventPlan]:
+    start = anchor - timedelta(hours=23)
+    end = end_at or anchor - timedelta(minutes=2)
+    span = end - start
+    event_types = ("PROCESS_EXECUTION", "NETWORK_CONNECTION", "FILE_EVENT", "DNS_QUERY", "L7_EVENT")
+    events = []
+    for offset in range(count):
+        index = first_index + offset
+        ratio = (offset + 1) / (count + 1)
+        occurred_at = start + span * ratio
+        event_type = event_types[offset % len(event_types)]
+        events.append(
+            _event(
+                profile,
+                seed,
+                anchor,
+                endpoint.hostname,
+                index,
+                event_type,
+                occurred_at,
+                _background_payload(event_type, endpoint, index),
+            )
+        )
+    return events
+
+
+def build_presentation_plan(seed: int, anchor: datetime) -> ProfilePlan:
+    endpoints = (
+        EndpointPlan(
+            "DEMO-STUDENT-WIN-07",
+            "presentation-student-win-07",
+            "WINDOWS",
+            "Windows 11 24H2",
+            "192.0.2.7",
+            "ONLINE",
+            24,
+            "X64",
+        ),
+        EndpointPlan(
+            "DEMO-DEV-WIN-02",
+            "presentation-dev-win-02",
+            "WINDOWS",
+            "Windows 11 24H2",
+            "192.0.2.22",
+            "ONLINE",
+            24,
+            "X64",
+        ),
+        EndpointPlan(
+            "DEMO-FINANCE-MAC-02",
+            "presentation-finance-mac-02",
+            "MACOS",
+            "macOS 15.5",
+            "192.0.2.42",
+            "OFFLINE",
+            16,
+            "ARM64",
+        ),
+    )
+    epoch = int(anchor.timestamp())
+    current_window = datetime.fromtimestamp((epoch // 1800) * 1800, tz=UTC)
+    elapsed_seconds = (anchor - current_window).total_seconds()
+    if elapsed_seconds < 6:
+        raise ValueError("presentation anchor must be at least 6 seconds into its 30-minute window")
+    if elapsed_seconds >= 15 * 60:
+        attack_offsets = tuple(timedelta(minutes=value) for value in (5, 7, 9, 10, 12, 14))
+    else:
+        spacing = elapsed_seconds / 7
+        attack_offsets = tuple(timedelta(seconds=spacing * value) for value in range(1, 7))
+    window_start = current_window
+    main = endpoints[0]
+    events = _background_events(
+        "presentation",
+        seed,
+        anchor,
+        main,
+        18,
+        end_at=window_start - timedelta(minutes=1),
+    )
+    attack = (
+        (
+            18,
+            "DNS_QUERY",
+            attack_offsets[0],
+            {
+                "query": "game-mirror.test",
+                "recordType": "A",
+                "responseCode": "NOERROR",
+                "answers": ["203.0.113.40"],
+                "processName": "chrome.exe",
+                "pid": 4100,
+            },
+        ),
+        (
+            19,
+            "FILE_EVENT",
+            attack_offsets[1],
+            {
+                "filePath": r"C:\Users\DEMO\Downloads\game-installer.exe",
+                "action": "CREATE",
+                "sha256": "7" * 64,
+                "processName": "chrome.exe",
+                "pid": 4100,
+            },
+        ),
+        (
+            20,
+            "PROCESS_EXECUTION",
+            attack_offsets[2],
+            {
+                "processName": "game-installer.exe",
+                "processPath": r"C:\Users\DEMO\Downloads\game-installer.exe",
+                "pid": 4200,
+                "ppid": 4100,
+                "commandLine": r"C:\Users\DEMO\Downloads\game-installer.exe --install",
+                "userName": "DEMO\\student",
+            },
+        ),
+        (
+            21,
+            "PROCESS_EXECUTION",
+            attack_offsets[3],
+            {
+                "processName": "powershell.exe",
+                "processPath": r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                "pid": 4242,
+                "ppid": 4200,
+                "commandLine": "powershell.exe -NoProfile -EncodedCommand SAFEDEMOONE",
+                "userName": "DEMO\\student",
+            },
+        ),
+        (
+            22,
+            "PROCESS_EXECUTION",
+            attack_offsets[4],
+            {
+                "processName": "powershell.exe",
+                "processPath": r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                "pid": 4243,
+                "ppid": 4242,
+                "commandLine": "powershell.exe -NoProfile -EncodedCommand SAFEDEMOTWO",
+                "userName": "DEMO\\student",
+            },
+        ),
+        (
+            23,
+            "NETWORK_CONNECTION",
+            attack_offsets[5],
+            {
+                "protocol": "TCP",
+                "remoteIp": "203.0.113.88",
+                "remotePort": 443,
+                "remoteDomain": "update-cache.test",
+                "processName": "powershell.exe",
+                "pid": 4243,
+            },
+        ),
+    )
+    events.extend(
+        _event(
+            "presentation",
+            seed,
+            anchor,
+            main.hostname,
+            index,
+            event_type,
+            window_start + offset,
+            payload,
+        )
+        for index, event_type, offset, payload in attack
+    )
+    events.extend(_background_events("presentation", seed, anchor, endpoints[1], 24))
+    events.extend(
+        _background_events("presentation", seed, anchor, endpoints[2], 16, end_at=anchor - timedelta(hours=6))
+    )
+    plan = ProfilePlan(
+        "presentation",
+        seed,
+        anchor,
+        endpoints,
+        tuple(sorted(events, key=lambda item: (item.occurred_at, str(item.event_id)))),
+    )
+    _validate_plan(plan)
+    return plan
+
+
+def build_dns_correctness_plan(seed: int, anchor: datetime) -> ProfilePlan:
+    endpoints = (
+        EndpointPlan(
+            "DEMO-DNS-WIN-01", "presentation-dns-win-01", "WINDOWS", "Windows 11 24H2", "192.0.2.61", "ONLINE", 4, "X64"
+        ),
+        EndpointPlan(
+            "DEMO-DNS-MAC-02", "presentation-dns-mac-02", "MACOS", "macOS 15.5", "192.0.2.62", "ONLINE", 4, "ARM64"
+        ),
+    )
+    rows = (
+        (
+            endpoints[0],
+            "NETWORK_CONNECTION",
+            {
+                "protocol": "TCP",
+                "remoteIp": "203.0.113.10",
+                "remotePort": 443,
+                "remoteDomain": "yahoo.com",
+                "processName": "chrome.exe",
+                "pid": 6101,
+            },
+        ),
+        (
+            endpoints[0],
+            "L7_EVENT",
+            {
+                "l7Protocol": "HTTPS",
+                "httpMethod": "GET",
+                "httpHost": "mail.yahoo.com",
+                "url": "https://mail.yahoo.com/inbox",
+                "tlsSni": "mail.yahoo.com",
+                "tlsVersion": "TLS1.3",
+            },
+        ),
+        (
+            endpoints[0],
+            "DNS_QUERY",
+            {
+                "query": "api.yahoo.com",
+                "recordType": "A",
+                "responseCode": "NOERROR",
+                "answers": ["203.0.113.10", "203.0.113.11"],
+                "processName": "chrome.exe",
+                "pid": 6101,
+            },
+        ),
+        (
+            endpoints[0],
+            "L7_EVENT",
+            {
+                "l7Protocol": "HTTPS",
+                "httpMethod": "GET",
+                "httpHost": "docs.example.test",
+                "url": "https://docs.example.test/",
+                "tlsSni": "notyahoo.com",
+                "tlsVersion": "TLS1.3",
+            },
+        ),
+        (
+            endpoints[1],
+            "L7_EVENT",
+            {
+                "l7Protocol": "HTTPS",
+                "httpMethod": "GET",
+                "httpHost": "yahoo.com.evil.example",
+                "url": "https://yahoo.com.evil.example/",
+                "tlsSni": "yahoo.com.evil.example",
+                "tlsVersion": "TLS1.3",
+            },
+        ),
+        (
+            endpoints[1],
+            "NETWORK_CONNECTION",
+            {
+                "protocol": "TCP",
+                "remoteIp": "203.0.113.12",
+                "remotePort": 443,
+                "remoteDomain": "yahoo.co",
+                "processName": "launchd",
+                "pid": 6201,
+            },
+        ),
+        (
+            endpoints[1],
+            "DNS_QUERY",
+            {
+                "query": "answers.example.test",
+                "recordType": "A",
+                "responseCode": "NOERROR",
+                "answers": ["203.0.113.10", "203.0.113.11"],
+                "processName": "launchd",
+                "pid": 6201,
+            },
+        ),
+        (
+            endpoints[1],
+            "PROCESS_EXECUTION",
+            {
+                "processName": "launchd",
+                "processPath": "/sbin/launchd",
+                "pid": 1,
+                "ppid": 0,
+                "commandLine": "/sbin/launchd",
+                "userName": "root",
+            },
+        ),
+    )
+    events = tuple(
+        _event(
+            "dns-correctness",
+            seed,
+            anchor,
+            endpoint.hostname,
+            index,
+            event_type,
+            anchor - timedelta(minutes=40 - index * 3),
+            payload,
+        )
+        for index, (endpoint, event_type, payload) in enumerate(rows)
+    )
+    plan = ProfilePlan("dns-correctness", seed, anchor, endpoints, events)
+    _validate_plan(plan)
+    return plan
+
+
+def build_plan(profile: str, seed: int, anchor: datetime) -> ProfilePlan:
+    if profile == "presentation":
+        return build_presentation_plan(seed, anchor)
+    if profile == "dns-correctness":
+        return build_dns_correctness_plan(seed, anchor)
+    raise ValueError(f"unsupported profile: {profile}")
+
+
+@lru_cache(maxsize=1)
+def _load_detection_engine() -> DetectionEngine:
+    loader = RuleLoader(
+        schema_path=ROOT / "schemas" / "rule-v1.schema.json",
+        mapping_path=ROOT / "mappings" / "mitre_attack.yaml",
+    )
+    return DetectionEngine(loader.load_directory(ROOT / "rules"))
+
+
+def _raw_event(plan: EventPlan, endpoint: EndpointPlan, endpoint_id: int) -> dict[str, object]:
+    return {
+        "schemaVersion": 1,
+        "batchId": str(plan.batch_id),
+        "endpointId": endpoint_id,
+        "agentId": endpoint.agent_id,
+        "hostname": endpoint.hostname,
+        "osType": endpoint.os_type,
+        "ipAddress": endpoint.ip_address,
+        "event": {
+            "eventId": str(plan.event_id),
+            "eventType": plan.event_type,
+            "occurredAt": _rfc3339(plan.occurred_at),
+            "payload": plan.payload,
+        },
+    }
+
+
+def _normalized_events(plan: ProfilePlan, endpoint_ids: dict[str, int]) -> list[dict[str, object]]:
+    endpoints = {item.hostname: item for item in plan.endpoints}
+    return [
+        normalize_event(
+            _raw_event(item, endpoints[item.hostname], endpoint_ids[item.hostname]),
+            ingested_at=item.occurred_at + timedelta(seconds=30),
+        )
+        for item in plan.events
+    ]
+
+
+def _validate_plan(plan: ProfilePlan) -> None:
+    expected = {"presentation": (3, 64, 3, 2), "dns-correctness": (2, 8, 0, 0)}[plan.profile]
+    if (len(plan.endpoints), len(plan.events), plan.counts["alerts"], plan.counts["incidents"]) != expected:
+        raise RuntimeError(f"{plan.profile} plan count contract changed")
+    if Counter(item.hostname for item in plan.events) != Counter(
+        {item.hostname: item.event_count for item in plan.endpoints}
+    ):
+        raise RuntimeError(f"{plan.profile} Endpoint event distribution changed")
+    synthetic_ids = {item.hostname: index + 1 for index, item in enumerate(plan.endpoints)}
+    matches = [
+        match
+        for event in _normalized_events(plan, synthetic_ids)
+        for match in _load_detection_engine().evaluate(event, detected_at=event["ingested_at"])
+    ]
+    if len(matches) != plan.counts["alerts"]:
+        raise RuntimeError(f"{plan.profile} produces {len(matches)} Rule matches, expected {plan.counts['alerts']}")
+    if plan.profile == "presentation":
+        codes = Counter(match.alert.rule_code for match in matches)
+        keys = Counter(match.incident.correlation_key for match in matches if match.incident is not None)
+        windows = {match.incident.window_start_at for match in matches[:2] if match.incident is not None}
+        if codes != {"PROC_POWERSHELL_ENCODED": 2, "NET_SUSPICIOUS_EGRESS": 1}:
+            raise RuntimeError(f"presentation Rule matches changed: {dict(codes)}")
+        if keys != {"suspicious-powershell": 2, "suspicious-egress": 1} or len(windows) != 1:
+            raise RuntimeError("presentation Incident correlation contract changed")
+
+
+def _reset_databases(target: SeedTarget) -> None:
+    with psycopg.connect(target.postgres_dsn) as connection:
+        apply_postgres_migrations(connection, ROOT / "migrations" / "postgresql", direction="down")
+        apply_postgres_migrations(connection, ROOT / "migrations" / "postgresql")
+    clickhouse = clickhouse_connect.get_client(dsn=target.clickhouse_dsn, autogenerate_session_id=False)
+    try:
+        apply_clickhouse_file(clickhouse, ROOT / "migrations" / "clickhouse" / "0001_initial.down.sql")
+        apply_clickhouse_file(clickhouse, ROOT / "migrations" / "clickhouse" / "0001_initial.up.sql")
+    finally:
+        clickhouse.close()
+
+
+def _seed_users(connection: psycopg.Connection, now: datetime) -> None:
+    UserRepository(connection).create_admin(
+        login_id="frontend-admin",
+        name="Presentation Administrator",
+        password_hash=hash_password("frontend-admin-password"),
+        now=now,
+    )
+    connection.execute(
+        """
+        INSERT INTO users (login_id, password_hash, name, role, status, locale, created_at, updated_at)
+        VALUES (%s, %s, %s, 'VIEWER', 'ACTIVE', 'KO', %s, %s)
+        """,
+        ("frontend-viewer", hash_password("frontend-viewer-password"), "Presentation Viewer", now, now),
+    )
+    connection.commit()
+
+
+def _insert_endpoints(connection: psycopg.Connection, plan: ProfilePlan) -> dict[str, int]:
+    repository = EndpointRepository(connection)
+    endpoint_ids: dict[str, int] = {}
+    for endpoint in plan.endpoints:
+        endpoint_id = repository.insert(
+            EndpointInsert(
+                agent_id=endpoint.agent_id,
+                hostname=endpoint.hostname,
+                os_type=OsType(endpoint.os_type),
+                registered_at=plan.anchor - timedelta(days=45),
+            )
+        )
+        sensor_provider = "EndpointSecurity" if endpoint.os_type == "MACOS" else "ETW"
+        connection.execute(
+            """
+            UPDATE endpoints SET
+                os_version = %s, ip_address = %s, agent_version = '2.7.1', agent_build_id = %s,
+                agent_arch = %s, capability_codes_json = %s, sensor_health_json = %s,
+                status = %s, last_seen_at = %s, updated_at = %s
+            WHERE endpoint_id = %s
+            """,
+            (
+                endpoint.os_version,
+                endpoint.ip_address,
+                f"{endpoint.os_type.lower()}-{endpoint.agent_arch.lower()}-presentation",
+                endpoint.agent_arch,
+                Jsonb(CAPABILITIES),
+                Jsonb(
+                    [
+                        {
+                            "sensor": "PROCESS",
+                            "status": "HEALTHY",
+                            "provider": sensor_provider,
+                            "packetDropCount": 0,
+                            "parseErrorCount": 0,
+                        }
+                    ]
+                ),
+                endpoint.status,
+                plan.anchor - (timedelta(hours=6) if endpoint.status == "OFFLINE" else timedelta(minutes=1)),
+                plan.anchor,
+                endpoint_id,
+            ),
+        )
+        connection.commit()
+        endpoint_ids[endpoint.hostname] = endpoint_id
+    return endpoint_ids
+
+
+def _insert_hot_metadata(connection: psycopg.Connection, events: list[dict[str, object]], now: datetime) -> None:
+    counts = Counter(
+        (
+            int(event["endpoint_id"]),
+            event["occurred_at"].astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0),
+        )
+        for event in events
+    )
+    for (endpoint_id, start), count in sorted(counts.items()):
+        connection.execute(
+            """
+            INSERT INTO ingest_metadata (
+                endpoint_id, bucket_start_at, bucket_end_at, storage_backend, storage_class,
+                storage_status, storage_path, event_count, created_at, updated_at
+            ) VALUES (%s, %s, %s, 'CLICKHOUSE', 'HOT', 'HOT', %s, %s, %s, %s)
+            ON CONFLICT (endpoint_id, bucket_start_at, storage_backend, storage_class) DO UPDATE SET
+                event_count = EXCLUDED.event_count, updated_at = EXCLUDED.updated_at, is_delete = FALSE
+            """,
+            (
+                endpoint_id,
+                start,
+                start + timedelta(days=1),
+                f"clickhouse://edr_events/date={start.date()}/endpoint_id={endpoint_id}",
+                count,
+                now,
+                now,
+            ),
+        )
+    connection.commit()
+
+
+def _direct_seed(target: SeedTarget, plan: ProfilePlan) -> tuple[dict[str, int], dict[str, object]]:
+    with psycopg.connect(target.postgres_dsn) as connection:
+        _seed_users(connection, plan.anchor)
+        endpoint_ids = _insert_endpoints(connection, plan)
+    events = _normalized_events(plan, endpoint_ids)
+    clickhouse = clickhouse_connect.get_client(dsn=target.clickhouse_dsn, autogenerate_session_id=False)
+    try:
+        EventRepository(clickhouse).insert(events)
+    finally:
+        clickhouse.close()
+    ids: dict[str, object] = {
+        "endpointIdsByHostname": endpoint_ids,
+        "presentationEndpointId": endpoint_ids.get("DEMO-STUDENT-WIN-07"),
+        "powershellIncidentId": None,
+        "egressIncidentId": None,
+        "powershellAlertIds": [],
+        "egressAlertId": None,
+        "eventIds": [str(event["event_id"]) for event in events],
+    }
+    engine = _load_detection_engine()
+    with psycopg.connect(target.postgres_dsn) as connection:
+        alerts = AlertRepository(connection)
+        incidents = IncidentRepository(connection)
+        for event in events:
+            for match in engine.evaluate(event, detected_at=event["ingested_at"]):
+                stored_alert = alerts.insert_if_absent(match.alert)
+                if match.alert.rule_code == "PROC_POWERSHELL_ENCODED":
+                    ids["powershellAlertIds"].append(stored_alert.alert_id)
+                elif match.alert.rule_code == "NET_SUSPICIOUS_EGRESS":
+                    ids["egressAlertId"] = stored_alert.alert_id
+                if match.incident is None:
+                    continue
+                stored_incident = incidents.upsert(
+                    IncidentInsert(
+                        endpoint_id=match.incident.endpoint_id,
+                        correlation_key=match.incident.correlation_key,
+                        window_start_at=match.incident.window_start_at,
+                        window_end_at=match.incident.window_end_at,
+                        title=match.alert.title,
+                        description=match.alert.summary,
+                        severity=match.alert.severity,
+                        detected_at=event["ingested_at"],
+                    )
+                )
+                incidents.link_alert(
+                    incident_id=stored_incident.incident_id,
+                    alert_id=stored_alert.alert_id,
+                    linked_at=event["ingested_at"],
+                )
+                key = (
+                    "powershellIncidentId"
+                    if match.incident.correlation_key == "suspicious-powershell"
+                    else "egressIncidentId"
+                )
+                ids[key] = stored_incident.incident_id
+        _insert_hot_metadata(connection, events, plan.anchor)
+    return endpoint_ids, ids
+
+
+def _collector_client(certificate: Path, private_key: Path, ca_certificate: Path) -> httpx.Client:
+    context = ssl.create_default_context(cafile=str(ca_certificate))
+    context.load_cert_chain(certfile=str(certificate), keyfile=str(private_key))
+    return httpx.Client(verify=context, timeout=15)
+
+
+def _collector_seed(
+    target: SeedTarget,
+    plan: ProfilePlan,
+    *,
+    wait_timeout_seconds: int,
+) -> tuple[dict[str, int], dict[str, object]]:
+    from tools.provision_agent_cert import provision
+
+    authority = ROOT / "runtime" / "compose" / "cert-authority"
+    with psycopg.connect(target.postgres_dsn) as connection:
+        _seed_users(connection, plan.anchor)
+    endpoint_ids: dict[str, int] = {}
+    certificates = {}
+    for endpoint in plan.endpoints:
+        certificate = provision(endpoint.agent_id, authority)
+        certificates[endpoint.hostname] = certificate
+        with _collector_client(certificate.certificate, certificate.private_key, certificate.ca_certificate) as client:
+            response = client.post(
+                f"{target.collector_base_url}/agents/register",
+                json={
+                    "agentId": endpoint.agent_id,
+                    "hostname": endpoint.hostname,
+                    "osType": endpoint.os_type,
+                    "osVersion": endpoint.os_version,
+                    "agentVersion": "2.7.1",
+                    "agentBuildId": f"{endpoint.os_type.lower()}-{endpoint.agent_arch.lower()}-presentation",
+                    "agentArch": endpoint.agent_arch,
+                    "capabilityCodes": CAPABILITIES,
+                },
+            )
+            response.raise_for_status()
+            endpoint_ids[endpoint.hostname] = int(response.json()["data"]["endpointId"])
+            heartbeat = client.post(
+                f"{target.collector_base_url}/agents/heartbeat",
+                json={
+                    "agentId": endpoint.agent_id,
+                    "agentVersion": "2.7.1",
+                    "agentBuildId": f"{endpoint.os_type.lower()}-{endpoint.agent_arch.lower()}-presentation",
+                    "agentArch": endpoint.agent_arch,
+                    "capabilityCodes": CAPABILITIES,
+                    "bufferDepth": 0,
+                    "sensorHealth": [
+                        {"sensor": "PROCESS", "status": "HEALTHY", "packetDropCount": 0, "parseErrorCount": 0}
+                    ],
+                    "sentAt": _rfc3339(datetime.now(UTC)),
+                },
+            )
+            heartbeat.raise_for_status()
+    events_by_hostname: dict[str, list[EventPlan]] = {endpoint.hostname: [] for endpoint in plan.endpoints}
+    for event in plan.events:
+        events_by_hostname[event.hostname].append(event)
+    accepted: list[str] = []
+    for endpoint in plan.endpoints:
+        certificate = certificates[endpoint.hostname]
+        event_plans = events_by_hostname[endpoint.hostname]
+        batch_id = _stable_uuid(plan.profile, plan.seed, plan.anchor, endpoint.hostname, 0, "collector-batch")
+        with _collector_client(certificate.certificate, certificate.private_key, certificate.ca_certificate) as client:
+            response = client.post(
+                f"{target.collector_base_url}/telemetry/batches",
+                json={
+                    "schemaVersion": 1,
+                    "batchId": str(batch_id),
+                    "agentId": endpoint.agent_id,
+                    "sentAt": _rfc3339(datetime.now(UTC)),
+                    "events": [
+                        {
+                            "eventId": str(event.event_id),
+                            "eventType": event.event_type,
+                            "occurredAt": _rfc3339(event.occurred_at),
+                            "payload": event.payload,
+                        }
+                        for event in event_plans
+                    ],
+                },
+            )
+            response.raise_for_status()
+            data = response.json()["data"]
+            if data["rejectedEvents"]:
+                raise RuntimeError(f"Collector rejected presentation events: {data['rejectedEvents']}")
+            accepted.extend(data["acceptedEventIds"])
+    if len(accepted) != len(plan.events):
+        raise RuntimeError(f"Collector acknowledged {len(accepted)} of {len(plan.events)} events")
+    ids = _wait_for_pipeline(target, plan, endpoint_ids, wait_timeout_seconds)
+    with psycopg.connect(target.postgres_dsn) as connection:
+        for endpoint in plan.endpoints:
+            connection.execute(
+                "UPDATE endpoints SET status=%s, last_seen_at=%s, updated_at=%s WHERE endpoint_id=%s",
+                (
+                    endpoint.status,
+                    plan.anchor - (timedelta(hours=6) if endpoint.status == "OFFLINE" else timedelta(minutes=1)),
+                    plan.anchor,
+                    endpoint_ids[endpoint.hostname],
+                ),
+            )
+        connection.commit()
+    ids["eventIds"] = accepted
+    ids["endpointIdsByHostname"] = endpoint_ids
+    ids["presentationEndpointId"] = endpoint_ids.get("DEMO-STUDENT-WIN-07")
+    return endpoint_ids, ids
+
+
+def _wait_for_pipeline(
+    target: SeedTarget,
+    plan: ProfilePlan,
+    endpoint_ids: dict[str, int],
+    timeout_seconds: int,
+) -> dict[str, object]:
+    deadline = time.monotonic() + timeout_seconds
+    endpoint_values = list(endpoint_ids.values())
+    while time.monotonic() < deadline:
+        clickhouse = clickhouse_connect.get_client(dsn=target.clickhouse_dsn, autogenerate_session_id=False)
+        try:
+            result = clickhouse.query(
+                """
+                SELECT uniqExact(event_id)
+                FROM edr_events FINAL
+                WHERE endpoint_id IN {endpoint_ids:Array(UInt64)} AND is_delete=0
+                """,
+                parameters={"endpoint_ids": endpoint_values},
+            )
+            event_count = int(result.result_rows[0][0])
+        finally:
+            clickhouse.close()
+        with psycopg.connect(target.postgres_dsn) as connection:
+            alert_rows = connection.execute(
+                "SELECT alert_id, rule_code FROM alerts WHERE is_delete=FALSE ORDER BY alert_id"
+            ).fetchall()
+            incident_rows = connection.execute(
+                "SELECT incident_id, correlation_key FROM incidents WHERE is_delete=FALSE ORDER BY incident_id"
+            ).fetchall()
+        if (
+            event_count == len(plan.events)
+            and len(alert_rows) == plan.counts["alerts"]
+            and len(incident_rows) == plan.counts["incidents"]
+        ):
+            powershell_alerts = [int(row[0]) for row in alert_rows if row[1] == "PROC_POWERSHELL_ENCODED"]
+            egress_alert = next((int(row[0]) for row in alert_rows if row[1] == "NET_SUSPICIOUS_EGRESS"), None)
+            powershell_incident = next(
+                (int(row[0]) for row in incident_rows if row[1] == "suspicious-powershell"), None
+            )
+            egress_incident = next((int(row[0]) for row in incident_rows if row[1] == "suspicious-egress"), None)
+            return {
+                "powershellIncidentId": powershell_incident,
+                "egressIncidentId": egress_incident,
+                "powershellAlertIds": powershell_alerts,
+                "egressAlertId": egress_alert,
+            }
+        time.sleep(0.5)
+    raise TimeoutError(f"Collector/Kafka pipeline did not reach expected counts within {timeout_seconds} seconds")
+
+
+def _manifest(
+    target: SeedTarget,
+    plan: ProfilePlan,
+    ingestion_mode: str,
+    endpoint_ids: dict[str, int],
+    ids: dict[str, object],
+) -> dict[str, object]:
+    event_times = [event.occurred_at for event in plan.events]
+    main_endpoint_id = endpoint_ids.get("DEMO-STUDENT-WIN-07")
+    powershell_incident_id = ids.get("powershellIncidentId")
+    egress_alert_id = ids.get("egressAlertId")
+    time_range = (
+        f"timePreset=CUSTOM&from={_rfc3339(min(event_times))}&to={_rfc3339(plan.anchor + timedelta(minutes=1))}"
+    )
+    return {
+        "profile": plan.profile,
+        "seed": plan.seed,
+        "anchor": _rfc3339(plan.anchor),
+        "generatedAt": _rfc3339(datetime.now(UTC)),
+        "mockData": True,
+        "dataNotice": "발표용으로 재구성한 local/QA 목데이터이며 production 실측값이 아닙니다.",
+        "ingestionMode": ingestion_mode,
+        "timeRange": {"from": _rfc3339(min(event_times)), "to": _rfc3339(plan.anchor + timedelta(minutes=1))},
+        "counts": plan.counts,
+        "ids": ids,
+        "urls": {
+            "overview": f"{target.dashboard_base_url}/?timePreset=LATEST_24H",
+            "endpointDetail": f"{target.dashboard_base_url}/endpoints/{main_endpoint_id}" if main_endpoint_id else None,
+            "endpointTimeline": f"{target.dashboard_base_url}/events?endpointId={main_endpoint_id}&{time_range}"
+            if main_endpoint_id
+            else None,
+            "powershellIncident": f"{target.dashboard_base_url}/incidents/{powershell_incident_id}"
+            if powershell_incident_id
+            else None,
+            "egressAlert": f"{target.dashboard_base_url}/alerts/{egress_alert_id}" if egress_alert_id else None,
+            "dnsCorrectness": f"{target.dashboard_base_url}/intelligence?value=yahoo.com&{time_range}",
+        },
+    }
+
+
+def _write_manifest(path: Path, manifest: dict[str, object]) -> None:
+    path = path if path.is_absolute() else ROOT / path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _print_plan(plan: ProfilePlan, target: SeedTarget, ingestion_mode: str) -> None:
+    target_description = describe_target(target)
+    print(f"EDR_C {plan.profile} demo seed")
+    print("  mock data:        yes (not production measurements)")
+    print(f"  ingestion mode:   {ingestion_mode}")
+    print(f"  anchor:           {_rfc3339(plan.anchor)}")
+    print(f"  PostgreSQL:       {target_description['postgres']}")
+    print(f"  ClickHouse:       {target_description['clickhouse']}")
+    print(f"  Endpoints:        {plan.counts['endpoints']}")
+    print(f"  Events:           {plan.counts['events']}")
+    print(f"  Alerts:           {plan.counts['alerts']}")
+    print(f"  Incidents:        {plan.counts['incidents']}")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Reset local/QA data and build deterministic EDR_C presentation fixtures."
+    )
+    parser.add_argument("--profile", choices=PROFILES, default="presentation")
+    parser.add_argument("--seed", type=int, default=20_260_721)
+    parser.add_argument("--anchor", default="now", help="'now' or an RFC 3339 timestamp")
+    parser.add_argument("--dry-run", action="store_true", help="Print counts and target without changing databases.")
+    parser.add_argument(
+        "--confirm-reset", action="store_true", help="Required because PostgreSQL and ClickHouse are reset."
+    )
+    parser.add_argument("--output-manifest", type=Path)
+    parser.add_argument(
+        "--emit-through-collector",
+        action="store_true",
+        help="Use mTLS Collector -> Kafka -> Workers instead of direct repositories.",
+    )
+    parser.add_argument("--wait-timeout-seconds", type=int, default=60)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        anchor = parse_anchor(args.anchor)
+        if args.wait_timeout_seconds < 1:
+            raise ValueError("wait-timeout-seconds must be at least 1")
+        plan = build_plan(args.profile, args.seed, anchor)
+        target = seed_target()
+        mode = "collector-kafka" if args.emit_through_collector else "direct-seed"
+        _print_plan(plan, target, mode)
+        if args.dry_run:
+            return 0
+        if not args.confirm_reset:
+            parser.error("--confirm-reset is required because this command resets local/QA databases")
+        assert_safe_reset_target(target)
+        _reset_databases(target)
+        if args.emit_through_collector:
+            endpoint_ids, ids = _collector_seed(target, plan, wait_timeout_seconds=args.wait_timeout_seconds)
+        else:
+            endpoint_ids, ids = _direct_seed(target, plan)
+        manifest = _manifest(target, plan, mode, endpoint_ids, ids)
+        manifest_path = args.output_manifest or DEFAULT_MANIFESTS[args.profile]
+        _write_manifest(manifest_path, manifest)
+        print(f"Manifest: {(manifest_path if manifest_path.is_absolute() else ROOT / manifest_path).resolve()}")
+        print("ADMIN  frontend-admin / frontend-admin-password")
+        print("VIEWER frontend-viewer / frontend-viewer-password")
+        return 0
+    except (RuntimeError, ValueError, OSError, psycopg.Error, httpx.HTTPError, TimeoutError) as error:
+        print(f"presentation demo seed failed: {error}", file=os.sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
