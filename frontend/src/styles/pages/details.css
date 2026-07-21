@@ -202,6 +202,18 @@
 .detail-ledger .link-list > a > span { min-width: 0; }
 .detail-ledger .link-list strong,
 .detail-ledger .link-list small { display: block; overflow-wrap: anywhere; }
+.detail-ledger .connected-incident-list > a { align-items: flex-start; flex-wrap: wrap; }
+.detail-ledger .connected-incident-copy { flex: 1 1 320px; align-items: flex-start; flex-direction: column; overflow: hidden; }
+.detail-ledger .connected-incident-badges {
+  min-width: max-content;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: var(--space-3);
+}
+.detail-ledger .connected-incident-badges .status-pill { width: max-content; flex: 0 0 auto; flex-direction: row; white-space: nowrap; }
 
 /* Incident: collapse an empty master pane and expand the evidence stage on demand. */
 .incident-workbench.queue-empty { grid-template-columns: minmax(0, 1fr); }

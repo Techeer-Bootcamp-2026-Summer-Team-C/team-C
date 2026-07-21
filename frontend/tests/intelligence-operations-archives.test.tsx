@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -24,7 +24,7 @@ import {
   topologyGraphEnabled,
 } from "../src/features/intelligenceOperations";
 import { LocaleProvider } from "../src/i18n/LocaleContext";
-import { ArchiveLifecycleBoard } from "../src/pages/ArchivesPage";
+import { ArchiveLifecycleBoard, ArchivesPage } from "../src/pages/ArchivesPage";
 import { CorrelationResult, IntelligenceContent } from "../src/pages/IntelligencePage";
 import { PipelineSnapshot } from "../src/pages/OperationsPage";
 import { canMutate } from "../src/query/policy";
@@ -63,14 +63,20 @@ describe("WP-08 Intelligence, Operations, and Archives", () => {
     expect(screen.getByRole("region", { name: "Intelligence" })).toHaveClass("intelligence-summary-rail");
     expect(container.querySelectorAll(".intelligence-summary-rail .kpi-card")).toHaveLength(0);
     expect(screen.getByRole("heading", { name: "MITRE matrix" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /TA0002/ }));
+    const tactic = screen.getByRole("button", { name: "TA0002, Execution, 3 Alert(s)" });
+    expect(tactic.querySelector(".mitre-code")).toHaveTextContent("TA0002");
+    expect(tactic.querySelector(".mitre-name")).toHaveTextContent("Execution");
+    fireEvent.click(tactic);
     const mitreInspector = screen.getByRole("complementary", { name: "Execution" });
     expect(within(mitreInspector).getByText("3")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("tab", { name: "Signals" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Signals" }));
     expect(screen.getByText("Domain · example.com")).toBeInTheDocument();
     expect(screen.getByText("Topology graph is disabled")).toBeInTheDocument();
-    expect(screen.getByRole("table", { name: "Endpoint egress relationships" }).closest(".relationship-evidence-table")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "SOC-WIN-01" }));
+    const topologyTable = screen.getByRole("table", { name: "Endpoint egress relationships" });
+    expect(topologyTable.closest(".relationship-evidence-table")).toBeInTheDocument();
+    expect(within(topologyTable).getByRole("columnheader", { name: "Destination" })).toBeInTheDocument();
+    expect(screen.getByText("Unique Endpoint-to-destination relationships")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "SOC-WIN-01" }));
     expect(screen.getByText("TCP relationship")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "2" })).toHaveAttribute("href", expect.stringContaining("/alerts?"));
     expect(screen.queryByText(/bytesOut/i)).not.toBeInTheDocument();
@@ -138,11 +144,46 @@ describe("WP-08 Intelligence, Operations, and Archives", () => {
     expect(stages).toHaveLength(6);
     expect(stages.every((stage) => stage.textContent?.includes("0"))).toBe(true);
   });
+
+  it("uses locale-stable ISO placeholders for English Archive date-time controls", () => {
+    renderWithProviders(<ArchivesPage />);
+    const from = screen.getByLabelText("From");
+    const to = screen.getByLabelText("To");
+    expect(from).toHaveAttribute("lang", "en-US");
+    expect(from).toHaveAttribute("type", "text");
+    expect(from).toHaveAttribute("placeholder", "YYYY-MM-DD HH:mm");
+    expect(from).toHaveAttribute("pattern", "\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}");
+    fireEvent.change(from, { target: { value: "2026-07-21 12:00" } });
+    expect(from).toBeValid();
+    expect(to).toHaveAttribute("lang", "en-US");
+    expect(to).toHaveAttribute("type", "text");
+    expect(to).toHaveAttribute("placeholder", "YYYY-MM-DD HH:mm");
+  });
+
+  it("keeps an invalid Archive date draft and only clears the URL filter for an empty value", () => {
+    renderWithProviders(<ArchivesPage />, ["/operations/archives?from=2026-07-21T03%3A00%3A00.000Z"]);
+    const from = screen.getByLabelText("From");
+
+    fireEvent.change(from, { target: { value: "not-a-date" } });
+    fireEvent.blur(from);
+
+    expect(from).toHaveValue("not-a-date");
+    expect(from).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText("Use YYYY-MM-DD HH:mm in your local time.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove From filter" })).toBeInTheDocument();
+
+    fireEvent.change(from, { target: { value: "" } });
+    fireEvent.blur(from);
+
+    expect(from).toHaveValue("");
+    expect(from).not.toHaveAttribute("aria-invalid");
+    expect(screen.queryByRole("button", { name: "Remove From filter" })).not.toBeInTheDocument();
+  });
 });
 
-function renderWithProviders(children: React.ReactNode) {
+function renderWithProviders(children: React.ReactNode, initialEntries: string[] = ["/"]) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={client}><AuthProvider><LocaleProvider><MemoryRouter>{children}</MemoryRouter></LocaleProvider></AuthProvider></QueryClientProvider>);
+  return render(<QueryClientProvider client={client}><AuthProvider><LocaleProvider><MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter></LocaleProvider></AuthProvider></QueryClientProvider>);
 }
 
 const dashboardFixture = {
