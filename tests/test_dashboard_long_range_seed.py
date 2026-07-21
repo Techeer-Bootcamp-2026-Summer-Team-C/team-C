@@ -39,3 +39,28 @@ def test_dry_run_does_not_require_reset_confirmation(capsys: pytest.CaptureFixtu
     output = capsys.readouterr().out
     assert "Events:           1,400" in output
     assert "Endpoints:        10" in output
+
+
+def test_presentation_performance_shape_is_exactly_248000_events(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert (
+        main(
+            [
+                "--dry-run",
+                "--days",
+                "31",
+                "--endpoints",
+                "100",
+                "--events-per-endpoint-day",
+                "80",
+                "--seed",
+                "20260715",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert "Events:           248,000" in output
+    assert "Endpoints:        100" in output
