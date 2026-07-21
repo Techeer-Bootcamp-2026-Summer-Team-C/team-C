@@ -54,6 +54,11 @@ describe("WP-05 alert workbench", () => {
     expect(screen.getByText("Read-only steps from PROC-001 v3")).toBeInTheDocument();
     expect(screen.getByText("Manual action")).toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    const connectedIncident = screen.getByText("Connected incident 7").closest("a");
+    expect(connectedIncident).not.toBeNull();
+    const badges = connectedIncident?.querySelector(".connected-incident-badges");
+    expect(badges).toHaveClass("connected-incident-badges");
+    expect(badges?.querySelectorAll(".status-pill")).toHaveLength(2);
   });
 
   it("replaces the last resolved Alert with the queue-complete state", async () => {
@@ -120,7 +125,14 @@ function detail(alertId: number, status: AlertDto["status"] = "OPEN"): AlertDeta
   return {
     ...summary(alertId, status),
     sourceEvent: null,
-    incidents: [],
+    incidents: [{
+      incidentId: 7,
+      title: "Connected incident 7",
+      severity: "HIGH",
+      status: "CLOSED",
+      windowStartAt: "2026-07-15T02:00:00Z",
+      windowEndAt: "2026-07-15T04:00:00Z",
+    }],
     responseGuidance: [{ order: 1, title: "Preserve evidence", description: "Capture the process tree before remediation.", requiresManualAction: true }],
   };
 }

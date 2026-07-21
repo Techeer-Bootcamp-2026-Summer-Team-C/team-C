@@ -14,11 +14,13 @@ export function TopologyGraph({
   selection,
   onSelect,
   label,
+  destinationLabel,
 }: {
   topology: EgressTopologyDto;
   selection: TopologySelection | null;
   onSelect: (selection: TopologySelection) => void;
   label: string;
+  destinationLabel: string;
 }) {
   const edgeGroups = groupTopologyEdges(topology);
   const graph = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({})).setGraph({ rankdir: "LR", ranksep: 100, nodesep: 36 });
@@ -33,7 +35,7 @@ export function TopologyGraph({
       id,
       position: { x: point.x - 90, y: point.y - 32 },
       data: { label: endpoint ? `${endpoint.hostname} · Risk ${endpoint.riskScore}` : id.slice(7) },
-      ariaLabel: endpoint ? `Endpoint ${endpoint.hostname}, risk ${endpoint.riskScore}` : `Target ${id.slice(7)}`,
+      ariaLabel: endpoint ? `Endpoint ${endpoint.hostname}, risk ${endpoint.riskScore}` : `${destinationLabel} ${id.slice(7)}`,
       className: endpoint ? "topology-flow-node endpoint" : "topology-flow-node target",
       draggable: false,
       focusable: true,

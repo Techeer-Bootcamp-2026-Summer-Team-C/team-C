@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -24,7 +24,7 @@ import {
   topologyGraphEnabled,
 } from "../src/features/intelligenceOperations";
 import { LocaleProvider } from "../src/i18n/LocaleContext";
-import { ArchiveLifecycleBoard } from "../src/pages/ArchivesPage";
+import { ArchiveLifecycleBoard, ArchivesPage } from "../src/pages/ArchivesPage";
 import { CorrelationResult, IntelligenceContent } from "../src/pages/IntelligencePage";
 import { PipelineSnapshot } from "../src/pages/OperationsPage";
 import { canMutate } from "../src/query/policy";
@@ -63,14 +63,20 @@ describe("WP-08 Intelligence, Operations, and Archives", () => {
     expect(screen.getByRole("region", { name: "Intelligence" })).toHaveClass("intelligence-summary-rail");
     expect(container.querySelectorAll(".intelligence-summary-rail .kpi-card")).toHaveLength(0);
     expect(screen.getByRole("heading", { name: "MITRE matrix" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /TA0002/ }));
+    const tactic = screen.getByRole("button", { name: "TA0002, Execution, 3 Alert(s)" });
+    expect(tactic.querySelector(".mitre-code")).toHaveTextContent("TA0002");
+    expect(tactic.querySelector(".mitre-name")).toHaveTextContent("Execution");
+    fireEvent.click(tactic);
     const mitreInspector = screen.getByRole("complementary", { name: "Execution" });
     expect(within(mitreInspector).getByText("3")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("tab", { name: "Signals" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Signals" }));
     expect(screen.getByText("Domain · example.com")).toBeInTheDocument();
     expect(screen.getByText("Topology graph is disabled")).toBeInTheDocument();
-    expect(screen.getByRole("table", { name: "Endpoint egress relationships" }).closest(".relationship-evidence-table")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "SOC-WIN-01" }));
+    const topologyTable = screen.getByRole("table", { name: "Endpoint egress relationships" });
+    expect(topologyTable.closest(".relationship-evidence-table")).toBeInTheDocument();
+    expect(within(topologyTable).getByRole("columnheader", { name: "Destination" })).toBeInTheDocument();
+    expect(screen.getByText("Unique Endpoint-to-destination relationships")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "SOC-WIN-01" }));
     expect(screen.getByText("TCP relationship")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "2" })).toHaveAttribute("href", expect.stringContaining("/alerts?"));
     expect(screen.queryByText(/bytesOut/i)).not.toBeInTheDocument();
@@ -137,6 +143,18 @@ describe("WP-08 Intelligence, Operations, and Archives", () => {
     const stages = within(screen.getByRole("list", { name: "Archive lifecycle" })).getAllByRole("listitem");
     expect(stages).toHaveLength(6);
     expect(stages.every((stage) => stage.textContent?.includes("0"))).toBe(true);
+  });
+
+  it("uses locale-stable ISO placeholders for English Archive date-time controls", () => {
+    renderWithProviders(<ArchivesPage />);
+    const from = screen.getByLabelText("From");
+    const to = screen.getByLabelText("To");
+    expect(from).toHaveAttribute("lang", "en-US");
+    expect(from).toHaveAttribute("type", "text");
+    expect(from).toHaveAttribute("placeholder", "YYYY-MM-DD HH:mm");
+    expect(to).toHaveAttribute("lang", "en-US");
+    expect(to).toHaveAttribute("type", "text");
+    expect(to).toHaveAttribute("placeholder", "YYYY-MM-DD HH:mm");
   });
 });
 

@@ -13,7 +13,7 @@ import { localDateTimeValue, numberParam, updateParams, utcFromLocal } from "../
 import { canMutate } from "../query/policy";
 
 export function ArchivesPage() {
-  const { t } = useI18n();
+  const { t, dateLocale } = useI18n();
   const auth = useAuth();
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
@@ -35,7 +35,7 @@ export function ArchivesPage() {
   return <div className="page-stack archives-page">
     <Link className="back-link" to="/operations"><ArrowLeft aria-hidden="true" size={15} />{t("navigation.operations")}</Link>
     <PageHeader title={t("archive.title")} />
-    <FilterBar appliedFilters={appliedFilters} hasFilters={appliedFilters.length > 0} onClear={() => setParams({})} onRemoveFilter={(key) => setParams(removeListFilter(params, key))} primary={<><Field label={t("filter.endpointIds")}><input aria-describedby="endpoint-id-help" onChange={(event) => setParams(updateParams(params, { endpointIds: event.target.value }))} placeholder="1001, 1002" value={rawEndpointIds} /><small id="endpoint-id-help">{t("archive.endpointHelp")}</small></Field><Field label={t("filter.from")}><input onChange={(event) => setParams(updateParams(params, { from: event.target.value ? utcFromLocal(event.target.value) : null }))} type="datetime-local" value={from ? localDateTimeValue(from) : ""} /></Field><Field label={t("filter.to")}><input onChange={(event) => setParams(updateParams(params, { to: event.target.value ? utcFromLocal(event.target.value) : null }))} type="datetime-local" value={to ? localDateTimeValue(to) : ""} /></Field></>} />
+    <FilterBar appliedFilters={appliedFilters} hasFilters={appliedFilters.length > 0} onClear={() => setParams({})} onRemoveFilter={(key) => setParams(removeListFilter(params, key))} primary={<><Field label={t("filter.endpointIds")}><input aria-describedby="endpoint-id-help" onChange={(event) => setParams(updateParams(params, { endpointIds: event.target.value }))} placeholder="1001, 1002" value={rawEndpointIds} /><small id="endpoint-id-help">{t("archive.endpointHelp")}</small></Field><Field label={t("filter.from")}><ArchiveDateTimeInput dateLocale={dateLocale} onCommit={(value) => setParams(updateParams(params, { from: value }))} timestamp={from} /></Field><Field label={t("filter.to")}><ArchiveDateTimeInput dateLocale={dateLocale} onCommit={(value) => setParams(updateParams(params, { to: value }))} timestamp={to} /></Field></>} />
     <ArchiveReadinessLedger endpointCount={endpointIds.length} from={from} hasCriteria={hasCriteria} ready={ready} to={to} />
     {hasCriteria ? <QueryFeedback error={result.error} fetching={result.isFetching} hasData={Boolean(result.data)} invalid={invalid} invalidMessage={t("archive.chooseRangeDescription")} onRetry={() => void result.refetch()} pending={result.isPending && ready} refetchError={result.isRefetchError} rows={7} /> : null}
     {ready && result.data ? <ArchiveLifecycleBoard items={result.data.data.items} /> : null}
@@ -43,6 +43,37 @@ export function ArchivesPage() {
     {ready && !writeAllowed ? <Panel title={t("archive.access")} subtitle={t("archive.viewerSubtitle")}><p className="read-only-note">{t("archive.viewerDescription")}</p></Panel> : null}
     {ready && result.data ? <Panel title={t("archive.buckets")} subtitle={t("archive.records", { total: result.data.data.total })}>{result.data.data.items.length ? <><DataTable busy={result.isFetching} label={t("archive.buckets")}><thead><tr><th scope="col">Endpoint</th><th aria-sort="descending" scope="col">{t("archive.bucket")}</th><th scope="col">{t("filter.status")}</th><th scope="col">{t("archive.objectPath")}</th><th scope="col">{t("archive.eventCount")}</th><th scope="col">{t("archive.restoreWindow")}</th><th scope="col">{t("archive.lastError")}</th></tr></thead><tbody>{result.data.data.items.map((bucket) => <tr className={`archive-row tone-${bucket.storageStatus.toLowerCase()}`} key={`${bucket.endpointId}-${bucket.bucketStartAt}`}><td><Link to={`/endpoints/${bucket.endpointId}`}>{bucket.endpointId}</Link></td><td>{formatDateTime(bucket.bucketStartAt)}<small>{t("common.to")} {formatDateTime(bucket.bucketEndAt)}</small></td><td><StatusPill value={bucket.storageStatus} /><small>{bucket.storageClass}</small></td><td><code className="path-value">{bucket.storagePath}</code></td><td>{bucket.eventCount}</td><td>{bucket.restoreRequestedAt ? t("archive.requested", { time: formatDateTime(bucket.restoreRequestedAt) }) : t("archive.notRequested")}<small>{bucket.restoreExpiresAt ? t("archive.expires", { time: formatDateTime(bucket.restoreExpiresAt) }) : t("archive.noExpiry")}</small></td><td>{bucket.lastError ?? t("common.none")}</td></tr>)}</tbody></DataTable><Pagination page={result.data.data} /></> : <EmptyState title={t("archive.noBuckets")} message={t("archive.noBucketsDescription")} />}</Panel> : null}
   </div>;
+}
+
+function ArchiveDateTimeInput({ dateLocale, onCommit, timestamp }: { dateLocale: string; onCommit: (value: string | null) => void; timestamp: string }) {
+  if (dateLocale !== "en-US") {
+    return <input lang={dateLocale} onChange={(event) => onCommit(event.target.value ? utcFromLocal(event.target.value) : null)} type="datetime-local" value={timestamp ? localDateTimeValue(timestamp) : ""} />;
+  }
+
+  const commit = (value: string) => onCommit(utcFromArchiveText(value));
+  return <input
+    defaultValue={timestamp ? localDateTimeValue(timestamp).replace("T", " ") : ""}
+    inputMode="numeric"
+    key={timestamp || "empty"}
+    lang="en-US"
+    onBlur={(event) => commit(event.currentTarget.value)}
+    onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
+    pattern="\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}"
+    placeholder="YYYY-MM-DD HH:mm"
+    title="YYYY-MM-DD HH:mm"
+    type="text"
+  />;
+}
+
+function utcFromArchiveText(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/.exec(trimmed);
+  if (!match) return null;
+  const localValue = `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}`;
+  const parsed = new Date(localValue);
+  if (Number.isNaN(parsed.getTime()) || localDateTimeValue(parsed.toISOString()) !== localValue) return null;
+  return utcFromLocal(localValue);
 }
 
 export function ArchiveReadinessLedger({ endpointCount, from, hasCriteria, ready, to }: { endpointCount: number; from: string; hasCriteria: boolean; ready: boolean; to: string }) {

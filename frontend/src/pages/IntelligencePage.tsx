@@ -292,7 +292,15 @@ function MitreGroup({
   return <section><h3>{label}</h3>{rows.length ? <div className="mitre-cells">{rows.map((row) => {
     const selected = selection?.type === row.type && selection.code === row.code;
     const heat = maximum > 0 ? Math.max(1, Math.ceil((row.count / maximum) * 3)) : 0;
-    return <button aria-pressed={selected} className={`${selected ? "selected " : ""}heat-${heat}`.trim()} key={`${row.type}-${row.code}`} onClick={() => onSelect(row)} type="button"><code>{row.code}</code><strong>{row.name}</strong><span>{t("intelligence.alertsCount", { count: row.count })}</span></button>;
+    return <button
+      aria-label={`${row.code}, ${row.name}, ${t("intelligence.alertsCount", { count: row.count })}`}
+      aria-pressed={selected}
+      className={`${selected ? "selected " : ""}heat-${heat}`.trim()}
+      key={`${row.type}-${row.code}`}
+      onClick={() => onSelect(row)}
+      title={`${row.code} · ${row.name}`}
+      type="button"
+    ><code className="mitre-code">{row.code}</code><strong className="mitre-name">{row.name}</strong><span className="mitre-count">{t("intelligence.alertsCount", { count: row.count })}</span></button>;
   })}</div> : <EmptyState title={t("intelligence.noMappings")} message={t("intelligence.noMappingsDescription")} />}</section>;
 }
 
@@ -312,8 +320,8 @@ export function TopologyWorkspace({ topology, graphEnabled }: { topology: Egress
     </div>
     {!filtered.edges.length ? <EmptyState title={t("intelligence.noFilteredRelationships")} message={t("intelligence.noFilteredRelationshipsDescription")} /> : <>
       <div className="topology-stage">
-        <aside aria-label={t("intelligence.legend")} className="topology-legend"><strong>{t("intelligence.legend")}</strong><ul><li><i className="endpoint" />Endpoint</li><li><i className="target" />Target</li><li><i className="observed" />{t("intelligence.observedEdge")}</li></ul><small>{t("intelligence.countsNotTraffic")}</small></aside>
-        {graphEnabled ? <Suspense fallback={<Skeleton rows={8} />}><LazyTopologyGraph label={t("intelligence.graphAria")} onSelect={setSelection} selection={selection} topology={filtered} /></Suspense> : <div className="topology-fallback" role="status"><Badge tone="neutral">{t("intelligence.tableFallback")}</Badge><strong>{t("intelligence.graphDisabled")}</strong><p>{t("intelligence.graphDisabledDescription")}</p></div>}
+        <aside aria-label={t("intelligence.legend")} className="topology-legend"><strong>{t("intelligence.legend")}</strong><ul><li><i className="endpoint" />Endpoint</li><li><i className="target" />{t("intelligence.destination")}</li><li><i className="observed" />{t("intelligence.observedEdge")}</li></ul><small>{t("intelligence.countsNotTraffic")}</small></aside>
+        {graphEnabled ? <Suspense fallback={<Skeleton rows={8} />}><LazyTopologyGraph destinationLabel={t("intelligence.destination")} label={t("intelligence.graphAria")} onSelect={setSelection} selection={selection} topology={filtered} /></Suspense> : <div className="topology-fallback" role="status"><Badge tone="neutral">{t("intelligence.tableFallback")}</Badge><strong>{t("intelligence.graphDisabled")}</strong><p>{t("intelligence.graphDisabledDescription")}</p></div>}
         <TopologyInspector selection={selection} topology={filtered} />
       </div>
       <TopologyEvidenceTable onSelect={setSelection} selection={selection} topology={filtered} />
@@ -349,14 +357,14 @@ function TopologyInspector({ topology, selection }: { topology: EgressTopologyDt
       <DefinitionGrid items={[{ label: "Risk", value: endpoint.riskScore }, { label: t("filter.status"), value: endpoint.status }, { label: t("intelligence.alertCount"), value: endpoint.alertCount }]} />
       <div className="context-links"><Link to={`/endpoints/${endpoint.endpointId}`}>{t("intelligence.openEndpoint")}</Link></div>
     </Inspector>;
-    if (selection.id.startsWith("target:")) return <Inspector description={t("intelligence.observedTargetDescription")} title={selection.id.slice(7)}><DefinitionGrid items={[{ label: t("intelligence.nodeType"), value: "TARGET" }, { label: t("intelligence.relationships"), value: topology.edges.filter((item) => targetNodeId(item.target) === selection.id).length }]} /></Inspector>;
+    if (selection.id.startsWith("target:")) return <Inspector description={t("intelligence.observedTargetDescription")} title={selection.id.slice(7)}><DefinitionGrid items={[{ label: t("intelligence.nodeType"), value: t("intelligence.destination").toUpperCase() }, { label: t("intelligence.relationships"), value: topology.edges.filter((item) => targetNodeId(item.target) === selection.id).length }]} /></Inspector>;
   }
   return <Inspector description={t("intelligence.topologySelectPrompt")} title={t("intelligence.selectedContext")}><EmptyState title={t("intelligence.nothingSelected")} message={t("intelligence.topologySelectPrompt")} /></Inspector>;
 }
 
 function TopologyEvidenceTable({ topology, selection, onSelect }: { topology: EgressTopologyDto; selection: TopologySelection | null; onSelect: (selection: TopologySelection) => void }) {
   const { t } = useI18n();
-  return <DataTable className="relationship-evidence-table" label={t("intelligence.relationships")}><thead><tr><th scope="col">{t("intelligence.source")}</th><th scope="col">{t("intelligence.target")}</th><th scope="col">Protocol</th><th scope="col">Events</th><th scope="col">Alerts</th><th scope="col">{t("intelligence.lastObserved")}</th></tr></thead><tbody>{topology.edges.map((edge) => {
+  return <DataTable className="relationship-evidence-table" label={t("intelligence.relationships")}><thead><tr><th scope="col">{t("intelligence.source")}</th><th scope="col">{t("intelligence.destination")}</th><th scope="col">Protocol</th><th scope="col">Events</th><th scope="col">Alerts</th><th scope="col">{t("intelligence.lastObserved")}</th></tr></thead><tbody>{topology.edges.map((edge) => {
     const id = topologyEdgeId(edge.endpointId, edge.target, edge.protocol);
     const selected = (selection?.kind === "EDGE" && selection.id === id)
       || (selection?.kind === "EDGE_GROUP" && selection.id === topologyEdgeGroupId(edge.endpointId, edge.target));
