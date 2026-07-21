@@ -668,6 +668,19 @@ Bundle 변화:
 - Bundle 변화: 새 runtime dependency 없음. production `OverviewPage` 113.83 kB / 34.78 kB gzip, route-local `DetectionActivityPanel` 500.42 kB / 171.18 kB gzip이며 기존 ECharts chunk warning은 유지된다.
 - 다음 Package: 없음.
 
+### REF-15. 브라우저 단일 세로 스크롤
+
+- 상태: 완료
+- 입력: 긴 Overview에서 browser document와 `main.main-content`가 각각 세로 scrollbar를 소유해 오른쪽에 scrollbar가 두 개 표시되는 오류.
+- 범위: AppShell의 page-level 세로 scroll ownership과 관련 문서·회귀 테스트만 수정했다. Table, payload, dialog 등 경계가 명확한 내부 scroller와 API·DTO·Backend는 변경하지 않았다.
+- 설계 판단: `.console-shell`의 고정 `height: 100dvh`를 `min-height`와 document-flow row로 바꾸고 `.main-content`의 `overflow: auto`를 제거했다. Navigation rail과 top bar는 sticky로 유지해 긴 page에서도 탐색 문맥을 보존한다. 중복 legacy·modular CSS가 다시 충돌하지 않도록 두 파일을 동일하게 수정했다.
+- 변경 파일: `frontend/src/styles.css`, `frontend/src/styles/shell.css`, `frontend/tests/release-gates.test.ts`, `docs/frontend/DESIGN.md`, `docs/frontend/FRONTEND_SPEC.md`, 이 실행계획.
+- 자동 검증: targeted Vitest 3 files / 28 tests passed, `npm run typecheck` passed, `npm run lint` passed, `npm run build` passed. 새 회귀 테스트는 두 CSS entry 모두에서 document-owned scroll 계약을 검사한다.
+- 브라우저 QA: 사용자 Chrome의 local session이 로그인 화면으로 만료되어 인증 후 Overview 실화면 검증은 수행하지 않았다. 자격 증명이나 browser storage는 조회·변경하지 않았다.
+- Bundle 변화: CSS layout rule과 test·문서만 변경했으며 새 runtime dependency는 없다. Production build는 passed했다.
+- 남은 위험: 로그인된 실제 Backend 화면에서 Overview와 짧은 route 각각의 scrollbar가 하나인지 최종 육안 확인이 필요하다.
+- 다음 Package: 로그인 세션이 준비되면 Overview와 다른 route의 단일 scrollbar 시각 QA만 수행한다.
+
 ### REF-13. 영어 wallboard overflow 오류 교정
 
 - 상태: 완료

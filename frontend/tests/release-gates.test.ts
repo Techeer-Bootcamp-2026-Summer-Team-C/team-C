@@ -39,6 +39,26 @@ describe("WP-09 release gates", () => {
     expect(styles).toContain("prefers-reduced-motion: reduce");
   });
 
+  it("keeps vertical page scrolling on the browser document", () => {
+    for (const file of ["src/styles.css", "src/styles/shell.css"]) {
+      const source = readFileSync(resolve(file), "utf8");
+      const consoleRules = [...source.matchAll(/\.console-shell\s*\{([^}]*)\}/g)].map(
+        (match) => match[1] ?? "",
+      );
+      const mainRule = source.match(/\.main-content\s*\{([^}]*)\}/)?.[1] ?? "";
+
+      expect(consoleRules.length, file).toBeGreaterThan(0);
+      expect(consoleRules[0], file).toContain("min-height: 100dvh");
+      expect(consoleRules[0], file).toMatch(/grid-template-rows:[^;]*auto/);
+      expect(
+        consoleRules.every((rule) => !/(?:^|;)\s*height:\s*100dvh/.test(rule)),
+        file,
+      ).toBe(true);
+      expect(mainRule, file).toContain("overflow: visible");
+      expect(source, file).toMatch(/\.top-bar\s*\{[^}]*position:\s*sticky/);
+    }
+  });
+
   it("documents both graph flags with enabled release defaults", () => {
     for (const file of ["../.env.example", "../.env.production.example"]) {
       const source = readFileSync(resolve(file), "utf8");
