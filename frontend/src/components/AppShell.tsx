@@ -29,7 +29,7 @@ import { useTheme } from "../theme/ThemeProvider";
 import { navigationDestination, navigationTimeScope } from "../lib/url";
 import {
   collectDashboardReport,
-  DashboardReportHeader,
+  DashboardReportDocument,
   DashboardReportPreview,
   type DashboardReportSnapshot,
 } from "../features/dashboardReport";
@@ -113,7 +113,7 @@ export function AppShell() {
   const [localeError, setLocaleError] = useState(false);
   const [search, setSearch] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
-  const [reportSnapshot, setReportSnapshot] = useState<DashboardReportSnapshot>(() => collectDashboardReport(null));
+  const [reportSnapshot, setReportSnapshot] = useState<DashboardReportSnapshot | null>(null);
   const [navigationTime, setNavigationTime] = useState(() => navigationTimeScope(location.search) ?? "timePreset=LATEST_24H");
   const breadcrumbs = buildBreadcrumbs(location.pathname, t);
   const pageTitleText = breadcrumbs.at(-1)?.label ?? t("navigation.console");
@@ -158,14 +158,21 @@ export function AppShell() {
   }
 
   function openReport(): void {
-    setReportSnapshot(collectDashboardReport(mainContentRef.current));
+    setReportSnapshot(collectDashboardReport(mainContentRef.current, {
+      operator: auth.user?.name ?? "—",
+      pageTitle: pageTitleText,
+      pathname: location.pathname,
+      search: location.search,
+      userRole: auth.user?.role ?? "—",
+    }));
     setReportOpen(true);
   }
 
   function printReport(): void {
+    if (!reportSnapshot) return;
     const previousTitle = document.title;
     const date = reportSnapshot.generatedAt.toISOString().slice(0, 10);
-    document.title = `${SERVICE_NAME} - ${pageTitleText} - ${date}`;
+    document.title = `${SERVICE_NAME} - ${reportSnapshot.pageTitle} - ${date}`;
     try {
       window.print();
     } finally {
@@ -244,36 +251,25 @@ export function AppShell() {
           </div>
         </header>
         <main className="main-content" id="main-content" ref={mainContentRef} tabIndex={-1}>
-          {reportOpen ? <DashboardReportHeader
-            dateLocale={dateLocale}
-            locale={locale}
-            pageTitle={pageTitleText}
-            pathname={location.pathname}
-            search={location.search}
-            snapshot={reportSnapshot}
-            userName={auth.user?.name}
-            userRole={auth.user?.role}
-          /> : null}
           <Suspense fallback={<div aria-label={t("common.loading")} className="route-loading" role="status"><span />{t("common.loading")}</div>}>
             <Outlet />
           </Suspense>
         </main>
+        {reportSnapshot ? <div aria-hidden="true" className="dashboard-report-print-shell">
+          <DashboardReportDocument dateLocale={dateLocale} locale={locale} snapshot={reportSnapshot} />
+        </div> : null}
         <Dialog
           actions={<>
             <Button onClick={() => setReportOpen(false)} type="button" variant="ghost">{t("report.cancel")}</Button>
             <Button onClick={printReport} type="button"><Printer aria-hidden="true" size={16} />{t("report.printSave")}</Button>
           </>}
           closeLabel={t("report.close")}
+          className="report-dialog"
           onClose={() => setReportOpen(false)}
           open={reportOpen}
-          title={t("report.snapshot", { page: pageTitleText })}
+          title={t("report.snapshot", { page: reportSnapshot?.pageTitle ?? pageTitleText })}
         >
-          <DashboardReportPreview locale={locale} snapshot={reportSnapshot} />
-          <dl className="report-details">
-            <div><dt>{t("report.page")}</dt><dd>{location.pathname}</dd></div>
-            <div><dt>{t("report.generated")}</dt><dd>{reportSnapshot.generatedAt.toLocaleString(dateLocale)}</dd></div>
-            <div><dt>{t("report.userRole")}</dt><dd>{auth.user?.role}</dd></div>
-          </dl>
+          {reportSnapshot ? <DashboardReportPreview dateLocale={dateLocale} locale={locale} snapshot={reportSnapshot} /> : null}
         </Dialog>
       </section>
     </div>

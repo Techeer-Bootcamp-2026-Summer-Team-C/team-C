@@ -68,6 +68,30 @@
   --status-warning-surface: rgba(231, 213, 106, .12);
   --status-success-surface: rgba(34, 197, 94, .12);
 
+  /* Stable paper palette for report preview and print in either application theme. */
+  --report-paper: #ffffff;
+  --report-paper-muted: #f4f6f8;
+  --report-ink: #101828;
+  --report-ink-secondary: #344054;
+  --report-ink-tertiary: #667085;
+  --report-rule: #d0d5dd;
+  --report-rule-subtle: #e4e7ec;
+  --report-rule-strong: #667085;
+  --report-accent: #175cd3;
+  --report-critical: #b42318;
+  --report-high: #b54708;
+  --report-medium: #7a5b00;
+  --report-low: #175cd3;
+  --report-success: #067647;
+  --report-info: #026aa2;
+  --report-neutral: #475467;
+  --report-series-events: #175cd3;
+  --report-series-alerts: #6941c6;
+  --report-series-incidents-open: #067647;
+  --report-series-incidents-closed: #b54708;
+  --report-preview-backdrop: #202126;
+  --report-preview-shadow: rgba(0, 0, 0, .36);
+
   --kpi-total-alerts: var(--accent-primary);
   --kpi-critical-alerts: var(--status-critical);
   --kpi-high-risk-endpoints: var(--status-high);
