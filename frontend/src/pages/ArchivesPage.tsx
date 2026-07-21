@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArchiveRestore } from "lucide-react";
+import { useId, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/endpoints";
 import { useAuth } from "../auth/AuthContext";
@@ -35,7 +36,7 @@ export function ArchivesPage() {
   return <div className="page-stack archives-page">
     <Link className="back-link" to="/operations"><ArrowLeft aria-hidden="true" size={15} />{t("navigation.operations")}</Link>
     <PageHeader title={t("archive.title")} />
-    <FilterBar appliedFilters={appliedFilters} hasFilters={appliedFilters.length > 0} onClear={() => setParams({})} onRemoveFilter={(key) => setParams(removeListFilter(params, key))} primary={<><Field label={t("filter.endpointIds")}><input aria-describedby="endpoint-id-help" onChange={(event) => setParams(updateParams(params, { endpointIds: event.target.value }))} placeholder="1001, 1002" value={rawEndpointIds} /><small id="endpoint-id-help">{t("archive.endpointHelp")}</small></Field><Field label={t("filter.from")}><ArchiveDateTimeInput dateLocale={dateLocale} onCommit={(value) => setParams(updateParams(params, { from: value }))} timestamp={from} /></Field><Field label={t("filter.to")}><ArchiveDateTimeInput dateLocale={dateLocale} onCommit={(value) => setParams(updateParams(params, { to: value }))} timestamp={to} /></Field></>} />
+    <FilterBar appliedFilters={appliedFilters} hasFilters={appliedFilters.length > 0} onClear={() => setParams({})} onRemoveFilter={(key) => setParams(removeListFilter(params, key))} primary={<><Field label={t("filter.endpointIds")}><input aria-describedby="endpoint-id-help" onChange={(event) => setParams(updateParams(params, { endpointIds: event.target.value }))} placeholder="1001, 1002" value={rawEndpointIds} /><small id="endpoint-id-help">{t("archive.endpointHelp")}</small></Field><ArchiveDateTimeField dateLocale={dateLocale} label={t("filter.from")} onCommit={(value) => setParams(updateParams(params, { from: value }))} timestamp={from} /><ArchiveDateTimeField dateLocale={dateLocale} label={t("filter.to")} onCommit={(value) => setParams(updateParams(params, { to: value }))} timestamp={to} /></>} />
     <ArchiveReadinessLedger endpointCount={endpointIds.length} from={from} hasCriteria={hasCriteria} ready={ready} to={to} />
     {hasCriteria ? <QueryFeedback error={result.error} fetching={result.isFetching} hasData={Boolean(result.data)} invalid={invalid} invalidMessage={t("archive.chooseRangeDescription")} onRetry={() => void result.refetch()} pending={result.isPending && ready} refetchError={result.isRefetchError} rows={7} /> : null}
     {ready && result.data ? <ArchiveLifecycleBoard items={result.data.data.items} /> : null}
@@ -45,24 +46,51 @@ export function ArchivesPage() {
   </div>;
 }
 
-function ArchiveDateTimeInput({ dateLocale, onCommit, timestamp }: { dateLocale: string; onCommit: (value: string | null) => void; timestamp: string }) {
+function ArchiveDateTimeField({ dateLocale, label, onCommit, timestamp }: { dateLocale: string; label: string; onCommit: (value: string | null) => void; timestamp: string }) {
   if (dateLocale !== "en-US") {
-    return <input lang={dateLocale} onChange={(event) => onCommit(event.target.value ? utcFromLocal(event.target.value) : null)} type="datetime-local" value={timestamp ? localDateTimeValue(timestamp) : ""} />;
+    return <Field label={label}><input lang={dateLocale} onChange={(event) => onCommit(event.target.value ? utcFromLocal(event.target.value) : null)} type="datetime-local" value={timestamp ? localDateTimeValue(timestamp) : ""} /></Field>;
   }
 
-  const commit = (value: string) => onCommit(utcFromArchiveText(value));
-  return <input
+  return <EnglishArchiveDateTimeField key={timestamp || "empty"} label={label} onCommit={onCommit} timestamp={timestamp} />;
+}
+
+function EnglishArchiveDateTimeField({ label, onCommit, timestamp }: { label: string; onCommit: (value: string | null) => void; timestamp: string }) {
+  const { t } = useI18n();
+  const errorId = useId();
+  const [invalid, setInvalid] = useState(false);
+  const commit = (value: string) => {
+    if (!value.trim()) {
+      setInvalid(false);
+      onCommit(null);
+      return;
+    }
+    const parsed = utcFromArchiveText(value);
+    if (!parsed) {
+      setInvalid(true);
+      return;
+    }
+    setInvalid(false);
+    onCommit(parsed);
+  };
+
+  return <label className={`field ${invalid ? "invalid" : ""}`}>
+    <span>{label}</span>
+    <input
+    aria-describedby={invalid ? errorId : undefined}
+    aria-invalid={invalid || undefined}
     defaultValue={timestamp ? localDateTimeValue(timestamp).replace("T", " ") : ""}
     inputMode="numeric"
-    key={timestamp || "empty"}
     lang="en-US"
     onBlur={(event) => commit(event.currentTarget.value)}
+    onChange={() => setInvalid(false)}
     onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
-    pattern="\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}"
+    pattern={"\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}"}
     placeholder="YYYY-MM-DD HH:mm"
     title="YYYY-MM-DD HH:mm"
     type="text"
-  />;
+    />
+    {invalid ? <small className="field-error" id={errorId}>{t("archive.invalidDateTime")}</small> : null}
+  </label>;
 }
 
 function utcFromArchiveText(value: string): string | null {
