@@ -702,10 +702,10 @@ Case 2 dark를 기본 semantic token으로 유지하고 같은 역할 이름의 
 - Desktop rail: 54px
 - Desktop top bar: 58px
 - Main shell: `min-height:100dvh`
-- Main content는 viewport 내부에서 독립 scroll한다.
+- Main content는 document flow에서 내용 높이만큼 확장하며 세로 page scroll은 browser document 하나가 소유한다.
 - Overview desktop: 목적별 고정 CSS grid, 12px gap
 - Overview 기본 배치: full-width EDR State strip 다음에 4개 KPI 행
-- Panel은 고정 높이가 필요할 때 내부만 scroll하며 page 전체와 중첩 scroll을 최소화한다.
+- Panel은 table, payload, dialog처럼 경계가 명확한 경우에만 내부 scroll을 사용하며 AppShell main과 browser document의 중첩 세로 scroll은 만들지 않는다.
 
 ### Responsive
 
@@ -721,7 +721,7 @@ Case 2 dark를 기본 semantic token으로 유지하고 같은 역할 이름의 
 
 ### AppShell
 
-- **Structure**: navigation rail/top navigation, global bar, optional filter bar, scrollable main.
+- **Structure**: sticky navigation rail/top bar, global bar, optional filter bar, document-flow main.
 - **Identity**: Overview root top bar는 breadcrumb와 visible page title을 반복하지 않고 `VITE_SERVICE_NAME`을 표시한다. 값이 없으면 임시 fallback `EDR Console`을 사용한다. 다른 route는 breadcrumb와 page title을 유지한다.
 - **States**: route active, compact responsive, loading auth.
 - **Accessibility**: `nav` landmark, current route는 `aria-current="page"`, icon button에는 visible tooltip과 accessible name.
