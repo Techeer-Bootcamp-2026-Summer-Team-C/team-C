@@ -149,6 +149,8 @@ services:
 
   app-init:
     <<: *app-service
+    # Docker Desktop exposes the Windows bind-mounted runtime files as root-owned.
+    user: "0:0"
     environment:
       <<: *app-environment
       EDR_ALLOW_CHMOD_EPERM: "1"

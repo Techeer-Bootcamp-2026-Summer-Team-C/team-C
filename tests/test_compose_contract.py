@@ -56,7 +56,9 @@ def test_local_init_permissions_are_scoped_to_bootstrap_services() -> None:
     assert cert_init["environment"]["EDR_ALLOW_CHMOD_EPERM"] == "1"
     assert cert_init["security_opt"] == ["no-new-privileges:true"]
     assert cert_init["cap_drop"] == ["ALL"]
-    assert "user" not in app_init
+    assert app_init["user"] == "0:0"
+    assert app_init["security_opt"] == ["no-new-privileges:true"]
+    assert app_init["cap_drop"] == ["ALL"]
     assert app_init["environment"]["EDR_ENV"] == "local"
     assert app_init["environment"]["EDR_ALLOW_CHMOD_EPERM"] == "1"
 
