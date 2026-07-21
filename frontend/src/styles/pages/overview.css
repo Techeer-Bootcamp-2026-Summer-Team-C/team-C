@@ -418,10 +418,13 @@
   .overview-signal-ribbon { break-inside: avoid; }
   .overview-dashboard { display: block; }
   .overview-posture-row,
-  .overview-kpi-row,
   .overview-analysis-row,
   .overview-queue-row { display: block; }
+  .overview-kpi-row { display: none !important; }
   .overview-block { break-inside: avoid; margin-bottom: var(--space-6); }
+  .risk-endpoint-ranking > li { grid-template-columns: 24px minmax(180px, 1fr) minmax(360px, .8fr); }
+  .risk-ranking-metrics { grid-template-columns: minmax(140px, 1fr) 80px 120px; }
+  .risk-ranking-metrics span { overflow: visible; text-overflow: clip; white-space: normal; }
   .detection-echarts-canvas,
   .activity-bucket-inspector,
   .chart-selected-value { display: none !important; }

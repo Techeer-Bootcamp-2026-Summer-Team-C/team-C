@@ -27,6 +27,12 @@ import { useI18n } from "../i18n/LocaleContext";
 import type { TranslationKey } from "../i18n/translations";
 import { useTheme } from "../theme/ThemeProvider";
 import { navigationDestination, navigationTimeScope } from "../lib/url";
+import {
+  collectDashboardReport,
+  DashboardReportHeader,
+  DashboardReportPreview,
+  type DashboardReportSnapshot,
+} from "../features/dashboardReport";
 import { Badge, Button, Dialog, Drawer, Popover, SelectField, Tooltip } from "./primitives";
 
 interface NavigationItem {
@@ -99,6 +105,7 @@ export function AppShell() {
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
+  const mainContentRef = useRef<HTMLElement>(null);
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const [compact, setCompact] = useState(readCompactNavigation);
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
@@ -106,6 +113,7 @@ export function AppShell() {
   const [localeError, setLocaleError] = useState(false);
   const [search, setSearch] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
+  const [reportSnapshot, setReportSnapshot] = useState<DashboardReportSnapshot>(() => collectDashboardReport(null));
   const [navigationTime, setNavigationTime] = useState(() => navigationTimeScope(location.search) ?? "timePreset=LATEST_24H");
   const breadcrumbs = buildBreadcrumbs(location.pathname, t);
   const pageTitleText = breadcrumbs.at(-1)?.label ?? t("navigation.console");
@@ -147,6 +155,22 @@ export function AppShell() {
     if (/^[1-9]\d*$/.test(value)) query.set("endpointId", value);
     else query.set("processName", value);
     navigate(`/events?${query.toString()}`);
+  }
+
+  function openReport(): void {
+    setReportSnapshot(collectDashboardReport(mainContentRef.current));
+    setReportOpen(true);
+  }
+
+  function printReport(): void {
+    const previousTitle = document.title;
+    const date = reportSnapshot.generatedAt.toISOString().slice(0, 10);
+    document.title = `${SERVICE_NAME} - ${pageTitleText} - ${date}`;
+    try {
+      window.print();
+    } finally {
+      document.title = previousTitle;
+    }
   }
 
   return (
@@ -213,13 +237,23 @@ export function AppShell() {
                 <small>{auth.user?.loginId}</small>
               </div>
               <div className="account-actions">
-                <Button onClick={() => setReportOpen(true)} type="button" variant="ghost"><Printer aria-hidden="true" size={17} />{t("report.openAria")}</Button>
+                <Button onClick={openReport} type="button" variant="ghost"><Printer aria-hidden="true" size={17} />{t("report.openAria")}</Button>
                 <Button onClick={() => auth.logout()} type="button" variant="ghost"><LogOut aria-hidden="true" size={17} />{t("navigation.logout")}</Button>
               </div>
             </Popover>
           </div>
         </header>
-        <main className="main-content" id="main-content" tabIndex={-1}>
+        <main className="main-content" id="main-content" ref={mainContentRef} tabIndex={-1}>
+          {reportOpen ? <DashboardReportHeader
+            dateLocale={dateLocale}
+            locale={locale}
+            pageTitle={pageTitleText}
+            pathname={location.pathname}
+            search={location.search}
+            snapshot={reportSnapshot}
+            userName={auth.user?.name}
+            userRole={auth.user?.role}
+          /> : null}
           <Suspense fallback={<div aria-label={t("common.loading")} className="route-loading" role="status"><span />{t("common.loading")}</div>}>
             <Outlet />
           </Suspense>
@@ -227,18 +261,17 @@ export function AppShell() {
         <Dialog
           actions={<>
             <Button onClick={() => setReportOpen(false)} type="button" variant="ghost">{t("report.cancel")}</Button>
-            <Button onClick={() => window.print()} type="button"><Printer aria-hidden="true" size={16} />{t("report.printSave")}</Button>
+            <Button onClick={printReport} type="button"><Printer aria-hidden="true" size={16} />{t("report.printSave")}</Button>
           </>}
           closeLabel={t("report.close")}
-          eyebrow="BROWSER REPORT"
           onClose={() => setReportOpen(false)}
           open={reportOpen}
           title={t("report.snapshot", { page: pageTitleText })}
         >
-          <p>{t("report.description")}</p>
+          <DashboardReportPreview locale={locale} snapshot={reportSnapshot} />
           <dl className="report-details">
             <div><dt>{t("report.page")}</dt><dd>{location.pathname}</dd></div>
-            <div><dt>{t("report.generated")}</dt><dd>{new Date().toLocaleString(dateLocale)}</dd></div>
+            <div><dt>{t("report.generated")}</dt><dd>{reportSnapshot.generatedAt.toLocaleString(dateLocale)}</dd></div>
             <div><dt>{t("report.userRole")}</dt><dd>{auth.user?.role}</dd></div>
           </dl>
         </Dialog>
