@@ -1096,7 +1096,7 @@ const korean: Partial<Record<TranslationKey, string>> = {
   "overview.alertVolume": "Alert 발생량",
   "overview.incidentActivity": "Incident 활동",
   "overview.endpointRisk": "Endpoint Risk",
-  "overview.fleetDistribution": "Fleet 분포",
+  "overview.fleetDistribution": "전체 Endpoint 현황",
   "overview.fleetDistributionSubtitle": "Endpoint Risk와 현재 Sensor Health",
   "overview.reportedEndpoints": "보고된 Endpoint {count}개",
   "overview.reportedRiskSnapshots": "Risk 스냅샷 {count}개",
