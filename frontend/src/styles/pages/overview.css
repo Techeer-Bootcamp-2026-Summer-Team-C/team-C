@@ -60,7 +60,7 @@
 .overview-signal-ribbon {
   min-width: 0;
   display: grid;
-  grid-template-columns: 190px minmax(0, 1fr);
+  grid-template-columns: 210px minmax(0, 1fr);
   align-items: stretch;
   overflow: hidden;
   background: var(--surface-shell);

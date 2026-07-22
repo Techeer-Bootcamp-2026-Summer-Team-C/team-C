@@ -615,12 +615,16 @@ Overview에 Response guidance summary를 유지하는 경우 현재 Dashboard DT
 ### 9.7 Intelligence — `확정`
 
 - MITRE는 tactic·technique matrix와 선택 Inspector 구성
+- MITRE count는 severity가 아니므로 card fill이나 border에 red heat를 사용하지 않는다. code와 name은 가로 읽기 흐름을 유지하고 긴 명칭은 단어 단위로 줄바꿈한다.
 - egress는 graph와 table fallback을 함께 제공
 - desktop Egress Topology는 `Legend | Graph | Selected context` 구조를 사용하고 좁은 화면에서는 세로로 재배치
 - Endpoint node, target node와 edge의 alert/observed 상태를 color, label, line style로 함께 구분
 - node·edge 선택 상태와 연결된 Event·Alert를 명확히 표시하고 graph 아래 evidence table의 같은 row를 강조
 - edge detail은 protocol, Event count, Alert count, last observed time만 사용하며 현재 데이터에 없는 bytesOut을 추정하지 않음
-- node가 많을 때 Top-N, 검색, filter를 제공
+- 기본 내장 Graph는 Top-N 10과 correlation 관계 10개로 제한하고, Top-N 25/50은 큰 화면 Dialog로 전환해 탐색한다. Table은 전체 계약 행을 유지한다.
+- Incident, Egress Topology, IP/Domain correlation Graph는 같은 `큰 화면` affordance를 제공하고 Dialog에서 Legend, Graph, Selected context와 선택 상태를 함께 유지한다.
+- Egress Graph는 Public Suffix List의 등록 가능 Domain 기준으로 둘 이상의 형제 Subdomain을 묶는다. 그룹 Node에서 정확한 Host를 펼치거나 다시 묶을 수 있으며 IP와 Evidence Table의 원본 Target은 변경하지 않는다.
+- node가 많을 때 Top-N, 검색, filter와 단계적 disclosure를 제공
 
 ### 9.8 Operations와 Archives — `확정`
 
@@ -896,6 +900,8 @@ Update only the assigned Work Package status and evidence in OVERVIEW_DASHBOARD_
 | D-031 | 2026-07-18 | 대형 관제 Overview에 Endpoint Risk level과 Sensor Health의 현재 집계를 Fleet Distribution으로 복원해 Default를 10-block으로 확장하되 Custom Dashboard catalog는 기존 9개 widget으로 유지한다 | SOC Overview는 일반 요약 화면이 아니라 상시 표시되는 관제 화면이므로 추세·분포·Queue를 같은 시야에서 비교해야 한다. 서버 Endpoint Summary 집계만 사용해 가짜 추세와 원본 재집계를 피한다 | `frontend/src/features/overview/FleetDistributionPanel.tsx`, `frontend/src/features/overview/OverviewDashboard.tsx`, `frontend/src/styles/pages/overview.css` |
 | D-032 | 2026-07-20 | active Custom Dashboard를 `/` Overview에 읽기 전용으로 적용하고 명시적 Default 복원 action을 제공한다. 생성·이름·Widget geometry 변경은 계속 `/dashboards` Draft Save에서만 수행한다 | 사용자가 만든 Dashboard를 실제 운영 화면에 적용할 수 있어야 한다는 제품 결정을 반영한다. D-027의 fixed-Overview 적용 제약을 대체하되 Default의 immutable 10-block 정보 구조와 browser-local 사용자 격리는 유지한다 | `frontend/src/features/overviewLayout/OverviewDashboardWorkspace.tsx`, `frontend/src/styles/pages/overview-layout.css` |
 | D-033 | 2026-07-22 | AppShell의 세로 page scroll은 browser document 하나가 소유하고 `main` 내부 세로 scroll을 제거한다 | 긴 Overview에서 browser와 main scrollbar가 중첩되는 오류를 제거하면서 navigation rail과 top bar의 sticky 탐색 맥락을 유지한다 | `frontend/src/styles.css`, `frontend/src/styles/shell.css`, `docs/frontend/FRONTEND_SPEC.md` |
+| D-034 | 2026-07-22 | Intelligence MITRE card의 count 기반 red heat를 제거하고 neutral surface와 가로형 code-name hierarchy를 사용한다 | MITRE mapping count를 severity로 오인시키지 않고 긴 tactic·technique 명칭이 좁은 card에서 글자 단위로 세로 분해되는 현상을 방지한다. D-020의 red heat 표현 결정을 대체한다 | `docs/frontend/DESIGN.md`, `frontend/src/pages/IntelligencePage.tsx`, `frontend/src/styles/pages/intelligence-operations.css` |
+| D-035 | 2026-07-22 | 관계 Graph의 내장 화면 밀도를 제한하고 큰 화면 Dialog를 Incident·Topology·Correlation에 일관되게 제공하며, Topology의 형제 Subdomain은 등록 가능 Domain으로 묶되 원본 Evidence를 보존한다 | 고밀도 관계를 한 화면에 모두 노출하는 인지 부하를 줄이고 정확한 Host·IP 근거와 탐색 가능성을 동시에 유지한다 | `docs/frontend/DESIGN.md`, `docs/frontend/FRONTEND_SPEC.md`, `frontend/src/components/IncidentInvestigation.tsx`, `frontend/src/pages/IntelligencePage.tsx`, `frontend/src/features/intelligenceOperations.ts` |
 
 ## 17. 관련 문서와 코드
 

@@ -163,7 +163,7 @@ describe("list pages share the filter, table, state, and URL contract", () => {
     const cases = [
       { element: <IncidentsPage />, path: "/incidents", primary: ["Time range", "Status", "Severity"], advanced: "Endpoint ID" },
       { element: <EndpointsPage />, path: "/endpoints", primary: ["Search endpoints", "Status", "Risk level"], advanced: "Endpoint IDs" },
-      { element: <EventsPage />, path: "/events", primary: ["Time range", "Endpoint ID", "Event type"], advanced: "process Name" },
+      { element: <EventsPage />, path: "/events", primary: ["Time range", "Endpoint ID", "Event type"], advanced: "Process Name" },
     ];
     for (const item of cases) {
       const view = renderPage(item.element, item.path);
@@ -176,6 +176,10 @@ describe("list pages share the filter, table, state, and URL contract", () => {
       expect(primaryControls).toHaveLength(3);
       await userEvent.click(within(filters).getByRole("button", { name: "More filters" }));
       expect(screen.getByRole("dialog", { name: "Additional filters" })).toHaveTextContent(item.advanced);
+      if (item.path === "/events") {
+        expect(screen.getByLabelText("Remote IP")).toBeInTheDocument();
+        expect(screen.getByLabelText("DNS Query")).toBeInTheDocument();
+      }
       view.unmount();
     }
   });

@@ -88,7 +88,7 @@ function SignalRibbon({ dashboard, endpoints }: { dashboard: DashboardSummaryDto
     { icon: <ShieldAlert aria-hidden="true" size={16} />, label: t("overview.signalOpenCases"), value: dashboard.incidents.openCount, tone: "incidents" },
   ] as const;
   return <section aria-label={t("overview.signalRibbon")} className="overview-signal-ribbon">
-    <header><span aria-hidden="true" /><strong>{t("overview.signalRibbon")}</strong><small>{t("overview.backendSnapshot")}</small></header>
+    <header><span aria-hidden="true" /><strong title={t("overview.signalRibbon")}>{t("overview.signalRibbon")}</strong><small>{t("overview.backendSnapshot")}</small></header>
     <div>{signals.map((signal) => <article className={`signal-${signal.tone}`} key={signal.label}>
       {signal.icon}<span>{signal.label}</span><strong>{signal.value}</strong>
     </article>)}</div>

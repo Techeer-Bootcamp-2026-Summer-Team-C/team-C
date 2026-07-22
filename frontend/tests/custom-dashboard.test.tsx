@@ -75,6 +75,7 @@ describe("custom Overview dashboard", () => {
     const { container } = renderWorkspace();
     expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(0);
     expect(screen.getByRole("region", { name: "Dashboard controls" })).toBeInTheDocument();
+    expect(container.querySelector(".dashboard-management-catalog button")).toHaveTextContent("10");
     expect(screen.queryByRole("button", { name: "Edit dashboard" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "New dashboard" }));

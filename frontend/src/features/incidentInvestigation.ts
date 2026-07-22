@@ -84,9 +84,7 @@ export function selectionMatchesTimelineItem(
   const nodes = investigation.nodes.filter((node) => selectionNodeIds(selection, investigation).has(node.nodeId));
   const edge = selectedEdge(selection, investigation);
   return nodes.some((node) => nodeMatchesTimeline(node, item))
-    || Boolean(edge && ((edge.eventId && edge.eventId === item.eventId)
-      || (edge.alertId && edge.alertId === item.alertId)
-      || (edge.incidentId && edge.incidentId === item.incidentId)));
+    || Boolean(edge && edgeMatchesTimeline(edge, item));
 }
 
 export function selectionForTimelineItem(
@@ -112,7 +110,14 @@ export function selectedProcessPid(
 }
 
 function nodeMatchesTimeline(node: InvestigationNodeDto, item: AttackTimelineItemDto): boolean {
-  return Boolean((node.eventId && node.eventId === item.eventId)
-    || (node.alertId && node.alertId === item.alertId)
-    || (node.incidentId && node.incidentId === item.incidentId));
+  if (node.nodeType !== item.itemType) return false;
+  if (item.itemType === "EVENT") return Boolean(item.eventId && node.eventId === item.eventId);
+  if (item.itemType === "ALERT") return Boolean(item.alertId && node.alertId === item.alertId);
+  return Boolean(item.incidentId && node.incidentId === item.incidentId);
+}
+
+function edgeMatchesTimeline(edge: InvestigationEdgeDto, item: AttackTimelineItemDto): boolean {
+  if (item.itemType === "EVENT") return Boolean(item.eventId && edge.eventId === item.eventId);
+  if (item.itemType === "ALERT") return Boolean(item.alertId && edge.alertId === item.alertId);
+  return Boolean(item.incidentId && edge.incidentId === item.incidentId);
 }

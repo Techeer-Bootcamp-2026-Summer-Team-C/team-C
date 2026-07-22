@@ -151,7 +151,7 @@ export function Popover({ label, trigger, children, className = "" }: {
   </div>;
 }
 
-export function Dialog({ open, onClose, title, eyebrow, children, actions, closeLabel = "Close", className = "" }: {
+export function Dialog({ open, onClose, title, eyebrow, children, actions, closeLabel = "Close", className = "", returnFocusRef }: {
   open: boolean;
   onClose: () => void;
   title: string;
@@ -160,10 +160,11 @@ export function Dialog({ open, onClose, title, eyebrow, children, actions, close
   actions?: ReactNode;
   closeLabel?: string;
   className?: string;
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const titleId = useId();
   const panelRef = useRef<HTMLElement>(null);
-  useModalFocus(open, onClose, panelRef);
+  useModalFocus(open, onClose, panelRef, returnFocusRef);
   if (!open) return null;
   return <div className="modal-layer" onMouseDown={(event) => {
     if (event.currentTarget === event.target) onClose();

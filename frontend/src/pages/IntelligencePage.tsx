@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { Search } from "lucide-react";
-import { lazy, Suspense, useMemo, useState, type FormEvent } from "react";
+import { Maximize2, Search } from "lucide-react";
+import { lazy, Suspense, useMemo, useRef, useState, type FormEvent, type RefObject } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/endpoints";
 import { CountBars } from "../components/charts";
 import { readTimeFilter, TimeFilterFields } from "../components/filters";
-import { Badge, Button } from "../components/primitives";
+import { Badge, Button, Dialog } from "../components/primitives";
 import {
   DataTable,
   DefinitionGrid,
@@ -23,6 +23,9 @@ import {
 } from "../components/ui";
 import type { CorrelationDto, DashboardSummaryDto, EgressTopologyDto } from "../contracts";
 import {
+  CORRELATION_GRAPH_RELATIONSHIP_LIMIT,
+  CORRELATION_INLINE_RELATIONSHIP_LIMIT,
+  buildTopologyDomainView,
   correlationEdgeId,
   correlationNodeId,
   endpointNodeId,
@@ -35,6 +38,7 @@ import {
   topologyEdgeGroupId,
   topologyGraphEnabled,
   type CorrelationSelection,
+  type TopologyDomainGroup,
   type TopologySelection,
 } from "../features/intelligenceOperations";
 import { useI18n } from "../i18n/LocaleContext";
@@ -148,6 +152,8 @@ export function CorrelationWorkspace({
 export function CorrelationResult({ correlation, graphEnabled }: { correlation: CorrelationDto; graphEnabled: boolean }) {
   const { t } = useI18n();
   const [selection, setSelection] = useState<CorrelationSelection | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const expandButtonRef = useRef<HTMLButtonElement>(null);
   if (!correlation.relationships.length) return <EmptyState title={t("intelligence.noCorrelation")} message={t("intelligence.noCorrelationDescription")} />;
 
   return <>
@@ -156,13 +162,42 @@ export function CorrelationResult({ correlation, graphEnabled }: { correlation: 
       <span>{t("intelligence.relatedCount", { count: correlation.related.length })}</span>
       <span>{formatDateTime(correlation.from)} — {formatDateTime(correlation.to)}</span>
     </div>
-    <div className="topology-stage correlation-stage">
-      <aside aria-label={t("intelligence.correlationLegend")} className="topology-legend"><strong>{t("intelligence.correlationLegend")}</strong><ul><li><i className="correlation-input" />{t("intelligence.inputNode")}</li><li><i className="domain" />Domain</li><li><i className="ip" />IP</li><li><i className="live" />LIVE_DNS</li><li><i className="observed" />OBSERVED_EVENTS</li></ul><small>{t("intelligence.ptrCaveat")}</small></aside>
-      {graphEnabled ? <Suspense fallback={<Skeleton rows={8} />}><LazyCorrelationGraph correlation={correlation} label={t("intelligence.correlationGraphAria")} onSelect={setSelection} selection={selection} /></Suspense> : <div className="topology-fallback" role="status"><Badge tone="neutral">{t("intelligence.tableFallback")}</Badge><strong>{t("intelligence.correlationGraphDisabled")}</strong><p>{t("intelligence.correlationGraphDisabledDescription")}</p></div>}
-      <CorrelationInspector correlation={correlation} selection={selection} />
-    </div>
+    <CorrelationStage correlation={correlation} expandButtonRef={expandButtonRef} graphEnabled={graphEnabled} onExpand={() => setExpanded(true)} onSelect={setSelection} relationshipLimit={CORRELATION_INLINE_RELATIONSHIP_LIMIT} selection={selection} />
+    <Dialog className="graph-workspace-dialog" closeLabel={t("intelligence.closeExpandedCorrelation")} eyebrow={t("intelligence.correlationTitle")} onClose={() => setExpanded(false)} open={expanded} returnFocusRef={expandButtonRef} title={t("intelligence.expandedCorrelation")}>
+      <CorrelationStage correlation={correlation} expanded graphEnabled={graphEnabled} onSelect={setSelection} relationshipLimit={CORRELATION_GRAPH_RELATIONSHIP_LIMIT} selection={selection} />
+    </Dialog>
     <CorrelationEvidenceTable correlation={correlation} onSelect={setSelection} selection={selection} />
   </>;
+}
+
+function CorrelationStage({ correlation, expandButtonRef, expanded = false, graphEnabled, onExpand, onSelect, relationshipLimit, selection }: {
+  correlation: CorrelationDto;
+  expandButtonRef?: RefObject<HTMLButtonElement | null>;
+  expanded?: boolean;
+  graphEnabled: boolean;
+  onExpand?: () => void;
+  onSelect: (selection: CorrelationSelection) => void;
+  relationshipLimit: number;
+  selection: CorrelationSelection | null;
+}) {
+  const { t } = useI18n();
+  return <div className={expanded ? "topology-stage correlation-stage expanded" : "topology-stage correlation-stage"}>
+    <aside aria-label={t("intelligence.correlationLegend")} className="topology-legend">
+      {onExpand ? <button aria-haspopup="dialog" aria-label={t("intelligence.expandCorrelation")} className="topology-expand" onClick={onExpand} ref={expandButtonRef} type="button"><span>{t("intelligence.correlationLegend")}</span><small>{t("common.largeView")}</small><Maximize2 aria-hidden="true" size={15} /></button> : <strong>{t("intelligence.correlationLegend")}</strong>}
+      <ul><li><i className="correlation-input" />{t("intelligence.inputNode")}</li><li><i className="domain" />Domain</li><li><i className="ip" />IP</li><li><i className="live" />LIVE_DNS</li><li><i className="observed" />OBSERVED_EVENTS</li></ul><small>{t("intelligence.ptrCaveat")}</small>
+    </aside>
+    {graphEnabled ? <Suspense fallback={<Skeleton rows={8} />}><LazyCorrelationGraph
+      correlation={correlation}
+      label={t("intelligence.correlationGraphAria")}
+      onSelect={onSelect}
+      relationshipLimit={relationshipLimit}
+      scopeLabel={correlation.relationships.length > relationshipLimit
+        ? t("intelligence.correlationGraphScope", { visible: relationshipLimit, total: correlation.relationships.length })
+        : undefined}
+      selection={selection}
+    /></Suspense> : <div className="topology-fallback" role="status"><Badge tone="neutral">{t("intelligence.tableFallback")}</Badge><strong>{t("intelligence.correlationGraphDisabled")}</strong><p>{t("intelligence.correlationGraphDisabledDescription")}</p></div>}
+    <CorrelationInspector correlation={correlation} selection={selection} />
+  </div>;
 }
 
 function CorrelationInspector({ correlation, selection }: { correlation: CorrelationDto; selection: CorrelationSelection | null }) {
@@ -288,14 +323,12 @@ function MitreGroup({
   onSelect: (selection: MitreSelection) => void;
 }) {
   const { t } = useI18n();
-  const maximum = Math.max(...rows.map((row) => row.count), 0);
   return <section><h3>{label}</h3>{rows.length ? <div className="mitre-cells">{rows.map((row) => {
     const selected = selection?.type === row.type && selection.code === row.code;
-    const heat = maximum > 0 ? Math.max(1, Math.ceil((row.count / maximum) * 3)) : 0;
     return <button
       aria-label={`${row.code}, ${row.name}, ${t("intelligence.alertsCount", { count: row.count })}`}
       aria-pressed={selected}
-      className={`${selected ? "selected " : ""}heat-${heat}`.trim()}
+      className={selected ? "selected" : undefined}
       key={`${row.type}-${row.code}`}
       onClick={() => onSelect(row)}
       title={`${row.code} · ${row.name}`}
@@ -309,27 +342,81 @@ export function TopologyWorkspace({ topology, graphEnabled }: { topology: Egress
   const [search, setSearch] = useState("");
   const [limit, setLimit] = useState(10);
   const [selection, setSelection] = useState<TopologySelection | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [expandedDomains, setExpandedDomains] = useState<ReadonlySet<string>>(() => new Set());
+  const expandButtonRef = useRef<HTMLButtonElement>(null);
   const filtered = useMemo(() => filterTopology(topology, search, limit), [topology, search, limit]);
+  const domainView = useMemo(() => buildTopologyDomainView(filtered, expandedDomains), [expandedDomains, filtered]);
+  const changeLimit = (nextLimit: number) => {
+    setSelection(null);
+    setLimit(nextLimit);
+    if (nextLimit > 10) setExpanded(true);
+  };
+  const closeExpanded = () => {
+    setExpanded(false);
+    setSelection(null);
+    if (limit > 10) setLimit(10);
+  };
+  const toggleDomain = (domain: string) => setExpandedDomains((current) => {
+    const next = new Set(current);
+    if (next.has(domain)) next.delete(domain); else next.add(domain);
+    return next;
+  });
   if (!topology.edges.length) return <Panel title={t("intelligence.egressTopology")} subtitle={t("intelligence.egressSubtitle")}><EmptyState title={t("intelligence.noRelationships")} message={t("intelligence.noRelationshipsDescription")} /></Panel>;
 
   return <Panel className="topology-workspace-panel" title={t("intelligence.egressTopology")} subtitle={t("intelligence.egressSubtitle")} meta={<StatusPill value="READ ONLY" />}>
     <div className="topology-toolbar">
-      <Field label={t("intelligence.searchTopology")}><span className="search-field"><Search aria-hidden="true" size={15} /><input onChange={(event) => setSearch(event.target.value)} type="search" value={search} /></span></Field>
-      <Field label={t("intelligence.topN")}><select onChange={(event) => setLimit(Number(event.target.value))} value={limit}><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option></select></Field>
+      <Field label={t("intelligence.searchTopology")}><span className="search-field"><Search aria-hidden="true" size={15} /><input onChange={(event) => { setSearch(event.target.value); setSelection(null); }} type="search" value={search} /></span></Field>
+      <Field label={t("intelligence.topN")}><select onChange={(event) => changeLimit(Number(event.target.value))} value={limit}><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option></select></Field>
       <span className="topology-range">{formatDateTime(topology.from)} — {formatDateTime(topology.to)}</span>
     </div>
     {!filtered.edges.length ? <EmptyState title={t("intelligence.noFilteredRelationships")} message={t("intelligence.noFilteredRelationshipsDescription")} /> : <>
-      <div className="topology-stage">
-        <aside aria-label={t("intelligence.legend")} className="topology-legend"><strong>{t("intelligence.legend")}</strong><ul><li><i className="endpoint" />Endpoint</li><li><i className="target" />{t("intelligence.destination")}</li><li><i className="observed" />{t("intelligence.observedEdge")}</li></ul><small>{t("intelligence.countsNotTraffic")}</small></aside>
-        {graphEnabled ? <Suspense fallback={<Skeleton rows={8} />}><LazyTopologyGraph destinationLabel={t("intelligence.destination")} label={t("intelligence.graphAria")} onSelect={setSelection} selection={selection} topology={filtered} /></Suspense> : <div className="topology-fallback" role="status"><Badge tone="neutral">{t("intelligence.tableFallback")}</Badge><strong>{t("intelligence.graphDisabled")}</strong><p>{t("intelligence.graphDisabledDescription")}</p></div>}
-        <TopologyInspector selection={selection} topology={filtered} />
-      </div>
-      <TopologyEvidenceTable onSelect={setSelection} selection={selection} topology={filtered} />
+      <TopologyStage domainGroups={domainView.groups} evidenceTopology={filtered} expandButtonRef={expandButtonRef} expandedDomains={expandedDomains} graphEnabled={graphEnabled} onExpand={() => setExpanded(true)} onSelect={setSelection} onToggleDomain={toggleDomain} selection={selection} topology={domainView.topology} />
+      <Dialog className="graph-workspace-dialog" closeLabel={t("intelligence.closeExpandedTopology")} eyebrow={t("intelligence.egressTopology")} onClose={closeExpanded} open={expanded} returnFocusRef={expandButtonRef} title={t("intelligence.expandedTopology")}>
+        <div className="expanded-graph-toolbar">
+          <Field label={t("intelligence.topN")}><select onChange={(event) => changeLimit(Number(event.target.value))} value={limit}><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option></select></Field>
+          <span>{t("intelligence.groupedDomainCaveat")}</span>
+        </div>
+        <TopologyStage domainGroups={domainView.groups} evidenceTopology={filtered} expanded expandedDomains={expandedDomains} graphEnabled={graphEnabled} onSelect={setSelection} onToggleDomain={toggleDomain} selection={selection} topology={domainView.topology} />
+      </Dialog>
+      <TopologyEvidenceTable domainGroups={domainView.groups} graphTopology={domainView.topology} onSelect={setSelection} selection={selection} topology={filtered} />
     </>}
   </Panel>;
 }
 
-function TopologyInspector({ topology, selection }: { topology: EgressTopologyDto; selection: TopologySelection | null }) {
+function TopologyStage({ domainGroups, evidenceTopology, expandButtonRef, expanded = false, expandedDomains, graphEnabled, onExpand, onSelect, onToggleDomain, selection, topology }: {
+  domainGroups: readonly TopologyDomainGroup[];
+  evidenceTopology: EgressTopologyDto;
+  expandButtonRef?: RefObject<HTMLButtonElement | null>;
+  expanded?: boolean;
+  expandedDomains: ReadonlySet<string>;
+  graphEnabled: boolean;
+  onExpand?: () => void;
+  onSelect: (selection: TopologySelection) => void;
+  onToggleDomain: (domain: string) => void;
+  selection: TopologySelection | null;
+  topology: EgressTopologyDto;
+}) {
+  const { t } = useI18n();
+  return <div className={expanded ? "topology-stage expanded" : "topology-stage"}>
+    <aside aria-label={t("intelligence.legend")} className="topology-legend">
+      {onExpand ? <button aria-haspopup="dialog" aria-label={t("intelligence.expandTopology")} className="topology-expand" onClick={onExpand} ref={expandButtonRef} type="button"><span>{t("intelligence.legend")}</span><small>{t("common.largeView")}</small><Maximize2 aria-hidden="true" size={15} /></button> : <strong>{t("intelligence.legend")}</strong>}
+      <ul><li><i className="endpoint" />Endpoint</li><li><i className="target" />{t("intelligence.destination")}</li><li><i className="domain-group" />{t("intelligence.domainGroup")}</li><li><i className="observed" />{t("intelligence.observedEdge")}</li><li><i className="alerts" />{t("intelligence.alertBearingEdge")}</li></ul>
+      <small>{t("intelligence.countsNotTraffic")}</small><small>{t("intelligence.groupedDomainCaveat")}</small>
+    </aside>
+    {graphEnabled ? <Suspense fallback={<Skeleton rows={8} />}><LazyTopologyGraph destinationLabel={t("intelligence.destination")} domainGroupLabel={t("intelligence.domainGroup")} domainGroups={domainGroups} hostsLabel={t("intelligence.hosts")} label={t("intelligence.graphAria")} onSelect={onSelect} selection={selection} topology={topology} /></Suspense> : <div className="topology-fallback" role="status"><Badge tone="neutral">{t("intelligence.tableFallback")}</Badge><strong>{t("intelligence.graphDisabled")}</strong><p>{t("intelligence.graphDisabledDescription")}</p></div>}
+    <TopologyInspector domainGroups={domainGroups} evidenceTopology={evidenceTopology} expandedDomains={expandedDomains} onToggleDomain={onToggleDomain} selection={selection} topology={topology} />
+  </div>;
+}
+
+function TopologyInspector({ domainGroups, evidenceTopology, expandedDomains, onToggleDomain, topology, selection }: {
+  domainGroups: readonly TopologyDomainGroup[];
+  evidenceTopology: EgressTopologyDto;
+  expandedDomains: ReadonlySet<string>;
+  onToggleDomain: (domain: string) => void;
+  topology: EgressTopologyDto;
+  selection: TopologySelection | null;
+}) {
   const { t } = useI18n();
   const edgeGroup = selectedTopologyEdgeGroup(topology, selection);
   if (edgeGroup) return <Inspector description={`${edgeGroup.sourceLabel} → ${edgeGroup.target}`} title={`${edgeGroup.protocols.join(" + ")} ${t("intelligence.relationship")}`}>
@@ -341,7 +428,7 @@ function TopologyInspector({ topology, selection }: { topology: EgressTopologyDt
     ]} />
     <div className="context-links"><Link to={evidenceListUrl("events", edgeGroup, topology)}>Events</Link><Link to={evidenceListUrl("alerts", edgeGroup, topology)}>Alerts</Link></div>
   </Inspector>;
-  const edge = selectedTopologyEdge(topology, selection);
+  const edge = selectedTopologyEdge(evidenceTopology, selection);
   if (edge) return <Inspector description={`${edge.sourceLabel} → ${edge.target}`} title={`${edge.protocol} ${t("intelligence.relationship")}`}>
     <DefinitionGrid items={[
       { label: "Protocol", value: edge.protocol },
@@ -357,23 +444,51 @@ function TopologyInspector({ topology, selection }: { topology: EgressTopologyDt
       <DefinitionGrid items={[{ label: "Risk", value: endpoint.riskScore }, { label: t("filter.status"), value: endpoint.status }, { label: t("intelligence.alertCount"), value: endpoint.alertCount }]} />
       <div className="context-links"><Link to={`/endpoints/${endpoint.endpointId}`}>{t("intelligence.openEndpoint")}</Link></div>
     </Inspector>;
-    if (selection.id.startsWith("target:")) return <Inspector description={t("intelligence.observedTargetDescription")} title={selection.id.slice(7)}><DefinitionGrid items={[{ label: t("intelligence.nodeType"), value: t("intelligence.destination").toUpperCase() }, { label: t("intelligence.relationships"), value: topology.edges.filter((item) => targetNodeId(item.target) === selection.id).length }]} /></Inspector>;
+    if (selection.id.startsWith("target:")) {
+      const target = selection.id.slice(7);
+      const domainGroup = domainGroups.find((group) => group.domain === target || group.targets.includes(target));
+      const groupExpanded = domainGroup ? expandedDomains.has(domainGroup.domain) : false;
+      const selectedDomainRoot = domainGroup?.domain === target;
+      const relationships = topology.edges.filter((item) => selectedDomainRoot
+        ? item.target === domainGroup.domain || domainGroup.targets.includes(item.target)
+        : targetNodeId(item.target) === selection.id).length;
+      return <Inspector description={selectedDomainRoot ? t("intelligence.groupedDomainDescription") : t("intelligence.observedTargetDescription")} title={target}>
+        <DefinitionGrid items={[
+          { label: t("intelligence.nodeType"), value: selectedDomainRoot ? t("intelligence.domainGroup").toUpperCase() : t("intelligence.destination").toUpperCase() },
+          { label: t("intelligence.relationships"), value: relationships },
+          ...(selectedDomainRoot && domainGroup ? [{ label: t("intelligence.hostCount"), value: domainGroup.targets.length }] : []),
+        ]} />
+        {selectedDomainRoot && domainGroup ? <ul className="domain-group-targets">{domainGroup.targets.map((item) => <li key={item}><code>{item}</code></li>)}</ul> : null}
+        {domainGroup ? <Button onClick={() => onToggleDomain(domainGroup.domain)} type="button" variant="ghost">{groupExpanded ? t("intelligence.collapseSubdomains", { domain: domainGroup.domain }) : t("intelligence.showSubdomains", { count: domainGroup.targets.length })}</Button> : null}
+      </Inspector>;
+    }
   }
   return <Inspector description={t("intelligence.topologySelectPrompt")} title={t("intelligence.selectedContext")}><EmptyState title={t("intelligence.nothingSelected")} message={t("intelligence.topologySelectPrompt")} /></Inspector>;
 }
 
-function TopologyEvidenceTable({ topology, selection, onSelect }: { topology: EgressTopologyDto; selection: TopologySelection | null; onSelect: (selection: TopologySelection) => void }) {
+function TopologyEvidenceTable({ domainGroups, graphTopology, topology, selection, onSelect }: {
+  domainGroups: readonly TopologyDomainGroup[];
+  graphTopology: EgressTopologyDto;
+  topology: EgressTopologyDto;
+  selection: TopologySelection | null;
+  onSelect: (selection: TopologySelection) => void;
+}) {
   const { t } = useI18n();
+  const selectedGraphGroup = selectedTopologyEdgeGroup(graphTopology, selection);
+  const selectedDomainGroup = domainGroups.find((group) => group.domain === selectedGraphGroup?.target);
   return <DataTable className="relationship-evidence-table" label={t("intelligence.relationships")}><thead><tr><th scope="col">{t("intelligence.source")}</th><th scope="col">{t("intelligence.destination")}</th><th scope="col">Protocol</th><th scope="col">Events</th><th scope="col">Alerts</th><th scope="col">{t("intelligence.lastObserved")}</th></tr></thead><tbody>{topology.edges.map((edge) => {
     const id = topologyEdgeId(edge.endpointId, edge.target, edge.protocol);
     const selected = (selection?.kind === "EDGE" && selection.id === id)
-      || (selection?.kind === "EDGE_GROUP" && selection.id === topologyEdgeGroupId(edge.endpointId, edge.target));
+      || (selection?.kind === "EDGE_GROUP" && selection.id === topologyEdgeGroupId(edge.endpointId, edge.target))
+      || Boolean(selectedGraphGroup
+        && edge.endpointId === selectedGraphGroup.endpointId
+        && (selectedDomainGroup?.targets.includes(edge.target) ?? edge.target === selectedGraphGroup.target));
     return <tr className={selected ? "selected-row" : undefined} key={id}><td><button aria-pressed={selected} className="evidence-select" onClick={() => onSelect({ kind: "EDGE", id })} type="button">{edge.sourceLabel}</button></td><td><code>{edge.target}</code></td><td>{edge.protocol}</td><td><Link to={evidenceListUrl("events", edge, topology)}>{edge.eventCount}</Link></td><td><Link to={evidenceListUrl("alerts", edge, topology)}>{edge.alertCount}</Link></td><td>{formatDateTime(edge.lastSeenAt)}</td></tr>;
   })}</tbody></DataTable>;
 }
 
 function evidenceListUrl(route: "events" | "alerts", edge: { endpointId: number }, topology: EgressTopologyDto): string {
-  const query = new URLSearchParams({ from: topology.from, to: topology.to });
-  query.set(route === "events" ? "endpointIds" : "endpointId", String(edge.endpointId));
+  const query = new URLSearchParams({ timePreset: "CUSTOM", from: topology.from, to: topology.to });
+  query.set("endpointId", String(edge.endpointId));
   return `/${route}?${query.toString()}`;
 }

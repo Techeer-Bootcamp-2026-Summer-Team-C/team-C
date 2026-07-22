@@ -1,5 +1,5 @@
 import { Maximize2 } from "lucide-react";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useRef, useState, type RefObject } from "react";
 import { Link } from "react-router-dom";
 import type {
   IncidentInvestigationDto,
@@ -40,6 +40,7 @@ export function IncidentInvestigation({
 }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
+  const expandButtonRef = useRef<HTMLButtonElement>(null);
   const localizedInvestigation = {
     ...investigation,
     nodes: investigation.nodes.map((node) => ({ ...node, label: detectionTitle(t, node.label) })),
@@ -54,19 +55,20 @@ export function IncidentInvestigation({
       <StatusPill value={warning.code} /><span>{investigationWarning(t, warning.code, warning.message)}</span>{warning.code === "ARCHIVE_NOT_READY" ? <Link to="/operations/archives">{t("error.archiveAction")}</Link> : null}
     </li>)}</ul> : null}
     <Panel className="investigation-panel" title={t("incident.investigation")} subtitle={t("incident.investigationSubtitle")}>
-      <InvestigationStage counts={counts} graphEnabled={graphEnabled} investigation={localizedInvestigation} onExpand={() => setExpanded(true)} onSelect={onSelect} selection={selection} showGraph={showGraph} />
+      <InvestigationStage counts={counts} expandButtonRef={expandButtonRef} graphEnabled={graphEnabled} investigation={localizedInvestigation} onExpand={() => setExpanded(true)} onSelect={onSelect} selection={selection} showGraph={showGraph} />
       <div className="investigation-evidence-table">
         <EvidenceTable investigation={localizedInvestigation} onSelect={onSelect} selection={selection} />
       </div>
     </Panel>
-    <Dialog className="investigation-dialog" closeLabel={t("incident.closeExpandedInvestigation")} eyebrow={t("incident.investigation")} onClose={() => setExpanded(false)} open={expanded} title={t("incident.expandedInvestigation")}>
+    <Dialog className="investigation-dialog" closeLabel={t("incident.closeExpandedInvestigation")} eyebrow={t("incident.investigation")} onClose={() => setExpanded(false)} open={expanded} returnFocusRef={expandButtonRef} title={t("incident.expandedInvestigation")}>
       <InvestigationStage counts={counts} expanded graphEnabled={graphEnabled} investigation={localizedInvestigation} onSelect={onSelect} selection={selection} showGraph={showGraph} />
     </Dialog>
   </div>;
 }
 
-function InvestigationStage({ counts, expanded = false, graphEnabled, investigation, onExpand, onSelect, selection, showGraph }: {
+function InvestigationStage({ counts, expandButtonRef, expanded = false, graphEnabled, investigation, onExpand, onSelect, selection, showGraph }: {
   counts: ReadonlyMap<(typeof NODE_TYPES)[number], number>;
+  expandButtonRef?: RefObject<HTMLButtonElement | null>;
   expanded?: boolean;
   graphEnabled: boolean;
   investigation: IncidentInvestigationDto;
@@ -78,7 +80,7 @@ function InvestigationStage({ counts, expanded = false, graphEnabled, investigat
   const { t } = useI18n();
   return <div className={expanded ? "investigation-stage expanded" : "investigation-stage"}>
     <aside aria-label={t("incident.observedNodes")} className="investigation-legend">
-      {onExpand ? <button aria-haspopup="dialog" aria-label={t("incident.expandObservedNodes")} className="investigation-expand" onClick={onExpand} type="button"><span>{t("incident.observedNodes")}</span><Maximize2 aria-hidden="true" size={15} /></button> : <strong>{t("incident.observedNodes")}</strong>}
+      {onExpand ? <button aria-haspopup="dialog" aria-label={t("incident.expandObservedNodes")} className="investigation-expand" onClick={onExpand} ref={expandButtonRef} type="button"><span>{t("incident.observedNodes")}</span><small>{t("common.largeView")}</small><Maximize2 aria-hidden="true" size={15} /></button> : <strong>{t("incident.observedNodes")}</strong>}
       <ul>{NODE_TYPES.map((type) => <li key={type}><i className={`legend-${type.toLowerCase()}`} /><span>{humanize(type)}</span><b>{counts.get(type)}</b></li>)}</ul>
       <div><span>{t("incident.edges")}</span><b>{investigation.edgeCount}</b></div>
     </aside>

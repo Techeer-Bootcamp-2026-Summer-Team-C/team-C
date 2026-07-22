@@ -9,6 +9,7 @@ import type {
   StorageStatus,
   TopologyEdgeDto,
 } from "../contracts";
+import { getDomain } from "tldts";
 
 export type TopologySelection =
   | { kind: "NODE"; id: string }
@@ -27,9 +28,22 @@ export interface TopologyEdgeGroup {
   edges: TopologyEdgeDto[];
 }
 
+export interface TopologyDomainGroup {
+  domain: string;
+  targets: string[];
+}
+
+export interface TopologyDomainView {
+  topology: EgressTopologyDto;
+  groups: TopologyDomainGroup[];
+}
+
 export type CorrelationSelection =
   | { kind: "NODE"; id: string }
   | { kind: "EDGE"; id: string };
+
+export const CORRELATION_GRAPH_RELATIONSHIP_LIMIT = 20;
+export const CORRELATION_INLINE_RELATIONSHIP_LIMIT = 10;
 
 export type PipelineStageId = "COLLECTION" | "DETECTION" | "STORAGE";
 
@@ -93,6 +107,50 @@ export function groupTopologyEdges(topology: Pick<EgressTopologyDto, "edges">): 
   return [...groups.values()].map((group) => ({ ...group, protocols: group.protocols.slice().sort() }));
 }
 
+export function registrableDomainForTarget(target: string): string | null {
+  return getDomain(target.trim().replace(/\.$/, ""), { allowPrivateDomains: true });
+}
+
+export function buildTopologyDomainView(
+  topology: EgressTopologyDto,
+  expandedDomains: ReadonlySet<string> = new Set(),
+): TopologyDomainView {
+  const targetsByDomain = new Map<string, Set<string>>();
+  for (const edge of topology.edges) {
+    const domain = registrableDomainForTarget(edge.target);
+    if (!domain) continue;
+    const targets = targetsByDomain.get(domain) ?? new Set<string>();
+    targets.add(edge.target);
+    targetsByDomain.set(domain, targets);
+  }
+
+  const groups: TopologyDomainGroup[] = [...targetsByDomain.entries()]
+    .filter(([, targets]) => targets.size > 1)
+    .map(([domain, targets]) => ({ domain, targets: [...targets].sort() }))
+    .sort((left, right) => left.domain.localeCompare(right.domain));
+  const groupByTarget = new Map(groups.flatMap((group) => group.targets.map((target) => [target, group.domain] as const)));
+  const edges = new Map<string, TopologyEdgeDto>();
+
+  for (const edge of topology.edges) {
+    const domain = groupByTarget.get(edge.target);
+    const target = domain && !expandedDomains.has(domain) ? domain : edge.target;
+    const id = topologyEdgeId(edge.endpointId, target, edge.protocol);
+    const current = edges.get(id);
+    if (!current) {
+      edges.set(id, { ...edge, target });
+      continue;
+    }
+    current.eventCount += edge.eventCount;
+    current.alertCount += edge.alertCount;
+    if (Date.parse(edge.lastSeenAt) > Date.parse(current.lastSeenAt)) current.lastSeenAt = edge.lastSeenAt;
+  }
+
+  return {
+    topology: { ...topology, edges: [...edges.values()].sort(compareTopologyEdges) },
+    groups,
+  };
+}
+
 export function endpointNodeId(endpointId: number): string {
   return `endpoint:${endpointId}`;
 }
@@ -107,6 +165,25 @@ export function correlationNodeId(valueType: "IP" | "DOMAIN", value: string): st
 
 export function correlationEdgeId(edge: CorrelationRelationshipDto): string {
   return `correlation-edge:${edge.relation}:${edge.sourceType}:${edge.sourceValue}:${edge.targetType}:${edge.targetValue}`;
+}
+
+export function correlationGraphRelationships(
+  correlation: Pick<CorrelationDto, "inputType" | "inputValue" | "relationships">,
+  limit = CORRELATION_GRAPH_RELATIONSHIP_LIMIT,
+): CorrelationRelationshipDto[] {
+  const inputId = correlationNodeId(correlation.inputType, correlation.inputValue);
+  return correlation.relationships
+    .map((edge, index) => ({
+      edge,
+      index,
+      inputConnected: [
+        correlationNodeId(edge.sourceType, edge.sourceValue),
+        correlationNodeId(edge.targetType, edge.targetValue),
+      ].includes(inputId),
+    }))
+    .sort((left, right) => Number(right.inputConnected) - Number(left.inputConnected) || left.index - right.index)
+    .slice(0, Math.max(1, limit))
+    .map(({ edge }) => edge);
 }
 
 export function selectedCorrelationRelationship(
