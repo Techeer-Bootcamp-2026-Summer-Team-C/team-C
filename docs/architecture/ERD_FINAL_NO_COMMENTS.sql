@@ -103,6 +103,7 @@ CREATE TABLE `ingest_metadata` (
   `restored_at` DATETIME NULL,
   `restore_expires_at` DATETIME NULL,
   `last_error` TEXT NULL,
+  `partition_deleted_at` DATETIME NULL,
   `created_at` DATETIME NOT NULL,
   `updated_at` DATETIME NOT NULL,
   `is_delete` TINYINT(1) NOT NULL DEFAULT 0,

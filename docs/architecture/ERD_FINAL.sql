@@ -103,6 +103,7 @@ CREATE TABLE `ingest_metadata` (
   `restored_at` DATETIME NULL COMMENT 'RestoreObject 임시 복원 완료 시각',
   `restore_expires_at` DATETIME NULL COMMENT '7일 임시 복원 만료 시각',
   `last_error` TEXT NULL COMMENT '마지막 Archive 또는 복원 오류',
+  `partition_deleted_at` DATETIME NULL COMMENT '검증된 Archive 보존 후 공유 ClickHouse 날짜 Partition 삭제 완료 시각',
   `created_at` DATETIME NOT NULL COMMENT '생성 시각',
   `updated_at` DATETIME NOT NULL COMMENT '수정 시각',
   `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '소프트 삭제 여부',

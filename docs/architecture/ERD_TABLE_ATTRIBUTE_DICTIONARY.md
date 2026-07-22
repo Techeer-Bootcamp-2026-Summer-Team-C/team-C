@@ -2,7 +2,7 @@
 
 ## 1. 문서 목적
 
-이 문서는 ERDCloud 업로드 파일 `ERD_FINAL.sql`과 `ERD_FINAL_NO_COMMENTS.sql`의 12개 테이블·201개 속성을 설명하는 데이터 사전이다. ERDCloud DDL은 importer 호환을 위해 MySQL 계열 타입으로 표현하지만, 아래 속성 표의 타입은 실제 실행 저장소인 SQLite, PostgreSQL, ClickHouse 타입을 기준으로 한다.
+이 문서는 ERDCloud 업로드 파일 `ERD_FINAL.sql`과 `ERD_FINAL_NO_COMMENTS.sql`의 12개 테이블·202개 속성을 설명하는 데이터 사전이다. ERDCloud DDL은 importer 호환을 위해 MySQL 계열 타입으로 표현하지만, 아래 속성 표의 타입은 실제 실행 저장소인 SQLite, PostgreSQL, ClickHouse 타입을 기준으로 한다.
 
 ## 2. 전체 테이블 구성
 
@@ -14,13 +14,13 @@
 | PostgreSQL | `endpoints` | 17 | Endpoint와 Agent 상태 |
 | PostgreSQL | `agent_auth_keys` | 11 | Agent mTLS 인증서 이력 |
 | PostgreSQL | `audit_logs` | 10 | Control-plane 변경 감사 |
-| PostgreSQL | `ingest_metadata` | 19 | HOT/archive 위치와 restore lifecycle |
+| PostgreSQL | `ingest_metadata` | 20 | HOT/archive 위치와 restore lifecycle |
 | PostgreSQL | `alerts` | 22 | Rule 및 MITRE ATT&CK 탐지 결과 |
 | PostgreSQL | `incidents` | 15 | 시간 구간 기반 Alert correlation |
 | PostgreSQL | `incident_alerts` | 7 | Incident와 Alert의 N:M 연결 |
 | PostgreSQL | `users` | 11 | Dashboard 로그인, RBAC와 UI 언어 설정 |
 | PostgreSQL | `user_dashboard_layouts` | 8 | JWT 사용자별 Dashboard 위젯 layout |
-| **합계** | **12개** | **201** | |
+| **합계** | **12개** | **202** | |
 
 관계의 중심은 `endpoints → alerts → incident_alerts ← incidents`다. `agent_auth_keys`와 `ingest_metadata`는 `endpoints`를, `user_dashboard_layouts`는 `users`를 참조한다. SQLite와 ClickHouse 테이블은 PostgreSQL과 저장소가 다르므로 물리 FK를 만들지 않고 ID로 논리 연결한다.
 
@@ -140,7 +140,7 @@
 
 ### 3.6 `ingest_metadata`
 
-목적: Endpoint/UTC DAY bucket별 data 위치와 단순 archive/restore 상태를 관리한다. 속성 수는 19개다. Endpoint 한 대의 하루치 event를 Parquet object 하나로 저장하고 ClickHouse 물리 partition은 같은 UTC 날짜의 모든 Endpoint가 공유한다. Archive row는 복원 중에도 `storage_backend=S3`, `storage_class=GLACIER_FLEXIBLE_RETRIEVAL`, 동일 `storage_path`를 유지하며 `restore_expires_at` 이후 `EXPIRED`가 된다.
+목적: Endpoint/UTC DAY bucket별 data 위치와 단순 archive/restore 상태를 관리한다. 속성 수는 20개다. Endpoint 한 대의 하루치 event를 Parquet object 하나로 저장하고 ClickHouse 물리 partition은 같은 UTC 날짜의 모든 Endpoint가 공유한다. Archive row는 복원 중에도 `storage_backend=S3`, `storage_class=GLACIER_FLEXIBLE_RETRIEVAL`, 동일 `storage_path`를 유지하며 `restore_expires_at` 이후 `EXPIRED`가 된다.
 
 HOT `storage_path`는 Endpoint별 ClickHouse 논리 조회 locator이고 S3 `storage_path`는 실제 object key다.
 
@@ -162,6 +162,7 @@ HOT `storage_path`는 Endpoint별 ClickHouse 논리 조회 locator이고 S3 `sto
 | `restored_at` | `TIMESTAMPTZ NULL` | 임시 복원 완료 시각 |
 | `restore_expires_at` | `TIMESTAMPTZ NULL` | 7일 임시 복원 만료 시각 |
 | `last_error` | `TEXT NULL` | 마지막 archive 또는 restore 오류 |
+| `partition_deleted_at` | `TIMESTAMPTZ NULL` | 검증된 archive 보존 후 공유 ClickHouse 날짜 partition 삭제 완료 시각 |
 | `created_at` | `TIMESTAMPTZ` | catalog row 생성 시각 |
 | `updated_at` | `TIMESTAMPTZ` | lifecycle 상태 마지막 갱신 시각 |
 | `is_delete` | `BOOLEAN` | HOT bucket 폐기 또는 catalog 소프트 삭제 표시 |
