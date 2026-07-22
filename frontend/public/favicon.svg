@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <rect width="32" height="32" rx="5" fill="#171c22"/>
-  <path d="M16 5 25 9v6c0 6-3.8 10-9 12-5.2-2-9-6-9-12V9l9-4Z" stroke="#56d0e6" stroke-width="2"/>
-  <path d="m11.5 16 3 3 6-7" stroke="#eef2f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 36" fill="none">
+  <path class="evidence-ring" fill="#667085" fill-rule="evenodd" d="M33.19 8.81A13 13 0 1 1 17.9 6.52L19.31 9.17A10 10 0 1 0 31.07 10.93Z"/>
+  <path class="evidence-aperture" fill="#2563e9" d="M16.23 6 18 4.23 25.77 12 24 13.77Z"/>
+  <circle class="evidence-focus" cx="24" cy="18" r="3" fill="#2563e9"/>
 </svg>

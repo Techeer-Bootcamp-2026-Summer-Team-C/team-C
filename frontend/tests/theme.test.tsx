@@ -50,9 +50,15 @@ describe("theme lifecycle", () => {
   });
 
   it("keeps the bootstrap key, dark default, light class, and meta colors aligned with the Provider", () => {
+    const favicon = readFileSync("public/favicon.svg", "utf8");
     const html = readFileSync("index.html", "utf8");
     const tokens = readFileSync("src/styles/tokens.css", "utf8");
     expect(html).toContain("<title>OWLBY</title>");
+    expect(favicon).toContain('class="evidence-ring"');
+    expect(favicon).toContain('class="evidence-aperture"');
+    expect(favicon).toContain('class="evidence-focus"');
+    expect(favicon).toContain('fill-rule="evenodd"');
+    expect(favicon).not.toContain("M16 5 25 9v6");
     expect(html).toContain('const key = "edr.theme"');
     expect(html).toContain('let theme = "dark"');
     expect(html).toContain('root.classList.toggle("light", theme === "light")');

@@ -30,6 +30,8 @@ it("guards a protected route, returns after login, and restores the session afte
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><MemoryRouter initialEntries={["/alerts?status=OPEN"]}><Routes><Route path="/login" element={<LoginPage />} /><Route path="/alerts" element={<RequireAuth><h1>Alert destination</h1></RequireAuth>} /></Routes></MemoryRouter></AuthProvider></ThemeProvider></QueryClientProvider>);
   expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+  expect(document.querySelector(".login-mark .service-mark-ring")).toBeInTheDocument();
+  expect(document.querySelector(".login-mark .lucide-shield")).not.toBeInTheDocument();
   await userEvent.type(screen.getByLabelText("Login ID"), "analyst");
   await userEvent.type(screen.getByLabelText("Password"), "test-password");
   await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
