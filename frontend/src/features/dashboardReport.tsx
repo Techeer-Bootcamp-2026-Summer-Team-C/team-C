@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { SERVICE_NAME } from "../config/branding";
 import type { Locale } from "../i18n/types";
 
 export type DashboardReportScope = "selected-period" | "current-snapshot" | "current-view";
@@ -106,7 +107,7 @@ const REPORT_COPY = {
     appliedScope: "Applied filters",
     currentSnapshot: "Current snapshot",
     currentView: "Current view",
-    documentType: "EDR OPERATIONS REPORT",
+    documentType: `${SERVICE_NAME} OPERATIONS REPORT`,
     empty: "No structured evidence is rendered on this page.",
     executiveSummary: "Executive Summary",
     generated: "Generated",
@@ -122,7 +123,7 @@ const REPORT_COPY = {
     appliedScope: "적용 필터",
     currentSnapshot: "현재 스냅샷",
     currentView: "현재 화면",
-    documentType: "EDR 운영 리포트",
+    documentType: `${SERVICE_NAME} 운영 리포트`,
     empty: "현재 화면에 구조화된 결과가 없습니다.",
     executiveSummary: "Executive Summary",
     generated: "생성 시각",
@@ -203,7 +204,7 @@ export function DashboardReportDocument({ dateLocale, locale, snapshot }: {
 }) {
   const copy = REPORT_COPY[locale];
   const filters = buildReportFilters(snapshot.search, locale);
-  const reportId = `EDR-${snapshot.generatedAt.toISOString().replace(/[-:]/g, "").slice(0, 15)}Z`;
+  const reportId = `${SERVICE_NAME}-${snapshot.generatedAt.toISOString().replace(/[-:]/g, "").slice(0, 15)}Z`;
   const overviewBreakdowns = snapshot.breakdowns.slice(0, 2);
   const remainingBreakdowns = snapshot.breakdowns.slice(2);
   const remainingRecordGroups = [...snapshot.recordGroups];
@@ -302,7 +303,7 @@ function ReportOverview({ breakdowns, dateLocale, filters, locale, reportId, sna
   const metricGroups = scopes.map((scope) => ({ scope, values: snapshot.metrics.filter((metric) => metric.scope === scope) })).filter((group) => group.values.length);
 
   return <>
-    <header className="report-masthead"><div><span>{copy.documentType}</span><h1>{snapshot.pageTitle}</h1></div><strong>EDR Console</strong></header>
+    <header className="report-masthead"><div><span>{copy.documentType}</span><h1>{snapshot.pageTitle}</h1></div><strong>{SERVICE_NAME}</strong></header>
     <dl className="report-metadata">
       <div><dt>{copy.reportId}</dt><dd>{reportId}</dd></div>
       <div><dt>{copy.generated}</dt><dd>{snapshot.generatedAt.toLocaleString(dateLocale)}</dd></div>

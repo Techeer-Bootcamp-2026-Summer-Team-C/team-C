@@ -22,7 +22,7 @@ import { Suspense, type FormEvent, useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import type { UserLocale } from "../contracts";
-import { SERVICE_MARK, SERVICE_NAME } from "../config/branding";
+import { SERVICE_NAME } from "../config/branding";
 import { useI18n } from "../i18n/LocaleContext";
 import type { TranslationKey } from "../i18n/translations";
 import { useTheme } from "../theme/ThemeProvider";
@@ -287,7 +287,13 @@ function PrimaryNavigation({ compact, mobile = false, onNavigate, onToggleCompac
   const compactLabel = compact ? t("navigation.expand") : t("navigation.compact");
   return <div className="navigation-content" id={mobile ? "mobile-primary-navigation" : undefined}>
     <div className="brand-mark" aria-label={SERVICE_NAME}>
-      <span aria-hidden="true">{SERVICE_MARK}</span>
+      <span className="service-mark" aria-hidden="true">
+        <svg viewBox="0 0 48 36">
+          <path className="service-mark-ring" d="M34 7a13 13 0 1 1-16-1" />
+          <path className="service-mark-aperture" d="m18 6 6 6" />
+          <circle className="service-mark-focus" cx="24" cy="18" r="3" />
+        </svg>
+      </span>
       <div><strong title={SERVICE_NAME}>{SERVICE_NAME}</strong></div>
     </div>
     <nav aria-label={t("navigation.primary")}>
@@ -322,7 +328,7 @@ function PrimaryNavigation({ compact, mobile = false, onNavigate, onToggleCompac
 function Breadcrumbs({ items, label }: { items: BreadcrumbItem[]; label: string }) {
   return <nav aria-label={label} className="breadcrumbs">
     <ol>
-      <li><Link to="/">EDR</Link></li>
+      <li><Link to="/">{SERVICE_NAME}</Link></li>
       {items.map((item, index) => <li key={`${item.label}-${item.to ?? "current"}`}>
         {item.to && index < items.length - 1 ? <Link to={item.to}>{item.label}</Link> : <span aria-current={index === items.length - 1 ? "page" : undefined}>{item.label}</span>}
       </li>)}

@@ -52,6 +52,7 @@ describe("theme lifecycle", () => {
   it("keeps the bootstrap key, dark default, light class, and meta colors aligned with the Provider", () => {
     const html = readFileSync("index.html", "utf8");
     const tokens = readFileSync("src/styles/tokens.css", "utf8");
+    expect(html).toContain("<title>OWLBY</title>");
     expect(html).toContain('const key = "edr.theme"');
     expect(html).toContain('let theme = "dark"');
     expect(html).toContain('root.classList.toggle("light", theme === "light")');

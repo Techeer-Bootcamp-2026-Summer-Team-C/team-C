@@ -26,8 +26,12 @@ describe("application shell foundation", () => {
   it("shows the service name instead of duplicate Overview breadcrumbs on the root route", async () => {
     renderRootShell();
     expect(await screen.findByRole("heading", { name: "Overview destination" })).toBeInTheDocument();
-    expect(screen.getAllByLabelText("EDR Console")).not.toHaveLength(0);
-    expect(screen.getByText("EDR Console", { selector: ".top-title > strong" })).toBeInTheDocument();
+    expect(screen.getAllByLabelText("OWLBY")).not.toHaveLength(0);
+    expect(document.querySelector(".service-mark-ring")).toBeInTheDocument();
+    expect(document.querySelector(".service-mark-aperture")).toBeInTheDocument();
+    expect(document.querySelector(".service-mark-focus")).toBeInTheDocument();
+    expect(screen.queryByText("OW", { selector: ".brand-mark > span" })).not.toBeInTheDocument();
+    expect(screen.getByText("OWLBY", { selector: ".top-title > strong" })).toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "Breadcrumb" })).not.toBeInTheDocument();
   });
 
@@ -92,6 +96,7 @@ describe("application shell foundation", () => {
     expect(screen.getByText("ADMIN")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Open printable report" }));
     expect(screen.getByRole("dialog", { name: "Archives snapshot" })).toBeInTheDocument();
+    expect(screen.getAllByText("OWLBY OPERATIONS REPORT").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Close report" })).toHaveFocus();
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "Archives snapshot" })).not.toBeInTheDocument();

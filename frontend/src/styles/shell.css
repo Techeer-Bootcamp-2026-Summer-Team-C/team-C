@@ -1,3 +1,7 @@
+/* Hallmark · component: Evidence O service mark · genre: modern-minimal · theme: OWLBY existing tokens
+ * states: static · dark · light · expanded · compact · drawer
+ * contrast: pass · pre-emit critique: P5 H4 E5 S5 R5 V4
+ */
 .app-shell,
 .app-shell.compact {
   min-height: 100dvh;
@@ -40,21 +44,26 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.brand-mark > span {
+.service-mark {
   width: 38px;
   height: 38px;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  color: var(--text-link);
-  background: var(--accent-muted);
-  border: 1px solid var(--text-link);
-  border-radius: var(--radius-control);
-  font-family: var(--font-mono);
-  font-size: var(--type-meta);
-  font-weight: var(--weight-semibold);
-  letter-spacing: .08em;
+  color: var(--text-primary);
 }
+
+.service-mark svg { width: 32px; height: 24px; overflow: visible; }
+.service-mark-ring,
+.service-mark-aperture {
+  fill: none;
+  stroke-linecap: square;
+  stroke-width: 2.5;
+  vector-effect: non-scaling-stroke;
+}
+.service-mark-ring { stroke: currentColor; }
+.service-mark-aperture { stroke: var(--accent-primary); }
+.service-mark-focus { fill: var(--accent-primary); }
 
 .brand-mark > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .brand-mark strong { overflow: hidden; color: var(--text-primary); font-family: var(--font-brand); font-size: var(--type-service-name); font-weight: var(--weight-semibold); line-height: 1.25; letter-spacing: .18em; text-transform: uppercase; text-overflow: ellipsis; white-space: nowrap; }

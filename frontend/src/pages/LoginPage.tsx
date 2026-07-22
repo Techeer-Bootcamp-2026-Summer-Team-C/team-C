@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { Button, TextField } from "../components/primitives";
+import { SERVICE_NAME } from "../config/branding";
 
 export function LoginPage() {
   const auth = useAuth();
@@ -35,9 +36,9 @@ export function LoginPage() {
 
   return (
     <main className="login-layout">
-      <section className="login-context" aria-label="EDR Console">
+      <section className="login-context" aria-label={SERVICE_NAME}>
         <div className="login-mark"><Shield aria-hidden="true" size={25} /></div>
-        <span>EDR / SINGLE TENANT</span>
+        <span>{SERVICE_NAME} / SINGLE TENANT</span>
         <h1>Move from signal to evidence.</h1>
         <p>Review current risk, collection health, Alerts, Incidents, Endpoint state, and event evidence from one operational console.</p>
         <ol aria-label="EDR evidence flow" className="login-signal-route">

@@ -695,3 +695,30 @@ Bundle 변화:
 - Bundle 변화: 새 runtime dependency와 JS 변화 없음. production `OverviewPage` 113.83 kB / 34.78 kB gzip, route-local `DetectionActivityPanel` 500.42 kB / 171.17 kB gzip이며 기존 ECharts chunk warning은 유지된다.
 - 남은 위험: 전체 test의 source-boundary 1건은 위 사용자 소유 중복 파일 때문에 계속 실패한다. 이번 CSS 오류 교정과 직접 관련된 미해결 사항은 없다.
 - 다음 Package: 없음.
+
+### REF-16. OWLBY 서비스 identity 적용
+
+- 상태: 완료
+- 입력: 팀이 확정한 서비스명 `OWLBY`.
+- 범위: AppShell Sidebar·Overview 상단·breadcrumb, Login, browser title, printable report와 관련 접근성 이름·테스트·현재 Frontend 문서. EDR domain 용어, `edr.*` browser storage key, `EDR_*` runtime 환경변수, Backend API title과 배포 식별자는 변경하지 않는다.
+- 설계 판단: 서비스명은 더 이상 미확정 build-time 값이 아니므로 `frontend/src/config/branding.ts`의 단일 상수 `OWLBY`로 고정했다. 한 단어 이름의 자동 첫 글자 `O` 대신 식별 가능한 compact mark `OW`를 명시했다.
+- 변경 파일: `frontend/src/config/branding.ts`, `frontend/src/components/AppShell.tsx`, `frontend/src/pages/LoginPage.tsx`, `frontend/src/features/dashboardReport.tsx`, `frontend/src/i18n/translations.ts`, `frontend/src/styles/shell.css`, `frontend/index.html`, 관련 test, `docs/frontend/DESIGN.md`, `docs/frontend/FRONTEND_SPEC.md`, 이 실행계획.
+- 자동 검증: 관련 `app-shell-foundation`, `locale`, `theme`, `dashboard-report` 4 files / 25 tests passed. 전체 `npm run test` 26 files / 160 tests, `npm run typecheck`, `npm run lint`, `npm run build`, `git diff --check`가 모두 passed했다.
+- 브라우저 QA: local Vite의 Login을 1440×900과 360×800에서 확인했다. 두 viewport 모두 browser title `OWLBY`, region accessible name `OWLBY`, visible `OWLBY / SINGLE TENANT`가 일치하고 document horizontal overflow와 label overflow가 없으며 console warning/error는 0건이다. Backend가 중지되어 인증 후 AppShell 실화면은 열지 않았고, AppShell·compact mark·print report는 위 렌더 테스트로 검증했다.
+- Bundle 변화: 새 runtime dependency 없음.
+- 남은 위험: 인증된 AppShell의 live Backend 연결 시각 QA는 이번 identity-only 변경에서 수행하지 않았다.
+- 다음 Package: 없음.
+
+### REF-17. OWLBY Evidence O compact symbol 적용
+
+- 상태: 완료
+- 입력: boxed `OW` mark 대신 B안 `Evidence O` symbol을 사용한다는 사용자 결정.
+- 범위: AppShell expanded·compact·mobile drawer의 service symbol, 관련 style·render test와 현재 Frontend identity 문서. `OWLBY` wordmark, route, API, auth, theme와 navigation 동작은 변경하지 않는다.
+- 설계 판단: 문자 `OW`와 accent box를 제거하고 열린 O ring, 대각선 aperture, 중앙 evidence point로 구성한 32×24px inline SVG를 사용한다. ring은 `--text-primary`, aperture와 point만 `--accent-primary`를 사용하며 새 color, mascot, shield, background, border와 motion은 추가하지 않는다.
+- 변경 파일: `frontend/src/components/AppShell.tsx`, `frontend/src/styles/shell.css`, `frontend/src/config/branding.ts`, `frontend/tests/app-shell-foundation.test.tsx`, `docs/frontend/DESIGN.md`, `docs/frontend/FRONTEND_SPEC.md`, 이 실행계획.
+- 자동 검증: 관련 `app-shell-foundation` 1 file / 7 tests와 전체 `npm run test` 26 files / 160 tests가 passed했다. `npm run typecheck`, `npm run lint`, `npm run build`, `UV_CACHE_DIR=/tmp/team-c-uv-cache-owlby-mark npm run openapi:check`, `git diff --check`도 passed했으며 수정 후 production build에는 CSS syntax warning이 없다.
+- 브라우저 QA: local mock API로 인증한 `/alerts`에서 expanded·compact navigation을 확인했다. dark에서 ring `rgb(245, 245, 246)`, accent `rgb(37, 99, 233)`, light에서 ring `rgb(16, 24, 40)`, accent `rgb(23, 92, 211)`로 semantic token이 적용됐다. mark background는 transparent, border는 none, old `OW` text는 0건이다. 360·768px drawer와 1024·1440px desktop에서 symbol이 노출되고 document horizontal overflow는 없다.
+- 시각 증거: `owlby-evidence-o-expanded.jpg`, `owlby-evidence-o-compact.jpg`를 검증 세션 출력으로 보존했다.
+- Bundle 변화: 새 runtime dependency 없음. SVG path와 CSS만 변경했다.
+- 남은 위험: symbol 자체의 상표 검색과 법적 검토는 제품 naming·identity 작업 범위 밖이다.
+- 다음 Package: 없음.

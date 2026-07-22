@@ -1,4 +1,4 @@
-# EDR Console Frontend Design
+# OWLBY Frontend Design
 
 - 문서 상태: Approved v3.1
 - 작성일: 2026-07-15
@@ -188,6 +188,7 @@ PLATFORM
 
 ### 6.1 분위기 — `확정`
 
+- 서비스 identity는 `OWLBY`, compact symbol은 box 없는 `Evidence O`를 사용한다. 열린 O ring은 관찰 범위를, 대각선 aperture와 중앙 point는 evidence focus를 의미하며 accent는 두 요소에만 제한한다.
 - 전문적인 EDR investigation console
 - near-black neutral dark를 기본값으로 하고 동일한 semantic 역할을 유지하는 light theme를 함께 제공하는 운영 UI
 - royal blue는 primary action과 active navigation에, 밝은 blue는 keyboard focus에 사용하고 violet은 Detection Activity의 Alerts series에만 제한
@@ -902,6 +903,8 @@ Update only the assigned Work Package status and evidence in OVERVIEW_DASHBOARD_
 | D-033 | 2026-07-22 | AppShell의 세로 page scroll은 browser document 하나가 소유하고 `main` 내부 세로 scroll을 제거한다 | 긴 Overview에서 browser와 main scrollbar가 중첩되는 오류를 제거하면서 navigation rail과 top bar의 sticky 탐색 맥락을 유지한다 | `frontend/src/styles.css`, `frontend/src/styles/shell.css`, `docs/frontend/FRONTEND_SPEC.md` |
 | D-034 | 2026-07-22 | Intelligence MITRE card의 count 기반 red heat를 제거하고 neutral surface와 가로형 code-name hierarchy를 사용한다 | MITRE mapping count를 severity로 오인시키지 않고 긴 tactic·technique 명칭이 좁은 card에서 글자 단위로 세로 분해되는 현상을 방지한다. D-020의 red heat 표현 결정을 대체한다 | `docs/frontend/DESIGN.md`, `frontend/src/pages/IntelligencePage.tsx`, `frontend/src/styles/pages/intelligence-operations.css` |
 | D-035 | 2026-07-22 | 관계 Graph의 내장 화면 밀도를 제한하고 큰 화면 Dialog를 Incident·Topology·Correlation에 일관되게 제공하며, Topology의 형제 Subdomain은 등록 가능 Domain으로 묶되 원본 Evidence를 보존한다 | 고밀도 관계를 한 화면에 모두 노출하는 인지 부하를 줄이고 정확한 Host·IP 근거와 탐색 가능성을 동시에 유지한다 | `docs/frontend/DESIGN.md`, `docs/frontend/FRONTEND_SPEC.md`, `frontend/src/components/IncidentInvestigation.tsx`, `frontend/src/pages/IntelligencePage.tsx`, `frontend/src/features/intelligenceOperations.ts` |
+| D-036 | 2026-07-22 | 서비스 identity를 `OWLBY`, compact mark를 `OW`로 확정하고 사용자 노출 브랜드 표기를 단일 Frontend 상수에 연결한다 | 확정된 서비스명을 AppShell, Login, browser title과 printable report에 일관되게 적용하면서 EDR domain 용어와 내부 storage·runtime 식별자를 보존한다 | `frontend/src/config/branding.ts`, `frontend/src/components/AppShell.tsx`, `frontend/src/pages/LoginPage.tsx`, `frontend/src/features/dashboardReport.tsx`, `frontend/index.html` |
+| D-037 | 2026-07-22 | D-036의 boxed `OW` compact mark를 box 없는 `Evidence O` symbol로 대체한다 | 중복 이니셜 배지보다 OWLBY 이름과 evidence focus를 연결하는 단일 symbol이 expanded·compact navigation 모두에서 더 명확하다. 새 색상이나 mascot을 추가하지 않고 기존 text·accent token만 사용한다 | `frontend/src/components/AppShell.tsx`, `frontend/src/styles/shell.css`, `frontend/src/config/branding.ts` |
 
 ## 17. 관련 문서와 코드
 

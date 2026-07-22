@@ -36,7 +36,7 @@ const english = {
   "navigation.intelligence": "Intelligence",
   "navigation.operations": "Operations",
   "navigation.archives": "Archives",
-  "navigation.console": "EDR Console",
+  "navigation.console": "OWLBY",
   "navigation.investigationPath": "Investigation path",
   "navigation.pathSignal": "Signal",
   "navigation.pathEvidence": "Evidence",

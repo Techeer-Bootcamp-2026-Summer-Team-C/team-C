@@ -119,7 +119,7 @@ describe("authenticated locale lifecycle", () => {
 
     renderShell("/login");
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
-    expect(screen.getByText("EDR / SINGLE TENANT")).toBeInTheDocument();
+    expect(screen.getByText("OWLBY / SINGLE TENANT")).toBeInTheDocument();
     expect(document.documentElement).toHaveClass("light");
     await userEvent.type(screen.getByLabelText("Login ID"), "analyst");
     await userEvent.type(screen.getByLabelText("Password"), "password");
