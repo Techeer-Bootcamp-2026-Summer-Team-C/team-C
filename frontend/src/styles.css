@@ -385,18 +385,6 @@ td small, td code, .table-primary code { display: block; margin-top: var(--space
   .donut { width: 150px; margin: 0 auto; }
 }
 
-@media print {
-  :root { color-scheme: dark; }
-  :root.light { color-scheme: light; }
-  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .nav-rail, .top-bar, .filter-bar, .modal-backdrop, .page-actions, .skip-link { display: none !important; }
-  .app-shell, .app-shell.compact { display: block; min-height: auto; }
-  .console-shell { display: block; height: auto; }
-  .main-content { overflow: visible; padding: 0; }
-  .page-stack { max-width: none; }
-  .panel, .kpi-card { break-inside: avoid; }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }

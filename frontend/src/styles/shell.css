@@ -216,15 +216,6 @@
 .account-actions .button { width: 100%; justify-content: flex-start; }
 
 .main-content { min-width: 0; overflow: visible; padding: var(--space-12); }
-.report-details { display: grid; gap: var(--space-5); margin: var(--space-8) 0 0; }
-.report-details div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--border-subtle); }
-.report-details dt { color: var(--text-tertiary); font-size: var(--type-meta); font-weight: var(--weight-medium); }
-.report-details dd { min-width: 0; margin: 0; color: var(--text-primary); overflow-wrap: anywhere; }
-.print-report-only { display: none; }
-.report-preview-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); margin-top: var(--space-8); }
-.report-preview-stats > div { min-width: 0; padding: var(--space-6); background: var(--surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); }
-.report-preview-stats span { display: block; color: var(--text-tertiary); font-size: var(--type-meta); }
-.report-preview-stats strong { display: block; margin-top: var(--space-3); color: var(--text-primary); font-size: var(--type-body); overflow-wrap: anywhere; }
 
 @media (max-width: 1240px) {
   .top-bar { grid-template-columns: minmax(140px, 190px) minmax(200px, 1fr) auto; }
@@ -264,105 +255,6 @@
   .session-summary { gap: var(--space-2); }
   .locale-control { display: none; }
   .main-content { padding: var(--space-6); }
-}
-
-@media print {
-  @page {
-    size: A4 landscape;
-    margin: 12mm 12mm 14mm;
-    @bottom-left { content: "EDR Console"; color: #667482; font-size: 7pt; }
-    @bottom-right { content: "Page " counter(page) " / " counter(pages); color: #667482; font-size: 7pt; }
-  }
-
-  :root,
-  :root.light {
-    color-scheme: light !important;
-    --surface-canvas: #ffffff;
-    --surface-shell: #ffffff;
-    --surface-panel: #ffffff;
-    --surface-raised: #ffffff;
-    --surface-inset: #f4f6f8;
-    --surface-hover: #eef2f6;
-    --border-default: #aeb7c2;
-    --border-panel: #c7cfd8;
-    --border-subtle: #dce2e8;
-    --border-strong: #788491;
-    --text-primary: #17202a;
-    --text-secondary: #44515e;
-    --text-tertiary: #667482;
-    --text-link: #173f8f;
-    --shadow-panel-edge: none;
-  }
-
-  html,
-  body,
-  #root { min-height: auto; color: var(--text-primary); background: #ffffff !important; }
-  body { font-size: 9pt; line-height: 1.42; }
-  .app-shell,
-  .app-shell.compact { display: block; min-height: 0; background: #ffffff; }
-  .console-shell { display: block; height: auto; min-height: 0; overflow: visible; }
-  .main-content { overflow: visible; padding: 0; }
-  .print-report-only { display: block !important; }
-  .drawer-layer,
-  .modal-layer,
-  .mobile-nav-menu { display: none !important; }
-
-  .print-report-header { margin-bottom: 8mm; color: var(--text-primary); }
-  .print-report-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 12mm; padding-bottom: 5mm; border-bottom: 2px solid var(--accent-primary); }
-  .print-report-title span { color: var(--accent-primary); font-family: var(--font-mono); font-size: 7.5pt; font-weight: var(--weight-bold); letter-spacing: .12em; }
-  .print-report-title h1 { margin-top: 1.5mm; font-size: 24pt; line-height: 1.12; letter-spacing: -.025em; }
-  .print-report-title > strong { color: var(--text-secondary); font-size: 9pt; letter-spacing: .06em; }
-  .print-report-metadata { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 5mm 0 0; border-top: 1px solid var(--border-subtle); border-left: 1px solid var(--border-subtle); }
-  .print-report-metadata > div { display: grid; grid-template-columns: 30mm minmax(0, 1fr); gap: 4mm; padding: 2.5mm 3mm; border-right: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
-  .print-report-metadata dt,
-  .print-report-scope dt { color: var(--text-tertiary); font-size: 7.5pt; font-weight: var(--weight-semibold); text-transform: uppercase; }
-  .print-report-metadata dd,
-  .print-report-scope dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
-  .print-report-scope,
-  .print-report-summary { margin-top: 5mm; }
-  .print-report-scope h2,
-  .print-report-summary > h2 { margin-bottom: 2.5mm; font-size: 11pt; }
-  .print-report-scope > dl { display: flex; flex-wrap: wrap; gap: 2mm; margin: 0; }
-  .print-report-scope > dl > div { display: flex; gap: 2mm; padding: 1.5mm 2.5mm; background: var(--surface-inset); border: 1px solid var(--border-subtle); border-radius: 2px; }
-  .print-report-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3mm; }
-  .print-report-metrics article { min-width: 0; padding: 3mm; border: 1px solid var(--border-panel); border-top: 2px solid var(--accent-primary); break-inside: avoid; }
-  .print-report-metrics span,
-  .print-report-metrics small { display: block; color: var(--text-secondary); }
-  .print-report-metrics strong { display: block; margin: 1mm 0; font-size: 18pt; line-height: 1; }
-  .print-report-metrics small { font-size: 7.5pt; }
-  .print-report-sections { display: grid; grid-template-columns: 36mm minmax(0, 1fr); gap: 4mm; margin-top: 4mm; padding-top: 3mm; border-top: 1px solid var(--border-subtle); }
-  .print-report-sections h3 { font-size: 9pt; }
-  .print-report-sections p { color: var(--text-secondary); }
-  .print-report-header > footer { margin-top: 6mm; padding: 3mm 0; border-top: 2px solid var(--text-primary); border-bottom: 1px solid var(--border-subtle); }
-  .print-report-header > footer span { font-size: 11pt; font-weight: var(--weight-bold); }
-
-  .page-stack { gap: 4mm; }
-  .page-header { padding: 0 0 3mm; border-bottom: 1px solid var(--border-subtle); }
-  .page-header h1 { font-size: 15pt; }
-  .page-header p { max-width: none; }
-  .panel,
-  .kpi-card,
-  .detail-ledger-section,
-  .edr-state-summary { color: var(--text-primary); background: #ffffff !important; box-shadow: none !important; break-inside: avoid-page; }
-  .panel { border-color: var(--border-panel); }
-  .panel-heading { padding: 3mm 4mm; background: var(--surface-inset); border-bottom-color: var(--border-subtle); }
-  .panel-body { overflow: visible; }
-  .table-scroll { overflow: visible; border-color: var(--border-panel); }
-  table { width: 100%; table-layout: auto; font-size: 7.5pt; }
-  thead { display: table-header-group; }
-  tr { break-inside: avoid; }
-  th,
-  td { padding: 1.8mm 2mm; color: var(--text-primary); border-color: var(--border-subtle); }
-  th { background: var(--surface-inset); }
-  a { color: inherit; text-decoration: none; }
-  .pagination,
-  [role="tablist"],
-  .workflow-actions,
-  .topology-toolbar,
-  .correlation-toolbar { display: none !important; }
-  .sort-header { min-height: 0; padding: 0; color: inherit; background: transparent; border: 0; }
-  .sort-header > span:last-child { display: none; }
-  .kpi-arrow { display: none; }
 }
 
 .route-loading {
