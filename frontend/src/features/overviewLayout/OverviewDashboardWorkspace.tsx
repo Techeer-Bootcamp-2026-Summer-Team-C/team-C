@@ -31,6 +31,7 @@ import "react-grid-layout/css/styles.css";
 import { Button, Dialog, SelectField, TextField } from "../../components/primitives";
 import {
   OverviewDashboard,
+  OVERVIEW_BLOCK_IDS,
   OverviewSignalRibbon,
   OverviewWidget,
   type OverviewDashboardProps,
@@ -210,11 +211,11 @@ function DashboardManagementHome({ activeDashboard, activeDashboardId, dashboard
   props: OverviewDashboardProps;
 }) {
   const { t } = useI18n();
-  const widgetCount = activeDashboard?.widgets.length ?? OVERVIEW_WIDGET_DEFINITIONS.length;
+  const widgetCount = activeDashboard?.widgets.length ?? OVERVIEW_BLOCK_IDS.length;
   return <section aria-label={t("dashboard.managerAria")} className="dashboard-management-home">
     <aside className="dashboard-management-catalog">
       <header><span>{t("dashboard.selectorLabel")}</span><strong>{t("dashboard.layoutCatalog")}</strong></header>
-      <button aria-pressed={activeDashboardId === DEFAULT_DASHBOARD_ID} className={activeDashboardId === DEFAULT_DASHBOARD_ID ? "active" : undefined} onClick={() => onSelect(DEFAULT_DASHBOARD_ID)} type="button"><span><strong>{t("dashboard.defaultName")}</strong><small>{t("dashboard.defaultFixed")}</small></span><small>{OVERVIEW_WIDGET_DEFINITIONS.length}</small></button>
+      <button aria-pressed={activeDashboardId === DEFAULT_DASHBOARD_ID} className={activeDashboardId === DEFAULT_DASHBOARD_ID ? "active" : undefined} onClick={() => onSelect(DEFAULT_DASHBOARD_ID)} type="button"><span><strong>{t("dashboard.defaultName")}</strong><small>{t("dashboard.defaultFixed")}</small></span><small>{OVERVIEW_BLOCK_IDS.length}</small></button>
       {dashboards.map((dashboard) => <button aria-pressed={activeDashboardId === dashboard.id} className={activeDashboardId === dashboard.id ? "active" : undefined} key={dashboard.id} onClick={() => onSelect(dashboard.id)} type="button"><span><strong>{dashboard.name}</strong><small>{t("dashboard.browserLocal")}</small></span><small>{dashboard.widgets.length}</small></button>)}
     </aside>
     <div className="dashboard-management-summary">

@@ -77,4 +77,16 @@ describe("WP-09 release gates", () => {
     expect(patterns).toContain(".chart-frame-fallback:not([open]) > :not(summary)");
     expect(patterns).toContain(".table-fallback:not([open]) > :not(summary)");
   });
+
+  it("keeps dense evidence and graph controls inside their desktop workspaces", () => {
+    const intelligenceStyles = readFileSync(resolve("src/styles/pages/intelligence-operations.css"), "utf8");
+    const detailStyles = readFileSync(resolve("src/styles/pages/details.css"), "utf8");
+
+    expect(intelligenceStyles).toContain(".correlation-workspace-panel .relationship-evidence-table");
+    expect(intelligenceStyles).toContain("max-height: min(640px, 65dvh)");
+    expect(intelligenceStyles).toContain("overscroll-behavior: contain");
+    expect(intelligenceStyles).toContain("position: sticky");
+    expect(detailStyles).toContain("grid-template-columns: minmax(0, 1fr) auto");
+    expect(detailStyles).toContain(".investigation-expand > span { min-width: 0; grid-column: 1 / -1; overflow-wrap: anywhere; }");
+  });
 });

@@ -9,6 +9,7 @@ import {
   incidentDetailUrl,
   incidentGraphEnabled,
   incidentQueueQuery,
+  selectionForTimelineItem,
   selectedProcessPid,
   selectionMatchesTimelineItem,
 } from "../src/features/incidentInvestigation";
@@ -52,10 +53,12 @@ describe("Incident investigation contract", () => {
     expect(onSelect).toHaveBeenCalledWith({ kind: "EDGE", id: "edge-1" });
     expect(screen.queryByRole("application", { name: "Incident investigation graph" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open Observed nodes in large view" }));
+    const expandButton = screen.getByRole("button", { name: "Open Observed nodes in large view" });
+    fireEvent.click(expandButton);
     expect(screen.getByRole("dialog", { name: "Observed nodes · expanded investigation" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Close expanded investigation" }));
     expect(screen.queryByRole("dialog", { name: "Observed nodes · expanded investigation" })).not.toBeInTheDocument();
+    expect(expandButton).toHaveFocus();
   });
 
   it("synchronizes graph context with timeline evidence and Process Tree PID", () => {
@@ -63,6 +66,26 @@ describe("Incident investigation contract", () => {
     const timeline: AttackTimelineDto = { incidentId: 1, endpointId: 1001, items: [{ itemType: "ALERT", occurredAt: NOW, title: "Encoded PowerShell", summary: "Observed alert", severity: "HIGH", eventType: null, eventId: null, alertId: 11, incidentId: 1, endpointId: 1001 }] };
     expect(selectionMatchesTimelineItem({ kind: "EDGE", id: "edge-1" }, investigation, timeline.items[0]!)).toBe(true);
     expect(selectedProcessPid({ kind: "NODE", id: "process-55" }, investigation)).toBe(55);
+  });
+
+  it("matches timeline evidence by its own identity instead of the shared Incident ID", () => {
+    const investigation = fixture({
+      nodes: [
+        node({ nodeId: "incident-1", nodeType: "INCIDENT", label: "Incident 1", incidentId: 1 }),
+        node({ nodeId: "event-1", nodeType: "EVENT", label: "powershell.exe", incidentId: 1, eventId: "event-1" }),
+        node({ nodeId: "alert-11", nodeType: "ALERT", label: "Encoded PowerShell", incidentId: 1, alertId: 11 }),
+      ],
+    });
+    const event = { itemType: "EVENT", occurredAt: NOW, title: "powershell.exe", summary: "Observed event", severity: null, eventType: "PROCESS_EXECUTION", eventId: "event-1", alertId: null, incidentId: 1, endpointId: 1001 } as const;
+    const alert = { itemType: "ALERT", occurredAt: NOW, title: "Encoded PowerShell", summary: "Observed alert", severity: "HIGH", eventType: null, eventId: "event-1", alertId: 11, incidentId: 1, endpointId: 1001 } as const;
+    const incident = { itemType: "INCIDENT", occurredAt: NOW, title: "Incident 1", summary: "Correlated evidence", severity: "HIGH", eventType: null, eventId: null, alertId: null, incidentId: 1, endpointId: 1001 } as const;
+
+    expect(selectionForTimelineItem(investigation, event)).toEqual({ kind: "NODE", id: "event-1" });
+    expect(selectionForTimelineItem(investigation, alert)).toEqual({ kind: "NODE", id: "alert-11" });
+    expect(selectionForTimelineItem(investigation, incident)).toEqual({ kind: "NODE", id: "incident-1" });
+    expect(selectionMatchesTimelineItem({ kind: "NODE", id: "event-1" }, investigation, event)).toBe(true);
+    expect(selectionMatchesTimelineItem({ kind: "NODE", id: "event-1" }, investigation, alert)).toBe(false);
+    expect(selectionMatchesTimelineItem({ kind: "NODE", id: "incident-1" }, investigation, event)).toBe(false);
   });
 
   it("lays out the full 250-node contract without dropping nodes", () => {

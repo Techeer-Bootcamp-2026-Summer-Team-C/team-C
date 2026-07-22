@@ -440,6 +440,9 @@ Archive:
 - MITRE tactic/technique, top process/domain/IP를 Dashboard 응답으로 표시한다.
 - `/dashboard/topology`의 Endpoint node와 egress edge를 읽기 전용으로 표시한다.
 - 같은 Endpoint→Target의 protocol별 edge는 graph에서 하나의 관계선으로 집약하고 protocol 목록과 합산 Event/Alert count를 Inspector에 표시한다. Semantic evidence table은 원래 protocol별 row를 그대로 유지한다.
+- Graph에서는 Public Suffix List 기준 등록 가능 Domain 아래 둘 이상의 형제 Subdomain을 하나의 Domain group으로 묶는다. Group Inspector에서 exact Host를 펼치거나 다시 묶을 수 있고 IP와 semantic evidence table의 원본 Target은 변경하지 않는다.
+- 내장 Egress Graph는 Top-N 10, 내장 correlation Graph는 관계 10개를 기본으로 한다. Egress Top-N 25/50과 correlation 최대 20개는 명시적인 큰 화면 Dialog에서 표시하고 Table은 전체 계약 행을 유지한다.
+- Incident, Egress Topology, correlation은 동일한 큰 화면 action, Escape 닫기, keyboard focus 복원과 선택 Context 동기화를 제공한다.
 - Endpoint ID repeated filter를 지원한다.
 - IP 또는 Domain을 URL query `value`로 조회하고 `/intelligence/correlate`의 Live DNS와 관찰 Event 관계를 함께 표시한다.
 - Top Domain과 Remote IP는 correlation 검색 시작점으로 사용할 수 있다.

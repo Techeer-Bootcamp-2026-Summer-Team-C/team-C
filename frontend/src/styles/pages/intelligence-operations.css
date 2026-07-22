@@ -1,3 +1,4 @@
+/* Hallmark · pre-emit critique: P5 H5 E5 S5 R4 V4 · genre: operational workbench · tone: austere · anchor: blue · macrostructure: Intelligence evidence workbench · contrast: pass (40–41) · nav: existing shell · footer: none · slop: pass (42–49) · mobile: pass (34, 49–57) */
 .intelligence-analysis-grid {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(320px, .8fr);
@@ -39,15 +40,18 @@
 .mitre-matrix > section { min-width: 0; padding: var(--space-5); border-left: 1px solid var(--border-subtle); }
 .mitre-matrix > section:first-child { border-left: 0; }
 .mitre-matrix h3 { margin-bottom: var(--space-4); color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--type-meta); letter-spacing: .08em; text-transform: uppercase; }
-.mitre-cells { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.mitre-cells { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--space-3); }
 .mitre-cells button {
   min-width: 0;
-  overflow: hidden;
   min-height: 76px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-content: start;
-  gap: var(--space-1);
+  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-areas:
+    "code name"
+    "count count";
+  align-content: center;
+  align-items: start;
+  gap: var(--space-2) var(--space-4);
   padding: var(--space-4);
   color: var(--text-primary);
   text-align: left;
@@ -56,14 +60,20 @@
   border-radius: var(--radius-control);
   cursor: pointer;
 }
-.mitre-cells button.heat-1 { background: color-mix(in srgb, var(--status-critical) 8%, var(--surface-inset)); border-color: color-mix(in srgb, var(--status-critical) 22%, var(--border-subtle)); }
-.mitre-cells button.heat-2 { background: color-mix(in srgb, var(--status-critical) 14%, var(--surface-inset)); border-color: color-mix(in srgb, var(--status-critical) 36%, var(--border-subtle)); }
-.mitre-cells button.heat-3 { background: color-mix(in srgb, var(--status-critical) 21%, var(--surface-inset)); border-color: color-mix(in srgb, var(--status-critical) 52%, var(--border-subtle)); }
-.mitre-cells button:hover,
+.mitre-cells button:hover { background: var(--surface-hover); border-color: var(--border-default); }
+.mitre-cells button:active { background: var(--surface-raised); }
 .mitre-cells button.selected { background: var(--surface-raised); border-color: var(--accent-primary); }
-.mitre-cells .mitre-code { display: block; min-width: 0; color: var(--text-link); white-space: nowrap; }
-.mitre-cells .mitre-name { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mitre-cells .mitre-count { display: block; margin-top: var(--space-2); color: var(--text-tertiary); font-size: var(--type-meta); white-space: nowrap; }
+.mitre-cells .mitre-code { grid-area: code; display: block; min-width: 0; color: var(--text-link); white-space: nowrap; }
+.mitre-cells .mitre-name {
+  grid-area: name;
+  display: block;
+  min-width: 0;
+  line-height: 1.35;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  hyphens: none;
+}
+.mitre-cells .mitre-count { grid-area: count; display: block; color: var(--text-tertiary); font-size: var(--type-meta); white-space: nowrap; }
 .mitre-matrix .state-card { min-height: 78px; padding: var(--space-5); background: transparent; border: 0; border-top: 1px solid var(--border-subtle); border-radius: 0; }
 .mitre-layout > .inspector { border-radius: 0; }
 .table-fallback { margin-top: var(--space-6); color: var(--text-secondary); }
@@ -88,6 +98,8 @@
 .correlation-summary { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-4); color: var(--text-secondary); font-size: var(--type-meta); }
 .correlation-summary span:first-child { display: flex; align-items: center; gap: var(--space-2); color: var(--text-primary); }
 .correlation-stage { margin-top: 0; }
+.correlation-graph-stack { min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.correlation-graph-scope { color: var(--text-tertiary); font-size: var(--type-meta); }
 .topology-legend i.correlation-input { border-width: 2px; border-color: var(--accent-primary); }
 .topology-legend i.domain { border-style: solid; border-color: var(--status-info); }
 .topology-legend i.ip { border-style: dashed; border-color: var(--text-tertiary); }
@@ -96,6 +108,17 @@
 .correlation-flow .react-flow__node.topology-flow-node.ip { border-style: dashed; border-color: var(--text-tertiary); }
 .correlation-flow .react-flow__node.topology-flow-node.input { border-width: 2px; border-color: var(--accent-primary); }
 .correlation-workspace-panel td .badge + .badge { margin-left: var(--space-2); }
+.correlation-workspace-panel .relationship-evidence-table {
+  max-height: min(640px, 65dvh);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.correlation-workspace-panel .relationship-evidence-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-inset);
+}
 .topology-toolbar { display: flex; align-items: flex-end; gap: var(--space-5); padding-bottom: var(--space-5); border-bottom: 1px solid var(--border-subtle); }
 .topology-toolbar .field:first-child { flex: 1; }
 .search-field { max-width: 420px; display: flex; align-items: center; gap: var(--space-3); padding-left: var(--space-4); background: var(--surface-inset); border: 1px solid var(--border-default); border-radius: var(--radius-control); }
@@ -104,30 +127,132 @@
 .topology-range { margin-left: auto; color: var(--text-tertiary); font-size: var(--type-meta); }
 .topology-stage { min-height: 420px; }
 .topology-legend { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); background: var(--surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); }
+.topology-expand {
+  width: 100%;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  color: var(--text-primary);
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.topology-expand > span { min-width: 0; overflow-wrap: anywhere; font-weight: var(--weight-semibold); }
+.topology-expand > small { color: var(--text-link); white-space: nowrap; }
+.topology-expand:hover { background: var(--surface-hover); border-color: var(--border-subtle); }
+.topology-expand:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+.topology-expand:active { background: var(--surface-raised); }
+.topology-expand:disabled { color: var(--text-disabled); background: var(--surface-disabled); cursor: not-allowed; }
 .topology-legend ul { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
 .topology-legend li { display: flex; align-items: center; gap: var(--space-3); }
 .topology-legend i { width: 16px; height: 10px; border: 1px solid var(--status-info); border-radius: 2px; }
-.topology-legend i.target { border-style: dashed; border-color: var(--text-tertiary); }
-.topology-legend i.observed { height: 2px; background: var(--status-info); border: 0; }
+.topology-legend i.target { border-color: var(--text-tertiary); }
+.topology-legend i.domain-group { border-width: 2px; border-color: var(--text-link); }
+.topology-legend i.observed { height: 0; background: transparent; border: 0; border-top: 2px dashed var(--text-tertiary); border-radius: 0; }
+.topology-legend i.alerts { height: 2px; background: var(--status-info); border: 0; border-radius: 0; }
 .topology-legend small { color: var(--text-tertiary); }
 .topology-flow { min-width: 0; min-height: 420px; overflow: hidden; background: var(--surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); }
-.topology-flow .react-flow__node.topology-flow-node { width: 180px; min-height: 64px; display: grid; place-items: center; padding: var(--space-3); color: var(--text-primary); text-align: center; background: var(--surface-panel); border: 1px solid var(--status-info); border-radius: var(--radius-control); font-size: var(--type-meta); }
-.topology-flow .react-flow__node.topology-flow-node.target { border-style: dashed; border-color: var(--text-tertiary); }
-.topology-flow .react-flow__node.topology-flow-node.selected { background: var(--surface-raised); box-shadow: 0 0 0 2px var(--accent-primary); }
-.react-flow__edge.selected .react-flow__edge-path { stroke: var(--accent-primary); stroke-width: 3; }
-.react-flow__edge-text { fill: var(--text-secondary); font-size: 11px; }
-.react-flow__edge-textbg { fill: var(--surface-inset); }
+.topology-flow.correlation-flow { min-height: 520px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-inline: contain; }
+.topology-flow.correlation-flow > .react-flow { min-width: 660px; }
+.topology-flow .react-flow__node.topology-flow-node { width: 160px; min-height: 64px; padding: var(--space-3); color: var(--text-primary); text-align: left; background: var(--surface-panel); border: 1px solid var(--border-default); border-radius: var(--radius-control); box-shadow: var(--shadow-1); font-size: var(--type-meta); }
+.topology-flow .react-flow__node.topology-flow-node.endpoint { border-left-color: var(--status-info); }
+.topology-flow .react-flow__node.topology-flow-node.target { border-left-color: var(--text-tertiary); }
+.topology-flow .react-flow__node.topology-flow-node.domain-group { border-left-width: 2px; border-left-color: var(--text-link); }
+.topology-flow .react-flow__node.topology-flow-node:hover { background: var(--surface-hover); }
+.topology-flow .react-flow__node.topology-flow-node:active { background: var(--surface-raised); }
+.topology-flow .react-flow__node.topology-flow-node:focus-visible,
+.topology-flow .react-flow__node.topology-flow-node.selected { border-color: var(--focus-ring-color); box-shadow: var(--focus-ring); }
+.topology-node-label { min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); text-align: left; }
+.topology-node-label small { color: var(--text-tertiary); font-size: var(--type-meta); letter-spacing: .08em; }
+.topology-node-label strong { display: -webkit-box; min-width: 0; overflow: hidden; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.topology-flow .react-flow__edge.topology-edge.observed-only .react-flow__edge-path { stroke: var(--text-tertiary); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.topology-flow .react-flow__edge.topology-edge.has-alerts .react-flow__edge-path { stroke: var(--status-info); stroke-width: 2; }
+.correlation-flow .react-flow__edge.correlation-edge.observed-only .react-flow__edge-path { stroke: var(--text-tertiary); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.correlation-flow .react-flow__edge.correlation-edge.live .react-flow__edge-path { stroke: var(--status-info); stroke-width: 2; }
+.topology-flow .react-flow__edge.selected .react-flow__edge-path,
+.topology-flow .react-flow__edge:focus-visible .react-flow__edge-path { stroke: var(--accent-primary); stroke-width: 2.5; stroke-dasharray: none; }
+.topology-edge-label {
+  appearance: none;
+  position: absolute;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-secondary);
+  font-family: var(--font-data);
+  font-size: var(--type-meta);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  box-shadow: 0 0 0 3px var(--surface-inset);
+  cursor: pointer;
+  pointer-events: all;
+}
+.topology-edge-label.observed-only { border-style: dashed; }
+.topology-edge-label.has-alerts,
+.topology-edge-label.live { color: var(--text-primary); border-color: var(--status-info); }
+.topology-edge-label:hover { background: var(--surface-hover); }
+.topology-edge-label:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+.topology-edge-label:disabled { color: var(--text-disabled); background: var(--surface-disabled); cursor: not-allowed; }
+.topology-edge-label:active,
+.topology-edge-label.selected { color: var(--text-primary); background: var(--surface-raised); border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--surface-inset), var(--focus-ring); }
 .topology-flow .react-flow__controls,
 .correlation-flow .react-flow__controls { overflow: hidden; background: var(--graph-control-background); border: 1px solid var(--graph-control-border); border-radius: var(--radius-control); box-shadow: none; }
 .topology-flow .react-flow__controls-button,
 .correlation-flow .react-flow__controls-button { color: var(--graph-control-foreground); background: var(--graph-control-background); border-bottom-color: var(--graph-control-border); }
-.topology-flow .react-flow__controls-button:hover,
-.correlation-flow .react-flow__controls-button:hover { background: var(--graph-control-hover); }
+.topology-flow .react-flow__controls-button:hover:not(:disabled),
+.correlation-flow .react-flow__controls-button:hover:not(:disabled) { background: var(--graph-control-hover); }
+.topology-flow .react-flow__controls-button:focus-visible,
+.correlation-flow .react-flow__controls-button:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--focus-ring-color); outline-offset: -3px; }
+.topology-flow .react-flow__controls-button:active:not(:disabled),
+.correlation-flow .react-flow__controls-button:active:not(:disabled) { background: var(--surface-inset); }
+.topology-flow .react-flow__controls-button:disabled,
+.correlation-flow .react-flow__controls-button:disabled { color: var(--text-disabled); background: var(--surface-disabled); cursor: not-allowed; }
 .topology-flow .react-flow__controls-button svg,
 .correlation-flow .react-flow__controls-button svg { fill: currentColor; }
 .topology-fallback { min-height: 420px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--space-4); padding: var(--space-8); background: var(--surface-inset); border: 1px dashed var(--border-default); border-radius: var(--radius-control); }
 .topology-fallback p { color: var(--text-secondary); }
 .context-links { display: flex; gap: var(--space-4); flex-wrap: wrap; margin-top: var(--space-5); }
+.domain-group-targets { max-height: 180px; display: flex; flex-direction: column; gap: var(--space-2); margin: var(--space-5) 0; padding: 0; overflow: auto; list-style: none; }
+.domain-group-targets code { display: block; overflow-wrap: anywhere; }
+
+.graph-workspace-dialog {
+  width: min(1600px, 100%);
+  height: calc(100dvh - 48px);
+  max-height: calc(100dvh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: var(--space-10);
+}
+.graph-workspace-dialog > .dialog-body { min-height: 0; flex: 1; display: flex; flex-direction: column; gap: var(--space-5); margin-top: var(--space-6); }
+.expanded-graph-toolbar { min-width: 0; display: flex; align-items: flex-end; gap: var(--space-5); padding-bottom: var(--space-4); border-bottom: 1px solid var(--border-subtle); }
+.expanded-graph-toolbar .field { flex: 0 0 180px; }
+.expanded-graph-toolbar > span { min-width: 0; color: var(--text-tertiary); font-size: var(--type-meta); overflow-wrap: anywhere; }
+.topology-stage.expanded {
+  min-height: 0;
+  height: 100%;
+  flex: 1;
+  grid-template-columns: 180px minmax(0, 1fr) minmax(280px, 340px);
+  overflow: hidden;
+  border: 1px solid var(--border-panel);
+  border-radius: var(--radius-panel);
+}
+.topology-stage.expanded > .topology-legend,
+.topology-stage.expanded > .inspector { height: 100%; overflow: auto; border: 0; border-radius: 0; }
+.topology-stage.expanded > .inspector { grid-column: auto; border-left: 1px solid var(--border-subtle); }
+.topology-stage.expanded > .topology-flow,
+.topology-stage.expanded .correlation-flow { height: 100%; min-height: 0 !important; overflow: hidden; border-block: 0; border-radius: 0; }
+.topology-stage.expanded .correlation-graph-stack { min-height: 0; height: 100%; }
+.topology-stage.expanded .correlation-flow { flex: 1; }
 
 .pipeline-snapshot-panel { border-color: var(--border-panel); }
 .collection-path-board { min-width: 0; margin-bottom: var(--space-6); overflow: hidden; border-block: 1px solid var(--border-subtle); }
@@ -196,13 +321,19 @@
   .mitre-layout { grid-template-columns: minmax(0, 1fr); }
 }
 
-@media (max-width: 1279px) {
+@media (max-width: 1365px) {
   .intelligence-analysis-grid { grid-template-columns: 1fr; }
   .mitre-layout { grid-template-columns: 1fr; }
   .mitre-cells { grid-template-columns: 1fr; }
   .topology-stage { grid-template-columns: minmax(140px, .35fr) minmax(0, 1.3fr); }
   .topology-stage > .inspector { grid-column: 1 / -1; }
   .archive-lifecycle { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 1079px) {
+  .topology-stage { grid-template-columns: 1fr; }
+  .topology-stage.expanded { grid-template-columns: minmax(140px, .35fr) minmax(0, 1.3fr); }
+  .topology-stage.expanded > .inspector { grid-column: 1 / -1; height: auto; max-height: 240px; border-top: 1px solid var(--border-subtle); border-left: 0; }
 }
 
 @media (max-width: 900px) {
@@ -218,6 +349,8 @@
   .correlation-toolbar { align-items: stretch; flex-direction: column; }
   .correlation-toolbar .button { width: 100%; }
   .topology-range { margin-left: 0; }
+  .topology-flow { min-height: 520px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-inline: contain; }
+  .topology-flow > .react-flow { min-width: 660px; }
 }
 
 @media (max-width: 767px) {
@@ -227,8 +360,26 @@
   .archive-lifecycle { grid-template-columns: 1fr; }
   .mitre-status-strip { grid-template-columns: 1fr; }
   .mitre-coverage-gap { grid-column: auto; }
-  .correlation-workspace-panel .panel-heading { align-items: flex-start; flex-wrap: wrap; }
-  .correlation-workspace-panel .panel-meta { text-align: left; }
+  .correlation-workspace-panel .panel-heading,
+  .topology-workspace-panel .panel-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  .correlation-workspace-panel .panel-meta,
+  .topology-workspace-panel .panel-meta {
+    width: 100%;
+    text-align: left;
+  }
+  .graph-workspace-dialog { width: 100%; height: 100dvh; max-height: 100dvh; padding: var(--space-8); border: 0; border-radius: 0; }
+  .expanded-graph-toolbar { align-items: stretch; flex-direction: column; }
+  .expanded-graph-toolbar .field { width: 100%; flex-basis: auto; }
+  .topology-stage.expanded { display: flex; flex-direction: column; overflow: auto; }
+  .topology-stage.expanded > .topology-legend,
+  .topology-stage.expanded > .inspector { height: auto; overflow: visible; }
+  .topology-stage.expanded > .inspector { border-top: 1px solid var(--border-subtle); border-left: 0; }
+  .topology-stage.expanded > .topology-flow,
+  .topology-stage.expanded .correlation-flow { min-height: 70dvh !important; flex: 0 0 70dvh; overflow-x: auto; }
 }
 
 @media print {

@@ -4,6 +4,17 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../src/auth/AuthContext";
+import {
+  correlationGraphMinHeight,
+  correlationSelectionFromElement,
+} from "../src/components/CorrelationGraph";
+import {
+  layoutTopologyEdgeLabels,
+  layoutTopologyNodes,
+  topologyEdgeVisualState,
+  topologyGraphMinHeight,
+  topologySelectionFromElement,
+} from "../src/components/TopologyGraph";
 import type {
   ArchiveBucketDto,
   CorrelationDto,
@@ -13,11 +24,16 @@ import type {
   OperationsHealthDto,
 } from "../src/contracts";
 import {
+  CORRELATION_GRAPH_RELATIONSHIP_LIMIT,
+  CORRELATION_INLINE_RELATIONSHIP_LIMIT,
   archiveLifecycleCounts,
+  buildTopologyDomainView,
   buildPipelineSnapshot,
   correlationEdgeId,
+  correlationGraphRelationships,
   filterTopology,
   groupTopologyEdges,
+  registrableDomainForTarget,
   selectedCorrelationRelationship,
   selectedTopologyEdgeGroup,
   topologyEdgeGroupId,
@@ -58,6 +74,93 @@ describe("WP-08 Intelligence, Operations, and Archives", () => {
     expect(selectedTopologyEdgeGroup(parallelTopology, selection)).toEqual(groups[0]);
   });
 
+  it("groups sibling subdomains by registrable domain without collapsing IP evidence", () => {
+    const groupedInput: EgressTopologyDto = {
+      ...topologyFixture,
+      edges: [
+        { ...topologyFixture.edges[1]!, endpointId: 1001, sourceLabel: "SOC-WIN-01", target: "api.corp.example", eventCount: 3, alertCount: 1 },
+        { ...topologyFixture.edges[1]!, endpointId: 1001, sourceLabel: "SOC-WIN-01", target: "auth.corp.example", eventCount: 5, alertCount: 2 },
+        topologyFixture.edges[0]!,
+      ],
+    };
+    const collapsed = buildTopologyDomainView(groupedInput);
+    expect(registrableDomainForTarget("auth.service.example.co.uk")).toBe("example.co.uk");
+    expect(registrableDomainForTarget("203.0.113.10")).toBeNull();
+    expect(collapsed.groups).toEqual([{ domain: "corp.example", targets: ["api.corp.example", "auth.corp.example"] }]);
+    expect(collapsed.topology.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({ endpointId: 1001, target: "corp.example", protocol: "DNS", eventCount: 8, alertCount: 3 }),
+      expect.objectContaining({ target: "203.0.113.10" }),
+    ]));
+    const expanded = buildTopologyDomainView(groupedInput, new Set(["corp.example"]));
+    expect(expanded.topology.edges.map((edge) => edge.target)).toEqual(expect.arrayContaining(["api.corp.example", "auth.corp.example", "203.0.113.10"]));
+  });
+
+  it("bounds the correlation canvas while preserving input-connected evidence first", () => {
+    const base = correlationFixture.relationships[0]!;
+    const relationships = Array.from({ length: 25 }, (_, index) => ({
+      ...base,
+      sourceValue: index === 24 ? correlationFixture.inputValue : `192.0.2.${index + 1}`,
+      targetValue: `related-${index}.example.test`,
+    }));
+    const visible = correlationGraphRelationships({ ...correlationFixture, relationships });
+    expect(visible).toHaveLength(CORRELATION_GRAPH_RELATIONSHIP_LIMIT);
+    expect(correlationGraphRelationships({ ...correlationFixture, relationships }, CORRELATION_INLINE_RELATIONSHIP_LIMIT)).toHaveLength(CORRELATION_INLINE_RELATIONSHIP_LIMIT);
+    expect(visible[0]).toMatchObject({ sourceValue: correlationFixture.inputValue, targetValue: "related-24.example.test" });
+    expect(correlationGraphMinHeight(new Map([
+      ["correlation:IP:input", { x: 0, y: 0 }],
+      ["correlation:DOMAIN:last", { x: 0, y: 900 }],
+    ]))).toBeGreaterThan(1_000);
+  });
+
+  it("reserves a readable label lane between topology ranks", () => {
+    const positions = layoutTopologyNodes(topologyFixture);
+    const source = positions.get("endpoint:1001");
+    const target = positions.get("target:203.0.113.10");
+    expect(source).toBeDefined();
+    expect(target).toBeDefined();
+    expect(target!.x - source!.x).toBeGreaterThanOrEqual(360);
+    const labelPositions = [...layoutTopologyEdgeLabels(groupTopologyEdges(topologyFixture), positions).values()];
+    const labelLanes = new Map<number, number[]>();
+    for (const { xOffset, y } of labelPositions) labelLanes.set(xOffset, [...(labelLanes.get(xOffset) ?? []), y]);
+    for (const lane of labelLanes.values()) {
+      const labelYs = lane.sort((left, right) => left - right);
+      for (let index = 1; index < labelYs.length; index += 1) expect(labelYs[index]! - labelYs[index - 1]!).toBeGreaterThanOrEqual(40);
+    }
+    const densePositions = new Map([...positions].map(([id, point]) => [id, { ...point, y: 0 }]));
+    const denseLaneOffsets = new Set([...layoutTopologyEdgeLabels(groupTopologyEdges(topologyFixture), densePositions).values()].map(({ xOffset }) => xOffset));
+    expect(denseLaneOffsets.size).toBe(2);
+    expect(topologyEdgeVisualState(0)).toBe("observed-only");
+    expect(topologyEdgeVisualState(1)).toBe("has-alerts");
+  });
+
+  it("grows the topology viewport before fitView would clip a tall node stack", () => {
+    const positions = new Map([
+      ["endpoint:1", { x: 0, y: 0 }],
+      ["endpoint:2", { x: 0, y: 800 }],
+    ]);
+    const nodeOnlyHeight = topologyGraphMinHeight(positions);
+    const labelAwareHeight = topologyGraphMinHeight(positions, new Map([["edge:1", { xOffset: 0, y: 1100 }]]));
+    expect(nodeOnlyHeight).toBeGreaterThan(1_000);
+    expect(labelAwareHeight).toBeGreaterThan(nodeOnlyHeight);
+    expect(topologyGraphMinHeight(new Map())).toBe(420);
+  });
+
+  it("maps React Flow keyboard selection back to the synchronized topology context", () => {
+    const node = document.createElement("div");
+    node.className = "react-flow__node";
+    node.dataset.id = "endpoint:1001";
+    const nodeLabel = document.createElement("strong");
+    node.append(nodeLabel);
+    const edge = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    edge.classList.add("react-flow__edge");
+    edge.dataset.id = "topology-group:1001:203.0.113.10";
+    expect(topologySelectionFromElement(nodeLabel)).toEqual({ kind: "NODE", id: "endpoint:1001" });
+    expect(topologySelectionFromElement(edge)).toEqual({ kind: "EDGE_GROUP", id: "topology-group:1001:203.0.113.10" });
+    expect(topologySelectionFromElement(null)).toBeNull();
+    expect(correlationSelectionFromElement(nodeLabel)).toEqual({ kind: "NODE", id: "endpoint:1001" });
+    expect(correlationSelectionFromElement(edge)).toEqual({ kind: "EDGE", id: "topology-group:1001:203.0.113.10" });
+  });
+
   it("renders MITRE selection, Rules/Signals tabs, and a synchronized table fallback without bytesOut", async () => {
     const { container } = renderWithProviders(<IntelligenceContent dashboard={dashboardFixture} graphEnabled={false} topology={topologyFixture} />);
     expect(screen.getByRole("region", { name: "Intelligence" })).toHaveClass("intelligence-summary-rail");
@@ -66,6 +169,8 @@ describe("WP-08 Intelligence, Operations, and Archives", () => {
     const tactic = screen.getByRole("button", { name: "TA0002, Execution, 3 Alert(s)" });
     expect(tactic.querySelector(".mitre-code")).toHaveTextContent("TA0002");
     expect(tactic.querySelector(".mitre-name")).toHaveTextContent("Execution");
+    expect(tactic.className).not.toMatch(/heat-/);
+    expect(screen.getByRole("button", { name: "T1059, Command and Scripting Interpreter, 2 Alert(s)" })).toHaveAttribute("title", "T1059 · Command and Scripting Interpreter");
     fireEvent.click(tactic);
     const mitreInspector = screen.getByRole("complementary", { name: "Execution" });
     expect(within(mitreInspector).getByText("3")).toBeInTheDocument();
@@ -78,8 +183,26 @@ describe("WP-08 Intelligence, Operations, and Archives", () => {
     expect(screen.getByText("Unique Endpoint-to-destination relationships")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "SOC-WIN-01" }));
     expect(screen.getByText("TCP relationship")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "2" })).toHaveAttribute("href", expect.stringContaining("/alerts?"));
+    const selectedRow = within(topologyTable).getByRole("button", { name: "SOC-WIN-01" }).closest("tr");
+    expect(selectedRow).not.toBeNull();
+    expect(within(selectedRow!).getByRole("link", { name: "5" })).toHaveAttribute("href", "/events?timePreset=CUSTOM&from=2026-07-15T00%3A00%3A00Z&to=2026-07-16T00%3A00%3A00Z&endpointId=1001");
+    expect(within(selectedRow!).getByRole("link", { name: "2" })).toHaveAttribute("href", "/alerts?timePreset=CUSTOM&from=2026-07-15T00%3A00%3A00Z&to=2026-07-16T00%3A00%3A00Z&endpointId=1001");
     expect(screen.queryByText(/bytesOut/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps dense topology limits in the large dialog and restores the embedded view to ten", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<IntelligenceContent dashboard={null} graphEnabled={false} topology={topologyFixture} />);
+    const topN = screen.getByRole("combobox", { name: "Top-N relationships" });
+    const expandButton = screen.getByRole("button", { name: "Open Endpoint egress topology in large view" });
+    expect(topN).toHaveValue("10");
+    expect(expandButton).toHaveAttribute("aria-haspopup", "dialog");
+    await user.selectOptions(topN, "25");
+    const dialog = screen.getByRole("dialog", { name: "Endpoint egress topology — Large view" });
+    expect(within(dialog).getByRole("combobox", { name: "Top-N relationships" })).toHaveValue("25");
+    await user.click(within(dialog).getByRole("button", { name: "Close large Endpoint egress topology" }));
+    expect(topN).toHaveValue("10");
+    expect(expandButton).toHaveFocus();
   });
 
   it("orders current pipeline problems first and never represents a historical flow", () => {
@@ -116,6 +239,12 @@ describe("WP-08 Intelligence, Operations, and Archives", () => {
     const inspector = screen.getByRole("complementary", { name: "PTR CANDIDATE" });
     expect(within(inspector).getAllByText("LIVE_DNS").length).toBeGreaterThan(0);
     expect(within(inspector).getByText(/8\.8\.8\.8 → dns\.google/)).toBeInTheDocument();
+    const expandButton = screen.getByRole("button", { name: "Open IP and Domain correlation graph in large view" });
+    await userEvent.click(expandButton);
+    const dialog = screen.getByRole("dialog", { name: "IP and Domain correlation — Large view" });
+    expect(dialog).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Close large IP and Domain correlation graph" }));
+    expect(expandButton).toHaveFocus();
   });
 
   it("shows every Archive lifecycle state, explicit zero counts, and role permission boundaries", () => {

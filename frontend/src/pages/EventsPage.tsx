@@ -48,6 +48,6 @@ export function EventsPage() {
   </div>;
 }
 function eventFilterLabel(field: typeof DETAIL_FILTERS[number], locale: "EN" | "KO", t: ReturnType<typeof useI18n>["t"]): string {
-  if (locale === "EN") return field.replace(/([A-Z])/g, " $1");
+  if (locale === "EN") return { processName: "Process Name", filePath: "File Path", domain: "Domain", remoteIp: "Remote IP", dnsQuery: "DNS Query", l7Protocol: "L7 Protocol" }[field];
   return { processName: t("event.processName"), filePath: t("event.filePath"), domain: "Remote Domain", remoteIp: "Remote IP", dnsQuery: "DNS Query", l7Protocol: "L7 Protocol" }[field];
 }
