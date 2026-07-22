@@ -38,6 +38,14 @@ PROFILES = ("presentation", "dns-correctness")
 CAPABILITIES = ["PROCESS_EXECUTION", "NETWORK_CONNECTION", "FILE_EVENT", "DNS_QUERY", "L7_EVENT"]
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1", "postgres", "clickhouse"}
 ALLOWED_DATABASES = {"edr", "edr_qa", "test_edr"}
+PRESENTATION_DAYS = 14
+PRESENTATION_DAILY_EVENTS = {
+    "GEONHA-MACMINI": 100,
+    "GEONHA-WIN": 75,
+    "SOYEON-WIN": 85,
+    "HYERYEONG-WIN": 65,
+    "JUHO-WIN": 75,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +67,10 @@ class EndpointPlan:
     status: str
     event_count: int
     agent_arch: str
+    owner_name: str = ""
+    major: str = ""
+    activity_profile: str = "generic"
+    sensor_status: str = "HEALTHY"
 
 
 @dataclass(frozen=True, slots=True)
@@ -202,156 +214,302 @@ def _event(
 
 
 def _background_payload(event_type: str, endpoint: EndpointPlan, index: int) -> dict[str, object]:
+    profiles = {
+        "geonha-mac": {
+            "processes": ("Code", "Terminal", "Docker Desktop", "python3", "node"),
+            "commands": ("code .", "git status", "docker compose ps", "uv run pytest", "npm run dev"),
+            "domains": ("github.com", "docs.python.org", "registry.npmjs.org", "hub.docker.com", "localhost"),
+            "files": (
+                "/Users/geonha/Developer/team-C/backend/main.py",
+                "/Users/geonha/Developer/team-C/frontend/src/App.tsx",
+                "/Users/geonha/Developer/team-C/pyproject.toml",
+                "/Users/geonha/Documents/lecture/security-notes.md",
+                "/Users/geonha/Developer/team-C/README.md",
+            ),
+            "user": "geonha",
+        },
+        "geonha-win": {
+            "processes": ("Code.exe", "powershell.exe", "chrome.exe", "Docker Desktop.exe", "wsl.exe"),
+            "commands": (
+                "code .",
+                "powershell.exe -NoProfile",
+                "chrome.exe --profile-directory=Default",
+                "docker compose ps",
+                "wsl.exe",
+            ),
+            "domains": ("class.tukorea.ac.kr", "github.com", "notion.so", "discord.com", "learn.microsoft.com"),
+            "files": (
+                r"C:\Users\Geonha\Documents\TUKorea\network-assignment.md",
+                r"C:\Users\Geonha\Desktop\team-C\backend\main.py",
+                r"C:\Users\Geonha\Desktop\team-C\frontend\src\App.tsx",
+                r"C:\Users\Geonha\Documents\TUKorea\capstone-notes.docx",
+                r"C:\Users\Geonha\Downloads\lecture-week-14.pdf",
+            ),
+            "user": r"TUKOREA\geonha",
+        },
+        "soyeon": {
+            "processes": ("chrome.exe", "Discord.exe", "MinecraftLauncher.exe", "javaw.exe", "Code.exe"),
+            "commands": (
+                "chrome.exe --profile-directory=Default",
+                "Discord.exe --start-minimized",
+                "MinecraftLauncher.exe",
+                "javaw.exe -Xmx4G -jar minecraft.jar",
+                "code .",
+            ),
+            "domains": ("class.tukorea.ac.kr", "discord.com", "minecraft.net", "github.com", "stackoverflow.com"),
+            "files": (
+                r"C:\Users\Soyeon\Documents\TUKorea\java-lab\Main.java",
+                r"C:\Users\Soyeon\AppData\Roaming\.minecraft\options.txt",
+                r"C:\Users\Soyeon\Documents\TUKorea\database-assignment.sql",
+                r"C:\Users\Soyeon\Downloads\lecture-operating-system.pdf",
+                r"C:\Users\Soyeon\Documents\TUKorea\algorithm-study.md",
+            ),
+            "user": r"TUKOREA\soyeon",
+        },
+        "hyeryeong": {
+            "processes": ("Figma.exe", "Photoshop.exe", "Illustrator.exe", "chrome.exe", "Creative Cloud.exe"),
+            "commands": (
+                "Figma.exe --app-startup",
+                "Photoshop.exe",
+                "Illustrator.exe",
+                "chrome.exe --profile-directory=Design",
+                "Creative Cloud.exe --background",
+            ),
+            "domains": ("figma.com", "behance.net", "fonts.google.com", "pinterest.com", "creativecloud.adobe.com"),
+            "files": (
+                r"C:\Users\Hyeryeong\Documents\Design\mobile-app-wireframe.fig",
+                r"C:\Users\Hyeryeong\Documents\Design\poster-final.psd",
+                r"C:\Users\Hyeryeong\Documents\Design\brand-logo.ai",
+                r"C:\Users\Hyeryeong\Downloads\pretendard-font.zip",
+                r"C:\Users\Hyeryeong\Pictures\reference-board.png",
+            ),
+            "user": r"TUKOREA\hyeryeong",
+        },
+        "juho": {
+            "processes": ("idea64.exe", "java.exe", "gradle.exe", "Docker Desktop.exe", "Postman.exe"),
+            "commands": (
+                "idea64.exe",
+                "java.exe -jar build/libs/course-api.jar",
+                "gradle.exe test",
+                "docker compose up -d",
+                "Postman.exe",
+            ),
+            "domains": (
+                "class.tukorea.ac.kr",
+                "github.com",
+                "repo.maven.apache.org",
+                "hub.docker.com",
+                "learning.postman.com",
+            ),
+            "files": (
+                r"C:\Users\Juho\IdeaProjects\course-api\src\main\java\Application.java",
+                r"C:\Users\Juho\IdeaProjects\course-api\build.gradle",
+                r"C:\Users\Juho\Documents\TUKorea\network-lab.pkt",
+                r"C:\Users\Juho\Documents\TUKorea\api-test.postman_collection.json",
+                r"C:\Users\Juho\Downloads\spring-week-14.pdf",
+            ),
+            "user": r"TUKOREA\juho",
+        },
+        "generic": {
+            "processes": ("launchd", "chrome.exe"),
+            "commands": ("/sbin/launchd", "chrome.exe"),
+            "domains": ("docs.example.test",),
+            "files": ("/tmp/lesson.txt",),
+            "user": "student",
+        },
+    }
+    profile = profiles[endpoint.activity_profile]
+    position = index % len(profile["processes"])
+    process = profile["processes"][position]
+    command = profile["commands"][position]
+    domain = profile["domains"][index % len(profile["domains"])]
+    file_path = profile["files"][index % len(profile["files"])]
     if event_type == "PROCESS_EXECUTION":
-        process = "launchd" if endpoint.os_type == "MACOS" else ("code.exe" if index % 2 else "chrome.exe")
         return {
             "processName": process,
-            "processPath": f"/usr/bin/{process}"
+            "processPath": f"/Applications/{process}.app/Contents/MacOS/{process}"
             if endpoint.os_type == "MACOS"
-            else rf"C:\Program Files\Demo\{process}",
+            else rf"C:\Program Files\{process}",
             "pid": 2000 + index,
             "ppid": 1000 + index,
-            "commandLine": f"{process} --demo-session {index}",
-            "userName": "DEMO\\student" if endpoint.os_type == "WINDOWS" else "demo.student",
+            "commandLine": command,
+            "userName": profile["user"],
         }
     if event_type == "NETWORK_CONNECTION":
         return {
             "protocol": "TCP",
             "remoteIp": f"192.0.2.{20 + index % 100}",
             "remotePort": 443,
-            "remoteDomain": "cdn.example.test",
-            "processName": "chrome.exe" if endpoint.os_type == "WINDOWS" else "launchd",
+            "remoteDomain": domain,
+            "processName": process,
             "pid": 2000 + index,
         }
     if event_type == "FILE_EVENT":
-        path = (
-            rf"C:\Users\DEMO\Documents\lesson-{index}.txt"
-            if endpoint.os_type == "WINDOWS"
-            else f"/Users/demo/Documents/lesson-{index}.txt"
-        )
         return {
-            "filePath": path,
+            "filePath": file_path,
             "action": "MODIFY",
             "sha256": f"{index % 16:x}" * 64,
-            "processName": "code.exe" if endpoint.os_type == "WINDOWS" else "launchd",
+            "processName": process,
             "pid": 2000 + index,
         }
     if event_type == "DNS_QUERY":
         return {
-            "query": "docs.example.test",
+            "query": domain,
             "recordType": "A",
             "responseCode": "NOERROR",
             "answers": [f"198.51.100.{20 + index % 100}"],
-            "processName": "chrome.exe" if endpoint.os_type == "WINDOWS" else "launchd",
+            "processName": process,
             "pid": 2000 + index,
         }
     return {
         "l7Protocol": "HTTPS",
         "httpMethod": "GET",
-        "httpHost": "docs.example.test",
-        "url": f"https://docs.example.test/lesson/{index}",
+        "httpHost": domain,
+        "url": f"https://{domain}/activity/{index % 20}",
         "httpStatusCode": 200,
-        "httpUserAgent": "EDR-C-Safe-Demo/1.0",
-        "tlsSni": "docs.example.test",
+        "httpUserAgent": "Mozilla/5.0 Chrome/126.0",
+        "tlsSni": domain,
         "tlsVersion": "TLS1.3",
     }
 
 
-def _background_events(
+def _daily_background_events(
     profile: str,
     seed: int,
     anchor: datetime,
     endpoint: EndpointPlan,
-    count: int,
+    daily_counts: tuple[int, ...],
     *,
     first_index: int = 0,
-    end_at: datetime | None = None,
+    newest_end_at: datetime | None = None,
 ) -> list[EventPlan]:
-    start = anchor - timedelta(hours=23)
-    end = end_at or anchor - timedelta(minutes=2)
-    span = end - start
     event_types = ("PROCESS_EXECUTION", "NETWORK_CONNECTION", "FILE_EVENT", "DNS_QUERY", "L7_EVENT")
-    events = []
-    for offset in range(count):
-        index = first_index + offset
-        ratio = (offset + 1) / (count + 1)
-        occurred_at = start + span * ratio
-        event_type = event_types[offset % len(event_types)]
-        events.append(
-            _event(
-                profile,
-                seed,
-                anchor,
-                endpoint.hostname,
-                index,
-                event_type,
-                occurred_at,
-                _background_payload(event_type, endpoint, index),
+    events: list[EventPlan] = []
+    index = first_index
+    for day_offset, count in enumerate(daily_counts):
+        start = anchor - timedelta(days=day_offset + 1)
+        end = newest_end_at if day_offset == 0 and newest_end_at is not None else anchor - timedelta(days=day_offset)
+        span = end - start
+        for position in range(count):
+            ratio = (position + 1) / (count + 1)
+            occurred_at = start + span * ratio
+            event_type = event_types[index % len(event_types)]
+            events.append(
+                _event(
+                    profile,
+                    seed,
+                    anchor,
+                    endpoint.hostname,
+                    index,
+                    event_type,
+                    occurred_at,
+                    _background_payload(event_type, endpoint, index),
+                )
             )
-        )
+            index += 1
     return events
 
 
 def build_presentation_plan(seed: int, anchor: datetime) -> ProfilePlan:
     endpoints = (
         EndpointPlan(
-            "DEMO-STUDENT-WIN-07",
-            "presentation-student-win-07",
-            "WINDOWS",
-            "Windows 11 24H2",
-            "192.0.2.7",
-            "ONLINE",
-            24,
-            "X64",
-        ),
-        EndpointPlan(
-            "DEMO-DEV-WIN-02",
-            "presentation-dev-win-02",
-            "WINDOWS",
-            "Windows 11 24H2",
-            "192.0.2.22",
-            "ONLINE",
-            24,
-            "X64",
-        ),
-        EndpointPlan(
-            "DEMO-FINANCE-MAC-02",
-            "presentation-finance-mac-02",
+            "GEONHA-MACMINI",
+            "geonha-macmini",
             "MACOS",
             "macOS 15.5",
-            "192.0.2.42",
-            "OFFLINE",
-            16,
+            "192.0.2.10",
+            "ONLINE",
+            1_400,
             "ARM64",
+            "황건하",
+            "컴퓨터공학전공",
+            "geonha-mac",
+        ),
+        EndpointPlan(
+            "GEONHA-WIN",
+            "geonha-win",
+            "WINDOWS",
+            "Windows 11 24H2",
+            "192.0.2.11",
+            "OFFLINE",
+            1_050,
+            "X64",
+            "황건하",
+            "컴퓨터공학전공",
+            "geonha-win",
+        ),
+        EndpointPlan(
+            "SOYEON-WIN",
+            "soyeon-win",
+            "WINDOWS",
+            "Windows 11 24H2",
+            "192.0.2.20",
+            "ONLINE",
+            1_190,
+            "X64",
+            "박소연",
+            "컴퓨터공학전공",
+            "soyeon",
+        ),
+        EndpointPlan(
+            "HYERYEONG-WIN",
+            "hyeryeong-win",
+            "WINDOWS",
+            "Windows 11 24H2",
+            "192.0.2.30",
+            "ONLINE",
+            910,
+            "X64",
+            "이혜령",
+            "디자인전공",
+            "hyeryeong",
+            "DEGRADED",
+        ),
+        EndpointPlan(
+            "JUHO-WIN",
+            "juho-win",
+            "WINDOWS",
+            "Windows 11 24H2",
+            "192.0.2.40",
+            "ONLINE",
+            1_050,
+            "X64",
+            "이주호",
+            "컴퓨터공학전공",
+            "juho",
         ),
     )
     epoch = int(anchor.timestamp())
     current_window = datetime.fromtimestamp((epoch // 1800) * 1800, tz=UTC)
     elapsed_seconds = (anchor - current_window).total_seconds()
     if elapsed_seconds < 6:
-        raise ValueError("presentation anchor must be at least 6 seconds into its 30-minute window")
-    if elapsed_seconds >= 15 * 60:
+        window_start = current_window - timedelta(minutes=30)
+        attack_offsets = tuple(timedelta(minutes=value) for value in (5, 7, 9, 10, 12, 14))
+    elif elapsed_seconds >= 15 * 60:
+        window_start = current_window
         attack_offsets = tuple(timedelta(minutes=value) for value in (5, 7, 9, 10, 12, 14))
     else:
+        window_start = current_window
         spacing = elapsed_seconds / 7
         attack_offsets = tuple(timedelta(seconds=spacing * value) for value in range(1, 7))
-    window_start = current_window
-    main = endpoints[0]
-    events = _background_events(
+    main = endpoints[2]
+    daily_count = PRESENTATION_DAILY_EVENTS[main.hostname]
+    events = _daily_background_events(
         "presentation",
         seed,
         anchor,
         main,
-        18,
-        end_at=window_start - timedelta(minutes=1),
+        (daily_count - 6,) + (daily_count,) * (PRESENTATION_DAYS - 1),
+        first_index=6,
+        newest_end_at=window_start - timedelta(minutes=1),
     )
     attack = (
         (
-            18,
+            0,
             "DNS_QUERY",
             attack_offsets[0],
             {
-                "query": "game-mirror.test",
+                "query": "minecraft-shader.example",
                 "recordType": "A",
                 "responseCode": "NOERROR",
                 "answers": ["203.0.113.40"],
@@ -360,11 +518,11 @@ def build_presentation_plan(seed: int, anchor: datetime) -> ProfilePlan:
             },
         ),
         (
-            19,
+            1,
             "FILE_EVENT",
             attack_offsets[1],
             {
-                "filePath": r"C:\Users\DEMO\Downloads\game-installer.exe",
+                "filePath": r"C:\Users\Soyeon\Downloads\Minecraft_Shader_Setup.exe",
                 "action": "CREATE",
                 "sha256": "7" * 64,
                 "processName": "chrome.exe",
@@ -372,20 +530,20 @@ def build_presentation_plan(seed: int, anchor: datetime) -> ProfilePlan:
             },
         ),
         (
-            20,
+            2,
             "PROCESS_EXECUTION",
             attack_offsets[2],
             {
-                "processName": "game-installer.exe",
-                "processPath": r"C:\Users\DEMO\Downloads\game-installer.exe",
+                "processName": "Minecraft_Shader_Setup.exe",
+                "processPath": r"C:\Users\Soyeon\Downloads\Minecraft_Shader_Setup.exe",
                 "pid": 4200,
                 "ppid": 4100,
-                "commandLine": r"C:\Users\DEMO\Downloads\game-installer.exe --install",
-                "userName": "DEMO\\student",
+                "commandLine": r"C:\Users\Soyeon\Downloads\Minecraft_Shader_Setup.exe --install",
+                "userName": r"TUKOREA\soyeon",
             },
         ),
         (
-            21,
+            3,
             "PROCESS_EXECUTION",
             attack_offsets[3],
             {
@@ -394,11 +552,11 @@ def build_presentation_plan(seed: int, anchor: datetime) -> ProfilePlan:
                 "pid": 4242,
                 "ppid": 4200,
                 "commandLine": "powershell.exe -NoProfile -EncodedCommand SAFEDEMOONE",
-                "userName": "DEMO\\student",
+                "userName": r"TUKOREA\soyeon",
             },
         ),
         (
-            22,
+            4,
             "PROCESS_EXECUTION",
             attack_offsets[4],
             {
@@ -407,11 +565,11 @@ def build_presentation_plan(seed: int, anchor: datetime) -> ProfilePlan:
                 "pid": 4243,
                 "ppid": 4242,
                 "commandLine": "powershell.exe -NoProfile -EncodedCommand SAFEDEMOTWO",
-                "userName": "DEMO\\student",
+                "userName": r"TUKOREA\soyeon",
             },
         ),
         (
-            23,
+            5,
             "NETWORK_CONNECTION",
             attack_offsets[5],
             {
@@ -437,10 +595,19 @@ def build_presentation_plan(seed: int, anchor: datetime) -> ProfilePlan:
         )
         for index, event_type, offset, payload in attack
     )
-    events.extend(_background_events("presentation", seed, anchor, endpoints[1], 24))
-    events.extend(
-        _background_events("presentation", seed, anchor, endpoints[2], 16, end_at=anchor - timedelta(hours=6))
-    )
+    for endpoint in endpoints:
+        if endpoint.hostname == main.hostname:
+            continue
+        endpoint_daily_count = PRESENTATION_DAILY_EVENTS[endpoint.hostname]
+        events.extend(
+            _daily_background_events(
+                "presentation",
+                seed,
+                anchor,
+                endpoint,
+                (endpoint_daily_count,) * PRESENTATION_DAYS,
+            )
+        )
     plan = ProfilePlan(
         "presentation",
         seed,
@@ -624,7 +791,7 @@ def _normalized_events(plan: ProfilePlan, endpoint_ids: dict[str, int]) -> list[
 
 
 def _validate_plan(plan: ProfilePlan) -> None:
-    expected = {"presentation": (3, 64, 3, 2), "dns-correctness": (2, 8, 0, 0)}[plan.profile]
+    expected = {"presentation": (5, 5_600, 3, 2), "dns-correctness": (2, 8, 0, 0)}[plan.profile]
     if (len(plan.endpoints), len(plan.events), plan.counts["alerts"], plan.counts["incidents"]) != expected:
         raise RuntimeError(f"{plan.profile} plan count contract changed")
     if Counter(item.hostname for item in plan.events) != Counter(
@@ -640,6 +807,12 @@ def _validate_plan(plan: ProfilePlan) -> None:
     if len(matches) != plan.counts["alerts"]:
         raise RuntimeError(f"{plan.profile} produces {len(matches)} Rule matches, expected {plan.counts['alerts']}")
     if plan.profile == "presentation":
+        latest_24h = sum(event.occurred_at > plan.anchor - timedelta(days=1) for event in plan.events)
+        latest_7d = sum(event.occurred_at > plan.anchor - timedelta(days=7) for event in plan.events)
+        if (latest_24h, latest_7d) != (400, 2_800):
+            raise RuntimeError(
+                f"presentation rolling window contract changed: latest24h={latest_24h}, latest7d={latest_7d}"
+            )
         codes = Counter(match.alert.rule_code for match in matches)
         keys = Counter(match.incident.correlation_key for match in matches if match.incident is not None)
         windows = {match.incident.window_start_at for match in matches[:2] if match.incident is not None}
@@ -709,15 +882,15 @@ def _insert_endpoints(connection: psycopg.Connection, plan: ProfilePlan) -> dict
                     [
                         {
                             "sensor": "PROCESS",
-                            "status": "HEALTHY",
+                            "status": endpoint.sensor_status,
                             "provider": sensor_provider,
                             "packetDropCount": 0,
-                            "parseErrorCount": 0,
+                            "parseErrorCount": 3 if endpoint.sensor_status == "DEGRADED" else 0,
                         }
                     ]
                 ),
                 endpoint.status,
-                plan.anchor - (timedelta(hours=6) if endpoint.status == "OFFLINE" else timedelta(minutes=1)),
+                plan.anchor - timedelta(hours=6) if endpoint.status == "OFFLINE" else plan.anchor,
                 plan.anchor,
                 endpoint_id,
             ),
@@ -770,7 +943,7 @@ def _direct_seed(target: SeedTarget, plan: ProfilePlan) -> tuple[dict[str, int],
         clickhouse.close()
     ids: dict[str, object] = {
         "endpointIdsByHostname": endpoint_ids,
-        "presentationEndpointId": endpoint_ids.get("DEMO-STUDENT-WIN-07"),
+        "presentationEndpointId": endpoint_ids.get("SOYEON-WIN"),
         "powershellIncidentId": None,
         "egressIncidentId": None,
         "powershellAlertIds": [],
@@ -865,7 +1038,12 @@ def _collector_seed(
                     "capabilityCodes": CAPABILITIES,
                     "bufferDepth": 0,
                     "sensorHealth": [
-                        {"sensor": "PROCESS", "status": "HEALTHY", "packetDropCount": 0, "parseErrorCount": 0}
+                        {
+                            "sensor": "PROCESS",
+                            "status": endpoint.sensor_status,
+                            "packetDropCount": 0,
+                            "parseErrorCount": 3 if endpoint.sensor_status == "DEGRADED" else 0,
+                        }
                     ],
                     "sentAt": _rfc3339(datetime.now(UTC)),
                 },
@@ -878,31 +1056,44 @@ def _collector_seed(
     for endpoint in plan.endpoints:
         certificate = certificates[endpoint.hostname]
         event_plans = events_by_hostname[endpoint.hostname]
-        batch_id = _stable_uuid(plan.profile, plan.seed, plan.anchor, endpoint.hostname, 0, "collector-batch")
-        with _collector_client(certificate.certificate, certificate.private_key, certificate.ca_certificate) as client:
-            response = client.post(
-                f"{target.collector_base_url}/telemetry/batches",
-                json={
-                    "schemaVersion": 1,
-                    "batchId": str(batch_id),
-                    "agentId": endpoint.agent_id,
-                    "sentAt": _rfc3339(datetime.now(UTC)),
-                    "events": [
-                        {
-                            "eventId": str(event.event_id),
-                            "eventType": event.event_type,
-                            "occurredAt": _rfc3339(event.occurred_at),
-                            "payload": event.payload,
-                        }
-                        for event in event_plans
-                    ],
-                },
+        for batch_index, start in enumerate(range(0, len(event_plans), 100)):
+            batch_events = event_plans[start : start + 100]
+            batch_id = _stable_uuid(
+                plan.profile,
+                plan.seed,
+                plan.anchor,
+                endpoint.hostname,
+                batch_index,
+                "collector-batch",
             )
-            response.raise_for_status()
-            data = response.json()["data"]
-            if data["rejectedEvents"]:
-                raise RuntimeError(f"Collector rejected presentation events: {data['rejectedEvents']}")
-            accepted.extend(data["acceptedEventIds"])
+            with _collector_client(
+                certificate.certificate,
+                certificate.private_key,
+                certificate.ca_certificate,
+            ) as client:
+                response = client.post(
+                    f"{target.collector_base_url}/telemetry/batches",
+                    json={
+                        "schemaVersion": 1,
+                        "batchId": str(batch_id),
+                        "agentId": endpoint.agent_id,
+                        "sentAt": _rfc3339(datetime.now(UTC)),
+                        "events": [
+                            {
+                                "eventId": str(event.event_id),
+                                "eventType": event.event_type,
+                                "occurredAt": _rfc3339(event.occurred_at),
+                                "payload": event.payload,
+                            }
+                            for event in batch_events
+                        ],
+                    },
+                )
+                response.raise_for_status()
+                data = response.json()["data"]
+                if data["rejectedEvents"]:
+                    raise RuntimeError(f"Collector rejected presentation events: {data['rejectedEvents']}")
+                accepted.extend(data["acceptedEventIds"])
     if len(accepted) != len(plan.events):
         raise RuntimeError(f"Collector acknowledged {len(accepted)} of {len(plan.events)} events")
     ids = _wait_for_pipeline(target, plan, endpoint_ids, wait_timeout_seconds)
@@ -912,7 +1103,7 @@ def _collector_seed(
                 "UPDATE endpoints SET status=%s, last_seen_at=%s, updated_at=%s WHERE endpoint_id=%s",
                 (
                     endpoint.status,
-                    plan.anchor - (timedelta(hours=6) if endpoint.status == "OFFLINE" else timedelta(minutes=1)),
+                    plan.anchor - timedelta(hours=6) if endpoint.status == "OFFLINE" else plan.anchor,
                     plan.anchor,
                     endpoint_ids[endpoint.hostname],
                 ),
@@ -920,7 +1111,7 @@ def _collector_seed(
         connection.commit()
     ids["eventIds"] = accepted
     ids["endpointIdsByHostname"] = endpoint_ids
-    ids["presentationEndpointId"] = endpoint_ids.get("DEMO-STUDENT-WIN-07")
+    ids["presentationEndpointId"] = endpoint_ids.get("SOYEON-WIN")
     return endpoint_ids, ids
 
 
@@ -982,7 +1173,7 @@ def _manifest(
     ids: dict[str, object],
 ) -> dict[str, object]:
     event_times = [event.occurred_at for event in plan.events]
-    main_endpoint_id = endpoint_ids.get("DEMO-STUDENT-WIN-07")
+    main_endpoint_id = endpoint_ids.get("SOYEON-WIN")
     powershell_incident_id = ids.get("powershellIncidentId")
     egress_alert_id = ids.get("egressAlertId")
     time_range = (
@@ -994,10 +1185,26 @@ def _manifest(
         "anchor": _rfc3339(plan.anchor),
         "generatedAt": _rfc3339(datetime.now(UTC)),
         "mockData": True,
-        "dataNotice": "발표용으로 재구성한 local/QA 목데이터이며 production 실측값이 아닙니다.",
+        "dataNotice": "시연을 위해 재현한 local/QA 데이터이며 production 실측값이 아닙니다.",
         "ingestionMode": ingestion_mode,
         "timeRange": {"from": _rfc3339(min(event_times)), "to": _rfc3339(plan.anchor + timedelta(minutes=1))},
         "counts": plan.counts,
+        "rangeCounts": {"latest24h": 400, "latest7d": 2_800, "latest14d": 5_600}
+        if plan.profile == "presentation"
+        else {"custom": len(plan.events)},
+        "endpointProfiles": [
+            {
+                "hostname": endpoint.hostname,
+                "ownerName": endpoint.owner_name,
+                "major": endpoint.major,
+                "osType": endpoint.os_type,
+                "status": endpoint.status,
+                "sensorStatus": endpoint.sensor_status,
+                "dailyEvents": PRESENTATION_DAILY_EVENTS.get(endpoint.hostname),
+                "totalEvents": endpoint.event_count,
+            }
+            for endpoint in plan.endpoints
+        ],
         "ids": ids,
         "urls": {
             "overview": f"{target.dashboard_base_url}/?timePreset=LATEST_24H",

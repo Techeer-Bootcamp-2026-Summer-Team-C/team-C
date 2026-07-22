@@ -1,15 +1,15 @@
-# EDR_C 발표용 목데이터 요구사항
+# EDR_C 시연 데이터 준비 요구사항
 
 - 작성일: 2026-07-21
 - 대상 저장소: `C:\Users\geonh\Desktop\team-C`
-- 문서 목적: 발표 시연·성능 개선·정확성 개선을 재현할 목데이터의 구현 요구사항 정의
-- 현재 상태: 요구사항만 확정하며, 이 문서 작성 단계에서는 seed 코드를 구현하지 않음
+- 문서 목적: Dashboard 시연·성능 개선·정확성 개선을 재현할 데이터의 구현 요구사항 정의
+- 현재 상태: `tools/seed_presentation_demo.py` 구현과 자동 검증 완료
 
 ## 1. 목표
 
 목데이터는 다음 세 가지 발표 근거를 각각 재현할 수 있어야 한다.
 
-1. 인트로의 가상 공격 시나리오를 Dashboard에서 조사하는 라이브 시연
+1. Minecraft 사고 재현 시나리오를 Dashboard에서 조사하는 라이브 시연
 2. Python 집계를 ClickHouse 집계로 옮긴 성능 개선의 데이터 규모
 3. IP·Domain 상관분석에서 부분 문자열로 발생하던 오탐 제거
 
@@ -17,11 +17,11 @@
 
 | Profile | 목적 | 예상 규모 | 발표 중 사용 방식 |
 | --- | --- | ---: | --- |
-| `presentation` | 라이브 Dashboard 조사 | 3 Endpoint, 64 Event, 3 Alert, 2 Incident | 발표 직전 seed 후 직접 조작 |
+| `presentation` | 라이브 Dashboard 조사 | 5 Endpoint, 14일 5,600 Event, 3 Alert, 2 Incident | 시연 직전 seed 후 직접 조작 |
 | `dns-correctness` | Domain 경계 오탐 검증 | 2 Endpoint, 8 Event 내외 | Screenshot 또는 짧은 녹화 |
 | `performance` | ClickHouse Dashboard 집계 규모 재현 | 31일, 100 Endpoint, 248,000 생성 Event | 사전 측정 결과와 그래프 사용 |
 
-`performance` profile은 실행 시간이 길고 다른 데이터를 초기화하므로 발표 직전에 실행하지 않는다.
+`performance` profile은 실행 시간이 길고 다른 데이터를 초기화하므로 시연 직전에 실행하지 않는다.
 
 ## 2. 구현 코드 기준 source of truth
 
@@ -48,7 +48,7 @@
 - 동일한 `--seed`와 `--anchor`를 사용하면 Event 내용과 관계가 동일해야 한다.
 - Event ID와 Batch ID는 임의 `uuid4` 대신 namespace가 분리된 deterministic UUID를 사용한다.
 - 목록 정렬이 바뀌지 않도록 Event 발생 시각과 ID의 순서를 고정한다.
-- 라이브 발표에서는 `--anchor now`, 녹화에서는 고정 RFC 3339 시각을 사용할 수 있어야 한다.
+- 라이브 시연에서는 `--anchor now`, 녹화에서는 고정 RFC 3339 시각을 사용할 수 있어야 한다.
 - `--anchor now`를 사용한 데이터는 `LATEST_24H` 범위에서 항상 보여야 한다.
 
 ### 3.2 안전한 초기화
@@ -71,7 +71,7 @@
 - 서로 다른 `correlation_key`의 Alert를 같은 Incident에 수동 연결하지 않는다.
 - `PROC_POWERSHELL_ENCODED`와 `NET_SUSPICIOUS_EGRESS`는 각각 `suspicious-powershell`, `suspicious-egress`를 사용하므로 별도 Incident가 되어야 한다.
 - 하나의 PowerShell Incident에 복수 Alert가 필요하면 같은 Endpoint의 Encoded PowerShell Event를 같은 30분 window 안에 2회 생성한다.
-- 발표용 핵심 Alert·Incident는 `tests/seed_frontend_qa.py`의 수동 SQL 연결을 그대로 복사하지 않는다.
+- 시연 핵심 Alert·Incident는 `tests/seed_frontend_qa.py`의 수동 SQL 연결을 그대로 복사하지 않는다.
 
 ### 3.5 표시용 데이터와 운영 상태의 분리
 
@@ -82,11 +82,11 @@
 
 ### 3.6 개인정보와 보안
 
-- 실제 팀원 이름, 실제 어린 시절 정보, 실제 가정용 IP를 사용하지 않는다.
-- Hostname과 사용자명에는 `DEMO`, `STUDENT` 등 가상 데이터임을 식별할 수 있는 값을 사용한다.
+- Endpoint 소유자는 팀에서 합의한 이름만 사용하고, 실제 계정 ID·가정용 IP·개인 파일 내용은 사용하지 않는다.
+- Hostname은 팀에서 합의한 `GEONHA-*`, `SOYEON-*`, `HYERYEONG-*`, `JUHO-*` 형식을 사용한다.
 - 실제 악성코드, 실행 가능한 payload, 실제 불법 다운로드 링크를 포함하지 않는다.
 - IP는 문서용 대역인 `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`를 사용한다.
-- 일반 시연 Domain은 `.test` 또는 `example` 계열을 사용한다.
+- 사고 재현용 설치 출처는 `example` 계열 Domain을 사용한다.
 
 ## 4. `presentation` profile
 
@@ -95,7 +95,7 @@
 인트로 영상 이후 Dashboard에서 다음 흐름을 자연스럽게 보여준다.
 
 ```text
-가상 게임 설치 파일 실행
+Minecraft shader 설치 파일 실행
 → Encoded PowerShell 실행 Event
 → Rule이 Alert 생성
 → 같은 Endpoint·Rule·30분 window의 Alert가 하나의 Incident로 묶임
@@ -110,36 +110,42 @@
 
 | Role | Login ID | Password | 용도 |
 | --- | --- | --- | --- |
-| ADMIN | `frontend-admin` | `frontend-admin-password` | 발표 시연 |
+| ADMIN | `frontend-admin` | `frontend-admin-password` | Dashboard 시연 |
 | VIEWER | `frontend-viewer` | `frontend-viewer-password` | 권한 화면 확인이 필요할 때만 사용 |
 
 이 값은 local/QA 전용이며 production credential로 사용하지 않는다.
 
 ### 4.3 Endpoint inventory
 
-정확히 3개의 Endpoint를 만든다.
+정확히 5개의 Endpoint를 만든다. 황건하는 Mac mini와 Windows 두 대를 사용하고, 나머지는 Windows 한 대씩 사용한다.
 
-| Endpoint | OS·상태 | 역할 | 예상 화면 상태 |
-| --- | --- | --- | --- |
-| `DEMO-STUDENT-WIN-07` | Windows 11, ONLINE | 메인 공격 시나리오 | 가장 높은 Risk, 3 active Alerts, 2 open Incidents |
-| `DEMO-DEV-WIN-02` | Windows 11, ONLINE | 정상 비교군과 Domain 검증 | Risk 낮음, active Alert 없음 |
-| `DEMO-FINANCE-MAC-02` | macOS, OFFLINE | OS·상태 다양성 | 최근 Event는 있으나 active Alert 없음 |
+| Endpoint | 소유자·전공 | OS·상태 | 정상 활동 패턴 | 예상 화면 상태 |
+| --- | --- | --- | --- | --- |
+| `GEONHA-MACMINI` | 황건하·컴퓨터공학전공 | macOS, ONLINE | VS Code, Terminal, Git, Docker, Python, Node | 정상, 주 사용 기기 |
+| `GEONHA-WIN` | 황건하·컴퓨터공학전공 | Windows 11, OFFLINE | 강의, VS Code, PowerShell, Docker, WSL | 정상, 보조 기기 |
+| `SOYEON-WIN` | 박소연·컴퓨터공학전공 | Windows 11, ONLINE | 강의, Discord, Minecraft, Java, VS Code | 가장 높은 Risk, 3 active Alerts, 2 open Incidents |
+| `HYERYEONG-WIN` | 이혜령·디자인전공 | Windows 11, ONLINE | Figma, Photoshop, Illustrator, font·reference 탐색 | PROCESS sensor 일부 저하, Alert 없음 |
+| `JUHO-WIN` | 이주호·컴퓨터공학전공 | Windows 11, ONLINE | IntelliJ, Java, Gradle, Docker, Postman | 정상, Alert 없음 |
 
-Endpoint ID를 코드에 하드코딩해 발표자가 추측하게 하지 않는다. 실행 결과 manifest에 실제 ID를 기록한다.
+Endpoint ID를 코드에 하드코딩해 시연자가 추측하게 하지 않는다. 실행 결과 manifest에 실제 ID를 기록한다.
 
 ### 4.4 Event 총량과 분포
 
 `presentation` profile의 예상 결과는 다음과 같다.
 
-- Endpoint: 3
-- Event: 정확히 64
+- Endpoint: 5
+- Event: 최근 14일 정확히 5,600
+- 최근 24시간 Event: 정확히 400
+- 최근 7일 Event: 정확히 2,800
 - Alert: 정확히 3
 - Incident: 정확히 2
-- `DEMO-STUDENT-WIN-07`: Event 24
-- `DEMO-DEV-WIN-02`: Event 24
-- `DEMO-FINANCE-MAC-02`: Event 16
+- `GEONHA-MACMINI`: 하루 100, 14일 1,400 Event
+- `GEONHA-WIN`: 하루 75, 14일 1,050 Event
+- `SOYEON-WIN`: 하루 85, 14일 1,190 Event
+- `HYERYEONG-WIN`: 하루 65, 14일 910 Event
+- `JUHO-WIN`: 하루 75, 14일 1,050 Event
 
-64개 Event에는 `PROCESS_EXECUTION`, `NETWORK_CONNECTION`, `FILE_EVENT`, `DNS_QUERY`, `L7_EVENT`가 모두 포함되어야 한다. 메인 공격 Event를 제외한 배경 Event는 활성 Rule에 우연히 걸리지 않는 값으로 만든다.
+5,600개 Event에는 `PROCESS_EXECUTION`, `NETWORK_CONNECTION`, `FILE_EVENT`, `DNS_QUERY`, `L7_EVENT`가 모두 포함되어야 한다. 메인 사고 Event 6개를 제외한 배경 Event는 활성 Rule에 우연히 걸리지 않는 값으로 만든다.
 
 ### 4.5 메인 공격 Timeline
 
@@ -147,9 +153,9 @@ Endpoint ID를 코드에 하드코딩해 발표자가 추측하게 하지 않는
 
 | 순서 | 상대 시각 | Event | 핵심 값 | 예상 탐지 결과 |
 | ---: | ---: | --- | --- | --- |
-| 1 | window + 5분 | DNS Query | `game-mirror.test` | Alert 없음 |
-| 2 | window + 7분 | File Create | `C:\Users\student\Downloads\game-installer.exe` | Alert 없음 |
-| 3 | window + 9분 | Process Execution | `game-installer.exe` | Alert 없음 |
+| 1 | window + 5분 | DNS Query | `minecraft-shader.example` | Alert 없음 |
+| 2 | window + 7분 | File Create | `C:\Users\Soyeon\Downloads\Minecraft_Shader_Setup.exe` | Alert 없음 |
+| 3 | window + 9분 | Process Execution | `Minecraft_Shader_Setup.exe` | Alert 없음 |
 | 4 | window + 10분 | Process Execution | `powershell.exe -EncodedCommand <safe-demo-value>` | HIGH Alert 1 |
 | 5 | window + 12분 | Process Execution | 같은 PID 계열의 두 번째 Encoded PowerShell | HIGH Alert 2 |
 | 6 | window + 14분 | Network Connection | `update-cache.test:443`, `203.0.113.88` | CRITICAL Alert 3 |
@@ -166,20 +172,22 @@ Endpoint ID를 코드에 하드코딩해 발표자가 추측하게 하지 않는
 | Incident 1 | `suspicious-powershell` | HIGH | Alert 1·2, `alert_count=2` |
 | Incident 2 | `suspicious-egress` | CRITICAL | Alert 3, `alert_count=1` |
 
-발표 시 “PowerShell과 외부 통신이 한 Incident로 자동 결합됐다”고 말하지 않는다. 오히려 서로 다른 상관 키를 함부로 합치지 않는 현재 동작을 정확하게 유지한다.
+시연 시 “PowerShell과 외부 통신이 한 Incident로 자동 결합됐다”고 말하지 않는다. 하나의 Minecraft 사고 케이스를 조사하되 시스템에는 서로 다른 상관 키의 Incident 2개가 존재한다고 설명한다.
 
 ### 4.7 시연 화면별 데이터 조건
 
 #### Overview
 
-- `LATEST_24H`에서 64 Event, 3 Alert, 2 open Incident가 보여야 한다.
-- `DEMO-STUDENT-WIN-07`이 Highest-risk Endpoint 첫 번째에 보여야 한다.
+- `LATEST_24H`에서 400 Event, 3 Alert, 2 open Incident가 보여야 한다.
+- `LATEST_7D`에서 2,800 Event, 3 Alert, 2 open Incident가 보여야 한다.
+- `SOYEON-WIN`이 Highest-risk Endpoint 첫 번째에 보여야 한다.
 - Event type과 시간대별 차트가 비어 있지 않아야 한다.
 - 최근 Incident 목록에서 두 Incident를 찾을 수 있어야 한다.
 
 #### Endpoint Detail
 
-- 메인 Endpoint에 3 active Alert와 2 open Incident가 보여야 한다.
+- `SOYEON-WIN`에 3 active Alert와 2 open Incident가 보여야 한다.
+- `LATEST_24H` Timeline에는 정확히 85개 Event가 보여야 한다.
 - 최근 Event에 DNS → File → Process → PowerShell → Network 흐름이 시간순으로 확인되어야 한다.
 - Sensor health는 표현 다양성을 위해 정상과 일부 저하 상태를 포함할 수 있지만, 실제 Worker health와 혼동되는 문구를 쓰지 않는다.
 
@@ -201,8 +209,8 @@ Endpoint ID를 코드에 하드코딩해 발표자가 추측하게 하지 않는
 
 ### 4.8 배경 Event 조건
 
-- 정상 Process 예시: `chrome.exe`, `explorer.exe`, `code.exe`, `python.exe`, macOS의 `launchd`.
-- 정상 Domain 예시: `docs.example.test`, `cdn.example.test`, `updates.example.test`.
+- 정상 Process는 Endpoint 역할에 따라 VS Code·Docker·Python·Node, IntelliJ·Java·Gradle·Postman, Figma·Photoshop·Illustrator, Minecraft Launcher·Java를 사용한다.
+- 정상 Domain은 `class.tukorea.ac.kr`, `github.com`, `notion.so`, `discord.com`, `figma.com`, `behance.net`, `repo.maven.apache.org` 등 역할에 맞게 분산한다.
 - `update-cache`, `rare-beacon`, `api.corp`, `artifact-`, `payload-` 등 활성 Rule에 걸리는 문자열을 배경 데이터에 넣지 않는다.
 - L7의 POST·PUT과 `update-cache` 또는 `storage.` 조합을 피한다.
 - Severity, Alert, Incident는 임의로 분포시키지 않고 위 3개 Alert와 2개 Incident만 생성한다.
@@ -322,7 +330,7 @@ uv run python tools/seed_dashboard_long_range.py --days 31 --endpoints 100 --eve
 
 ## 7. Seed 실행 인터페이스 요구사항
 
-신규 발표용 seed의 권장 인터페이스는 다음과 같다.
+시연 데이터 seed의 권장 인터페이스는 다음과 같다.
 
 ```powershell
 uv run python tools/seed_presentation_demo.py --profile presentation --seed 20260721 --anchor now --dry-run
@@ -369,10 +377,15 @@ runtime/demo/presentation-manifest.json
     "to": "RFC3339 timestamp"
   },
   "counts": {
-    "endpoints": 3,
-    "events": 64,
+    "endpoints": 5,
+    "events": 5600,
     "alerts": 3,
     "incidents": 2
+  },
+  "rangeCounts": {
+    "latest24h": 400,
+    "latest7d": 2800,
+    "latest14d": 5600
   },
   "ids": {
     "presentationEndpointId": 0,
@@ -408,7 +421,7 @@ manifest에는 실제 production secret을 기록하지 않는다.
 - Collector가 broker ACK를 받은 Event ID와, Worker 처리 후 ClickHouse·PostgreSQL에 나타난 ID를 분리해 확인한다.
 - accepted response를 Detection 완료로 해석하지 않는다.
 - timeout 안에 예상 Event·Alert·Incident가 모두 조회되는지 poll하고 결과를 manifest에 기록한다.
-- 실패 시 라이브 발표를 중단시키지 않도록 녹화 영상 fallback을 준비한다.
+- 실패 시 라이브 시연을 중단시키지 않도록 녹화 영상 fallback을 준비한다.
 
 ## 10. 검증 요구사항
 
@@ -416,11 +429,13 @@ manifest에는 실제 production secret을 기록하지 않는다.
 
 최소한 다음을 test로 고정한다.
 
-- `presentation` dry-run count가 3·64·3·2인지 확인
+- `presentation` dry-run count가 5·5,600·3·2인지 확인
+- 최근 24시간 400 Event, 최근 7일 2,800 Event인지 확인
+- 5개 Endpoint의 이름·소유자·전공·OS·일별 분포가 고정되는지 확인
 - deterministic seed에서 ID와 Timeline이 반복 실행마다 같은지 확인
 - 두 PowerShell Alert가 하나의 `suspicious-powershell` Incident에 연결되는지 확인
 - Egress Alert가 별도 `suspicious-egress` Incident에 연결되는지 확인
-- 61개의 비탐지 Event가 추가 Alert를 만들지 않는지 확인
+- 5,597개의 비탐지 Event가 추가 Alert를 만들지 않는지 확인
 - `notyahoo.com`과 `yahoo.com.evil.example`이 `yahoo.com` 결과에서 제외되는지 확인
 - DNS answer JSON array가 exact membership으로 처리되는지 확인
 - Endpoint filter가 DB query까지 전달되는지 확인
@@ -441,14 +456,14 @@ seed 후 다음 API 또는 대응 service 결과를 검증한다.
 ### 화면 검증
 
 - 1920×1080 기준 화면 잘림이 없어야 한다.
-- 발표자가 클릭할 대상이 첫 화면 또는 명확한 filter 결과에 있어야 한다.
+- 시연자가 클릭할 대상이 첫 화면 또는 명확한 filter 결과에 있어야 한다.
 - 데이터가 너무 많아 메인 Incident를 찾기 어렵지 않아야 한다.
 - time preset을 `LATEST_24H`로 바꿔도 핵심 Event가 사라지지 않아야 한다.
 - 한글·영문 혼용으로 제목이 잘리지 않는지 확인한다.
 
 ## 11. 발표·녹화 운영 요구사항
 
-- 라이브 발표 하루 전과 발표 직전에 같은 명령으로 seed해본다.
+- 라이브 시연 하루 전과 시연 직전에 같은 명령으로 seed해본다.
 - 영상 녹화는 고정 `--anchor`를 사용해 목록 순서와 숫자를 유지한다.
 - 라이브 시연은 `--anchor now`를 사용해 “최근 Event”로 보이게 한다.
 - 영상과 라이브 화면의 ID가 달라도 발표 대본은 manifest의 이름을 기준으로 작성한다.
@@ -465,44 +480,47 @@ seed 후 다음 API 또는 대응 service 결과를 검증한다.
 4. `runtime/demo/presentation-manifest.json` 생성 기능
 5. 실행·복구 방법을 적은 짧은 runbook
 6. presentation과 performance profile의 destructive reset 경고
-7. 발표자가 사용할 정확한 로그인 정보, URL, 클릭 순서
+7. 시연자가 사용할 정확한 로그인 정보, URL, 클릭 순서
 
 기존 `tools/seed_dashboard_long_range.py`는 성능 profile에 재사용하되, base fixture가 추가하는 Event와 실제 측정 범위를 검증한다.
 
 ## 13. 완료 기준
 
-다음 조건을 모두 충족해야 발표용 목데이터가 준비된 것으로 본다.
+다음 조건을 모두 충족해야 시연 데이터가 준비된 것으로 본다.
 
 - 한 명령으로 presentation profile을 재생성할 수 있다.
-- Overview에서 64 Event·3 Alert·2 Incident가 확인된다.
+- Overview `LATEST_24H`에서 400 Event·3 Alert·2 Incident가 확인된다.
+- Overview `LATEST_7D`에서 2,800 Event가 확인된다.
+- 5개 Endpoint와 최근 14일 5,600 Event가 생성된다.
+- `SOYEON-WIN`에서 Minecraft 사고 Timeline과 85개 최근 Event를 조사할 수 있다.
 - PowerShell Incident에 같은 Rule의 Alert 2개가 연결된다.
 - Egress Alert는 별도 Incident로 존재한다.
 - 메인 Endpoint에서 전체 Timeline을 클릭해 조사할 수 있다.
 - Domain exact·subdomain만 포함되고 두 대표 오탐 Domain은 제외된다.
 - 248,000 생성 Event 성능 profile의 dry-run과 실행 방법이 검증된다.
-- seed 경로와 실제 Kafka Pipeline 경로를 발표자가 구분해 설명할 수 있다.
+- seed 경로와 실제 Kafka Pipeline 경로를 시연자가 구분해 설명할 수 있다.
 - 목데이터임을 숨기거나 production 실측처럼 표현하는 문장이 없다.
 - 라이브 시연 실패 시 사용할 녹화 영상이 준비된다.
 
 ## 14. 구현 담당자에게 보낼 요구 메시지
 
 ```text
-EDR_C 최종 발표용 목데이터를 만들어 주세요.
+EDR_C 최종 시연 데이터를 준비해 주세요.
 
 먼저 docs/presentation/MOCK_DATA_REQUIREMENTS.md를 전체 확인하고, 현재 구현 코드를 source of truth로 사용해 주세요.
 
 핵심 요구사항은 다음과 같습니다.
 
-1. presentation profile: 3 Endpoint, 64 Event, 3 Alert, 2 Incident
-2. 같은 Endpoint의 Encoded PowerShell Event 2개를 같은 30분 window에 넣어 하나의 suspicious-powershell Incident로 연결
+1. presentation profile: 5 Endpoint, 최근 14일 5,600 Event, 최근 24시간 400 Event, 최근 7일 2,800 Event, 3 Alert, 2 Incident
+2. 박소연의 SOYEON-WIN에서 Minecraft shader 설치 사고를 재현하고 Encoded PowerShell Event 2개를 같은 30분 window에 넣어 하나의 suspicious-powershell Incident로 연결
 3. NET_SUSPICIOUS_EGRESS Alert는 correlation_key가 다르므로 별도 suspicious-egress Incident로 생성
 4. 서로 다른 Rule의 Alert를 SQL로 한 Incident에 수동 연결하지 않기
 5. dns-correctness profile에서 yahoo.com exact·subdomain은 포함하고 notyahoo.com, yahoo.com.evil.example은 제외
 6. --dry-run, --confirm-reset, --seed, --anchor 지원
-7. 실행 후 Endpoint·Alert·Incident ID와 발표용 URL이 담긴 manifest 생성
+7. 실행 후 Endpoint·Alert·Incident ID와 시연 URL이 담긴 manifest 생성
 8. local/QA가 아니면 destructive seed 실행 거부
 9. 직접 seed와 Collector·Kafka를 통한 실제 주입 모드를 명확히 구분
 10. 기존 tools/seed_dashboard_long_range.py의 31일·100 Endpoint·하루 80 Event 조건도 검증
 
-구현 후에는 자동 test, API 검증 결과, 실제 생성 count, 발표자가 사용할 실행 명령과 클릭 순서를 함께 알려주세요.
+구현 후에는 자동 test, API 검증 결과, 실제 생성 count, 시연자가 사용할 실행 명령과 클릭 순서를 함께 알려주세요.
 ```

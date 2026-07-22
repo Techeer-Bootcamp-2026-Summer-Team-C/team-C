@@ -33,20 +33,41 @@ def _verify_presentation(
     manifest: dict[str, Any],
 ) -> dict[str, Any]:
     counts = manifest["counts"]
+    range_counts = manifest["rangeCounts"]
     ids = manifest["ids"]
     summary = _request(
         client,
         "/api/v1/dashboard/summary?timePreset=LATEST_24H&interval=5m",
         token,
     )
-    actual = {
+    latest_24h = {
         "endpoints": int(summary["endpoints"]["totalCount"]),
         "events": int(summary["events"]["totalCount"]),
         "alerts": int(summary["alerts"]["totalCount"]),
         "incidents": int(summary["incidents"]["openCount"]),
     }
-    if actual != counts:
-        raise AssertionError(f"Overview counts differ: expected={counts}, actual={actual}")
+    expected_24h = {
+        "endpoints": counts["endpoints"],
+        "events": range_counts["latest24h"],
+        "alerts": counts["alerts"],
+        "incidents": counts["incidents"],
+    }
+    if latest_24h != expected_24h:
+        raise AssertionError(f"LATEST_24H Overview differs: expected={expected_24h}, actual={latest_24h}")
+    summary_7d = _request(
+        client,
+        "/api/v1/dashboard/summary?timePreset=LATEST_7D&interval=1d",
+        token,
+    )
+    latest_7d = {
+        "endpoints": int(summary_7d["endpoints"]["totalCount"]),
+        "events": int(summary_7d["events"]["totalCount"]),
+        "alerts": int(summary_7d["alerts"]["totalCount"]),
+        "incidents": int(summary_7d["incidents"]["openCount"]),
+    }
+    expected_7d = {**expected_24h, "events": range_counts["latest7d"]}
+    if latest_7d != expected_7d:
+        raise AssertionError(f"LATEST_7D Overview differs: expected={expected_7d}, actual={latest_7d}")
 
     powershell_incident_id = int(ids["powershellIncidentId"])
     egress_incident_id = int(ids["egressIncidentId"])
@@ -66,7 +87,7 @@ def _verify_presentation(
         raise AssertionError("PowerShell Incident timeline does not expose both linked Alerts")
     main_endpoint_id = int(ids["presentationEndpointId"])
     endpoint = _request(client, f"/api/v1/endpoints/{main_endpoint_id}", token)
-    if endpoint["hostname"] != "DEMO-STUDENT-WIN-07":
+    if endpoint["hostname"] != "SOYEON-WIN":
         raise AssertionError("manifest presentationEndpointId points to the wrong Endpoint")
     if endpoint["risk"]["activeAlertCount"] != 3 or endpoint["risk"]["openIncidentCount"] != 2:
         raise AssertionError("main Endpoint must expose 3 active Alerts and 2 open Incidents")
@@ -75,13 +96,18 @@ def _verify_presentation(
         f"/api/v1/events?timePreset=LATEST_24H&endpointId={main_endpoint_id}&page=1&size=100",
         token,
     )
-    if events["total"] != 24:
-        raise AssertionError(f"main Endpoint timeline expected 24 Events, got {events['total']}")
+    if events["total"] != 85:
+        raise AssertionError(f"SOYEON-WIN LATEST_24H timeline expected 85 Events, got {events['total']}")
+    expected_hostnames = {"GEONHA-MACMINI", "GEONHA-WIN", "SOYEON-WIN", "HYERYEONG-WIN", "JUHO-WIN"}
+    actual_hostnames = set(ids["endpointIdsByHostname"])
+    if actual_hostnames != expected_hostnames:
+        raise AssertionError(f"Endpoint hostnames differ: expected={expected_hostnames}, actual={actual_hostnames}")
     return {
-        "overview": actual,
+        "overviewLatest24h": latest_24h,
+        "overviewLatest7d": latest_7d,
         "powershellIncidentAlertCount": powershell["alertCount"],
         "egressIncidentAlertCount": egress["alertCount"],
-        "mainEndpointTimelineEvents": events["total"],
+        "soyeonTimelineLatest24h": events["total"],
     }
 
 

@@ -1,5 +1,6 @@
 import json
-from datetime import UTC, datetime
+from collections import Counter
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -18,11 +19,34 @@ ANCHOR = datetime(2026, 7, 21, 12, 20, tzinfo=UTC)
 def test_presentation_profile_has_exact_counts_distribution_and_correlation() -> None:
     plan = build_presentation_plan(20_260_721, ANCHOR)
 
-    assert plan.counts == {"endpoints": 3, "events": 64, "alerts": 3, "incidents": 2}
+    assert plan.counts == {"endpoints": 5, "events": 5_600, "alerts": 3, "incidents": 2}
     assert {endpoint.hostname: endpoint.event_count for endpoint in plan.endpoints} == {
-        "DEMO-STUDENT-WIN-07": 24,
-        "DEMO-DEV-WIN-02": 24,
-        "DEMO-FINANCE-MAC-02": 16,
+        "GEONHA-MACMINI": 1_400,
+        "GEONHA-WIN": 1_050,
+        "SOYEON-WIN": 1_190,
+        "HYERYEONG-WIN": 910,
+        "JUHO-WIN": 1_050,
+    }
+    assert Counter(endpoint.owner_name for endpoint in plan.endpoints) == {
+        "황건하": 2,
+        "박소연": 1,
+        "이혜령": 1,
+        "이주호": 1,
+    }
+    assert {endpoint.major for endpoint in plan.endpoints if endpoint.owner_name == "이혜령"} == {"디자인전공"}
+    assert {
+        endpoint.major for endpoint in plan.endpoints if endpoint.owner_name != "이혜령"
+    } == {"컴퓨터공학전공"}
+    assert sum(event.occurred_at > ANCHOR - timedelta(days=1) for event in plan.events) == 400
+    assert sum(event.occurred_at > ANCHOR - timedelta(days=7) for event in plan.events) == 2_800
+    assert min(event.occurred_at for event in plan.events) > ANCHOR - timedelta(days=14)
+    assert max(event.occurred_at for event in plan.events) <= ANCHOR
+    assert {event.event_type for event in plan.events} == {
+        "PROCESS_EXECUTION",
+        "NETWORK_CONNECTION",
+        "FILE_EVENT",
+        "DNS_QUERY",
+        "L7_EVENT",
     }
     powershell = [
         event
@@ -30,8 +54,15 @@ def test_presentation_profile_has_exact_counts_distribution_and_correlation() ->
         if event.event_type == "PROCESS_EXECUTION" and "-EncodedCommand" in str(event.payload.get("commandLine"))
     ]
     assert len(powershell) == 2
-    assert {event.hostname for event in powershell} == {"DEMO-STUDENT-WIN-07"}
+    assert {event.hostname for event in powershell} == {"SOYEON-WIN"}
     assert abs((powershell[1].occurred_at - powershell[0].occurred_at).total_seconds()) < 1_800
+    minecraft = [
+        event
+        for event in plan.events
+        if "Minecraft_Shader_Setup.exe" in json.dumps(event.payload, ensure_ascii=False)
+    ]
+    assert len(minecraft) == 2
+    assert {event.hostname for event in minecraft} == {"SOYEON-WIN"}
 
 
 def test_profile_generation_is_deterministic_for_seed_and_anchor() -> None:
@@ -39,8 +70,8 @@ def test_profile_generation_is_deterministic_for_seed_and_anchor() -> None:
     second = build_presentation_plan(7, ANCHOR)
 
     assert first.events == second.events
-    assert len({event.event_id for event in first.events}) == 64
-    assert len({event.batch_id for event in first.events}) == 64
+    assert len({event.event_id for event in first.events}) == 5_600
+    assert len({event.batch_id for event in first.events}) == 5_600
 
 
 def test_dns_correctness_fixture_contains_boundaries_and_exact_answer_members() -> None:
@@ -79,8 +110,8 @@ def test_dry_run_prints_counts_without_reset_confirmation(capsys: pytest.Capture
     )
 
     output = capsys.readouterr().out
-    assert "Endpoints:        3" in output
-    assert "Events:           64" in output
+    assert "Endpoints:        5" in output
+    assert "Events:           5600" in output
     assert "Alerts:           3" in output
     assert "Incidents:        2" in output
     assert "mock data:        yes" in output
