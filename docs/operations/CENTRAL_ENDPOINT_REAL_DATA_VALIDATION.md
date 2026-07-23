@@ -27,7 +27,7 @@ macOS Agent ───┘                         │
                          중앙 API :8080 → Dashboard
 ```
 
-이 검증에서는 `tests/seed_frontend_qa.py`, `tools.seed_dashboard_long_range`, DB 직접 Event 삽입을 사용하지 않는다. Agent가 실제 OS에서 수집하여 전송한 Event만 검증 대상으로 인정한다.
+이 검증에서는 QA fixture나 DB 직접 Event 삽입을 사용하지 않는다. Agent가 실제 OS에서 수집하여 전송한 Event만 검증 대상으로 인정한다.
 
 ## 1. 역할과 범위
 

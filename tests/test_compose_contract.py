@@ -166,7 +166,6 @@ def test_backend_image_allowlists_runtime_and_demo_setup_tools() -> None:
         assert f"tools/{tool}" in dockerfile
     for development_only_tool in (
         "export_openapi.py",
-        "seed_dashboard_long_range.py",
         "sync_mitre_attack.py",
     ):
         assert f"tools/{development_only_tool}" not in dockerfile

@@ -10,7 +10,7 @@
 | --- | --- |
 | `../contracts/API_SPEC.md` | Dashboard와 Agent가 사용하는 REST 계약 |
 | `../contracts/RISK_POLICY.md` | Endpoint Risk, Threat Level, Collection Health와 전역 EDR 상태 계산 공식 |
-| `../frontend/FRONTEND_SPEC.md` | Frontend route, 화면별 API, query, 수동 갱신, 인증, 시각 token, component state, responsive와 접근성 |
+| `../../frontend/src/`, `../../frontend/tests/` | Frontend route, 화면별 API, query, 인증, 시각 token, component state와 검증 |
 | `EDR_DATA_MODEL.md` | 저장소별 논리 데이터 모델 |
 | `ERD_FINAL.sql` | 한글 설명을 포함한 ERDCloud 업로드용 MySQL 호환 최종 논리 ERD |
 | `TECH_STACK.md` | 컴포넌트, 실행환경, 데이터 흐름과 운영 정책 |
@@ -396,8 +396,8 @@ HOT `storage_path`는 물리 partition명이 아니라 `clickhouse://edr_events/
 - Overview의 23개 콘텐츠 widget은 `react-grid-layout@2.2.3` registry로 관리한다. 이 버전은 React 19 peer 범위를 충족하고 실제 drag, resize, collision 재배치, vertical compaction, bounds, responsive breakpoint와 widget별 min/max를 제공한다.
 - 저장 대상은 데스크톱 12열의 `id/x/y/w/h/hidden`이며 태블릿 6열은 저장 순서를 유지해 자동 생성한다. 768px 미만 viewport는 지원하지 않는다. Header, sidebar, user menu, route와 widget 내부 요소는 grid 대상이 아니다.
 - 기본 layout은 저장 layout 조회와 병렬로 먼저 렌더링하지만 조회 완료 전에는 편집 진입을 잠근다. 태블릿 자동 layout은 읽기 전용이며 drag, resize와 편집 진입은 데스크톱에서만 허용한다.
-- Frontend route, 화면별 API 조합, query 직렬화, 수동 refresh와 retry 정책은 `../frontend/FRONTEND_SPEC.md`를 따른다.
-- Frontend color, spacing, panel/chart/list primitive, responsive와 접근성은 `../frontend/FRONTEND_SPEC.md`의 Design System 부분을 따른다.
+- Frontend route, 화면별 API 조합, query 직렬화, 수동 refresh와 retry 정책은 현재 `frontend/src/` 구현과 `frontend/tests/` 검증을 기준으로 한다.
+- Frontend color, spacing, panel/chart/list primitive, responsive와 접근성은 현재 CSS token, 공통 component와 시각 검증을 기준으로 한다.
 - Dashboard JWT access token, 사용자 정보, 만료시각은 탭 단위 `sessionStorage`에 저장한다. 마지막 primary route와 navigation compact 상태만 `localStorage`에 저장하고 Overview layout은 JWT `sub` 사용자별 `user_dashboard_layouts`와 `/dashboard/layouts/overview` API에 저장한다.
 - Layout PUT은 전체 문서와 revision을 사용하며 충돌 시 `409 DASHBOARD_LAYOUT_REVISION_CONFLICT`다. GET은 신규/삭제 widget과 변경된 크기 제한을 registry에 병합하고 손상 JSON은 기본 layout으로 복구한다.
 - `lastRefreshedAt`은 프론트가 마지막 성공 응답 수신 시각으로 관리하며 API field가 아니다. Backend 계산 시각은 `edrState.calculatedAt`, `risk.calculatedAt`을 사용하고 legacy `generatedAt`, `decision`, `source`는 사용하지 않는다.
@@ -505,8 +505,8 @@ tools/
 - Threat Level과 Collection Health를 구분한 EDR 상태와 reason code 확인
 - Alert의 Rule version에 맞는 읽기 전용 response guidance 확인
 - 목록 query가 `../contracts/API_SPEC.md`의 filter, deterministic sort와 pagination을 지키는지 확인
-- Overview/Operations가 `../frontend/FRONTEND_SPEC.md`의 수동 refresh와 no-auto-retry 규칙을 지키는지 확인
-- 768px과 1280px에서 `../frontend/FRONTEND_SPEC.md`의 navigation, table, focus와 상태 표시 확인
+- Overview/Operations가 현재 query policy의 수동 refresh와 no-auto-retry 규칙을 지키는지 확인
+- 768px과 1280px에서 navigation, table, focus와 상태 표시 확인
 - 저장 Report, 웹 replay, Agent 원격 조치 endpoint가 존재하지 않는지 확인
 - Agent SQLite ACK row 물리 삭제 확인
 - failure 1건을 S3에 저장하고 관리자 CLI로 수동 재처리

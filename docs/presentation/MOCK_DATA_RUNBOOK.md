@@ -219,23 +219,7 @@ uv run python -m tools.verify_presentation_demo --manifest runtime/demo/dns-corr
 
 Intelligence에서 `yahoo.com`을 조회한다. `yahoo.com`, `mail.yahoo.com`, `api.yahoo.com`만 관찰 범위에 포함되고 `notyahoo.com`, `yahoo.com.evil.example`, `yahoo.co`는 제외돼야 한다.
 
-## 4. 248,000 Event 성능 profile
-
-시연 직전에는 실행하지 않는다. 먼저 계산만 확인한다.
-
-```powershell
-uv run python tools/seed_dashboard_long_range.py --days 31 --endpoints 100 --events-per-endpoint-day 80 --seed 20260715 --dry-run
-```
-
-출력의 `Events`가 `248,000`인지 확인한 뒤, 성능 측정용 local/QA 환경에서만 실행한다.
-
-```powershell
-uv run python tools/seed_dashboard_long_range.py --days 31 --endpoints 100 --events-per-endpoint-day 80 --seed 20260715 --confirm-reset
-```
-
-기존 long-range 도구는 먼저 작은 base fixture를 넣고 248,000개 생성 Event를 추가한다. 따라서 `Events added: 248,000`은 추가 생성량이며 DB 전체 row 수와 동일하다고 표현하지 않는다.
-
-## 5. direct seed와 실제 Kafka Pipeline의 차이
+## 4. direct seed와 실제 Kafka Pipeline의 차이
 
 기본 `direct-seed`는 시연 상태를 빠르고 결정적으로 복원한다. Event는 ClickHouse repository로, Alert·Incident는 현재 Rule loader와 Detection engine 및 PostgreSQL repository로 생성한다. Kafka 처리 증거로 사용하지 않는다.
 
@@ -247,7 +231,7 @@ uv run python -m tools.seed_presentation_demo --profile presentation --seed 2026
 
 이 모드는 local 개발 CA로 profile별 mTLS Agent 인증서를 발급하고 Collector broker ACK 이후 ClickHouse·PostgreSQL의 최종 count를 polling한다. Collector의 accepted 응답 자체를 Detection 완료로 해석하지 않는다. manifest의 `ingestionMode`로 실행 경로를 확인한다.
 
-## 6. 고정 anchor와 녹화 fallback
+## 5. 고정 anchor와 녹화 fallback
 
 녹화에는 고정 RFC 3339 anchor를 사용해 Event 순서와 ID를 재현한다. 녹화 직후에는 같은 고정 anchor로 다시 seed하고 manifest URL이 재생되는지 확인한다.
 

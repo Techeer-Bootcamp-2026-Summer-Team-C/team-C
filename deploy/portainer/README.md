@@ -10,7 +10,7 @@
 - `compose.portainer-agent.yaml`
 - `compose.portainer-server.yaml`
 
-Portainer에 입력할 변수 이름은 `env.infra.example`, `env.service.example`, `env.observability.example`을 참고한다. 예시 파일에는 비밀값을 넣지 않으며 실제 값은 Portainer 환경 변수로만 관리한다. 현재 운영 스냅샷과 남은 과제는 `docs/operations/DEPLOYMENT_STATUS.md`에 기록한다.
+Portainer에 입력할 변수 이름은 `env.infra.example`, `env.service.example`, `env.observability.example`을 참고한다. 예시 파일에는 비밀값을 넣지 않으며 실제 값은 Portainer 환경 변수로만 관리한다.
 
 현재 저장소 변경을 GitHub에 올리기 전에는 아래 명령을 실행하지 않는다.
 

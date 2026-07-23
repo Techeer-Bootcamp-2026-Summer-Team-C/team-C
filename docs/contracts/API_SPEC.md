@@ -4,7 +4,7 @@
 
 이 문서는 single-tenant 포트폴리오 EDR PoC의 Dashboard REST API와 Windows/macOS Agent Collector REST 계약을 정의한다.
 
-Endpoint Risk와 전역 EDR 상태의 계산 공식은 `RISK_POLICY.md`, 프론트 route·polling·화면 mapping·시각 token·component state는 `../frontend/FRONTEND_SPEC.md`를 따른다. 외부 API 응답 shape가 충돌하면 이 문서의 FastAPI/Pydantic 계약이 우선한다.
+Endpoint Risk와 전역 EDR 상태의 계산 공식은 `RISK_POLICY.md`를 따른다. 프론트 route·query·화면 상태는 현재 `frontend/src/` 구현과 `frontend/tests/` 검증을 기준으로 하며, 외부 API 응답 shape가 충돌하면 이 문서의 FastAPI/Pydantic 계약이 우선한다.
 
 Agent는 Process, Network, File, DNS, L7 5종 metadata를 전송한다. Npcap/tcpdump에서 읽은 원본 packet은 실시간 분석 후 폐기하며 PCAP 파일, PCAP upload API, Agent command API는 제공하지 않는다.
 
