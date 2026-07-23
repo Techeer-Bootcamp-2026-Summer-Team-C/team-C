@@ -1,6 +1,6 @@
 name: edr-c-service
 
-x-backend-image: &backend-image ghcr.io/techeer-bootcamp-2026-summer-team-c/team-c-backend:${EDR_IMAGE_TAG:?EDR_IMAGE_TAG is required}
+x-backend-image: &backend-image ghcr.io/techeer-bootcamp-2026-summer-team-c/team-c-backend:e7b24fdc808630d3d3f44d0e0dc8501a4ca92a6b
 
 x-app-environment: &app-environment
   EDR_ENV: production
@@ -91,7 +91,7 @@ services:
       start_period: 60s
 
   nginx:
-    image: ghcr.io/techeer-bootcamp-2026-summer-team-c/team-c-nginx:${EDR_IMAGE_TAG:?EDR_IMAGE_TAG is required}
+    image: ghcr.io/techeer-bootcamp-2026-summer-team-c/team-c-nginx:e7b24fdc808630d3d3f44d0e0dc8501a4ca92a6b
     depends_on:
       backend:
         condition: service_healthy
