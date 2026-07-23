@@ -4,7 +4,7 @@ rule_name: Unusual HTTPS Upload
 alert_title: Unusual HTTPS upload detected
 alert_summary: An unusual upload request was observed to an external host.
 version: 1
-enabled: true
+enabled: false
 event_type: L7_EVENT
 conditions:
   all:
@@ -23,13 +23,8 @@ conditions:
       value: '(?i)(update-cache|storage)\.'
 severity: CRITICAL
 risk_score: 94
-mitre:
-  tactic_code: TA0010
-  technique_code: T1048.003
 incident:
-  enabled: true
-  correlation_key: unusual-l7-upload
-  window_seconds: 1800
+  enabled: false
 response_guidance:
   - order: 1
     title: Review upload context

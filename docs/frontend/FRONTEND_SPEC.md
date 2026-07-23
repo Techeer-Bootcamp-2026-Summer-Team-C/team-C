@@ -1,12 +1,11 @@
 # EDR Dashboard Frontend 구현 명세
 
-- 갱신일: 2026-07-17
-- 현재 Overview 실행계획: [OVERVIEW_DASHBOARD_REDESIGN_PLAN.md](./OVERVIEW_DASHBOARD_REDESIGN_PLAN.md)
-- 현재 Theme/Custom Dashboard 작업지시서: [THEME_CUSTOM_DASHBOARD_IMPLEMENTATION_WORK_ORDER.md](./THEME_CUSTOM_DASHBOARD_IMPLEMENTATION_WORK_ORDER.md)
+- 갱신일: 2026-07-23
+- 문서 상태: 현재 구현 기준
 
 ## 1. 문서 목적
 
-이 문서는 React/TypeScript/Vite EDR Dashboard의 route, 화면 구성, API mapping, query, polling, 인증, 상태 처리와 기존 UI reference 사용 범위를 정의한다.
+이 문서는 React/TypeScript/Vite EDR Dashboard의 route, 화면 구성, API mapping, query, 수동 갱신, 인증, 상태 처리와 기존 UI reference 사용 범위를 정의한다.
 
 문서 책임 우선순위:
 
@@ -248,31 +247,22 @@ page
 size
 ```
 
-## 7. Polling과 request lifecycle
+## 7. 수동 갱신과 request lifecycle
 
-| 화면/API | 주기 |
-| --- | ---: |
-| Overview의 Dashboard API 3개, 위험 Endpoint, Incident queue | 30초 |
-| Operations Ingest summary | 15초 |
-| Operations live health | 30초 |
-| Operations Failure queue | 30초 |
-| Archive에 `RESTORE_REQUESTED` 존재 | 10초 |
-| Archive 진행 항목 없음 | 30초 |
-| Alert/Incident/Endpoint/Event 목록·상세 | 자동 polling 없음 |
+모든 화면은 route 진입과 사용자의 명시적인 새로고침 action에서만 조회한다. 화면 전체 reload, timer 기반
+polling, browser focus/reconnect 시 자동 조회는 사용하지 않는다.
 
 규칙:
 
 - 화면 진입 시 즉시 조회한다.
-- browser document가 hidden이면 polling을 중지한다.
-- visible 복귀 시 마지막 성공 조회가 해당 화면 polling 주기보다 오래됐으면 즉시 조회한다.
+- 새로고침 action은 현재 query만 다시 요청하며 `window.location.reload`로 page 전체를 다시 열지 않는다.
 - route 이탈과 filter 변경 시 이전 request를 `AbortController`로 취소한다.
 - Alert status mutation 성공 후 해당 Alert 상세와 현재 Alert 목록을 즉시 재조회한다.
 - Archive restore 시작 성공 후 Archive 목록을 즉시 재조회한다.
-- 429는 `Retry-After`를 우선한다.
-- 503은 5초, 15초, 30초 간격으로 최대 3회 retry한다.
-- 400, 401, 403, 404, 409, 413은 자동 retry하지 않는다.
+- GET과 mutation은 HTTP status와 관계없이 자동 retry하지 않는다. `429 Retry-After`와 error envelope의
+  `retryable`은 사용자에게 다음 수동 시도를 안내하는 정보로만 사용한다.
 - refresh 실패 시 마지막 성공 데이터를 유지하고 warning banner와 retry action을 표시한다.
-- polling 결과가 갱신돼도 focus, scroll, 현재 선택 row를 초기화하지 않는다.
+- 수동 refresh 결과가 갱신돼도 focus, scroll, 현재 선택 row를 초기화하지 않는다.
 
 `lastRefreshedAt`은 해당 화면의 마지막 성공 응답을 받은 frontend 시각이다. API field가 아니며 `edrState.calculatedAt`, `risk.calculatedAt`과 구분한다.
 
@@ -424,7 +414,7 @@ Live Service/Pipeline Health:
 
 - Backend API, PostgreSQL, ClickHouse, Kafka, S3 요청 시점 Probe 상태와 latency
 - Event Storage/Detection Consumer Group member 수와 현재 lag
-- 30초 polling, 수동 refresh, 부분 실패 상태
+- 수동 refresh와 부분 실패 상태
 - 과거 availability/lag 이력 그래프 없음
 
 Archive:
@@ -432,7 +422,7 @@ Archive:
 - endpointIds, UTC from/to restore form
 - ArchiveBucketDto 목록과 server pagination
 - ADMIN/ANALYST만 restore 시작
-- `RESTORE_REQUESTED` 진행 중 polling
+- restore 시작 직후 목록을 한 번 다시 조회하고 이후 상태는 사용자가 수동 refresh로 확인
 - failure payload replay control 없음
 
 ### 8.8 Intelligence와 Report
@@ -482,7 +472,7 @@ Archive:
 - 모든 interactive element는 visible focus와 accessible name을 가진다.
 - status/severity는 color와 text를 함께 사용한다.
 - chart는 text summary 또는 table fallback을 제공한다.
-- polling이 screen reader live region을 반복 발생시키지 않도록 자동 refresh 결과는 silent update한다. 오류와 사용자 mutation 결과만 적절한 status message로 알린다.
+- 수동 refresh 완료·오류와 사용자 mutation 결과는 적절한 status message로 알린다.
 - locale selector와 저장 오류는 명시적인 accessible name/status를 제공하고 `document.documentElement.lang` 및 날짜 locale을 현재 사용자 설정과 함께 갱신한다.
 - `prefers-reduced-motion`을 존중한다.
 - WCAG 2.2 AA를 목표로 하며 구체 token과 primitive 규칙은 이 문서의 Design System 부분을 따른다.
@@ -547,13 +537,13 @@ Legacy `DashboardResult`, `EndpointRisk`, `EDR state`, `decision`, `source`, `ge
 9. Alert 목록·상세·status mutation·Response Guidance
 10. Incident 목록·상세
 11. Operations Live Health/Ingest/Archive
-12. responsive, keyboard, accessibility, polling 안정화
+12. responsive, keyboard, accessibility, 수동 refresh 안정화
 13. 실제 Backend 연동과 browser visual QA
 
 ## 14. 완료 조건
 
 - 모든 화면이 `../contracts/API_SPEC.md` DTO만 사용한다.
-- 제품 REST API 수는 Dashboard 25개 + Collector 3개 = 28개다.
+- 제품 REST API 수는 Dashboard 30개 + Collector 3개 = 33개다.
 - 프론트 집계로 Endpoint Risk/EDR 상태/chart bucket을 만들지 않는다.
 - JWT가 storage에 남지 않는다.
 - browser print Report와 읽기 전용 Failure Sink만 있고 저장 Report API, 웹 replay, Agent command가 없다.
@@ -735,7 +725,7 @@ Case 2 dark를 기본 semantic token으로 유지하고 같은 역할 이름의 
 - **Structure**: status label, score, short reason summary, calculated time detail link.
 - **Variants**: GREEN, YELLOW, RED.
 - **States**: loading skeleton, current, stale/error.
-- **Accessibility**: 색상과 함께 status text 제공. 자동 갱신은 live region으로 매번 읽지 않고 사용자가 상세를 열 때 확인한다.
+- **Accessibility**: 색상과 함께 status text 제공. 수동 refresh와 오류 결과를 live region에서 한 번만 알린다.
 
 ### GlobalFilterBar
 
@@ -833,7 +823,7 @@ Case 2 dark를 기본 semantic token으로 유지하고 같은 역할 이름의 
 규칙:
 
 - `transform`, `opacity`, `filter`만 animate한다.
-- polling refresh 때 chart entry animation을 반복하지 않는다.
+- 수동 refresh 때 chart entry animation을 반복하지 않는다.
 - hover가 의미 없는 non-interactive card에는 motion을 넣지 않는다.
 - `prefers-reduced-motion: reduce`에서는 chart reveal과 skeleton 이동을 제거하거나 정적인 대체 표현을 사용한다.
 - focus-visible outline은 2px `#4C85FF`, 2px offset을 사용한다.
@@ -858,7 +848,7 @@ Case 2 dark를 기본 semantic token으로 유지하고 같은 역할 이름의 
 | 키보드 중심 Analyst | Alert 목록에서 상세·guidance·상태 변경 | 모든 action과 row를 keyboard로 도달하고 현재 focus가 보임 |
 | 저시력 사용자 | EDR 상태, 위험 Endpoint와 오류 확인 | 200% zoom에서 정보 손실 없이 읽고 색상 외 label이 존재 |
 | 색각 이상 사용자 | severity/status 비교 | 색상 없이 text/icon/count로 구분 가능 |
-| reduced-motion 사용자 | Dashboard polling과 chart 확인 | 반복 motion 없이 동일 정보 확인 가능 |
+| reduced-motion 사용자 | Dashboard 수동 refresh와 chart 확인 | 반복 motion 없이 동일 정보 확인 가능 |
 | Tablet 운영자 | 긴급 상태 확인 후 상세 이동 | 768px에서 EDR 상태, 주요 KPI, navigation과 detail flow가 동작 |
 
 ### Constraints
@@ -867,7 +857,7 @@ Case 2 dark를 기본 semantic token으로 유지하고 같은 역할 이름의 
 - body text contrast 4.5:1, large text와 essential graphical object 3:1 이상.
 - 모든 interactive element는 visible focus, accessible name, keyboard activation을 제공한다.
 - table과 chart의 핵심 정보는 text 또는 tabular form으로도 접근 가능해야 한다.
-- polling으로 focus, scroll position, 선택 row를 초기화하지 않는다.
+- 수동 refresh로 focus, scroll position, 선택 row를 초기화하지 않는다.
 - 오류 메시지는 color만으로 구분하지 않고 원인·다음 action·requestId를 포함한다.
 - icon은 `lucide-react` 또는 동등한 SVG icon을 사용하고 emoji를 icon으로 쓰지 않는다.
 

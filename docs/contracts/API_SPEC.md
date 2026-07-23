@@ -24,7 +24,7 @@ Agent는 Process, Network, File, DNS, L7 5종 metadata를 전송한다. Npcap/tc
 
 - single tenant이며 `tenantId`를 사용하지 않는다.
 - Windows Agent는 C++20 Service/CLI다.
-- macOS Agent는 Swift CLI + LaunchAgent다.
+- macOS Agent는 Swift CLI + system LaunchDaemon이다. 현재 packet capture 때문에 전체 프로세스가 root로 실행되며, root-owned config/private key/state와 `umask 077`을 강제하지만 별도 privileged helper 분리는 구현하지 않았다.
 - Linux와 iOS는 지원하지 않는다.
 
 ### 3.2 저장소 구분
@@ -824,7 +824,7 @@ GET /api/v1/alerts/{alertId}
 
 `IncidentReferenceDto`는 `incidentId: integer`, `title: string`, `severity: Severity`, `status: OPEN | CLOSED`, `windowStartAt: timestamp`, `windowEndAt: timestamp` required field를 가진다. Source event가 HOT/RESTORED에서 조회되지 않으면 `sourceEvent` key는 유지하고 `null`로 반환하며, 연결 Incident가 없으면 `incidents: []`다. 담당자 필드는 없다.
 
-Incident 최초 생성 시 원인이 된 Alert RuleV1의 `alert_title`, `alert_summary`를 각각 Incident `title`, `description`에 그대로 snapshot한다. 같은 Incident key에 후속 Alert가 연결되어도 기존 문자열을 덮어쓰지 않는다.
+Incident 최초 생성 시 원인이 된 Alert RuleV1의 `alert_title`, `alert_summary`를 각각 Incident `title`, `description`에 그대로 snapshot한다. 같은 Incident key에 후속 Alert가 연결되어도 기존 문자열을 덮어쓰지 않는다. 서로 다른 Rule은 같은 Endpoint에서 동일한 `correlation_key`와 고정 window를 명시한 경우에만 Incident를 공유하며, 이 관계는 시간 기반 묶음이지 프로세스와 통신의 인과관계 증명이 아니다.
 
 ### 11.3 상태 변경
 
@@ -842,7 +842,7 @@ PATCH /api/v1/alerts/{alertId}/status
 
 ## 12. Incidents API
 
-Incident는 RuleV1 correlation key/window로 자동 생성하는 read-only projection이다. 생성 시 `OPEN`이며 기존 Detection Worker의 60초 periodic task가 `window_end_at`이 지난 OPEN Incident를 `CLOSED`로 바꾸고 `closed_at=window_end_at`을 기록한다. 담당자·사용자 상태 변경 API는 없다.
+Incident는 RuleV1 correlation key/window로 자동 생성하는 read-only projection이다. 활성 Rule condition은 해당 event type에서 정규화되는 payload field만 참조할 수 있고, 공유 correlation key는 모든 참여 Rule에서 동일한 window 크기를 사용해야 readiness를 통과한다. 생성 시 `OPEN`이며 기존 Detection Worker의 60초 periodic task가 `window_end_at`이 지난 OPEN Incident를 `CLOSED`로 바꾸고 `closed_at=window_end_at`을 기록한다. 담당자·사용자 상태 변경 API는 없다.
 
 ### 12.1 목록
 

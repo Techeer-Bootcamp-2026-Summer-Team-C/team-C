@@ -4,7 +4,7 @@ rule_name: Rare Domain Query
 alert_title: Rare domain query detected
 alert_summary: An endpoint queried a rarely observed domain.
 version: 1
-enabled: true
+enabled: false
 event_type: DNS_QUERY
 conditions:
   all:
@@ -13,13 +13,8 @@ conditions:
       value: '(?i)(update-cache|rare-beacon)'
 severity: HIGH
 risk_score: 76
-mitre:
-  tactic_code: TA0011
-  technique_code: T1071.004
 incident:
-  enabled: true
-  correlation_key: rare-domain-query
-  window_seconds: 1800
+  enabled: false
 response_guidance:
   - order: 1
     title: Review domain and query process

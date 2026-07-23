@@ -1,0 +1,34 @@
+schema_version: 1
+rule_code: NET_SUSPICIOUS_EGRESS
+rule_name: Suspicious TLS Destination
+alert_title: Suspicious TLS destination detected
+alert_summary: A TLS ClientHello exposed an SNI value matching a configured suspicious destination pattern.
+version: 2
+enabled: true
+event_type: L7_EVENT
+conditions:
+  all:
+    - field: l7_protocol
+      operator: eq
+      value: TLS
+    - field: tls_sni
+      operator: regex
+      value: '(?i)(?:^|\.)(?:update-cache|rare-beacon)(?:\.|$)'
+severity: CRITICAL
+risk_score: 92
+mitre:
+  tactic_code: TA0011
+  technique_code: T1573
+incident:
+  enabled: true
+  correlation_key: powershell-tls-egress-chain
+  window_seconds: 1800
+response_guidance:
+  - order: 1
+    title: Review destination and related process activity
+    description: TLS SNI와 목적지 평판을 확인하고 같은 시간대의 프로세스 및 네트워크 이벤트를 검토합니다.
+    requires_manual_action: false
+  - order: 2
+    title: Contain unauthorized egress
+    description: 승인되지 않은 통신으로 판단되면 외부 방화벽에서 목적지를 차단하고 Endpoint 격리가 필요한지 검토합니다.
+    requires_manual_action: true

@@ -1,5 +1,6 @@
 """브라우저 QA용 실제 로컬 서비스를 초기화한다. 운영 코드에서는 import하지 않는다."""
 
+import argparse
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -16,6 +17,11 @@ from backend.event_service import RestoredEventReader
 from backend.storage.clickhouse import EventRepository, FailureRepository
 from backend.storage.migrations import apply_clickhouse_file, apply_postgres_migrations
 from backend.workers import normalize_event
+from tools.seed_safety import (
+    assert_safe_reset_targets,
+    parse_allowed_qa_hosts,
+    require_reset_confirmation,
+)
 
 ROOT = Path(__file__).parents[1]
 POSTGRES_DSN = os.getenv(
@@ -23,11 +29,14 @@ POSTGRES_DSN = os.getenv(
     "postgresql://edr:replace-with-a-local-password@127.0.0.1:55432/edr",
 )
 CLICKHOUSE_PASSWORD = os.getenv("CLICKHOUSE_PASSWORD", "replace-with-a-local-password")
+CLICKHOUSE_RESET_DSN = "http://127.0.0.1:58123/edr"
 S3_ENDPOINT = os.getenv("EDR_S3_ENDPOINT_URL", "http://127.0.0.1:59000")
 S3_ACCESS_KEY = os.getenv("EDR_S3_ACCESS_KEY_ID", "edr-local")
 S3_SECRET_KEY = os.getenv("EDR_S3_SECRET_ACCESS_KEY", "replace-with-a-local-password")
 S3_BUCKET = os.getenv("EDR_S3_BUCKET", "edr-failures")
 S3_REGION = os.getenv("EDR_AWS_REGION", "us-east-1")
+ENVIRONMENT = os.getenv("EDR_ENV", "local")
+ALLOWED_QA_HOSTS = parse_allowed_qa_hosts(os.getenv("EDR_SEED_ALLOWED_QA_HOSTS"))
 
 
 def raw_event(
@@ -56,7 +65,13 @@ def raw_event(
     }
 
 
-def main() -> None:
+def seed(*, confirm_reset: bool = False) -> None:
+    require_reset_confirmation(confirm_reset)
+    assert_safe_reset_targets(
+        environment=ENVIRONMENT,
+        targets=(("PostgreSQL", POSTGRES_DSN), ("ClickHouse", CLICKHOUSE_RESET_DSN)),
+        allowed_qa_hosts=ALLOWED_QA_HOSTS,
+    )
     now = datetime.now(UTC).replace(microsecond=0)
     day = now.replace(hour=0, minute=0, second=0)
     old_day = day - timedelta(days=30)
@@ -394,5 +409,19 @@ def main() -> None:
     print(f"ARCHIVE_NOT_READY range: endpointId=3 from={old_day.isoformat()} to={old_day_end.isoformat()}")
 
 
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Reset allowlisted local/QA databases and seed browser QA fixtures.")
+    parser.add_argument(
+        "--confirm-reset",
+        action="store_true",
+        help="Required because PostgreSQL and ClickHouse are fully reset.",
+    )
+    args = parser.parse_args(argv)
+    if not args.confirm_reset:
+        parser.error("--confirm-reset is required because this command resets local/QA databases")
+    seed(confirm_reset=args.confirm_reset)
+    return 0
+
+
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

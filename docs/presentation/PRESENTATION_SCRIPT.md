@@ -8,16 +8,15 @@
 
 ## 1. 사용 전 확인
 
-이 대본은 현재 구현과 발표용 목데이터 요구사항을 기준으로 작성했다. 다만 `tools/seed_presentation_demo.py`는 아직 요구사항 단계이므로 실제 발표 전 다음 항목을 반드시 확인한다.
+이 대본은 현재 구현과 `tools/seed_presentation_demo.py`의 presentation profile을 기준으로 작성했다. 실제 발표 전 다음 항목을 반드시 확인한다.
 
-- `presentation` profile이 실제로 구현되어 있는가
-- PowerShell Incident에 `PROC_POWERSHELL_ENCODED` Alert 2개만 연결되는가
-- `NET_SUSPICIOUS_EGRESS` Alert는 별도 Incident로 생성되는가
+- `presentation` profile의 dry-run과 Rule v2 자동 검증이 통과하는가
+- `powershell-tls-egress-chain` Incident에 PowerShell Alert 2개와 TLS SNI Egress Alert 1개가 연결되는가
 - 발표자가 클릭할 Endpoint·Incident·Alert ID가 manifest와 일치하는가
 - Architecture 이미지에서 `Kafka Table Engine`이 제거되고 두 Worker가 반영됐는가
-- Kafka partition 수를 특정 숫자로 말하지 않도록 PPT와 대본이 일치하는가
+- Kafka 기본 partition 수를 언급한다면 코드·Compose·TECH_STACK의 현재 값 2와 일치하는가
 
-목데이터가 아직 구현되지 않았다면 이 대본의 시연 구간은 “예정 시나리오”일 뿐이다. 기존 `tests/seed_frontend_qa.py` 화면으로 서로 다른 Rule의 Alert가 자동으로 하나의 Incident가 됐다고 설명하면 안 된다.
+기존 영상이나 고정 Screenshot은 현재 presentation profile 실행 결과를 검증한 뒤 사용한다. 과거 fixture 화면을 현재 Worker 결과처럼 설명하지 않는다.
 
 ## 2. 발표 전체 시간표
 
@@ -123,15 +122,15 @@
 조작:
 
 - Endpoint, Severity, 탐지 시간과 연결 Alert 수를 가리킨다.
-- 연결된 PowerShell Alert 2개가 보이도록 이동한다.
+- 연결된 PowerShell Alert 2개와 TLS SNI Egress Alert 1개가 보이도록 이동한다.
 
 대사:
 
-> 같은 Endpoint에서 30분 안에 반복된 Encoded PowerShell 탐지는 각각 Alert로 남습니다. 하지만 `suspicious-powershell` correlation key와 window가 같아 하나의 Incident에서 함께 조사할 수 있습니다.
+> 같은 Endpoint의 Encoded PowerShell 탐지 두 건과 TLS SNI 기반 외부 통신 탐지 한 건이 `powershell-tls-egress-chain` key와 같은 30분 고정 구간을 사용해 하나의 Incident에 연결됐습니다. 이 연결은 시간 기반 조사 단서이며 Process가 해당 통신을 만들었다는 인과관계까지 증명하지는 않습니다.
 
 주의:
 
-- 화면에 `NET_SUSPICIOUS_EGRESS` Alert가 같은 Incident 안에 보이면 현재 fixture가 잘못된 것이다. 발표 전에 수정한다.
+- 세 Alert의 Endpoint, correlation key와 fixed window가 현재 fixture manifest와 일치하는지 확인한다.
 
 #### 2:20~2:50 — Alert·Event 근거
 
@@ -145,15 +144,15 @@
 
 > Alert를 열면 원본 Event 근거를 확인할 수 있습니다. 여기서는 `powershell.exe`의 command line에 `-EncodedCommand`가 있고, PID와 부모 Process도 남아 있습니다. 단순한 경고가 아니라 탐지 이유를 역추적할 수 있습니다.
 
-#### 2:50~3:00 — 외부 통신 구분
+#### 2:50~3:00 — 외부 통신 근거
 
 조작:
 
-- 별도 Egress Incident 또는 Alert가 있음을 짧게 가리키고 PPT로 전환한다.
+- 같은 Incident의 `NET_SUSPICIOUS_EGRESS` Alert와 원본 TLS Event의 `tlsSni`를 짧게 가리키고 PPT로 전환한다.
 
 대사:
 
-> 의심스러운 외부 통신도 탐지했지만, correlation key가 다르므로 PowerShell과 억지로 합치지 않고 별도 Incident로 유지합니다.
+> Agent가 TLS 원문을 저장하는 대신 ClientHello의 SNI metadata를 남겼고, Rule이 설정된 의심 목적지 패턴을 탐지했습니다. PowerShell과 같은 시간 구간에서 조사할 수 있지만 둘의 인과관계를 단정하지는 않습니다.
 
 시연 실패 시 전환 멘트:
 
@@ -191,7 +190,7 @@
 강조:
 
 - 화면에서 `ACK ≠ Detection complete`를 크게 표시한다.
-- 특정 partition 개수를 말하지 않는다.
+- partition 수를 언급하면 로컬 기본값 2이며 production 고정값이 아니라고 설명한다.
 - 시간이 남으면 다음 한 문장만 추가한다.
 
 > 같은 Endpoint ID를 key로 사용해 partition 내부의 Event 순서를 유지하고, 설정된 partition 수 범위에서 Worker를 독립적으로 확장할 수 있습니다.
@@ -263,7 +262,7 @@
 
 대사:
 
-> 현재는 Windows와 macOS의 metadata 수집부터 Alert·Incident 조사까지 구현했습니다. 수집 구간은 mTLS로 인증하고, 원본 PCAP은 저장하지 않습니다. 대응은 분석가용 Guidance까지 제공하며 원격 격리나 Process 종료를 자동 실행하지 않습니다. 자동 대응과 cross-rule correlation은 근거와 정책을 보강한 뒤 확장할 범위입니다.
+> 현재는 Windows와 macOS의 metadata 수집부터 Alert·Incident 조사까지 구현했습니다. 수집 구간은 mTLS로 인증하고, 원본 PCAP은 저장하지 않습니다. 대응은 분석가용 Guidance까지 제공하며 원격 격리나 Process 종료를 자동 실행하지 않습니다. 현재 cross-rule correlation은 명시적으로 같은 key를 쓰는 좁은 시간 기반 묶음이며, Process와 통신의 인과관계를 검증하는 correlation은 후속 범위입니다.
 
 의도:
 
@@ -279,7 +278,7 @@
 
 대사:
 
-> 처음 영상에는 Encoded PowerShell과 외부 통신이라는 두 신호가 남았습니다. EDR_C는 이를 빠르게 처리하면서도 근거가 다른 관계를 억지로 합치지 않고, 각 Alert와 원본 Event를 확인하게 합니다.
+> 처음 영상에는 Encoded PowerShell과 외부 통신이라는 두 신호가 남았습니다. EDR_C는 명시된 시간 기반 key로 이를 하나의 조사 단위에 모으면서도, 각 Alert와 원본 Event를 따로 제시해 관찰된 근거와 추론을 구분합니다.
 >
 > 저희는 위험을 경고하는 데서 끝나지 않고, Endpoint Event를 빠르고 정확하게 연결해 무슨 일이 있었는지 설명하는 EDR을 구현했습니다. 감사합니다.
 
@@ -298,7 +297,7 @@
 | 0:25 | EDR | 지속 관찰, 공격 전후 행위와 근거 |
 | 0:50 | EDR_C | 5 Event type, RuleV1, Event→Alert→Incident |
 | 1:20 | Demo | Overview→PowerShell Incident→Alert→Event |
-| 2:50 | 분리 | Egress는 별도 correlation key·Incident |
+| 2:50 | TLS 근거 | 같은 Incident의 TLS SNI Alert, 시간 상관과 인과 구분 |
 | 3:00 | Architecture | Endpoint부터 Dashboard까지 구현 |
 | 3:20 | Kafka | 비동기 분리, ACK 경계, 두 Topic, 수동 commit, 멱등성 |
 | 4:10 | DB | Event=ClickHouse, 상태·관계=PostgreSQL, Archive=S3 |
@@ -355,9 +354,9 @@
 
 > Consumer는 성공 후 offset을 수동 commit하고, 재전달 가능성을 전제로 Event ID와 Alert의 유일성을 이용해 멱등 처리합니다. exactly-once라고 주장하지 않습니다.
 
-### PowerShell과 외부 통신을 왜 하나의 Incident로 합치지 않았나요?
+### PowerShell과 외부 통신을 왜 하나의 Incident로 연결했나요?
 
-> 현재 Incident key는 Endpoint, Rule의 correlation key, time window입니다. 두 Rule은 correlation key가 다르므로 별도 Incident가 됩니다. Cross-rule correlation은 잘못된 관계를 만들지 않도록 추가 근거와 정책을 설계한 뒤 확장할 범위입니다.
+> 두 Rule이 같은 `powershell-tls-egress-chain` key와 30분 window를 명시했기 때문에 같은 Endpoint에서 하나의 Incident를 공유합니다. 이는 시연 시나리오에 한정한 시간 기반 correlation이며, Process가 TLS 통신을 만들었다는 인과관계를 증명하지는 않습니다.
 
 ### 왜 DB를 두 개 사용했나요?
 
@@ -384,12 +383,12 @@
 - [ ] 영상 포함 본문이 7분 45초 안에 끝남
 - [ ] 영상에 `시연을 위해 재구성한 가상 시나리오`가 보임
 - [ ] Dashboard가 로그인된 상태로 `LATEST_24H`에 열려 있음
-- [ ] PowerShell Incident에 PowerShell Alert 2개만 연결됨
-- [ ] Egress Alert가 별도 Incident임
+- [ ] `powershell-tls-egress-chain` Incident에 PowerShell Alert 2개와 TLS SNI Egress Alert 1개가 연결됨
+- [ ] 시간 기반 correlation을 Process·통신 인과관계로 설명하지 않음
 - [ ] manifest의 URL과 화면 ID가 일치함
 - [ ] Architecture 이미지가 현재 Worker·Topic 흐름과 일치함
 - [ ] Kafka ACK와 Detection 완료를 구분해 말함
-- [ ] 특정 Kafka partition 수를 말하지 않음
+- [ ] Kafka partition 수를 말한다면 현재 기본값 2와 일치함
 - [ ] 성능 슬라이드에 `목데이터 환경` 표기가 있음
 - [ ] Domain 포함·제외 사례가 화면과 일치함
 - [ ] 영상·시연 녹화본·PDF가 발표 PC에 로컬 저장됨

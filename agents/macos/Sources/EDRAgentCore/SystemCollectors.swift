@@ -20,12 +20,30 @@ private func runCommand(_ executable: String, _ arguments: [String]) throws -> S
     return String(decoding: data, as: UTF8.self)
 }
 
+func sanitizeCommandLine(_ value: String) -> String {
+    let pattern = #"((?:--?|/)(?:password|passwd|token|api[-_]?key|secret|client[-_]?secret|access[-_]?token|encodedcommand|enc)(?:[=:]|\s+))(?:"[^"]*"|'[^']*'|\S+)"#
+    guard let expression = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+        return value
+    }
+    return expression.stringByReplacingMatches(
+        in: value,
+        range: NSRange(value.startIndex..., in: value),
+        withTemplate: "$1<redacted>"
+    )
+}
+
 public enum ProcessCollector {
     public static func collect() -> CollectorSnapshot {
         do {
             let pathOutput = try runCommand("/bin/ps", ["-axo", "pid=,ppid=,comm="])
-            let commandOutput = try runCommand("/bin/ps", ["-axo", "pid=,command="])
-            let commandLines = Dictionary(uniqueKeysWithValues: commandOutput.split(separator: "\n").compactMap(parseCommand))
+            let commandLines: [Int: String]
+            if let commandOutput = try? runCommand("/bin/ps", ["-axo", "pid=,command="]) {
+                commandLines = Dictionary(
+                    uniqueKeysWithValues: commandOutput.split(separator: "\n").compactMap(parseCommand)
+                )
+            } else {
+                commandLines = [:]
+            }
             let events = pathOutput.split(separator: "\n").compactMap { parse($0, commandLines: commandLines) }
             return CollectorSnapshot(events: events, health: SensorSnapshot(sensor: "PROCESS", status: "HEALTHY"))
         } catch {
@@ -37,13 +55,16 @@ public enum ProcessCollector {
         let fields = line.split(maxSplits: 2, whereSeparator: \.isWhitespace)
         guard fields.count == 3, let pid = Int(fields[0]), let ppid = Int(fields[1]) else { return nil }
         let processPath = String(fields[2])
-        return TelemetryEvent(eventType: "PROCESS_EXECUTION", payload: [
+        var payload: [String: JSONValue] = [
             "processName": .string(URL(fileURLWithPath: processPath).lastPathComponent),
             "pid": .integer(pid),
             "ppid": .integer(ppid),
             "processPath": .string(processPath),
-            "commandLine": .string(commandLines[pid] ?? processPath),
-        ])
+        ]
+        if let commandLine = commandLines[pid], !commandLine.isEmpty {
+            payload["commandLine"] = .string(sanitizeCommandLine(commandLine))
+        }
+        return TelemetryEvent(eventType: "PROCESS_EXECUTION", payload: payload)
     }
 
     private static func parseCommand(_ line: Substring) -> (Int, String)? {
@@ -142,17 +163,28 @@ public final class FileEventCollector: @unchecked Sendable {
     private func accept(paths: [String], flags: UnsafePointer<FSEventStreamEventFlags>, count: Int) {
         lock.lock(); defer { lock.unlock() }
         for index in 0..<min(count, paths.count) {
-            let flag = flags[index]
-            let action: String
-            if flag & UInt32(kFSEventStreamEventFlagItemRemoved) != 0 { action = "DELETED" }
-            else if flag & UInt32(kFSEventStreamEventFlagItemRenamed) != 0 { action = "RENAMED" }
-            else if flag & UInt32(kFSEventStreamEventFlagItemCreated) != 0 { action = "CREATED" }
-            else { action = "MODIFIED" }
+            let action = FileEventAction(flags: flags[index]).rawValue
             var payload: [String: JSONValue] = ["filePath": .string(paths[index]), "action": .string(action)]
-            if action != "DELETED", let data = try? Data(contentsOf: URL(fileURLWithPath: paths[index])), data.count <= 32 * 1024 * 1024 {
+            if action != FileEventAction.delete.rawValue,
+               let data = try? Data(contentsOf: URL(fileURLWithPath: paths[index])),
+               data.count <= 32 * 1024 * 1024 {
                 payload["sha256"] = .string(SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined())
             }
             events.append(TelemetryEvent(eventType: "FILE_EVENT", payload: payload))
         }
+    }
+}
+
+public enum FileEventAction: String, Sendable {
+    case create = "CREATE"
+    case delete = "DELETE"
+    case modify = "MODIFY"
+    case rename = "RENAME"
+
+    init(flags: FSEventStreamEventFlags) {
+        if flags & UInt32(kFSEventStreamEventFlagItemRemoved) != 0 { self = .delete }
+        else if flags & UInt32(kFSEventStreamEventFlagItemRenamed) != 0 { self = .rename }
+        else if flags & UInt32(kFSEventStreamEventFlagItemCreated) != 0 { self = .create }
+        else { self = .modify }
     }
 }

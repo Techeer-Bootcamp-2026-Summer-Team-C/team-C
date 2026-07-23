@@ -48,7 +48,7 @@ void contract_fixtures() {
     const std::vector<Event> fixtures{
         event(1),
         {uuid_string(), "NETWORK_CONNECTION", utc_now(), {{"protocol", std::string("TCP")}, {"remoteIp", std::string("203.0.113.1")}, {"remotePort", std::int64_t(443)}}},
-        {uuid_string(), "FILE_EVENT", utc_now(), {{"filePath", std::string("C:\\Temp\\file.txt")}, {"action", std::string("MODIFIED")}}},
+        {uuid_string(), "FILE_EVENT", utc_now(), {{"filePath", std::string("C:\\Temp\\file.txt")}, {"action", std::string(kFileActionModify)}}},
         {uuid_string(), "DNS_QUERY", utc_now(), {{"query", std::string("example.com")}, {"recordType", std::string("A")}}},
     };
     for (const auto& value : fixtures) {
@@ -57,6 +57,16 @@ void contract_fixtures() {
         require(json.find("\"occurredAt\":\"") != std::string::npos, "occurredAt must use the camelCase contract");
         require(json.find('Z') != std::string::npos, "timestamps must be UTC");
     }
+    require(encode_event(fixtures[2]).find("\"action\":\"MODIFY\"") != std::string::npos,
+            "file actions must use the canonical Collector contract");
+    const auto sanitized = sanitize_command_line(
+        "pwsh.exe -EncodedCommand ZQBjAGgAbwA= --token=secret-value --mode audit"
+    );
+    require(sanitized.find("ZQBjAGgAbwA=") == std::string::npos &&
+                sanitized.find("secret-value") == std::string::npos &&
+                sanitized.find("-EncodedCommand <redacted>") != std::string::npos &&
+                sanitized.find("--mode audit") != std::string::npos,
+            "command line collection must preserve detection flags while redacting sensitive values");
 }
 
 void buffer_and_batch() {
@@ -87,6 +97,25 @@ void buffer_and_batch() {
         bool overflow = false;
         try { capped.enqueue(event(2)); } catch (const std::overflow_error&) { overflow = true; }
         require(overflow, "queue limit must reject excess events");
+    }
+    {
+        EventBuffer isolated(root / "isolated.sqlite3", 2);
+        isolated.enqueue(event(1));
+        isolated.enqueue(event(2));
+        isolated.apply_result({}, {{event(1).event_id, "INVALID", false}, {event(2).event_id, "INVALID", false}}, 1, 4);
+        isolated.enqueue(event(3));
+        isolated.enqueue(event(4));
+        require(isolated.metrics().pending == 2 && isolated.metrics().failed == 2,
+                "FAILED rows must not consume PENDING capacity");
+        isolated.apply_result({}, {{event(3).event_id, "INVALID", false}}, 1, 4);
+        const auto metrics = isolated.metrics();
+        require(metrics.pending == 1 && metrics.failed == 2,
+                "FAILED rows must be bounded independently with oldest-first pruning");
+        isolated.apply_result({event(4).event_id}, {}, 1, 4);
+        isolated.enqueue(event(1));
+        isolated.enqueue(event(2));
+        require(isolated.metrics().pending == 1,
+                "oldest FAILED row must be pruned while the newer FAILED identity remains");
     }
     std::filesystem::remove_all(root);
 }

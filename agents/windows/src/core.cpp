@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <mutex>
 #include <random>
+#include <regex>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -144,6 +145,14 @@ std::string sanitize_url(const std::string& value) {
                                     fragment == std::string::npos ? value.size() : fragment));
 }
 
+std::string sanitize_command_line(const std::string& value) {
+    static const std::regex sensitive_argument(
+        R"(((?:--?|/)(?:password|passwd|token|api[-_]?key|secret|client[-_]?secret|access[-_]?token|encodedcommand|enc)(?:[=:]|\s+))(?:"[^"]*"|'[^']*'|\S+))",
+        std::regex::icase
+    );
+    return std::regex_replace(value, sensitive_argument, "$1<redacted>");
+}
+
 int exponential_backoff(int attempt, int base_seconds, int cap_seconds) {
     const int shift = std::clamp(attempt - 1, 0, 20);
     return std::min(cap_seconds, base_seconds * (1 << shift));
@@ -174,7 +183,9 @@ EventBuffer::~EventBuffer() {
 
 void EventBuffer::enqueue(const Event& event, std::optional<std::int64_t> endpoint_id) {
     std::scoped_lock lock(impl_->mutex);
-    if (impl_->scalar("SELECT COUNT(*) FROM local_event_buffer") >= impl_->max_events) throw std::overflow_error("event buffer full");
+    if (impl_->scalar("SELECT COUNT(*) FROM local_event_buffer WHERE status='PENDING'") >= impl_->max_events) {
+        throw std::overflow_error("event buffer pending capacity full");
+    }
     auto statement = impl_->prepare(
         "INSERT OR IGNORE INTO local_event_buffer(endpoint_id,event_id,batch_id,event_type,payload_json,collected_at,status,retry_count,last_error,next_retry_at,created_at,updated_at) "
         "VALUES(?,?,NULL,?,?,?,'PENDING',0,NULL,NULL,?,?)"
@@ -242,6 +253,13 @@ void EventBuffer::apply_result(const std::vector<std::string>& accepted, const s
             else sqlite3_bind_null(statement.value, 4);
             bind_text(statement.value, 5, utc_now()); bind_text(statement.value, 6, item.event_id); sqlite3_step(statement.value);
         }
+        auto prune = impl_->prepare(
+            "DELETE FROM local_event_buffer WHERE local_event_buffer_id IN ("
+            "SELECT local_event_buffer_id FROM local_event_buffer WHERE status='FAILED' "
+            "ORDER BY local_event_buffer_id LIMIT MAX(0,(SELECT COUNT(*) FROM local_event_buffer WHERE status='FAILED')-?))"
+        );
+        sqlite3_bind_int(prune.value, 1, impl_->max_events);
+        if (sqlite3_step(prune.value) != SQLITE_DONE) throw std::runtime_error("SQLite failed-event pruning failed");
         impl_->execute("COMMIT");
     } catch (...) { impl_->execute("ROLLBACK"); throw; }
 }

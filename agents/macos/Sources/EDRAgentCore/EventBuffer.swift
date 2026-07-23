@@ -56,7 +56,9 @@ public final class EventBuffer: @unchecked Sendable {
 
     public func enqueue(_ event: TelemetryEvent, endpointId: Int64? = nil) throws {
         lock.lock(); defer { lock.unlock() }
-        guard try scalarInt("SELECT COUNT(*) FROM local_event_buffer") < maxEvents else { throw AgentError.queueFull }
+        guard try scalarInt("SELECT COUNT(*) FROM local_event_buffer WHERE status = 'PENDING'") < maxEvents else {
+            throw AgentError.queueFull
+        }
         let encoded = String(decoding: try encoder.encode(event), as: UTF8.self)
         let now = utcNow()
         let statement = try prepare("""
@@ -135,6 +137,16 @@ public final class EventBuffer: @unchecked Sendable {
                 try stepDone(statement)
                 sqlite3_finalize(statement)
             }
+            let prune = try prepare("""
+            DELETE FROM local_event_buffer WHERE local_event_buffer_id IN (
+                SELECT local_event_buffer_id FROM local_event_buffer WHERE status = 'FAILED'
+                ORDER BY local_event_buffer_id
+                LIMIT MAX(0, (SELECT COUNT(*) FROM local_event_buffer WHERE status = 'FAILED') - ?)
+            )
+            """)
+            sqlite3_bind_int(prune, 1, Int32(maxEvents))
+            try stepDone(prune)
+            sqlite3_finalize(prune)
             try execute("COMMIT")
         } catch {
             try? execute("ROLLBACK")

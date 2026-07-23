@@ -17,7 +17,6 @@
 기획 기준 문서:
 
 - `docs/presentation/PRESENTATION_PLAN.md`
-- `docs/presentation/PPT_PLANNING_HANDOFF.md`
 
 핵심 구현 근거:
 
@@ -26,8 +25,8 @@
 - `backend/workers.py`
 - `backend/storage/postgres.py`
 - `backend/storage/clickhouse.py`
-- `rules/process/proc_powershell_encoded.v1.yaml`
-- `rules/network/net_suspicious_egress.v1.yaml`
+- `rules/process/proc_powershell_encoded.v2.yaml`
+- `rules/network/net_suspicious_egress.v2.yaml`
 - `tests/seed_frontend_qa.py`
 - `tests/test_dns_lookup.py`
 - `tests/test_storage_integration.py`
@@ -245,9 +244,9 @@ Overview
 
 반드시 지킬 사실:
 
-- 동일 Incident의 여러 Alert를 보여줄 때는 같은 Endpoint, 같은 Rule, 같은 `correlation_key`, 같은 30분 window의 반복 탐지를 사용한다.
-- PowerShell과 encrypted egress가 자동으로 하나의 Incident에 합쳐졌다고 설명하지 않는다.
-- 현재 QA seed의 수동 연결 화면을 실제 Detection Worker의 cross-rule correlation 결과처럼 설명하지 않는다.
+- 동일 Incident의 Alert 3개는 같은 Endpoint와 같은 `powershell-tls-egress-chain`, 같은 30분 고정 bucket을 사용한다.
+- PowerShell Alert 2개와 TLS SNI 기반 Egress Alert 1개가 Rule v2 설정에 따라 하나의 Incident를 공유한다고 설명한다.
+- 이 시간 기반 correlation을 PowerShell Process와 TLS 통신의 인과관계 증명으로 과장하지 않는다.
 
 ### 5.5 전체 Architecture
 
@@ -340,7 +339,7 @@ Detection Worker ──→ PostgreSQL
 - exactly-once 보장
 - 자동 또는 무한 Scaling 구현
 - 현재 로컬 구성을 고가용성 Kafka Cluster로 표현
-- 특정 Kafka partition 개수 표시
+- 로컬 기본값 2를 production 고정값이나 고가용성 근거로 표현
 
 ### 5.7 저장소 역할
 
@@ -462,7 +461,7 @@ Event 관찰
 
 - Response Guidance는 분석가를 위한 읽기 전용·수동 조치 안내다.
 - 자동 격리, 원격 Process 종료, File 삭제는 구현하지 않았다.
-- PowerShell과 encrypted egress를 자동으로 합치는 cross-rule Incident correlation은 구현하지 않았다.
+- cross-rule correlation은 명시적으로 같은 key/window를 공유하는 좁은 시간 기반 묶음만 구현했다.
 - Npcap·tcpdump에서 Metadata를 추출하지만 원본 PCAP은 저장하지 않는다.
 
 인트로의 시각 Motif를 다시 사용해 처음의 질문에 답한다. 마지막에는 다음 문장을 그대로 사용한다.
@@ -471,12 +470,12 @@ Event 관찰
 
 ## 6. 기술적 사실 관계와 금지 표현
 
-### 6.1 Correlation과 QA seed
+### 6.1 Correlation과 presentation fixture
 
 현재 RuleV1:
 
-- `PROC_POWERSHELL_ENCODED`: `correlation_key: suspicious-powershell`, `window_seconds: 1800`
-- `NET_SUSPICIOUS_EGRESS`: `correlation_key: suspicious-egress`, `window_seconds: 1800`
+- `PROC_POWERSHELL_ENCODED`: `correlation_key: powershell-tls-egress-chain`, `window_seconds: 1800`
+- TLS SNI 기반 `NET_SUSPICIOUS_EGRESS`: `correlation_key: powershell-tls-egress-chain`, `window_seconds: 1800`
 
 현재 Incident UPSERT 기준:
 
@@ -484,24 +483,27 @@ Event 관찰
 (endpoint_id, correlation_key, window_start_at)
 ```
 
-따라서 두 Rule은 자동으로 같은 Incident에 합쳐지지 않는다. `tests/seed_frontend_qa.py`는 두 Alert를 하나의 Incident에 직접 연결하지만, 이는 Dashboard QA용 수동 관계이며 Detection Worker의 cross-rule correlation 결과가 아니다.
+따라서 두 Rule의 Alert는 같은 Endpoint와 같은 30분 고정 bucket에서 하나의 Incident를 공유한다. presentation profile은 PowerShell Alert 2개와 TLS SNI Egress Alert 1개, 총 3개를 이 경로로 연결한다.
 
-발표에서 다중 Alert Incident를 보여줄 때 권장하는 사실 기반 시나리오:
+발표에서 다중 Alert Incident를 보여줄 때 사실 기반 시나리오:
 
 ```text
 같은 Endpoint
-→ 30분 안에 Encoded PowerShell Event 반복
-→ 같은 Rule의 Alert 두 개
-→ 같은 suspicious-powershell Incident에 연결
+→ 같은 30분 고정 bucket의 Encoded PowerShell Event 두 건
+→ 같은 bucket의 TLS ClientHello SNI Event 한 건
+→ PowerShell Alert 두 개와 TLS SNI Egress Alert 한 개
+→ 같은 powershell-tls-egress-chain Incident에 연결
 ```
 
-### 6.2 Kafka partition 불일치
+이 연결은 시간 근접성을 조사 단서로 제공하며 Process와 TLS 통신의 인과관계를 증명하지 않는다.
+
+### 6.2 Kafka partition 기준
 
 - `backend/kafka.py`: 기본값 2
 - `compose.yaml`: 기본값 2
-- `docs/architecture/TECH_STACK.md`: 최소 3으로 기록
+- `docs/architecture/TECH_STACK.md`: 기본값 2
 
-정리 전까지 PPT와 발표에서 특정 partition 개수를 사용하지 않는다. 다음 표현만 사용한다.
+PPT에서 수치가 필요하면 로컬 기본값 2라고 표현한다. Worker 확장성은 다음 범위로 제한한다.
 
 > 설정된 Kafka partition 수 범위에서 Worker를 독립적으로 확장할 수 있습니다.
 
@@ -513,8 +515,8 @@ Event 관찰
 | 전달 보장 | at-least-once와 멱등성 | exactly-once 보장 |
 | Worker | partition 범위에서 독립 확장 | 자동·무한 Scaling |
 | Local Kafka | 개발·시연용 로컬 구성 | 고가용성 Cluster |
-| Incident | 같은 Endpoint·key·window의 Alert 연결 | PowerShell·egress 자동 통합 |
-| QA seed | Dashboard QA용 수동 관계 | 실제 Worker의 cross-rule 결과 |
+| Incident | 명시적으로 같은 Endpoint·key·fixed window의 Alert 연결 | Process와 통신의 인과관계 증명 |
+| Presentation fixture | Rule v2의 3 Alert·1 Incident 검증 결과 | 과거 fixture나 영상의 결과를 현재 실행처럼 표현 |
 | 성능 | 목데이터 동일 API 전후 측정 | Production P95/P99 |
 | DNS | Domain boundary 기반 Correctness 개선 | 성능 수치 개선 |
 | Response | 분석가용 Guidance | 자동 격리·종료·삭제 |
@@ -563,9 +565,9 @@ Event 관찰
 
 ### 기술 정확성
 
-- [ ] PowerShell과 encrypted egress를 같은 Incident로 자동 연결했다고 쓰지 않았는가
-- [ ] QA seed의 수동 관계를 실제 Worker 성과라고 쓰지 않았는가
-- [ ] Kafka partition 개수를 표시하지 않았는가
+- [ ] PowerShell Alert 2개와 TLS SNI Egress Alert 1개가 같은 key·고정 bucket으로 연결됐는가
+- [ ] 시간 기반 correlation을 Process와 통신의 인과관계로 과장하지 않았는가
+- [ ] Kafka partition 개수를 표시한다면 현재 로컬 기본값 2와 일치하는가
 - [ ] exactly-once, 자동 Scaling, 고가용성 Cluster를 주장하지 않았는가
 - [ ] Broker ACK를 저장·탐지 완료로 설명하지 않았는가
 - [ ] 성능 수치를 Production Benchmark로 표현하지 않았는가
@@ -597,9 +599,9 @@ Event 관찰
 
 기술적 사실 관계는 요구서의 '기술적 사실 관계와 금지 표현'을 반드시 지켜 주세요. 특히 다음 내용을 주의해 주세요.
 
-1. PowerShell과 encrypted egress는 correlation_key가 달라 현재 자동으로 같은 Incident가 되지 않습니다.
-2. QA seed의 두 Alert 연결은 수동으로 구성된 Dashboard QA 관계이며 실제 Detection Worker의 cross-rule 결과가 아닙니다.
-3. Kafka partition 개수는 코드·Compose와 TECH_STACK 문서가 불일치하므로 PPT에 특정 숫자를 넣지 않습니다.
+1. PowerShell과 TLS SNI egress Rule은 `powershell-tls-egress-chain`과 1,800초 window를 공유해 같은 Endpoint·고정 bucket에서 하나의 Incident를 만듭니다.
+2. 이 관계는 시간 기반 correlation이며 Process와 통신의 인과관계 증명으로 표현하지 않습니다.
+3. Kafka partition 기본값은 코드·Compose·TECH_STACK 모두 2입니다.
 4. 성능 수치는 31일·100 Endpoint·248,000 Event 목데이터 환경의 동일 API 전후 측정이며 Production Benchmark가 아닙니다.
 5. Response Guidance는 읽기 전용·수동 조치 안내이며 자동 격리·프로세스 종료·파일 삭제 기능이 아닙니다.
 

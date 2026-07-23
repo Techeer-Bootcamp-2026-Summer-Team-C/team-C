@@ -17,6 +17,7 @@ import psycopg
 
 from backend.storage.clickhouse import EventRepository, FailureRepository
 from backend.workers import normalize_event
+from tools.seed_safety import require_reset_confirmation
 
 ROOT = Path(__file__).parents[1]
 BASE_SEED_PATH = ROOT / "tests" / "seed_frontend_qa.py"
@@ -825,9 +826,10 @@ def _print_estimate(config: SeedConfig) -> None:
     print(f"  Archive cases:    {len(ARCHIVE_STATUSES)}")
 
 
-def seed(config: SeedConfig) -> None:
+def seed(config: SeedConfig, *, confirm_reset: bool = False) -> None:
+    require_reset_confirmation(confirm_reset)
     base_seed = _load_base_seed()
-    base_seed.main()
+    base_seed.seed(confirm_reset=confirm_reset)
     now = datetime.now(UTC).replace(microsecond=0)
     endpoints = build_endpoint_seeds(config, now=now)
 
@@ -890,7 +892,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if not args.confirm_reset:
         parser.error("--confirm-reset is required because this command resets the local QA databases")
-    seed(config)
+    seed(config, confirm_reset=args.confirm_reset)
     return 0
 
 

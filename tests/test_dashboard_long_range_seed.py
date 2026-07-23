@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from tools.seed_dashboard_long_range import SeedConfig, build_endpoint_seeds, main
+from tools.seed_dashboard_long_range import SeedConfig, _load_base_seed, build_endpoint_seeds, main, seed
 
 
 def test_default_long_range_seed_estimate() -> None:
@@ -39,6 +39,18 @@ def test_dry_run_does_not_require_reset_confirmation(capsys: pytest.CaptureFixtu
     output = capsys.readouterr().out
     assert "Events:           1,400" in output
     assert "Endpoints:        10" in output
+
+
+def test_seed_function_rejects_missing_confirmation_before_loading_services() -> None:
+    with pytest.raises(RuntimeError, match="explicit --confirm-reset"):
+        seed(SeedConfig())
+
+
+def test_legacy_base_seed_rejects_missing_confirmation_before_connecting() -> None:
+    base_seed = _load_base_seed()
+
+    with pytest.raises(RuntimeError, match="explicit --confirm-reset"):
+        base_seed.seed()
 
 
 def test_presentation_performance_shape_is_exactly_248000_events(

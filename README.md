@@ -190,6 +190,15 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build -c release
 
 sudo install -d -m 755 /usr/local/libexec
 sudo install -m 755 .build/release/edr-macos-agent /usr/local/libexec/edr-macos-agent
+sudo install -d -o root -g wheel -m 700 "/Library/Application Support/EDR-C-Agent"
+sudo install -o root -g wheel -m 600 /absolute/path/to/config.json \
+  "/Library/Application Support/EDR-C-Agent/config.json"
+sudo install -o root -g wheel -m 600 /absolute/path/to/agent.key \
+  "/Library/Application Support/EDR-C-Agent/agent.key"
+sudo install -o root -g wheel -m 644 /absolute/path/to/agent.crt \
+  "/Library/Application Support/EDR-C-Agent/agent.crt"
+sudo install -o root -g wheel -m 644 /absolute/path/to/ca.crt \
+  "/Library/Application Support/EDR-C-Agent/ca.crt"
 sudo install -o root -g wheel -m 644 \
   com.edr-c.agent.plist \
   /Library/LaunchDaemons/com.edr-c.agent.plist
@@ -199,7 +208,10 @@ sudo launchctl kickstart -k system/com.edr-c.agent
 sudo launchctl print system/com.edr-c.agent
 ```
 
-`/Library/Application Support/EDR-C-Agent/config.json`과 인증서 경로는 LaunchDaemon이 읽을 수 있는 절대 경로로 설정한다. 등록을 제거할 때는 다음 명령을 사용한다.
+`config.json`의 인증서·private key·state 경로는 위 설치 위치의 절대 경로로 설정한다. LaunchDaemon은
+`tcpdump` 권한 때문에 현재 전체 프로세스를 root로 실행하므로 config/private key/state는 root 전용 권한을
+강제하며 plist는 `umask 077`을 적용한다. 별도 packet-capture helper로 권한을 분리하는 구조는 아직 구현하지
+않았다. 등록을 제거할 때는 다음 명령을 사용한다.
 
 ```bash
 sudo launchctl bootout system /Library/LaunchDaemons/com.edr-c.agent.plist
@@ -218,10 +230,11 @@ sudo rm /Library/LaunchDaemons/com.edr-c.agent.plist
 대시보드 확인에 사용할 데이터를 생성합니다.
 
 ```powershell
-uv run --env-file .env python .\tests\seed_frontend_qa.py
+uv run --env-file .env python .\tests\seed_frontend_qa.py --confirm-reset
 ```
 
-이 명령은 기존 로컬 데이터베이스를 초기화합니다.
+이 명령은 기존 로컬 데이터베이스를 초기화합니다. 모든 destructive seed는 `EDR_ENV=local|qa`,
+허용된 demo database 이름, local host 또는 `EDR_SEED_ALLOWED_QA_HOSTS`에 정확히 명시한 QA host를 함께 확인합니다.
 
 ```text
 ADMIN

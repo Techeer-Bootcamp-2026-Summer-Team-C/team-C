@@ -163,6 +163,9 @@ def test_production_images_are_built_for_ec2_and_tagged_with_the_commit() -> Non
     assert "team-c-backend" in workflow
     assert "team-c-nginx" in workflow
     assert ":latest" not in workflow
+    assert "\n  workflow_call:\n" in workflow
+    assert "\n  workflow_dispatch:\n" in workflow
+    assert "\n  push:\n" not in workflow
     assert "COPY deploy/nginx/nginx.prod.conf /etc/nginx/nginx.conf" in nginx_dockerfile
     assert parsed_workflow["permissions"] == {"contents": "read"}
     assert parsed_workflow["jobs"]["build-and-push"]["needs"] == "validate"
@@ -179,12 +182,20 @@ def test_production_images_are_built_for_ec2_and_tagged_with_the_commit() -> Non
     assert "compose.prod.yaml config --quiet" in validation_commands
 
 
-def test_pull_request_ci_covers_backend_frontend_and_compose_gates() -> None:
+def test_pull_request_and_main_ci_cover_backend_frontend_agents_integration_and_compose_gates() -> None:
     workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     parsed_workflow = yaml.safe_load(workflow)
 
-    assert set(parsed_workflow["jobs"]) == {"validate"}
+    assert set(parsed_workflow["jobs"]) == {
+        "validate",
+        "backend-integration",
+        "windows-agent",
+        "macos-agent",
+        "production-images",
+    }
     assert "pull_request:" in workflow
+    assert "push:" in workflow
+    assert "- main" in workflow
     assert "uv run ruff check ." in workflow
     assert "bash -n tools/backup_production_data.sh" in workflow
     assert "uv run pip-audit --local --skip-editable" in workflow
@@ -197,6 +208,30 @@ def test_pull_request_ci_covers_backend_frontend_and_compose_gates() -> None:
     assert "compose.prod.yaml config --quiet" in workflow
     assert "compose.infra.yaml config --quiet" in workflow
     assert "compose.service.yaml config --quiet" in workflow
+    assert "compose.observability.yaml config --quiet" in workflow
+    assert "compose.portainer-agent.yaml config --quiet" in workflow
+    assert "compose.portainer-server.yaml config --quiet" in workflow
+    assert "uv run pytest -m integration" in workflow
+    assert "docker compose logs --no-color --tail=200 postgres clickhouse kafka minio" in workflow
+    assert parsed_workflow["jobs"]["backend-integration"]["timeout-minutes"] == 20
+    assert parsed_workflow["jobs"]["windows-agent"]["timeout-minutes"] == 30
+    assert parsed_workflow["jobs"]["macos-agent"]["timeout-minutes"] == 20
+    assert "cmake --build build/windows --config Release" in workflow
+    assert "ctest --test-dir build/windows -C Release --output-on-failure" in workflow
+    assert "swift test --package-path agents/macos" in workflow
+    production_images = parsed_workflow["jobs"]["production-images"]
+    assert production_images["if"] == "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    assert production_images["needs"] == [
+        "validate",
+        "backend-integration",
+        "windows-agent",
+        "macos-agent",
+    ]
+    assert production_images["permissions"] == {
+        "contents": "write",
+        "packages": "write",
+    }
+    assert production_images["uses"] == "./.github/workflows/build-prod-images.yml"
 
 
 def test_nginx_resolves_recreated_backend_containers_through_docker_dns() -> None:

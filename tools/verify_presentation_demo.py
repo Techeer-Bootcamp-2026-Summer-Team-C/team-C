@@ -69,28 +69,24 @@ def _verify_presentation(
     if latest_7d != expected_7d:
         raise AssertionError(f"LATEST_7D Overview differs: expected={expected_7d}, actual={latest_7d}")
 
-    powershell_incident_id = int(ids["powershellIncidentId"])
-    egress_incident_id = int(ids["egressIncidentId"])
-    powershell = _request(client, f"/api/v1/incidents/{powershell_incident_id}", token)
-    egress = _request(client, f"/api/v1/incidents/{egress_incident_id}", token)
-    if powershell["correlationKey"] != "suspicious-powershell" or powershell["alertCount"] != 2:
-        raise AssertionError("PowerShell Incident must contain two suspicious-powershell Alerts")
-    if egress["correlationKey"] != "suspicious-egress" or egress["alertCount"] != 1:
-        raise AssertionError("Egress Alert must remain in its own suspicious-egress Incident")
+    chain_incident_id = int(ids["chainIncidentId"])
+    chain = _request(client, f"/api/v1/incidents/{chain_incident_id}", token)
+    if chain["correlationKey"] != "powershell-tls-egress-chain" or chain["alertCount"] != 3:
+        raise AssertionError("PowerShell/TLS Incident must contain all three attack-chain Alerts")
 
     timeline = _request(
         client,
-        f"/api/v1/incidents/{powershell_incident_id}/timeline",
+        f"/api/v1/incidents/{chain_incident_id}/timeline",
         token,
     )
-    if len(timeline["items"]) < 2:
-        raise AssertionError("PowerShell Incident timeline does not expose both linked Alerts")
+    if len(timeline["items"]) < 6:
+        raise AssertionError("PowerShell/TLS Incident timeline does not expose all linked Events and Alerts")
     main_endpoint_id = int(ids["presentationEndpointId"])
     endpoint = _request(client, f"/api/v1/endpoints/{main_endpoint_id}", token)
     if endpoint["hostname"] != "SOYEON-WIN":
         raise AssertionError("manifest presentationEndpointId points to the wrong Endpoint")
-    if endpoint["risk"]["activeAlertCount"] != 3 or endpoint["risk"]["openIncidentCount"] != 2:
-        raise AssertionError("main Endpoint must expose 3 active Alerts and 2 open Incidents")
+    if endpoint["risk"]["activeAlertCount"] != 3 or endpoint["risk"]["openIncidentCount"] != 1:
+        raise AssertionError("main Endpoint must expose 3 active Alerts and 1 open Incident")
     events = _request(
         client,
         f"/api/v1/events?timePreset=LATEST_24H&endpointId={main_endpoint_id}&page=1&size=100",
@@ -105,8 +101,7 @@ def _verify_presentation(
     return {
         "overviewLatest24h": latest_24h,
         "overviewLatest7d": latest_7d,
-        "powershellIncidentAlertCount": powershell["alertCount"],
-        "egressIncidentAlertCount": egress["alertCount"],
+        "chainIncidentAlertCount": chain["alertCount"],
         "soyeonTimelineLatest24h": events["total"],
     }
 

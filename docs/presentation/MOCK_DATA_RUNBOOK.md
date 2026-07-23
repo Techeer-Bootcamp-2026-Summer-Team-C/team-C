@@ -2,6 +2,11 @@
 
 이 Runbook의 데이터와 수치는 시연을 위해 재현한 local/QA 데이터다. production 실측이나 실제 침해 기록으로 표현하지 않는다.
 
+모든 destructive 명령은 `--confirm-reset`을 요구하고 `EDR_ENV=local|qa`, 허용된 demo database 이름,
+local host를 함께 검증한다. 원격 QA database가 필요하면 `EDR_ENV=qa`와
+`EDR_SEED_ALLOWED_QA_HOSTS=qa-db.example.internal,qa-clickhouse.example.internal`처럼 정확한 hostname
+allowlist를 명시한다. 이름에 `qa` 또는 `test`가 포함됐다는 이유만으로 원격 host를 허용하지 않는다.
+
 ## 1. presentation profile
 
 서비스를 먼저 실행한다.
@@ -16,7 +21,7 @@ uv run python -m tools.local_demo start
 uv run python -m tools.seed_presentation_demo --profile presentation --seed 20260721 --anchor now --dry-run
 ```
 
-PostgreSQL과 ClickHouse의 local/QA 데이터를 초기화하고 `5 Endpoint / 14일 5,600 Event / 3 Alert / 2 Incident`를 생성한다. 최근 24시간은 400 Event, 최근 7일은 2,800 Event다.
+PostgreSQL과 ClickHouse의 local/QA 데이터를 초기화하고 `5 Endpoint / 14일 5,600 Event / 3 Alert / 1 Incident`를 생성한다. 최근 24시간은 400 Event, 최근 7일은 2,800 Event다.
 
 ```powershell
 uv run python -m tools.seed_presentation_demo --profile presentation --seed 20260721 --anchor now --confirm-reset
@@ -32,15 +37,15 @@ uv run python -m tools.verify_presentation_demo --manifest runtime/demo/presenta
 
 ## 2. 시연 클릭 순서
 
-1. manifest의 `urls.overview`를 열고 `LATEST_24H`에서 400 Event, 3 Alert, 2 open Incident를 확인한다.
+1. manifest의 `urls.overview`를 열고 `LATEST_24H`에서 400 Event, 3 Alert, 1 open Incident를 확인한다.
 2. 기간을 `LATEST_7D`로 바꿔 2,800 Event를 확인한 뒤 `LATEST_24H`로 돌아온다.
 3. Highest-risk Endpoint `SOYEON-WIN`을 연다.
 4. Endpoint 화면의 `최근 Event 열기`를 눌러 최근 24시간 85개 Timeline을 확인한다.
 5. Minecraft shader 설치 파일 → Encoded PowerShell 2회 → 외부 통신 순서를 확인한다.
-6. Overview 또는 Incident 목록에서 manifest의 `powershellIncidentId`에 해당하는 Incident를 연다.
-7. `Attack Timeline`과 연결 Alert 표에서 같은 `PROC_POWERSHELL_ENCODED` Alert 2개를 확인한다.
-8. 두 Alert의 원본 Event를 열어 같은 Endpoint와 같은 30분 window인지 확인한다.
-9. 같은 Minecraft 사고 케이스를 구성하는 `suspicious-egress` Incident와 `NET_SUSPICIOUS_EGRESS` Alert가 시스템상 별도로 존재하는지 확인한다.
+6. Overview 또는 Incident 목록에서 manifest의 `chainIncidentId`에 해당하는 Incident를 연다.
+7. `Attack Timeline`과 연결 Alert 표에서 `PROC_POWERSHELL_ENCODED` Alert 2개와 `NET_SUSPICIOUS_EGRESS` Alert 1개를 확인한다.
+8. 세 Alert의 원본 Event를 열어 같은 Endpoint와 같은 30분 window인지 확인한다.
+9. TLS Event의 `tlsSni=update-cache.test`와 Incident의 `powershell-tls-egress-chain` correlation key를 확인한다.
 
 ## 3. DNS correctness profile
 
@@ -94,7 +99,7 @@ uv run python -m tools.seed_presentation_demo --profile presentation --seed 2026
 
 - 최종본: `output/playwright/presentation-demo-final-1280x720.webm`
 - 규격: WebM(VP8), 1280×720, 68.28초
-- 포함 동선: Overview 400/3/2와 5 Endpoint → 최근 7일 2,800 → `SOYEON-WIN` → 최근 24시간 85 Event와 Minecraft Timeline → PowerShell Incident(Alert 2개) → 별도 Egress Incident
+- 포함 동선: Overview 400/3/1과 5 Endpoint → 최근 7일 2,800 → `SOYEON-WIN` → 최근 24시간 85 Event와 Minecraft Timeline → PowerShell/TLS Incident(Alert 3개)
 - 기존 3 Endpoint·64 Event 녹화본은 새 데이터 설계의 fallback으로 사용하지 않는다.
 - 로그인 비밀번호 입력 장면, `.env`, 인증서 private key, production 화면은 포함하지 않는다.
 

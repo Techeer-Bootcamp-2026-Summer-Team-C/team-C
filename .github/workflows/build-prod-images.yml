@@ -1,24 +1,7 @@
 name: Build production images
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - ".dockerignore"
-      - ".github/workflows/build-prod-images.yml"
-      - "backend/**"
-      - "deploy/docker/**"
-      - "deploy/nginx/**"
-      - "deploy/portainer/compose.service.yaml"
-      - "deploy/portainer/pin-images.py"
-      - "mappings/**"
-      - "migrations/**"
-      - "rules/**"
-      - "schemas/**"
-      - "tools/**"
-      - "pyproject.toml"
-      - "uv.lock"
+  workflow_call:
   workflow_dispatch:
 
 permissions:

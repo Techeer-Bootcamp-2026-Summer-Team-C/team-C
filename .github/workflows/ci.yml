@@ -2,12 +2,15 @@ name: CI
 
 on:
   pull_request:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -63,3 +66,93 @@ jobs:
           docker compose --env-file .env.production.example -f compose.prod.yaml config --quiet
           docker compose --env-file deploy/portainer/env.infra.example -f deploy/portainer/compose.infra.yaml config --quiet
           docker compose --env-file deploy/portainer/env.service.example -f deploy/portainer/compose.service.yaml config --quiet
+          docker compose --env-file deploy/portainer/env.observability.example -f deploy/portainer/compose.observability.yaml config --quiet
+          docker compose -f deploy/portainer/compose.portainer-agent.yaml config --quiet
+          docker compose -f deploy/portainer/compose.portainer-server.yaml config --quiet
+
+  backend-integration:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install uv and backend dependencies
+        run: |
+          pip install uv==0.11.11
+          uv sync --locked --dev
+
+      - name: Start isolated integration stores
+        run: docker compose up -d --wait postgres clickhouse kafka minio
+
+      - name: Run backend storage and pipeline integration tests
+        env:
+          EDR_RUN_DASHBOARD_INTEGRATION: "1"
+          EDR_RUN_INGEST_INTEGRATION: "1"
+          EDR_RUN_STORAGE_INTEGRATION: "1"
+          TEST_CLICKHOUSE_HOST: 127.0.0.1
+          TEST_CLICKHOUSE_PASSWORD: edr-local-clickhouse
+          TEST_CLICKHOUSE_PORT: "58123"
+          TEST_KAFKA_BOOTSTRAP: 127.0.0.1:59092
+          TEST_POSTGRES_DSN: postgresql://edr:edr-local-postgres@127.0.0.1:55432/edr
+          TEST_S3_ACCESS_KEY: edr-local
+          TEST_S3_ENDPOINT: http://127.0.0.1:59000
+          TEST_S3_SECRET_KEY: edr-local-minio
+        run: uv run pytest -m integration
+
+      - name: Show integration store logs on failure
+        if: failure()
+        run: docker compose logs --no-color --tail=200 postgres clickhouse kafka minio
+
+      - name: Stop isolated integration stores
+        if: always()
+        run: docker compose down -v
+
+  windows-agent:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Windows Agent dependencies
+        shell: pwsh
+        run: vcpkg install sqlite3:x64-windows
+
+      - name: Configure and build the native Windows Agent
+        shell: pwsh
+        run: |
+          cmake -S agents/windows -B build/windows -A x64 `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          cmake --build build/windows --config Release
+
+      - name: Test the native Windows Agent
+        run: ctest --test-dir build/windows -C Release --output-on-failure
+
+  macos-agent:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build and test the macOS Agent
+        run: swift test --package-path agents/macos
+
+  production-images:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - validate
+      - backend-integration
+      - windows-agent
+      - macos-agent
+    permissions:
+      contents: write
+      packages: write
+    uses: ./.github/workflows/build-prod-images.yml

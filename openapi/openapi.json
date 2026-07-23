@@ -3851,7 +3851,13 @@
         "additionalProperties": false,
         "properties": {
           "action": {
-            "description": "파일에 수행된 동작입니다.",
+            "description": "파일에 수행된 정규화된 동작입니다.",
+            "enum": [
+              "CREATE",
+              "DELETE",
+              "MODIFY",
+              "RENAME"
+            ],
             "examples": [
               "CREATE"
             ],

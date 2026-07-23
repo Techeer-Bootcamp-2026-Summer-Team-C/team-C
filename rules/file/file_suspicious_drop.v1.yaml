@@ -4,7 +4,7 @@ rule_name: Suspicious File Drop
 alert_title: Suspicious file drop detected
 alert_summary: A process created a suspicious payload or artifact file.
 version: 1
-enabled: true
+enabled: false
 event_type: FILE_EVENT
 conditions:
   all:
@@ -16,13 +16,8 @@ conditions:
       value: '(?i)(payload|artifact)-'
 severity: HIGH
 risk_score: 76
-mitre:
-  tactic_code: TA0003
-  technique_code: T1547.001
 incident:
-  enabled: true
-  correlation_key: suspicious-file-drop
-  window_seconds: 1800
+  enabled: false
 response_guidance:
   - order: 1
     title: Validate file origin and hash

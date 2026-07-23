@@ -20,7 +20,22 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-install-project
 
 COPY backend ./backend
-COPY tools ./tools
+COPY tools/__init__.py \
+    tools/check_worker_health.py \
+    tools/create_admin.py \
+    tools/local_demo.py \
+    tools/prod_init.py \
+    tools/provision_agent_cert.py \
+    tools/provision_compose_certs.py \
+    tools/replay_failure.py \
+    tools/run_detection_worker.py \
+    tools/run_event_storage_worker.py \
+    tools/run_storage_lifecycle_worker.py \
+    tools/secure_files.py \
+    tools/seed_presentation_demo.py \
+    tools/seed_safety.py \
+    tools/verify_presentation_demo.py \
+    ./tools/
 COPY mappings ./mappings
 COPY migrations ./migrations
 COPY rules ./rules

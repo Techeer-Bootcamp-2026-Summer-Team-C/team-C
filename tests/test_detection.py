@@ -25,6 +25,7 @@ def test_rule_loader_and_detection_snapshot_rule_strings() -> None:
             "agent_id": "agent-win-001",
             "event_type": "PROCESS_EXECUTION",
             "occurred_at": occurred_at,
+            "process_name": "powershell.exe",
             "command_line": "powershell.exe -EncodedCommand ZQBjAGgAbwA=",
         },
         detected_at=occurred_at,
@@ -36,7 +37,7 @@ def test_rule_loader_and_detection_snapshot_rule_strings() -> None:
     assert alert.summary == "PowerShell was executed with an encoded command argument."
     assert alert.mitre_tactic_name == "Execution"
     assert matches[0].incident is not None
-    assert matches[0].incident.correlation_key == "suspicious-powershell"
+    assert matches[0].incident.correlation_key == "powershell-tls-egress-chain"
 
 
 def test_non_matching_event_does_not_create_alert() -> None:
@@ -63,8 +64,8 @@ def test_non_matching_event_does_not_create_alert() -> None:
     ("event_type", "fields", "expected_rule_code"),
     [
         (
-            "NETWORK_CONNECTION",
-            {"remote_domain": "update-cache.example.net"},
+            "L7_EVENT",
+            {"l7_protocol": "TLS", "tls_sni": "update-cache.example.net"},
             "NET_SUSPICIOUS_EGRESS",
         ),
         (
@@ -79,7 +80,7 @@ def test_non_matching_event_does_not_create_alert() -> None:
         ),
         (
             "L7_EVENT",
-            {"l7_protocol": "HTTPS", "http_method": "POST", "http_host": "storage.example.com"},
+            {"l7_protocol": "HTTP", "http_method": "POST", "http_host": "storage.example.com"},
             "L7_UPLOAD_ANOMALY",
         ),
     ],
@@ -109,3 +110,70 @@ def test_demo_rule_matches_seeded_source_event(
     )
 
     assert [match.alert.rule_code for match in matches] == [expected_rule_code]
+
+
+def test_powershell_and_tls_egress_share_only_the_configured_endpoint_window() -> None:
+    loader = RuleLoader(
+        schema_path=ROOT / "schemas/rule-v1.schema.json",
+        mapping_path=ROOT / "mappings/mitre_attack.yaml",
+    )
+    engine = DetectionEngine(loader.load_directory(ROOT / "rules"))
+    process_time = datetime(2026, 7, 12, 1, 2, 3, tzinfo=UTC)
+    egress_time = datetime(2026, 7, 12, 1, 12, 3, tzinfo=UTC)
+    process = engine.evaluate(
+        {
+            "event_id": "018ff8f4-86de-7b25-9b8a-2d22f6a3e201",
+            "endpoint_id": 1001,
+            "agent_id": "agent-win-001",
+            "event_type": "PROCESS_EXECUTION",
+            "occurred_at": process_time,
+            "process_name": "powershell.exe",
+            "command_line": "powershell.exe -EncodedCommand [REDACTED]",
+        },
+        detected_at=process_time,
+    )[0]
+    egress = engine.evaluate(
+        {
+            "event_id": "018ff8f4-86de-7b25-9b8a-2d22f6a3e202",
+            "endpoint_id": 1001,
+            "agent_id": "agent-win-001",
+            "event_type": "L7_EVENT",
+            "occurred_at": egress_time,
+            "l7_protocol": "TLS",
+            "tls_sni": "update-cache.example.net",
+        },
+        detected_at=egress_time,
+    )[0]
+
+    assert process.alert.rule_code == "PROC_POWERSHELL_ENCODED"
+    assert egress.alert.rule_code == "NET_SUSPICIOUS_EGRESS"
+    assert process.incident is not None
+    assert egress.incident is not None
+    assert process.incident.endpoint_id == egress.incident.endpoint_id == 1001
+    assert process.incident.correlation_key == egress.incident.correlation_key
+    assert process.incident.window_start_at == egress.incident.window_start_at
+    assert process.incident.window_end_at == egress.incident.window_end_at
+
+
+def test_https_metadata_does_not_claim_unencrypted_upload_technique() -> None:
+    loader = RuleLoader(
+        schema_path=ROOT / "schemas/rule-v1.schema.json",
+        mapping_path=ROOT / "mappings/mitre_attack.yaml",
+    )
+    engine = DetectionEngine(loader.load_directory(ROOT / "rules"))
+    occurred_at = datetime(2026, 7, 12, 1, 2, 3, tzinfo=UTC)
+    matches = engine.evaluate(
+        {
+            "event_id": "018ff8f4-86de-7b25-9b8a-2d22f6a3e203",
+            "endpoint_id": 1001,
+            "agent_id": "agent-win-001",
+            "event_type": "L7_EVENT",
+            "occurred_at": occurred_at,
+            "l7_protocol": "HTTPS",
+            "http_method": "POST",
+            "http_host": "storage.example.com",
+        },
+        detected_at=occurred_at,
+    )
+
+    assert matches == []

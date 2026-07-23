@@ -366,6 +366,7 @@ dependencies = [
     { name = "cryptography" },
     { name = "dnspython" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "jsonschema" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pyarrow" },
@@ -378,7 +379,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "pip-audit" },
     { name = "pytest" },
     { name = "ruff" },
@@ -393,6 +393,7 @@ requires-dist = [
     { name = "cryptography", specifier = ">=48.0.1,<49" },
     { name = "dnspython", specifier = ">=2.8.0" },
     { name = "fastapi", specifier = ">=0.115,<1" },
+    { name = "httpx", specifier = ">=0.28,<1" },
     { name = "jsonschema", specifier = ">=4.23,<5" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
     { name = "pyarrow", specifier = ">=23.0.1,<24" },
@@ -405,7 +406,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "httpx", specifier = ">=0.28,<1" },
     { name = "pip-audit", specifier = ">=2.9,<3" },
     { name = "pytest", specifier = ">=9.0.3,<10" },
     { name = "ruff", specifier = ">=0.11,<1" },

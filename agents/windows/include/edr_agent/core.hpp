@@ -5,6 +5,7 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -50,7 +51,13 @@ std::string uuid_string();
 std::string json_escape(const std::string& value);
 std::string encode_event(const Event& event);
 std::string sanitize_url(const std::string& value);
+std::string sanitize_command_line(const std::string& value);
 int exponential_backoff(int attempt, int base_seconds, int cap_seconds);
+
+inline constexpr std::string_view kFileActionCreate = "CREATE";
+inline constexpr std::string_view kFileActionDelete = "DELETE";
+inline constexpr std::string_view kFileActionModify = "MODIFY";
+inline constexpr std::string_view kFileActionRename = "RENAME";
 
 class EventBuffer {
   public:

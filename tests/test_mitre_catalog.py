@@ -31,7 +31,7 @@ def test_catalog_rejects_invalid_tactic_technique_pair() -> None:
 
 def test_rule_loader_rejects_existing_codes_in_an_invalid_pair(tmp_path: Path) -> None:
     rule_path = tmp_path / "invalid_pair.yaml"
-    sample = (ROOT / "rules" / "process" / "proc_powershell_encoded.v1.yaml").read_text(encoding="utf-8")
+    sample = (ROOT / "rules" / "process" / "proc_powershell_encoded.v2.yaml").read_text(encoding="utf-8")
     rule_path.write_text(sample.replace("tactic_code: TA0002", "tactic_code: TA0001"), encoding="utf-8")
     loader = RuleLoader(
         schema_path=ROOT / "schemas" / "rule-v1.schema.json",

@@ -1,0 +1,31 @@
+schema_version: 1
+rule_code: DNS_RARE_DOMAIN
+rule_name: Configured Suspicious Domain Query
+alert_title: Suspicious domain pattern query detected
+alert_summary: An endpoint queried a domain matching a configured suspicious pattern.
+version: 2
+enabled: true
+event_type: DNS_QUERY
+conditions:
+  all:
+    - field: dns_query
+      operator: regex
+      value: '(?i)(?:^|\.)(?:update-cache|rare-beacon)(?:\.|$)'
+severity: HIGH
+risk_score: 76
+mitre:
+  tactic_code: TA0011
+  technique_code: T1071.004
+incident:
+  enabled: true
+  correlation_key: suspicious-domain-query
+  window_seconds: 1800
+response_guidance:
+  - order: 1
+    title: Review domain and query process
+    description: Domain 등록 정보와 평판, DNS 응답, 질의를 생성한 프로세스 및 같은 Endpoint의 후속 연결을 확인합니다.
+    requires_manual_action: false
+  - order: 2
+    title: Block confirmed malicious domain
+    description: 악성 Domain으로 확인되면 DNS 또는 보안 Gateway에서 차단하고 다른 Endpoint의 동일 질의 여부를 조사합니다.
+    requires_manual_action: true

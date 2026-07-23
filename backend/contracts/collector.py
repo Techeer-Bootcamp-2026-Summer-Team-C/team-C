@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
 from .common import ContractModel, NonNegativeInt, PositiveId, UtcDateTime
@@ -100,7 +100,10 @@ class NetworkConnectionPayload(OptionalRequestFieldsModel):
 
 class FileEventPayload(OptionalRequestFieldsModel):
     file_path: str = Field(description="관찰된 파일의 절대 경로입니다.")
-    action: str = Field(description="파일에 수행된 동작입니다.", examples=["CREATE"])
+    action: Literal["CREATE", "DELETE", "MODIFY", "RENAME"] = Field(
+        description="파일에 수행된 정규화된 동작입니다.",
+        examples=["CREATE"],
+    )
     sha256: str | SkipJsonSchema[None] = Field(default=None, description="파일 내용의 SHA-256 해시입니다.")
     process_name: str | SkipJsonSchema[None] = Field(
         default=None, description="파일 동작을 수행한 프로세스 이름입니다."
@@ -108,6 +111,18 @@ class FileEventPayload(OptionalRequestFieldsModel):
     pid: NonNegativeInt | SkipJsonSchema[None] = Field(
         default=None, description="파일 동작을 수행한 프로세스 ID입니다."
     )
+
+    @field_validator("action", mode="before")
+    @classmethod
+    def normalize_legacy_action(cls, value: object) -> object:
+        if isinstance(value, str):
+            return {
+                "CREATED": "CREATE",
+                "DELETED": "DELETE",
+                "MODIFIED": "MODIFY",
+                "RENAMED": "RENAME",
+            }.get(value.upper(), value.upper())
+        return value
 
 
 class DnsQueryPayload(OptionalRequestFieldsModel):

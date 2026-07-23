@@ -2081,10 +2081,11 @@ export interface components {
         FileEventPayload: {
             /**
              * Action
-             * @description 파일에 수행된 동작입니다.
+             * @description 파일에 수행된 정규화된 동작입니다.
              * @example CREATE
+             * @enum {string}
              */
-            action: string;
+            action: "CREATE" | "DELETE" | "MODIFY" | "RENAME";
             /**
              * Filepath
              * @description 관찰된 파일의 절대 경로입니다.

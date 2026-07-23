@@ -27,6 +27,12 @@ from backend.storage.migrations import apply_clickhouse_file, apply_postgres_mig
 from backend.storage.models import EndpointInsert, IncidentInsert
 from backend.storage.postgres import AlertRepository, EndpointRepository, IncidentRepository, UserRepository
 from backend.workers import normalize_event
+from tools.seed_safety import (
+    assert_safe_reset_targets,
+    database_name,
+    parse_allowed_qa_hosts,
+    require_reset_confirmation,
+)
 
 ROOT = Path(__file__).parents[1]
 ENV_FILE = ROOT / ".env"
@@ -35,9 +41,6 @@ DEFAULT_MANIFESTS = {
     "dns-correctness": ROOT / "runtime" / "demo" / "dns-correctness-manifest.json",
 }
 PROFILES = ("presentation", "dns-correctness")
-CAPABILITIES = ["PROCESS_EXECUTION", "NETWORK_CONNECTION", "FILE_EVENT", "DNS_QUERY", "L7_EVENT"]
-LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1", "postgres", "clickhouse"}
-ALLOWED_DATABASES = {"edr", "edr_qa", "test_edr"}
 PRESENTATION_DAYS = 14
 PRESENTATION_DAILY_EVENTS = {
     "GEONHA-MACMINI": 100,
@@ -55,6 +58,7 @@ class SeedTarget:
     clickhouse_dsn: str
     dashboard_base_url: str
     collector_base_url: str
+    allowed_qa_hosts: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +75,14 @@ class EndpointPlan:
     major: str = ""
     activity_profile: str = "generic"
     sensor_status: str = "HEALTHY"
+
+
+@dataclass(frozen=True, slots=True)
+class AgentFixtureMetadata:
+    version: str
+    build_id: str
+    capability_codes: tuple[str, ...]
+    sensor_health: tuple[dict[str, object], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,7 +106,7 @@ class ProfilePlan:
     @property
     def counts(self) -> dict[str, int]:
         alert_count = 3 if self.profile == "presentation" else 0
-        incident_count = 2 if self.profile == "presentation" else 0
+        incident_count = 1 if self.profile == "presentation" else 0
         return {
             "endpoints": len(self.endpoints),
             "events": len(self.events),
@@ -117,6 +129,56 @@ def parse_anchor(value: str, *, now: datetime | None = None) -> datetime:
     if parsed.tzinfo is None:
         raise ValueError("anchor must include an RFC 3339 UTC offset")
     return parsed.astimezone(UTC).replace(microsecond=0)
+
+
+def agent_fixture_metadata(endpoint: EndpointPlan) -> AgentFixtureMetadata:
+    """Mirror the version, capabilities, and providers reported by the shipped agents."""
+    packet_status = endpoint.sensor_status
+    if packet_status not in {"HEALTHY", "DEGRADED", "UNAVAILABLE"}:
+        raise ValueError(f"unsupported fixture sensor status: {packet_status}")
+
+    common_health: list[dict[str, object]] = [
+        {"sensor": "PROCESS", "status": "HEALTHY"},
+        {"sensor": "NETWORK", "status": "HEALTHY"},
+        {"sensor": "FILE", "status": "HEALTHY"},
+    ]
+    packet_errors = 3 if packet_status == "DEGRADED" else 0
+    if endpoint.os_type == "WINDOWS":
+        capabilities = ["PROCESS_EXECUTION", "NETWORK_CONNECTION", "FILE_EVENT", "DNS_QUERY"]
+        common_health.append({"sensor": "DNS", "status": "HEALTHY", "provider": "DNS_CLIENT_ETW"})
+        packet_provider = "NPCAP"
+        build_id = "win-x64-20260712.1"
+    elif endpoint.os_type == "MACOS":
+        capabilities = ["PROCESS_EXECUTION", "NETWORK_CONNECTION", "FILE_EVENT"]
+        packet_provider = "TCPDUMP"
+        build_id = "macos-arm64-20260712.1"
+    else:
+        raise ValueError(f"unsupported fixture OS type: {endpoint.os_type}")
+
+    common_health.extend(
+        [
+            {
+                "sensor": "PACKET_METADATA",
+                "status": packet_status,
+                "provider": packet_provider,
+                "packetDropCount": 0,
+            },
+            {
+                "sensor": "L7",
+                "status": packet_status,
+                "parseErrorCount": packet_errors,
+            },
+        ]
+    )
+    if packet_status == "HEALTHY":
+        capabilities.extend(["DNS_QUERY", "L7_EVENT", "PACKET_METADATA_V1"])
+
+    return AgentFixtureMetadata(
+        version="0.1.0",
+        build_id=build_id,
+        capability_codes=tuple(dict.fromkeys(capabilities)),
+        sensor_health=tuple(common_health),
+    )
 
 
 def load_environment_values() -> dict[str, str]:
@@ -152,30 +214,16 @@ def seed_target(values: dict[str, str] | None = None) -> SeedTarget:
         ),
         dashboard_base_url=f"http://127.0.0.1:{dashboard_port}",
         collector_base_url=f"https://127.0.0.1:{collector_port}/api/v1/collector",
+        allowed_qa_hosts=parse_allowed_qa_hosts(values.get("EDR_SEED_ALLOWED_QA_HOSTS")),
     )
 
 
-def _database_name(dsn: str) -> str:
-    return urlparse(dsn).path.strip("/").split("/", 1)[0]
-
-
-def _safe_host(environment: str, host: str | None) -> bool:
-    if host in LOCAL_HOSTS:
-        return True
-    lowered = (host or "").lower()
-    return environment == "qa" and ("qa" in lowered or "test" in lowered)
-
-
 def assert_safe_reset_target(target: SeedTarget) -> None:
-    if target.environment not in {"local", "qa"}:
-        raise RuntimeError("destructive demo seed is allowed only when EDR_ENV is local or qa")
-    for label, dsn in (("PostgreSQL", target.postgres_dsn), ("ClickHouse", target.clickhouse_dsn)):
-        parsed = urlparse(dsn)
-        database = _database_name(dsn)
-        if not _safe_host(target.environment, parsed.hostname):
-            raise RuntimeError(f"{label} host is not an allowlisted local/QA target: {parsed.hostname or '<missing>'}")
-        if database not in ALLOWED_DATABASES:
-            raise RuntimeError(f"{label} database is not an allowlisted demo database: {database or '<missing>'}")
+    assert_safe_reset_targets(
+        environment=target.environment,
+        targets=(("PostgreSQL", target.postgres_dsn), ("ClickHouse", target.clickhouse_dsn)),
+        allowed_qa_hosts=target.allowed_qa_hosts,
+    )
 
 
 def describe_target(target: SeedTarget) -> dict[str, str]:
@@ -183,8 +231,8 @@ def describe_target(target: SeedTarget) -> dict[str, str]:
     clickhouse = urlparse(target.clickhouse_dsn)
     return {
         "environment": target.environment,
-        "postgres": f"{postgres.hostname}:{postgres.port or 5432}/{_database_name(target.postgres_dsn)}",
-        "clickhouse": f"{clickhouse.hostname}:{clickhouse.port or 8123}/{_database_name(target.clickhouse_dsn)}",
+        "postgres": f"{postgres.hostname}:{postgres.port or 5432}/{database_name(target.postgres_dsn)}",
+        "clickhouse": f"{clickhouse.hostname}:{clickhouse.port or 8123}/{database_name(target.clickhouse_dsn)}",
     }
 
 
@@ -570,15 +618,12 @@ def build_presentation_plan(seed: int, anchor: datetime) -> ProfilePlan:
         ),
         (
             5,
-            "NETWORK_CONNECTION",
+            "L7_EVENT",
             attack_offsets[5],
             {
-                "protocol": "TCP",
-                "remoteIp": "203.0.113.88",
-                "remotePort": 443,
-                "remoteDomain": "update-cache.test",
-                "processName": "powershell.exe",
-                "pid": 4243,
+                "l7Protocol": "TLS",
+                "tlsSni": "update-cache.test",
+                "tlsVersion": "TLS1.2",
             },
         ),
     )
@@ -791,7 +836,7 @@ def _normalized_events(plan: ProfilePlan, endpoint_ids: dict[str, int]) -> list[
 
 
 def _validate_plan(plan: ProfilePlan) -> None:
-    expected = {"presentation": (5, 5_600, 3, 2), "dns-correctness": (2, 8, 0, 0)}[plan.profile]
+    expected = {"presentation": (5, 5_600, 3, 1), "dns-correctness": (2, 8, 0, 0)}[plan.profile]
     if (len(plan.endpoints), len(plan.events), plan.counts["alerts"], plan.counts["incidents"]) != expected:
         raise RuntimeError(f"{plan.profile} plan count contract changed")
     if Counter(item.hostname for item in plan.events) != Counter(
@@ -815,14 +860,16 @@ def _validate_plan(plan: ProfilePlan) -> None:
             )
         codes = Counter(match.alert.rule_code for match in matches)
         keys = Counter(match.incident.correlation_key for match in matches if match.incident is not None)
-        windows = {match.incident.window_start_at for match in matches[:2] if match.incident is not None}
+        windows = {match.incident.window_start_at for match in matches if match.incident is not None}
         if codes != {"PROC_POWERSHELL_ENCODED": 2, "NET_SUSPICIOUS_EGRESS": 1}:
             raise RuntimeError(f"presentation Rule matches changed: {dict(codes)}")
-        if keys != {"suspicious-powershell": 2, "suspicious-egress": 1} or len(windows) != 1:
+        if keys != {"powershell-tls-egress-chain": 3} or len(windows) != 1:
             raise RuntimeError("presentation Incident correlation contract changed")
 
 
-def _reset_databases(target: SeedTarget) -> None:
+def _reset_databases(target: SeedTarget, *, confirm_reset: bool = False) -> None:
+    require_reset_confirmation(confirm_reset)
+    assert_safe_reset_target(target)
     with psycopg.connect(target.postgres_dsn) as connection:
         apply_postgres_migrations(connection, ROOT / "migrations" / "postgresql", direction="down")
         apply_postgres_migrations(connection, ROOT / "migrations" / "postgresql")
@@ -855,6 +902,7 @@ def _insert_endpoints(connection: psycopg.Connection, plan: ProfilePlan) -> dict
     repository = EndpointRepository(connection)
     endpoint_ids: dict[str, int] = {}
     for endpoint in plan.endpoints:
+        metadata = agent_fixture_metadata(endpoint)
         endpoint_id = repository.insert(
             EndpointInsert(
                 agent_id=endpoint.agent_id,
@@ -863,11 +911,10 @@ def _insert_endpoints(connection: psycopg.Connection, plan: ProfilePlan) -> dict
                 registered_at=plan.anchor - timedelta(days=45),
             )
         )
-        sensor_provider = "EndpointSecurity" if endpoint.os_type == "MACOS" else "ETW"
         connection.execute(
             """
             UPDATE endpoints SET
-                os_version = %s, ip_address = %s, agent_version = '2.7.1', agent_build_id = %s,
+                os_version = %s, ip_address = %s, agent_version = %s, agent_build_id = %s,
                 agent_arch = %s, capability_codes_json = %s, sensor_health_json = %s,
                 status = %s, last_seen_at = %s, updated_at = %s
             WHERE endpoint_id = %s
@@ -875,20 +922,11 @@ def _insert_endpoints(connection: psycopg.Connection, plan: ProfilePlan) -> dict
             (
                 endpoint.os_version,
                 endpoint.ip_address,
-                f"{endpoint.os_type.lower()}-{endpoint.agent_arch.lower()}-presentation",
+                metadata.version,
+                metadata.build_id,
                 endpoint.agent_arch,
-                Jsonb(CAPABILITIES),
-                Jsonb(
-                    [
-                        {
-                            "sensor": "PROCESS",
-                            "status": endpoint.sensor_status,
-                            "provider": sensor_provider,
-                            "packetDropCount": 0,
-                            "parseErrorCount": 3 if endpoint.sensor_status == "DEGRADED" else 0,
-                        }
-                    ]
-                ),
+                Jsonb(list(metadata.capability_codes)),
+                Jsonb(list(metadata.sensor_health)),
                 endpoint.status,
                 plan.anchor - timedelta(hours=6) if endpoint.status == "OFFLINE" else plan.anchor,
                 plan.anchor,
@@ -944,8 +982,7 @@ def _direct_seed(target: SeedTarget, plan: ProfilePlan) -> tuple[dict[str, int],
     ids: dict[str, object] = {
         "endpointIdsByHostname": endpoint_ids,
         "presentationEndpointId": endpoint_ids.get("SOYEON-WIN"),
-        "powershellIncidentId": None,
-        "egressIncidentId": None,
+        "chainIncidentId": None,
         "powershellAlertIds": [],
         "egressAlertId": None,
         "eventIds": [str(event["event_id"]) for event in events],
@@ -980,12 +1017,7 @@ def _direct_seed(target: SeedTarget, plan: ProfilePlan) -> tuple[dict[str, int],
                     alert_id=stored_alert.alert_id,
                     linked_at=event["ingested_at"],
                 )
-                key = (
-                    "powershellIncidentId"
-                    if match.incident.correlation_key == "suspicious-powershell"
-                    else "egressIncidentId"
-                )
-                ids[key] = stored_incident.incident_id
+                ids["chainIncidentId"] = stored_incident.incident_id
         _insert_hot_metadata(connection, events, plan.anchor)
     return endpoint_ids, ids
 
@@ -1010,6 +1042,7 @@ def _collector_seed(
     endpoint_ids: dict[str, int] = {}
     certificates = {}
     for endpoint in plan.endpoints:
+        metadata = agent_fixture_metadata(endpoint)
         certificate = provision(endpoint.agent_id, authority)
         certificates[endpoint.hostname] = certificate
         with _collector_client(certificate.certificate, certificate.private_key, certificate.ca_certificate) as client:
@@ -1020,10 +1053,10 @@ def _collector_seed(
                     "hostname": endpoint.hostname,
                     "osType": endpoint.os_type,
                     "osVersion": endpoint.os_version,
-                    "agentVersion": "2.7.1",
-                    "agentBuildId": f"{endpoint.os_type.lower()}-{endpoint.agent_arch.lower()}-presentation",
+                    "agentVersion": metadata.version,
+                    "agentBuildId": metadata.build_id,
                     "agentArch": endpoint.agent_arch,
-                    "capabilityCodes": CAPABILITIES,
+                    "capabilityCodes": list(metadata.capability_codes),
                 },
             )
             response.raise_for_status()
@@ -1032,19 +1065,12 @@ def _collector_seed(
                 f"{target.collector_base_url}/agents/heartbeat",
                 json={
                     "agentId": endpoint.agent_id,
-                    "agentVersion": "2.7.1",
-                    "agentBuildId": f"{endpoint.os_type.lower()}-{endpoint.agent_arch.lower()}-presentation",
+                    "agentVersion": metadata.version,
+                    "agentBuildId": metadata.build_id,
                     "agentArch": endpoint.agent_arch,
-                    "capabilityCodes": CAPABILITIES,
+                    "capabilityCodes": list(metadata.capability_codes),
                     "bufferDepth": 0,
-                    "sensorHealth": [
-                        {
-                            "sensor": "PROCESS",
-                            "status": endpoint.sensor_status,
-                            "packetDropCount": 0,
-                            "parseErrorCount": 3 if endpoint.sensor_status == "DEGRADED" else 0,
-                        }
-                    ],
+                    "sensorHealth": list(metadata.sensor_health),
                     "sentAt": _rfc3339(datetime.now(UTC)),
                 },
             )
@@ -1151,13 +1177,11 @@ def _wait_for_pipeline(
         ):
             powershell_alerts = [int(row[0]) for row in alert_rows if row[1] == "PROC_POWERSHELL_ENCODED"]
             egress_alert = next((int(row[0]) for row in alert_rows if row[1] == "NET_SUSPICIOUS_EGRESS"), None)
-            powershell_incident = next(
-                (int(row[0]) for row in incident_rows if row[1] == "suspicious-powershell"), None
+            chain_incident = next(
+                (int(row[0]) for row in incident_rows if row[1] == "powershell-tls-egress-chain"), None
             )
-            egress_incident = next((int(row[0]) for row in incident_rows if row[1] == "suspicious-egress"), None)
             return {
-                "powershellIncidentId": powershell_incident,
-                "egressIncidentId": egress_incident,
+                "chainIncidentId": chain_incident,
                 "powershellAlertIds": powershell_alerts,
                 "egressAlertId": egress_alert,
             }
@@ -1174,7 +1198,7 @@ def _manifest(
 ) -> dict[str, object]:
     event_times = [event.occurred_at for event in plan.events]
     main_endpoint_id = endpoint_ids.get("SOYEON-WIN")
-    powershell_incident_id = ids.get("powershellIncidentId")
+    chain_incident_id = ids.get("chainIncidentId")
     egress_alert_id = ids.get("egressAlertId")
     time_range = (
         f"timePreset=CUSTOM&from={_rfc3339(min(event_times))}&to={_rfc3339(plan.anchor + timedelta(minutes=1))}"
@@ -1212,8 +1236,8 @@ def _manifest(
             "endpointTimeline": f"{target.dashboard_base_url}/events?endpointId={main_endpoint_id}&{time_range}"
             if main_endpoint_id
             else None,
-            "powershellIncident": f"{target.dashboard_base_url}/incidents/{powershell_incident_id}"
-            if powershell_incident_id
+            "chainIncident": f"{target.dashboard_base_url}/incidents/{chain_incident_id}"
+            if chain_incident_id
             else None,
             "egressAlert": f"{target.dashboard_base_url}/alerts/{egress_alert_id}" if egress_alert_id else None,
             "dnsCorrectness": f"{target.dashboard_base_url}/intelligence?value=yahoo.com&{time_range}",
@@ -1277,8 +1301,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if not args.confirm_reset:
             parser.error("--confirm-reset is required because this command resets local/QA databases")
-        assert_safe_reset_target(target)
-        _reset_databases(target)
+        _reset_databases(target, confirm_reset=args.confirm_reset)
         if args.emit_through_collector:
             endpoint_ids, ids = _collector_seed(target, plan, wait_timeout_seconds=args.wait_timeout_seconds)
         else:

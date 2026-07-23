@@ -4,7 +4,7 @@ rule_name: PowerShell Encoded Command
 alert_title: Encoded PowerShell command detected
 alert_summary: PowerShell was executed with an encoded command argument.
 version: 1
-enabled: true
+enabled: false
 event_type: PROCESS_EXECUTION
 conditions:
   all:
@@ -13,13 +13,8 @@ conditions:
       value: "-EncodedCommand"
 severity: HIGH
 risk_score: 85
-mitre:
-  tactic_code: TA0002
-  technique_code: T1059.001
 incident:
-  enabled: true
-  correlation_key: suspicious-powershell
-  window_seconds: 1800
+  enabled: false
 response_guidance:
   - order: 1
     title: Review source event

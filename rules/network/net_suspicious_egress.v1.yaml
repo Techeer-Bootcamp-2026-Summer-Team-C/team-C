@@ -4,7 +4,7 @@ rule_name: Suspicious Egress Destination
 alert_title: Suspicious encrypted egress detected
 alert_summary: A monitored process connected to a rare external destination.
 version: 1
-enabled: true
+enabled: false
 event_type: NETWORK_CONNECTION
 conditions:
   all:
@@ -13,13 +13,8 @@ conditions:
       value: '(?i)(update-cache|api\.corp|rare-beacon)'
 severity: CRITICAL
 risk_score: 92
-mitre:
-  tactic_code: TA0011
-  technique_code: T1071.001
 incident:
-  enabled: true
-  correlation_key: suspicious-egress
-  window_seconds: 1800
+  enabled: false
 response_guidance:
   - order: 1
     title: Review destination and source process

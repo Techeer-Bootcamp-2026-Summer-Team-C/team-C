@@ -12,6 +12,31 @@ import Testing
     )
     #expect(event.payload["processName"] == .string("Google Chrome"))
     #expect(event.payload["processPath"] == .string("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"))
+    #expect(event.payload["commandLine"] == .string("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --type=renderer"))
+}
+
+@Test func processCommandLineIsOptionalAndSensitiveValuesAreRedacted() throws {
+    let withoutCommand = try #require(
+        ProcessCollector.parse("42 1 /usr/bin/pwsh"[...], commandLines: [:])
+    )
+    #expect(withoutCommand.payload["commandLine"] == nil)
+
+    let withCommand = try #require(
+        ProcessCollector.parse(
+            "42 1 /usr/bin/pwsh"[...],
+            commandLines: [42: "pwsh -EncodedCommand ZQBjAGgAbwA= --token=secret-value --mode audit"]
+        )
+    )
+    #expect(withCommand.payload["commandLine"] == .string(
+        "pwsh -EncodedCommand <redacted> --token=<redacted> --mode audit"
+    ))
+}
+
+@Test func fileEventFlagsMapToCanonicalCollectorActions() {
+    #expect(FileEventAction(flags: UInt32(kFSEventStreamEventFlagItemCreated)).rawValue == "CREATE")
+    #expect(FileEventAction(flags: UInt32(kFSEventStreamEventFlagItemRemoved)).rawValue == "DELETE")
+    #expect(FileEventAction(flags: UInt32(kFSEventStreamEventFlagItemRenamed)).rawValue == "RENAME")
+    #expect(FileEventAction(flags: 0).rawValue == "MODIFY")
 }
 
 private func ethernetIPv4(protocolNumber: UInt8, transport: [UInt8]) -> Data {

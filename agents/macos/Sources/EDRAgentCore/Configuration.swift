@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 public struct AgentConfiguration: Codable, Sendable {
@@ -34,16 +35,122 @@ public struct AgentConfiguration: Codable, Sendable {
     }
 
     public static func load(path: String) throws -> AgentConfiguration {
+        let effectiveUserID = UInt32(geteuid())
+        try PrivilegedFileSecurity.validateConfigurationFile(path: path, effectiveUserID: effectiveUserID)
         let data = try Data(contentsOf: URL(fileURLWithPath: path))
         let configuration = try JSONDecoder().decode(AgentConfiguration.self, from: data)
         guard configuration.collectorBaseUrl.hasPrefix("https://") else {
             throw AgentError.invalidConfiguration("collectorBaseUrl must use https")
         }
+        for (label, value) in [
+            ("certificatePath", configuration.certificatePath),
+            ("privateKeyPath", configuration.privateKeyPath),
+            ("caCertificatePath", configuration.caCertificatePath),
+            ("stateDirectory", configuration.stateDirectory),
+            ("watchDirectory", configuration.watchDirectory),
+        ] where !NSString(string: value).isAbsolutePath {
+            throw AgentError.invalidConfiguration("\(label) must be an absolute path")
+        }
         guard configuration.queueMaxEvents > 0, configuration.retryBaseSeconds > 0,
               configuration.retryMaxSeconds >= configuration.retryBaseSeconds else {
             throw AgentError.invalidConfiguration("queue and retry limits must be positive")
         }
+        try PrivilegedFileSecurity.validateRuntimeFiles(
+            configuration: configuration,
+            effectiveUserID: effectiveUserID
+        )
         return configuration
+    }
+}
+
+enum PrivilegedFileSecurity {
+    static func validateConfigurationFile(path: String, effectiveUserID: UInt32) throws {
+        guard effectiveUserID == 0 else { return }
+        try validateRegularFile(
+            path: path,
+            label: "configuration file",
+            privatePermissions: true
+        )
+    }
+
+    static func validateRuntimeFiles(configuration: AgentConfiguration, effectiveUserID: UInt32) throws {
+        guard effectiveUserID == 0 else { return }
+        try validateRegularFile(
+            path: configuration.privateKeyPath,
+            label: "private key",
+            privatePermissions: true
+        )
+        try validateRegularFile(
+            path: configuration.certificatePath,
+            label: "client certificate",
+            privatePermissions: false
+        )
+        try validateRegularFile(
+            path: configuration.caCertificatePath,
+            label: "CA certificate",
+            privatePermissions: false
+        )
+        try validateDirectory(path: configuration.stateDirectory, label: "state directory")
+    }
+
+    static func validateRegularFile(
+        path: String,
+        label: String,
+        privatePermissions: Bool,
+        attributes: [FileAttributeKey: Any]? = nil,
+        parentAttributes: [FileAttributeKey: Any]? = nil
+    ) throws {
+        let values = try attributes ?? FileManager.default.attributesOfItem(atPath: path)
+        guard values[.type] as? FileAttributeType == .typeRegular else {
+            throw AgentError.invalidConfiguration("\(label) must be a regular file")
+        }
+        try validateRootOwnership(values, label: label)
+        let permissions = try permissions(from: values, label: label)
+        let forbiddenMask: UInt16 = privatePermissions ? 0o077 : 0o022
+        guard permissions & forbiddenMask == 0 else {
+            let requirement = privatePermissions ? "root-only" : "not group/world-writable"
+            throw AgentError.invalidConfiguration("\(label) permissions must be \(requirement)")
+        }
+        try validateDirectory(
+            path: URL(fileURLWithPath: path).deletingLastPathComponent().path,
+            label: "\(label) parent directory",
+            requirePrivatePermissions: false,
+            attributes: parentAttributes
+        )
+    }
+
+    static func validateDirectory(
+        path: String,
+        label: String,
+        requirePrivatePermissions: Bool = true,
+        attributes: [FileAttributeKey: Any]? = nil
+    ) throws {
+        let values = try attributes ?? FileManager.default.attributesOfItem(atPath: path)
+        guard values[.type] as? FileAttributeType == .typeDirectory else {
+            throw AgentError.invalidConfiguration("\(label) must be a directory")
+        }
+        try validateRootOwnership(values, label: label)
+        let permissions = try permissions(from: values, label: label)
+        let forbiddenMask: UInt16 = requirePrivatePermissions ? 0o077 : 0o022
+        guard permissions & forbiddenMask == 0 else {
+            throw AgentError.invalidConfiguration("\(label) has unsafe permissions")
+        }
+    }
+
+    private static func validateRootOwnership(_ attributes: [FileAttributeKey: Any], label: String) throws {
+        guard let owner = attributes[.ownerAccountID] as? NSNumber, owner.uint32Value == 0 else {
+            throw AgentError.invalidConfiguration("\(label) must be owned by root")
+        }
+    }
+
+    private static func permissions(
+        from attributes: [FileAttributeKey: Any],
+        label: String
+    ) throws -> UInt16 {
+        guard let value = attributes[.posixPermissions] as? NSNumber else {
+            throw AgentError.invalidConfiguration("\(label) permissions are unavailable")
+        }
+        return value.uint16Value
     }
 }
 

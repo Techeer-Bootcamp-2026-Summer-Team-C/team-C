@@ -14,6 +14,8 @@
 #include <wincrypt.h>
 
 #include <array>
+#include <cstddef>
+#include <cstdint>
 #include <fstream>
 #include <mutex>
 #include <thread>
@@ -31,6 +33,51 @@ std::string narrow(const std::wstring& value) {
     std::string output(size, '\0');
     WideCharToMultiByte(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), output.data(), size, nullptr, nullptr);
     return output;
+}
+
+std::optional<std::wstring> process_image_path(HANDLE process) {
+    std::array<wchar_t, 32 * 1024> value{};
+    DWORD size = static_cast<DWORD>(value.size());
+    if (!QueryFullProcessImageNameW(process, 0, value.data(), &size) || size == 0) return std::nullopt;
+    return std::wstring(value.data(), size);
+}
+
+std::optional<std::wstring> process_command_line(HANDLE process) {
+    // ProcessCommandLineInformation (60) has no stable import-library contract. Resolve it at
+    // runtime and omit commandLine when a Windows build or process ACL does not permit access.
+    struct NativeUnicodeString {
+        USHORT length;
+        USHORT maximum_length;
+        PWSTR buffer;
+    };
+    using NtQueryInformationProcessFunction = LONG(NTAPI*)(HANDLE, ULONG, PVOID, ULONG, PULONG);
+    static const auto query = [] {
+        const HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+        return ntdll
+                   ? reinterpret_cast<NtQueryInformationProcessFunction>(
+                         GetProcAddress(ntdll, "NtQueryInformationProcess")
+                     )
+                   : nullptr;
+    }();
+    if (!query) return std::nullopt;
+
+    ULONG required = 0;
+    query(process, 60, nullptr, 0, &required);
+    constexpr ULONG kMaximumCommandLineBytes = 128 * 1024;
+    if (required < sizeof(NativeUnicodeString) || required > kMaximumCommandLineBytes) return std::nullopt;
+
+    std::vector<std::byte> storage(required);
+    if (query(process, 60, storage.data(), required, &required) < 0) return std::nullopt;
+    const auto* value = reinterpret_cast<const NativeUnicodeString*>(storage.data());
+    if (!value->buffer || value->length == 0 || value->length % sizeof(wchar_t) != 0 ||
+        value->maximum_length < value->length) return std::nullopt;
+
+    const auto storage_begin = reinterpret_cast<std::uintptr_t>(storage.data());
+    const auto storage_end = storage_begin + storage.size();
+    const auto text_begin = reinterpret_cast<std::uintptr_t>(value->buffer);
+    if (text_begin < storage_begin || text_begin > storage_end ||
+        value->length > storage_end - text_begin) return std::nullopt;
+    return std::wstring(value->buffer, value->length / sizeof(wchar_t));
 }
 
 std::string sha256_file(const std::filesystem::path& path) {
@@ -119,10 +166,10 @@ std::optional<Event> tls_certificate_event(std::span<const std::uint8_t> packet)
     };
     std::map<std::string, JsonValue> payload{{"l7Protocol", std::string("TLS")}};
     const auto subject = certificate_name(0), issuer = certificate_name(CERT_NAME_ISSUER_FLAG);
-    if (!subject.empty()) payload["tlsSubject"] = subject;
-    if (!issuer.empty()) payload["tlsIssuer"] = issuer;
+    if (!subject.empty()) payload["tlsCertificateSubject"] = subject;
+    if (!issuer.empty()) payload["tlsCertificateIssuer"] = issuer;
     const auto checksum = sha256_bytes(certificate_bytes);
-    if (!checksum.empty()) payload["tlsSha256"] = checksum;
+    if (!checksum.empty()) payload["tlsCertificateSha256"] = checksum;
     CertFreeCertificateContext(certificate);
     return Event{uuid_string(), "L7_EVENT", utc_now(), std::move(payload)};
 }
@@ -160,10 +207,20 @@ Collection collect_processes() {
     if (snapshot == INVALID_HANDLE_VALUE) { result.health.status = "DEGRADED"; return result; }
     PROCESSENTRY32W entry{.dwSize = sizeof(entry)};
     if (Process32FirstW(snapshot, &entry)) do {
-        result.events.push_back({uuid_string(), "PROCESS_EXECUTION", utc_now(), {
+        std::map<std::string, JsonValue> payload{
             {"processName", narrow(entry.szExeFile)}, {"pid", static_cast<std::int64_t>(entry.th32ProcessID)},
             {"ppid", static_cast<std::int64_t>(entry.th32ParentProcessID)}
-        }});
+        };
+        const HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, entry.th32ProcessID);
+        if (process) {
+            if (const auto path = process_image_path(process)) payload["processPath"] = narrow(*path);
+            if (const auto command_line = process_command_line(process)) {
+                const auto sanitized = sanitize_command_line(narrow(*command_line));
+                if (!sanitized.empty()) payload["commandLine"] = sanitized;
+            }
+            CloseHandle(process);
+        }
+        result.events.push_back({uuid_string(), "PROCESS_EXECUTION", utc_now(), std::move(payload)});
     } while (Process32NextW(snapshot, &entry));
     CloseHandle(snapshot);
     return result;
@@ -213,8 +270,13 @@ Collection collect_file_events(const std::filesystem::path& path, std::chrono::m
             while (item) {
                 const std::wstring name(item->FileName, item->FileNameLength / sizeof(wchar_t));
                 const auto full_path = path / name;
-                const std::map<DWORD, std::string> actions{{FILE_ACTION_ADDED, "CREATED"}, {FILE_ACTION_REMOVED, "DELETED"},
-                    {FILE_ACTION_MODIFIED, "MODIFIED"}, {FILE_ACTION_RENAMED_OLD_NAME, "RENAMED"}, {FILE_ACTION_RENAMED_NEW_NAME, "RENAMED"}};
+                const std::map<DWORD, std::string> actions{
+                    {FILE_ACTION_ADDED, std::string(kFileActionCreate)},
+                    {FILE_ACTION_REMOVED, std::string(kFileActionDelete)},
+                    {FILE_ACTION_MODIFIED, std::string(kFileActionModify)},
+                    {FILE_ACTION_RENAMED_OLD_NAME, std::string(kFileActionRename)},
+                    {FILE_ACTION_RENAMED_NEW_NAME, std::string(kFileActionRename)},
+                };
                 std::map<std::string, JsonValue> payload{{"filePath", narrow(full_path.wstring())}, {"action", actions.at(item->Action)}};
                 const auto checksum = sha256_file(full_path); if (!checksum.empty()) payload["sha256"] = checksum;
                 result.events.push_back({uuid_string(), "FILE_EVENT", utc_now(), std::move(payload)});

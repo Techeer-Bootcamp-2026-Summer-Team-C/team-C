@@ -142,6 +142,35 @@ def test_backend_image_and_app_services_drop_root_privileges() -> None:
         assert app["cap_drop"] == ["ALL"]
 
 
+def test_backend_image_allowlists_runtime_and_demo_setup_tools() -> None:
+    dockerfile = (ROOT / "deploy/docker/backend.Dockerfile").read_text(encoding="utf-8")
+
+    assert "COPY tools ./tools" not in dockerfile
+    for tool in (
+        "check_worker_health.py",
+        "create_admin.py",
+        "local_demo.py",
+        "prod_init.py",
+        "provision_agent_cert.py",
+        "provision_compose_certs.py",
+        "replay_failure.py",
+        "run_detection_worker.py",
+        "run_event_storage_worker.py",
+        "run_storage_lifecycle_worker.py",
+        "secure_files.py",
+        "seed_presentation_demo.py",
+        "seed_safety.py",
+        "verify_presentation_demo.py",
+    ):
+        assert f"tools/{tool}" in dockerfile
+    for development_only_tool in (
+        "export_openapi.py",
+        "seed_dashboard_long_range.py",
+        "sync_mitre_attack.py",
+    ):
+        assert f"tools/{development_only_tool}" not in dockerfile
+
+
 def test_production_example_has_no_access_key_fields() -> None:
     example = (ROOT / ".env.production.example").read_text(encoding="utf-8")
 

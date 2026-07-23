@@ -70,6 +70,44 @@ private func temporaryBuffer(maxEvents: Int = 1000) throws -> EventBuffer {
     #expect(throws: AgentError.queueFull) { try buffer.enqueue(event(2)) }
 }
 
+@Test func failedRowsHaveAnIndependentBoundAndDoNotStarvePendingCapacity() throws {
+    let buffer = try temporaryBuffer(maxEvents: 2)
+    try buffer.enqueue(event(1))
+    try buffer.enqueue(event(2))
+    try buffer.apply(
+        result: TelemetryResult(
+            batchId: "00000000-0000-4000-8000-000000000091",
+            acceptedEventIds: [],
+            rejectedEvents: [
+                RejectedEvent(eventId: event(1).eventId, code: "INVALID", message: "stop", retryable: false),
+                RejectedEvent(eventId: event(2).eventId, code: "INVALID", message: "stop", retryable: false),
+            ]
+        ),
+        backoffSeconds: { _ in 1 }
+    )
+
+    try buffer.enqueue(event(3))
+    try buffer.enqueue(event(4))
+    #expect(try buffer.metrics() == BufferMetrics(pending: 2, failed: 2, retryCount: 2))
+
+    try buffer.apply(
+        result: TelemetryResult(
+            batchId: "00000000-0000-4000-8000-000000000092",
+            acceptedEventIds: [event(4).eventId],
+            rejectedEvents: [
+                RejectedEvent(eventId: event(3).eventId, code: "INVALID", message: "stop", retryable: false),
+            ]
+        ),
+        backoffSeconds: { _ in 1 }
+    )
+    #expect(try buffer.metrics() == BufferMetrics(pending: 0, failed: 2, retryCount: 2))
+
+    try buffer.enqueue(event(1))
+    #expect(try buffer.metrics().pending == 1)
+    try buffer.enqueue(event(2))
+    #expect(try buffer.metrics().pending == 1)
+}
+
 private final class OfflineThenAcceptCurl: CurlExecuting, @unchecked Sendable {
     private let lock = NSLock()
     var offline = true
