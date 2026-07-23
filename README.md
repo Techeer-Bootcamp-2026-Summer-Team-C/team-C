@@ -1,10 +1,50 @@
-# EDR_C
+# OWLBY
 
-Windows와 macOS 엔드포인트의 보안 이벤트를 수집하고 탐지 결과를 대시보드에서 확인하는 EDR PoC
+Windows와 macOS Endpoint의 보안 Event를 수집하고, 탐지 결과를 Alert와 Incident까지 연결해 추적하는 EDR 플랫폼입니다.
+
+![OWLBY EDR 플랫폼 소개 화면](assets/demo/00-demo-evidence-flow.png)
+
+## 데모
+
+### 종합 현황 및 Endpoint 모니터링
+
+![종합 현황에서 Endpoint 상태와 위험 Endpoint 상세를 확인하는 과정](assets/demo/01-overview-endpoints.gif)
+
+Endpoint의 수집 상태와 위험도를 확인하고, 위험 Endpoint의 Alert와 Incident로 바로 이동합니다.
+
+### Event 검색 및 분석
+
+![Process Event를 검색하고 Process Tree와 Raw Payload를 분석하는 과정](assets/demo/02-event-analysis.gif)
+
+Event를 유형별로 검색하고, 원본 필드와 Process Tree, Raw Payload를 확인합니다.
+
+### Alert 분류
+
+![Alert 큐에서 위험도와 상태를 분류하고 Evidence chain을 확인하는 화면](assets/demo/03-alert-triage.png)
+
+Severity, Risk, Status를 기준으로 Alert를 분류하고 `Endpoint → Event → Rule → Alert → Incident` 근거 체인을 추적합니다.
+
+### Incident 조사
+
+![Incident의 Investigation Graph를 조사하는 과정](assets/demo/04-incident-investigation.gif)
+
+연결된 Alert와 Event를 Investigation Graph로 확장해 조사할 근거를 선택합니다.
+
+### IP 및 Domain 분석
+
+![Endpoint egress topology와 IP 및 Domain 상관관계를 분석하는 화면](assets/demo/05-ip-domain-correlation.png)
+
+Endpoint의 외부 통신 관계를 비교하고, 관측된 IP 또는 Domain을 기준으로 관련 근거를 조회합니다.
+
+### 운영 및 Archive 관리
+
+![수집 및 탐지 파이프라인 상태와 Archive 조회 범위를 관리하는 화면](assets/demo/06-operations-archive.png)
+
+Collector, Kafka, Worker, 저장소 상태를 점검하고 Endpoint와 기간을 지정해 Archive 복원 범위를 관리합니다.
 
 ## 프로젝트 소개
 
-EDR_C는 단일 조직 환경을 대상으로 만든 Endpoint Detection & Response 프로젝트입니다.
+OWLBY는 단일 조직 환경을 대상으로 만든 Endpoint Detection & Response 프로젝트입니다.
 
 Windows와 macOS Agent가 프로세스, 네트워크, 파일, DNS, L7 이벤트를 수집하고 탐지 결과를 대시보드에서 보여줍니다. 원본 패킷은 저장하지 않고 분석에 필요한 메타데이터만 수집합니다.
 
@@ -222,3 +262,11 @@ uv run --env-file .env python -m tools.seed_dashboard_long_range `
 ADMIN  frontend-admin / frontend-admin-password
 VIEWER frontend-viewer / frontend-viewer-password
 ```
+
+## 팀원 소개
+
+|                     황 건 하                      |                     박 소 연                      |                     이 혜 령                      |                     이 주 호                      |
+| :--------------------------------------------: | :--------------------------------------------: | :--------------------------------------------: | :--------------------------------------------: |
+| <img src="assets/team/04-hwang-geonha.jpg" width="180" alt="황건하"> | <img src="assets/team/01-park-soyeon.jpg" width="180" alt="박소연"> | <img src="assets/team/03-lee-hyeryeong.jpg" width="180" alt="이혜령"> | <img src="assets/team/02-lee-juho.jpg" width="180" alt="이주호"> |
+| [@altius03](https://github.com/altius03) | [@yoskrap](https://github.com/yoskrap) | [@hyernglee](https://github.com/hyernglee) | [@coder072](https://github.com/coder072) |
+|              Team Leader<br>Full Stack              |                Full Stack<br>DevOps                |               Frontend<br>Design               |                    Backend                     |
