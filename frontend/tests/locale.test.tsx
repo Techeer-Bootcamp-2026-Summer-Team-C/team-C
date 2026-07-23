@@ -119,7 +119,7 @@ describe("authenticated locale lifecycle", () => {
 
     renderShell("/login");
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
-    expect(screen.getByText("OWLBY / SINGLE TENANT")).toBeInTheDocument();
+    expect(screen.getByText("OWLBY")).toBeInTheDocument();
     expect(document.documentElement).toHaveClass("light");
     await userEvent.type(screen.getByLabelText("Login ID"), "analyst");
     await userEvent.type(screen.getByLabelText("Password"), "password");
@@ -131,7 +131,7 @@ describe("authenticated locale lifecycle", () => {
     await userEvent.click(screen.getByRole("button", { name: "계정 메뉴 열기" }));
     await userEvent.click(screen.getByRole("button", { name: "로그아웃" }));
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
-    expect(screen.getByText("Move from signal to evidence.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Move from signal to evidence." })).toBeInTheDocument();
     expect(document.documentElement).toHaveClass("light");
     await waitFor(() => expect(document.documentElement.lang).toBe("en"));
   });

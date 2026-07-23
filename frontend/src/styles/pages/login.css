@@ -1,32 +1,158 @@
-.login-layout { min-width: 0; background: var(--surface-canvas); }
+/* Hallmark — genre: modern-minimal — tone: technical-austere — anchor hue: royal blue — macrostructure: Split Authentication — design-system: docs/frontend/DESIGN.md — contrast: pass — desktop: 1280–1440 */
+/* Hallmark — pre-emit critique: P5 H5 E5 S5 R5 V4 */
+.login-layout {
+  min-width: 0;
+  min-height: 100dvh;
+  grid-template-columns: minmax(0, 5fr) minmax(420px, 3fr);
+  background: var(--surface-canvas);
+}
 .login-context {
   position: relative;
   overflow: hidden;
+  justify-content: flex-start;
+  gap: 0;
+  padding: 120px clamp(32px, 8vw, 120px) 120px;
   background-color: var(--surface-shell);
   border-color: var(--border-subtle);
 }
-.login-context h1 { max-width: 720px; font-size: clamp(32px, 4vw, 52px); font-weight: var(--weight-semibold); line-height: 1.15; letter-spacing: -.025em; }
 .login-context > * { position: relative; z-index: 1; }
-.login-mark { background: transparent; border-color: transparent; }
+.login-brand {
+  min-height: 50px;
+  width: fit-content;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin-bottom: var(--space-20);
+}
+.login-brand > span {
+  color: var(--text-tertiary);
+  font-size: var(--type-kpi-secondary);
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  letter-spacing: .008em;
+}
+.login-mark {
+  width: 50px;
+  height: 50px;
+  flex: 0 0 50px;
+  background: transparent;
+  border-color: transparent;
+}
 .login-mark .service-mark { width: 100%; height: 100%; }
 .login-mark .service-mark svg { width: 42px; height: 32px; }
-.login-context > p { color: var(--text-secondary); }
-.login-signal-route { width: min(100%, 780px); display: flex; flex-direction: column; margin: var(--space-4) 0; padding: 0; list-style: none; border-block: 1px solid var(--border-subtle); }
-.login-signal-route li { min-width: 0; min-height: 62px; display: grid; grid-template-columns: 24px 112px minmax(0, 1fr); align-items: center; gap: var(--space-4); padding: var(--space-4) var(--space-2); border-top: 1px solid var(--border-subtle); }
-.login-signal-route li:first-child { border-top: 0; }
-.login-signal-route svg { color: var(--text-link); }
-.login-signal-route span { color: var(--text-link); font-family: var(--font-mono); font-size: var(--type-meta); font-weight: var(--weight-semibold); }
-.login-signal-route strong { min-width: 0; color: var(--text-primary); font-size: var(--type-label); font-weight: var(--weight-semibold); overflow-wrap: anywhere; }
-.login-signal-route small { grid-column: 3; color: var(--text-secondary); font-size: var(--type-meta); overflow-wrap: anywhere; }
-.login-boundary { background: var(--surface-inset); border-color: var(--accent-primary); }
+.login-context h1 {
+  max-width: 720px;
+  margin-bottom: var(--space-20);
+  font-size: 48px;
+  font-weight: var(--weight-semibold);
+  line-height: 54px;
+  letter-spacing: -.025em;
+  overflow-wrap: anywhere;
+}
+.login-context h1 span { display: block; white-space: nowrap; }
+.login-context h1 span + span { margin-left: 128px; }
+.login-signal-route {
+  width: min(100%, 668px);
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 var(--space-6);
+  padding: var(--space-4) 0;
+  list-style: none;
+}
+.login-signal-route li {
+  min-width: 0;
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 24px 112px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+}
+.login-signal-route li:last-child { border-bottom: 1px solid var(--border-subtle); }
+.login-signal-route svg {
+  width: 17px;
+  height: 17px;
+  color: var(--text-link);
+}
+.login-signal-route span {
+  color: var(--text-link);
+  font-family: var(--font-mono);
+  font-size: var(--type-label);
+  font-weight: var(--weight-semibold);
+  line-height: 1.5;
+}
+.login-signal-route strong {
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: var(--type-panel-title);
+  font-weight: var(--weight-semibold);
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.login-boundary {
+  position: relative;
+  width: min(100%, 416px);
+  min-height: 40px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  padding: var(--space-5) var(--space-8);
+  background: var(--surface-inset);
+  border: 0;
+}
+.login-boundary::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: var(--space-5);
+  width: 2px;
+  height: 20px;
+  background: var(--accent-primary);
+  border-radius: 1px;
+}
+.login-boundary strong {
+  font-size: var(--type-panel-title);
+  font-weight: var(--weight-medium);
+  line-height: 20px;
+}
 .login-panel { position: relative; }
-.login-panel form { background: var(--surface-panel); border-color: var(--border-panel); box-shadow: none; }
-.login-heading { border-color: var(--border-subtle); }
+.login-panel form {
+  gap: var(--space-6);
+  padding: var(--space-12);
+  background: var(--surface-panel);
+  border-color: var(--border-panel);
+  box-shadow: none;
+}
+.login-heading {
+  gap: var(--space-5);
+  padding: var(--space-10) 0 var(--space-6);
+  border-color: var(--border-subtle);
+}
+.login-heading h2 {
+  font-size: var(--type-section-title);
+  line-height: 30px;
+}
+.login-panel .field { gap: var(--space-3); }
+.login-panel .field input { min-height: 44px; height: 44px; }
+.login-panel .login-submit {
+  width: 80px;
+  min-height: 44px;
+}
 .login-error { border-color: var(--status-critical); background: var(--surface-inset); }
 
 @media (max-width: 900px) {
   .login-layout { grid-template-columns: 1fr; }
-  .login-context { min-height: 38vh; border-right: 0; border-bottom: 1px solid var(--border-subtle); }
+  .login-context {
+    min-height: 38vh;
+    padding: var(--space-16);
+    border-right: 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .login-brand { margin-bottom: var(--space-12); }
+  .login-context h1 { margin-bottom: var(--space-12); font-size: clamp(34px, 8vw, 48px); line-height: 1.1; }
+  .login-context h1 span + span { margin-left: 0; }
   .login-signal-route { width: 100%; }
 }
 
