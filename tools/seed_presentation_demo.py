@@ -62,6 +62,7 @@ PRESENTATION_DAILY_EVENTS = {
     "HYERYEONG-WIN": 65,
     "JUHO-WIN": 75,
 }
+PRESENTATION_ROLLING_WINDOW_SAFETY = timedelta(hours=12)
 
 
 @dataclass(frozen=True, slots=True)
@@ -487,12 +488,13 @@ def _daily_background_events(
     *,
     first_index: int = 0,
     newest_end_at: datetime | None = None,
+    start_delays: dict[int, timedelta] | None = None,
 ) -> list[EventPlan]:
     event_types = ("PROCESS_EXECUTION", "NETWORK_CONNECTION", "FILE_EVENT", "DNS_QUERY", "L7_EVENT")
     events: list[EventPlan] = []
     index = first_index
     for day_offset, count in enumerate(daily_counts):
-        start = anchor - timedelta(days=day_offset + 1)
+        start = anchor - timedelta(days=day_offset + 1) + (start_delays or {}).get(day_offset, timedelta())
         end = newest_end_at if day_offset == 0 and newest_end_at is not None else anchor - timedelta(days=day_offset)
         span = end - start
         for position in range(count):
@@ -599,6 +601,10 @@ def build_presentation_plan(seed: int, anchor: datetime) -> ProfilePlan:
         attack_offsets = tuple(timedelta(seconds=spacing * value) for value in range(1, 7))
     main = endpoints[2]
     daily_count = PRESENTATION_DAILY_EVENTS[main.hostname]
+    rolling_boundary_delays = {
+        0: PRESENTATION_ROLLING_WINDOW_SAFETY,
+        6: PRESENTATION_ROLLING_WINDOW_SAFETY,
+    }
     events = _daily_background_events(
         "presentation",
         seed,
@@ -607,6 +613,7 @@ def build_presentation_plan(seed: int, anchor: datetime) -> ProfilePlan:
         (daily_count - 6,) + (daily_count,) * (PRESENTATION_DAYS - 1),
         first_index=6,
         newest_end_at=window_start - timedelta(minutes=1),
+        start_delays=rolling_boundary_delays,
     )
     attack = (
         (
@@ -708,6 +715,7 @@ def build_presentation_plan(seed: int, anchor: datetime) -> ProfilePlan:
                 anchor,
                 endpoint,
                 (endpoint_daily_count,) * PRESENTATION_DAYS,
+                start_delays=rolling_boundary_delays,
             )
         )
     plan = ProfilePlan(
@@ -909,12 +917,18 @@ def _validate_plan(plan: ProfilePlan) -> None:
     if len(matches) != plan.counts["alerts"]:
         raise RuntimeError(f"{plan.profile} produces {len(matches)} Rule matches, expected {plan.counts['alerts']}")
     if plan.profile == "presentation":
-        latest_24h = sum(event.occurred_at > plan.anchor - timedelta(days=1) for event in plan.events)
-        latest_7d = sum(event.occurred_at > plan.anchor - timedelta(days=7) for event in plan.events)
-        if (latest_24h, latest_7d) != (400, 2_800):
-            raise RuntimeError(
-                f"presentation rolling window contract changed: latest24h={latest_24h}, latest7d={latest_7d}"
+        for observed_at in (plan.anchor, plan.anchor + PRESENTATION_ROLLING_WINDOW_SAFETY):
+            latest_24h = sum(
+                observed_at - timedelta(days=1) < event.occurred_at <= observed_at for event in plan.events
             )
+            latest_7d = sum(
+                observed_at - timedelta(days=7) < event.occurred_at <= observed_at for event in plan.events
+            )
+            if (latest_24h, latest_7d) != (400, 2_800):
+                raise RuntimeError(
+                    "presentation rolling window contract changed: "
+                    f"observedAt={observed_at.isoformat()}, latest24h={latest_24h}, latest7d={latest_7d}"
+                )
         codes = Counter(match.alert.rule_code for match in matches)
         keys = Counter(match.incident.correlation_key for match in matches if match.incident is not None)
         windows = {match.incident.window_start_at for match in matches if match.incident is not None}

@@ -55,6 +55,21 @@ def test_presentation_profile_has_exact_counts_distribution_and_correlation() ->
     } == {"컴퓨터공학전공"}
     assert sum(event.occurred_at > ANCHOR - timedelta(days=1) for event in plan.events) == 400
     assert sum(event.occurred_at > ANCHOR - timedelta(days=7) for event in plan.events) == 2_800
+    delayed_verification = ANCHOR + timedelta(hours=12)
+    assert (
+        sum(
+            delayed_verification - timedelta(days=1) < event.occurred_at <= delayed_verification
+            for event in plan.events
+        )
+        == 400
+    )
+    assert (
+        sum(
+            delayed_verification - timedelta(days=7) < event.occurred_at <= delayed_verification
+            for event in plan.events
+        )
+        == 2_800
+    )
     assert min(event.occurred_at for event in plan.events) > ANCHOR - timedelta(days=14)
     assert max(event.occurred_at for event in plan.events) <= ANCHOR
     assert {event.event_type for event in plan.events} == {
