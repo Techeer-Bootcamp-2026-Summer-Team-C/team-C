@@ -24,6 +24,7 @@ COPY tools/__init__.py \
     tools/check_worker_health.py \
     tools/create_admin.py \
     tools/local_demo.py \
+    tools/manage_admin.py \
     tools/prod_init.py \
     tools/provision_agent_cert.py \
     tools/provision_compose_certs.py \

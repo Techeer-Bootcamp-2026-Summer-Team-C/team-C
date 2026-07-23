@@ -150,6 +150,7 @@ def test_backend_image_allowlists_runtime_and_demo_setup_tools() -> None:
         "check_worker_health.py",
         "create_admin.py",
         "local_demo.py",
+        "manage_admin.py",
         "prod_init.py",
         "provision_agent_cert.py",
         "provision_compose_certs.py",

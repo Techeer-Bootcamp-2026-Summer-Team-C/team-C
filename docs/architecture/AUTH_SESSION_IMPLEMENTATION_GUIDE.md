@@ -117,7 +117,7 @@ Access Token, `locale`을 포함한 `UserDto`, 실제 만료시각은 단일 aut
 - JWT 만료는 `Settings.access_token_ttl_seconds`를 사용한다.
 - 보호 API는 JWT 검증 후 현재 사용자 role과 `ACTIVE` 상태를 PostgreSQL에서 다시 확인한다.
 - 로그인 성공 시 `last_login_at`과 `updated_at`을 갱신한다.
-- `tools.create_admin`은 `--login-id`, `--name`을 받고 password는 `getpass` 또는 안전한 stdin으로 읽는다. 개발 환경에서 기존 계정을 재지정할 때만 `--reset-existing`을 사용한다.
+- `tools.create_admin`은 `--login-id`, `--name`을 받고 대화형 password를 두 번 확인하거나 안전한 stdin으로 읽는다. Production ADMIN은 최소 16자를 요구한다. 개발 환경에서 기존 계정을 재지정할 때만 `--reset-existing`을 사용한다.
 
 ## 7. Frontend 구현 기준
 

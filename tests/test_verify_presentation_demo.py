@@ -1,6 +1,10 @@
-import httpx
+import io
+from unittest.mock import Mock
 
-from tools.verify_presentation_demo import _verify_presentation
+import httpx
+import pytest
+
+from tools.verify_presentation_demo import _verify_presentation, main
 
 
 def test_verify_presentation_requires_one_three_alert_chain_incident() -> None:
@@ -60,3 +64,73 @@ def test_verify_presentation_requires_one_three_alert_chain_incident() -> None:
         result = _verify_presentation(client, "token", manifest)
 
     assert result["chainIncidentAlertCount"] == 3
+
+
+def test_verifier_can_prompt_for_password_without_putting_it_in_arguments(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    verify = Mock(return_value={"profile": "presentation", "verified": True})
+    monkeypatch.setattr("tools.verify_presentation_demo.verify", verify)
+    monkeypatch.setattr("tools.verify_presentation_demo.getpass.getpass", lambda _: "private-password")
+
+    assert (
+        main(
+            [
+                "--manifest",
+                "/tmp/presentation-manifest.json",
+                "--api-base-url",
+                "https://api.tukproject.dev",
+                "--login-id",
+                "mentor-review",
+                "--prompt-password",
+            ]
+        )
+        == 0
+    )
+
+    assert verify.call_args.kwargs["password"] == "private-password"
+    assert "private-password" not in capsys.readouterr().out
+
+
+def test_verifier_can_read_one_password_line_from_stdin(monkeypatch: pytest.MonkeyPatch) -> None:
+    verify = Mock(return_value={"profile": "presentation", "verified": True})
+    monkeypatch.setattr("tools.verify_presentation_demo.verify", verify)
+    monkeypatch.setattr(
+        "tools.verify_presentation_demo.sys.stdin",
+        io.StringIO("stdin-password\nignored\n"),
+    )
+
+    assert main(["--password-stdin"]) == 0
+    assert verify.call_args.kwargs["password"] == "stdin-password"
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["--api-base-url", "https://api.tukproject.dev"],
+        ["--api-base-url", "https://api.tukproject.dev", "--password", "visible-password"],
+    ],
+)
+def test_remote_verifier_rejects_default_or_plaintext_argument_passwords(
+    monkeypatch: pytest.MonkeyPatch,
+    arguments: list[str],
+) -> None:
+    verify = Mock()
+    monkeypatch.setattr("tools.verify_presentation_demo.verify", verify)
+
+    assert main(arguments) == 2
+    verify.assert_not_called()
+
+
+def test_verifier_password_stdin_rejects_an_interactive_terminal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    terminal = io.StringIO("visible-password\n")
+    verify = Mock()
+    monkeypatch.setattr(terminal, "isatty", lambda: True)
+    monkeypatch.setattr("tools.verify_presentation_demo.sys.stdin", terminal)
+    monkeypatch.setattr("tools.verify_presentation_demo.verify", verify)
+
+    assert main(["--password-stdin"]) == 2
+    verify.assert_not_called()

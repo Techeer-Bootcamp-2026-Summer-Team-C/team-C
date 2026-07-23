@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
 ROOT = Path(__file__).parents[1]
 DEFAULT_MANIFEST = ROOT / "runtime" / "demo" / "presentation-manifest.json"
+LOOPBACK_API_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
 
 def _request(client: httpx.Client, path: str, token: str) -> dict[str, Any]:
@@ -161,19 +164,43 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--api-base-url", default="http://127.0.0.1:8080")
     parser.add_argument("--login-id", default="frontend-admin")
-    parser.add_argument("--password", default="frontend-admin-password")
+    password_source = parser.add_mutually_exclusive_group()
+    password_source.add_argument("--password", help="Password value. Prefer --prompt-password outside local QA.")
+    password_source.add_argument("--prompt-password", action="store_true", help="Read the password without echo.")
+    password_source.add_argument("--password-stdin", action="store_true", help="Read one password line from stdin.")
     return parser
+
+
+def _password_from_args(args: argparse.Namespace) -> str:
+    api_host = (urlparse(args.api_base_url).hostname or "").lower().rstrip(".")
+    is_loopback = api_host in LOOPBACK_API_HOSTS
+    if not is_loopback and args.password is not None:
+        raise ValueError("--password is allowed only for a loopback API; use --prompt-password")
+    if not is_loopback and not (args.prompt_password or args.password_stdin):
+        raise ValueError("remote API verification requires --prompt-password or redirected --password-stdin")
+    if args.prompt_password:
+        password = getpass.getpass("Password: ")
+    elif args.password_stdin:
+        if sys.stdin.isatty():
+            raise ValueError("--password-stdin requires redirected non-interactive input")
+        password = sys.stdin.readline().rstrip("\n")
+    else:
+        password = args.password or "frontend-admin-password"
+    if not password:
+        raise ValueError("password must not be empty")
+    return password
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     manifest_path = args.manifest if args.manifest.is_absolute() else ROOT / args.manifest
     try:
+        password = _password_from_args(args)
         result = verify(
             manifest_path,
             api_base_url=args.api_base_url,
             login_id=args.login_id,
-            password=args.password,
+            password=password,
         )
     except (OSError, ValueError, KeyError, AssertionError, httpx.HTTPError) as error:
         print(f"presentation demo verification failed: {error}", file=sys.stderr)

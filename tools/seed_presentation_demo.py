@@ -3,7 +3,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import ssl
+import tempfile
 import time
 from collections import Counter
 from dataclasses import dataclass
@@ -16,6 +18,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 import clickhouse_connect
 import httpx
 import psycopg
+from clickhouse_connect.driver.exceptions import ClickHouseError
 from psycopg.types.json import Jsonb
 
 from backend.auth import hash_password
@@ -23,14 +26,24 @@ from backend.contracts.enums import OsType
 from backend.detection import DetectionEngine
 from backend.rule_loader import RuleLoader
 from backend.storage.clickhouse import EventRepository
-from backend.storage.migrations import apply_clickhouse_file, apply_postgres_migrations
+from backend.storage.migrations import (
+    ClickHouseCommandClient,
+    apply_clickhouse_file,
+    apply_postgres_migrations,
+    record_applied_postgres_migrations,
+    split_sql_statements,
+)
 from backend.storage.models import EndpointInsert, IncidentInsert
 from backend.storage.postgres import AlertRepository, EndpointRepository, IncidentRepository, UserRepository
 from backend.workers import normalize_event
 from tools.seed_safety import (
+    PRODUCTION_DEMO_RESET_CONFIRMATION,
+    PRODUCTION_RUNTIME_STOPPED_CONFIRMATION,
+    assert_production_demo_reset_authorized,
     assert_safe_reset_targets,
     database_name,
     parse_allowed_qa_hosts,
+    production_demo_target_fingerprint,
     require_reset_confirmation,
 )
 
@@ -59,6 +72,14 @@ class SeedTarget:
     dashboard_base_url: str
     collector_base_url: str
     allowed_qa_hosts: frozenset[str] = frozenset()
+    production_demo_reset_mode: str = ""
+    demo_reset_target_id: str = ""
+    kafka_bootstrap_servers: str = ""
+    kafka_raw_topic: str = ""
+    kafka_validated_topic: str = ""
+    event_storage_consumer_group: str = ""
+    detection_consumer_group: str = ""
+    s3_bucket: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -212,17 +233,53 @@ def seed_target(values: dict[str, str] | None = None) -> SeedTarget:
             "EDR_CLICKHOUSE_DSN",
             f"http://edr:{clickhouse_password}@127.0.0.1:{clickhouse_port}/edr",
         ),
-        dashboard_base_url=f"http://127.0.0.1:{dashboard_port}",
-        collector_base_url=f"https://127.0.0.1:{collector_port}/api/v1/collector",
+        dashboard_base_url=values.get("EDR_DASHBOARD_BASE_URL", f"http://127.0.0.1:{dashboard_port}"),
+        collector_base_url=values.get(
+            "EDR_COLLECTOR_BASE_URL",
+            f"https://127.0.0.1:{collector_port}/api/v1/collector",
+        ),
         allowed_qa_hosts=parse_allowed_qa_hosts(values.get("EDR_SEED_ALLOWED_QA_HOSTS")),
+        production_demo_reset_mode=values.get("EDR_PRODUCTION_DEMO_RESET_MODE", ""),
+        demo_reset_target_id=values.get("EDR_DEMO_RESET_TARGET_ID", ""),
+        kafka_bootstrap_servers=values.get("EDR_KAFKA_BOOTSTRAP_SERVERS", ""),
+        kafka_raw_topic=values.get("EDR_KAFKA_RAW_TOPIC", ""),
+        kafka_validated_topic=values.get("EDR_KAFKA_VALIDATED_TOPIC", ""),
+        event_storage_consumer_group=values.get("EDR_EVENT_STORAGE_CONSUMER_GROUP", ""),
+        detection_consumer_group=values.get("EDR_DETECTION_CONSUMER_GROUP", ""),
+        s3_bucket=values.get("EDR_S3_BUCKET", ""),
     )
 
 
 def assert_safe_reset_target(target: SeedTarget) -> None:
     assert_safe_reset_targets(
         environment=target.environment,
-        targets=(("PostgreSQL", target.postgres_dsn), ("ClickHouse", target.clickhouse_dsn)),
+        targets=_reset_targets(target),
         allowed_qa_hosts=target.allowed_qa_hosts,
+    )
+
+
+def _reset_targets(target: SeedTarget) -> tuple[tuple[str, str], tuple[str, str]]:
+    return (("PostgreSQL", target.postgres_dsn), ("ClickHouse", target.clickhouse_dsn))
+
+
+def _production_runtime_context(target: SeedTarget) -> dict[str, str]:
+    return {
+        "kafkaBootstrapServers": target.kafka_bootstrap_servers,
+        "kafkaRawTopic": target.kafka_raw_topic,
+        "kafkaValidatedTopic": target.kafka_validated_topic,
+        "eventStorageConsumerGroup": target.event_storage_consumer_group,
+        "detectionConsumerGroup": target.detection_consumer_group,
+        "s3Bucket": target.s3_bucket,
+    }
+
+
+def production_demo_fingerprint(target: SeedTarget) -> str:
+    return production_demo_target_fingerprint(
+        environment=target.environment,
+        targets=_reset_targets(target),
+        reset_mode=target.production_demo_reset_mode,
+        target_id=target.demo_reset_target_id,
+        runtime_context=_production_runtime_context(target),
     )
 
 
@@ -867,18 +924,56 @@ def _validate_plan(plan: ProfilePlan) -> None:
             raise RuntimeError("presentation Incident correlation contract changed")
 
 
-def _reset_databases(target: SeedTarget, *, confirm_reset: bool = False) -> None:
+def _reset_databases(
+    target: SeedTarget,
+    *,
+    confirm_reset: bool = False,
+    production_demo_reset: bool = False,
+    production_confirmation: str | None = None,
+    runtime_stopped_confirmation: str | None = None,
+    target_fingerprint: str | None = None,
+) -> None:
     require_reset_confirmation(confirm_reset)
-    assert_safe_reset_target(target)
+    if production_demo_reset:
+        assert_production_demo_reset_authorized(
+            environment=target.environment,
+            targets=_reset_targets(target),
+            reset_mode=target.production_demo_reset_mode,
+            target_id=target.demo_reset_target_id,
+            runtime_context=_production_runtime_context(target),
+            confirmation=production_confirmation,
+            runtime_stopped_confirmation=runtime_stopped_confirmation,
+            target_fingerprint=target_fingerprint,
+        )
+    else:
+        assert_safe_reset_target(target)
     with psycopg.connect(target.postgres_dsn) as connection:
         apply_postgres_migrations(connection, ROOT / "migrations" / "postgresql", direction="down")
         apply_postgres_migrations(connection, ROOT / "migrations" / "postgresql")
+        record_applied_postgres_migrations(connection, ROOT / "migrations" / "postgresql")
     clickhouse = clickhouse_connect.get_client(dsn=target.clickhouse_dsn, autogenerate_session_id=False)
     try:
-        apply_clickhouse_file(clickhouse, ROOT / "migrations" / "clickhouse" / "0001_initial.down.sql")
-        apply_clickhouse_file(clickhouse, ROOT / "migrations" / "clickhouse" / "0001_initial.up.sql")
+        clickhouse_migrations = ROOT / "migrations" / "clickhouse"
+        for path in sorted(clickhouse_migrations.glob("*.down.sql"), reverse=True):
+            _apply_clickhouse_down_file(clickhouse, path)
+        for path in sorted(clickhouse_migrations.glob("*.up.sql")):
+            apply_clickhouse_file(clickhouse, path)
     finally:
         clickhouse.close()
+
+
+def _apply_clickhouse_down_file(client: ClickHouseCommandClient, path: Path) -> None:
+    for statement in split_sql_statements(path.read_text(encoding="utf-8")):
+        try:
+            client.command(statement)
+        except ClickHouseError as error:
+            message = str(error)
+            is_unknown_table = (
+                re.search(r"\bcode\s*:\s*60\b", message, flags=re.IGNORECASE) is not None
+                and re.search(r"\bUNKNOWN_TABLE\b", message) is not None
+            )
+            if not is_unknown_table:
+                raise
 
 
 def _seed_users(connection: psycopg.Connection, now: datetime) -> None:
@@ -969,9 +1064,15 @@ def _insert_hot_metadata(connection: psycopg.Connection, events: list[dict[str, 
     connection.commit()
 
 
-def _direct_seed(target: SeedTarget, plan: ProfilePlan) -> tuple[dict[str, int], dict[str, object]]:
+def _direct_seed(
+    target: SeedTarget,
+    plan: ProfilePlan,
+    *,
+    seed_default_users: bool = True,
+) -> tuple[dict[str, int], dict[str, object]]:
     with psycopg.connect(target.postgres_dsn) as connection:
-        _seed_users(connection, plan.anchor)
+        if seed_default_users:
+            _seed_users(connection, plan.anchor)
         endpoint_ids = _insert_endpoints(connection, plan)
     events = _normalized_events(plan, endpoint_ids)
     clickhouse = clickhouse_connect.get_client(dsn=target.clickhouse_dsn, autogenerate_session_id=False)
@@ -1033,12 +1134,14 @@ def _collector_seed(
     plan: ProfilePlan,
     *,
     wait_timeout_seconds: int,
+    seed_default_users: bool = True,
 ) -> tuple[dict[str, int], dict[str, object]]:
     from tools.provision_agent_cert import provision
 
     authority = ROOT / "runtime" / "compose" / "cert-authority"
-    with psycopg.connect(target.postgres_dsn) as connection:
-        _seed_users(connection, plan.anchor)
+    if seed_default_users:
+        with psycopg.connect(target.postgres_dsn) as connection:
+            _seed_users(connection, plan.anchor)
     endpoint_ids: dict[str, int] = {}
     certificates = {}
     for endpoint in plan.endpoints:
@@ -1195,6 +1298,10 @@ def _manifest(
     ingestion_mode: str,
     endpoint_ids: dict[str, int],
     ids: dict[str, object],
+    *,
+    reset_mode: str = "local-qa-full-reset",
+    accounts_seeded: bool = True,
+    target_fingerprint: str | None = None,
 ) -> dict[str, object]:
     event_times = [event.occurred_at for event in plan.events]
     main_endpoint_id = endpoint_ids.get("SOYEON-WIN")
@@ -1209,8 +1316,12 @@ def _manifest(
         "anchor": _rfc3339(plan.anchor),
         "generatedAt": _rfc3339(datetime.now(UTC)),
         "mockData": True,
-        "dataNotice": "시연을 위해 재현한 local/QA 데이터이며 production 실측값이 아닙니다.",
+        "dataNotice": "시연을 위해 재현한 데이터이며 production 실측값이 아닙니다.",
         "ingestionMode": ingestion_mode,
+        "resetMode": reset_mode,
+        "accountsSeeded": accounts_seeded,
+        "accountProvisioningRequired": not accounts_seeded,
+        "targetFingerprint": target_fingerprint,
         "timeRange": {"from": _rfc3339(min(event_times)), "to": _rfc3339(plan.anchor + timedelta(minutes=1))},
         "counts": plan.counts,
         "rangeCounts": {"latest24h": 400, "latest7d": 2_800, "latest14d": 5_600}
@@ -1245,20 +1356,94 @@ def _manifest(
     }
 
 
-def _write_manifest(path: Path, manifest: dict[str, object]) -> None:
-    path = path if path.is_absolute() else ROOT / path
+def _manifest_output_path(path: Path | None, profile: str, *, production_demo_reset: bool) -> Path:
+    if production_demo_reset:
+        if path is None:
+            raise ValueError("production demo reset requires an explicit --output-manifest path")
+        if not path.is_absolute():
+            raise ValueError("production demo manifest path must be absolute")
+        resolved = path.resolve()
+        allowed_root = Path("/tmp/edr-c-demo").resolve()
+        if resolved == allowed_root or not resolved.is_relative_to(allowed_root):
+            raise ValueError("production demo manifest must be written below /tmp/edr-c-demo")
+        if resolved.exists() and not resolved.is_file():
+            raise ValueError("production demo manifest target must be a regular file")
+        return resolved
+    selected = path or DEFAULT_MANIFESTS[profile]
+    return (selected if selected.is_absolute() else ROOT / selected).resolve()
+
+
+def _preflight_manifest_output(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if path.exists() and not path.is_file():
+        raise ValueError("manifest target must be a regular file")
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    temporary_path = Path(temporary_name)
+    probe_descriptor = -1
+    probe_path: Path | None = None
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            descriptor = -1
+            handle.write("manifest-write-preflight\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        probe_descriptor, probe_name = tempfile.mkstemp(prefix=f".{path.name}.probe.", dir=path.parent)
+        probe_path = Path(probe_name)
+        os.close(probe_descriptor)
+        probe_descriptor = -1
+        os.replace(temporary_path, probe_path)
+        if not probe_path.is_file():
+            raise OSError("manifest atomic replace preflight did not create a regular file")
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if probe_descriptor >= 0:
+            os.close(probe_descriptor)
+        temporary_path.unlink(missing_ok=True)
+        if probe_path is not None:
+            probe_path.unlink(missing_ok=True)
 
 
-def _print_plan(plan: ProfilePlan, target: SeedTarget, ingestion_mode: str) -> None:
+def _write_manifest(path: Path, manifest: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(manifest, ensure_ascii=False, indent=2) + "\n"
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    temporary_path = Path(temporary_name)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            descriptor = -1
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, path)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        temporary_path.unlink(missing_ok=True)
+
+
+def _print_plan(
+    plan: ProfilePlan,
+    target: SeedTarget,
+    ingestion_mode: str,
+    *,
+    reset_mode: str,
+    accounts_seeded: bool,
+    target_fingerprint: str | None,
+) -> None:
     target_description = describe_target(target)
     print(f"EDR_C {plan.profile} demo seed")
     print("  mock data:        yes (not production measurements)")
     print(f"  ingestion mode:   {ingestion_mode}")
+    print(f"  reset mode:       {reset_mode}")
+    print(f"  accounts seeded:  {'yes' if accounts_seeded else 'no'}")
     print(f"  anchor:           {_rfc3339(plan.anchor)}")
     print(f"  PostgreSQL:       {target_description['postgres']}")
     print(f"  ClickHouse:       {target_description['clickhouse']}")
+    if target_fingerprint is not None:
+        print(f"  target fingerprint: {target_fingerprint}")
     print(f"  Endpoints:        {plan.counts['endpoints']}")
     print(f"  Events:           {plan.counts['events']}")
     print(f"  Alerts:           {plan.counts['alerts']}")
@@ -1267,7 +1452,7 @@ def _print_plan(plan: ProfilePlan, target: SeedTarget, ingestion_mode: str) -> N
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Reset local/QA data and build deterministic EDR_C presentation fixtures."
+        description="Reset an explicitly authorized demo target and build deterministic EDR_C presentation fixtures."
     )
     parser.add_argument("--profile", choices=PROFILES, default="presentation")
     parser.add_argument("--seed", type=int, default=20_260_721)
@@ -1277,6 +1462,23 @@ def build_parser() -> argparse.ArgumentParser:
         "--confirm-reset", action="store_true", help="Required because PostgreSQL and ClickHouse are reset."
     )
     parser.add_argument("--output-manifest", type=Path)
+    parser.add_argument(
+        "--production-demo-reset",
+        action="store_true",
+        help="Use the separately guarded full-reset path for the dedicated production mentor demo.",
+    )
+    parser.add_argument(
+        "--confirm-production-demo-reset",
+        help=f"Production-only destructive confirmation. Exact value: {PRODUCTION_DEMO_RESET_CONFIRMATION}",
+    )
+    parser.add_argument(
+        "--confirm-runtime-stopped",
+        help=f"Confirms that ingress and workers are stopped. Exact value: {PRODUCTION_RUNTIME_STOPPED_CONFIRMATION}",
+    )
+    parser.add_argument(
+        "--target-fingerprint",
+        help="Production-only SHA-256 target fingerprint printed by --dry-run.",
+    )
     parser.add_argument(
         "--emit-through-collector",
         action="store_true",
@@ -1295,24 +1497,82 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("wait-timeout-seconds must be at least 1")
         plan = build_plan(args.profile, args.seed, anchor)
         target = seed_target()
+        production_demo_reset = bool(args.production_demo_reset)
+        if production_demo_reset and args.profile != "presentation":
+            raise ValueError("production demo reset supports only the presentation profile")
+        if production_demo_reset and args.emit_through_collector:
+            raise ValueError("production demo reset supports only deterministic direct seed mode")
         mode = "collector-kafka" if args.emit_through_collector else "direct-seed"
-        _print_plan(plan, target, mode)
+        reset_mode = "production-demo-full-reset" if production_demo_reset else "local-qa-full-reset"
+        accounts_seeded = not production_demo_reset
+        fingerprint = production_demo_fingerprint(target) if production_demo_reset else None
+        manifest_path = _manifest_output_path(
+            args.output_manifest,
+            args.profile,
+            production_demo_reset=production_demo_reset,
+        )
+        _print_plan(
+            plan,
+            target,
+            mode,
+            reset_mode=reset_mode,
+            accounts_seeded=accounts_seeded,
+            target_fingerprint=fingerprint,
+        )
         if args.dry_run:
             return 0
         if not args.confirm_reset:
-            parser.error("--confirm-reset is required because this command resets local/QA databases")
-        _reset_databases(target, confirm_reset=args.confirm_reset)
+            parser.error("--confirm-reset is required because this command resets PostgreSQL and ClickHouse")
+        if production_demo_reset:
+            assert_production_demo_reset_authorized(
+                environment=target.environment,
+                targets=_reset_targets(target),
+                reset_mode=target.production_demo_reset_mode,
+                target_id=target.demo_reset_target_id,
+                runtime_context=_production_runtime_context(target),
+                confirmation=args.confirm_production_demo_reset,
+                runtime_stopped_confirmation=args.confirm_runtime_stopped,
+                target_fingerprint=args.target_fingerprint,
+            )
+        _preflight_manifest_output(manifest_path)
+        _reset_databases(
+            target,
+            confirm_reset=args.confirm_reset,
+            production_demo_reset=production_demo_reset,
+            production_confirmation=args.confirm_production_demo_reset,
+            runtime_stopped_confirmation=args.confirm_runtime_stopped,
+            target_fingerprint=args.target_fingerprint,
+        )
         if args.emit_through_collector:
-            endpoint_ids, ids = _collector_seed(target, plan, wait_timeout_seconds=args.wait_timeout_seconds)
+            endpoint_ids, ids = _collector_seed(
+                target,
+                plan,
+                wait_timeout_seconds=args.wait_timeout_seconds,
+                seed_default_users=accounts_seeded,
+            )
         else:
-            endpoint_ids, ids = _direct_seed(target, plan)
-        manifest = _manifest(target, plan, mode, endpoint_ids, ids)
-        manifest_path = args.output_manifest or DEFAULT_MANIFESTS[args.profile]
+            endpoint_ids, ids = _direct_seed(target, plan, seed_default_users=accounts_seeded)
+        manifest = _manifest(
+            target,
+            plan,
+            mode,
+            endpoint_ids,
+            ids,
+            reset_mode=reset_mode,
+            accounts_seeded=accounts_seeded,
+            target_fingerprint=fingerprint,
+        )
         _write_manifest(manifest_path, manifest)
-        print(f"Manifest: {(manifest_path if manifest_path.is_absolute() else ROOT / manifest_path).resolve()}")
-        print("ADMIN  frontend-admin / frontend-admin-password")
-        print("VIEWER frontend-viewer / frontend-viewer-password")
+        print(f"Manifest: {manifest_path}")
+        if accounts_seeded:
+            print("ADMIN  frontend-admin / frontend-admin-password")
+            print("VIEWER frontend-viewer / frontend-viewer-password")
+        else:
+            print("Accounts: none; create the user-selected ADMIN separately with tools.create_admin")
         return 0
+    except ClickHouseError:
+        print("presentation demo seed failed: ClickHouse operation failed", file=os.sys.stderr)
+        return 2
     except (RuntimeError, ValueError, OSError, psycopg.Error, httpx.HTTPError, TimeoutError) as error:
         print(f"presentation demo seed failed: {error}", file=os.sys.stderr)
         return 2

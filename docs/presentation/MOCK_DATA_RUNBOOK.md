@@ -35,6 +35,166 @@ uv run python -m tools.verify_presentation_demo --manifest runtime/demo/presenta
 
 로그인은 `frontend-admin / frontend-admin-password`를 사용한다. manifest에는 실행 후 결정된 Endpoint·Alert·Incident ID와 시연 URL이 기록된다.
 
+### 배포된 멘토 전용 사이트
+
+이 절차는 기존 PostgreSQL·ClickHouse 내용을 전부 삭제한다. 서비스가 멘토 시연 전용이고 전체 초기화가 승인된 경우에만 사용한다. 기존 데이터 보존이나 live rollback을 성공 조건으로 약속하지 않으며, 실패 시 복구 방식은 동일한 seed와 anchor를 사용한 결정적 재주입이다. 기존 production guard를 `EDR_ENV=qa`로 속여 우회하지 않는다.
+
+#### 1. 배포와 runtime을 고정한다
+
+초기화 기능이 포함된 Backend image SHA가 배포됐는지 먼저 확인한다. 이후 초기화가 끝날 때까지 stack을 다시 배포하거나 환경 변수를 바꾸지 않는다.
+
+실제 Agent가 모두 중지됐고 자동 재시작되지 않는지 확인한다. Nginx를 다시 열기 전에도 같은 상태를 재확인해야 한다. 실제 Agent가 별도 경로로 Collector에 직접 접근할 수 있다면 그 경로도 먼저 차단한다.
+
+Backend Console에서 production opt-in과 이 배포만 가리키는 고유 target ID를 설정한다. 아래 ID는 이 멘토 전용 배포에서만 사용하며, 다른 배포를 초기화할 때 재사용하지 않는다.
+
+```bash
+export EDR_PRODUCTION_DEMO_RESET_MODE=FULL_RESET_DEDICATED_MENTOR_DEMO
+export EDR_DEMO_RESET_TARGET_ID=mentor-demo-team-c-prod-20260723
+export EDR_DASHBOARD_BASE_URL=https://tukproject.dev
+export DEMO_ANCHOR="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+```
+
+fingerprint에는 다음 runtime context가 포함된다. Portainer stack과 Backend Console의 값이 정확히 같은지 확인한다. 기본값이 아닌 값을 운영 중이라면 기본값으로 덮어쓰지 말고 실제 배포 값을 유지한다.
+
+| 환경 변수 | 이 배포의 예상값 |
+| --- | --- |
+| `EDR_KAFKA_BOOTSTRAP_SERVERS` | `kafka:29092` |
+| `EDR_KAFKA_RAW_TOPIC` | `telemetry.raw` |
+| `EDR_KAFKA_VALIDATED_TOPIC` | `telemetry.validated` |
+| `EDR_EVENT_STORAGE_CONSUMER_GROUP` | `edr-event-storage-v1` |
+| `EDR_DETECTION_CONSUMER_GROUP` | `edr-detection-v1` |
+| `EDR_S3_BUCKET` | Portainer stack에 설정된 기존 private bucket의 정확한 이름 |
+
+빈 값이나 문서 placeholder를 사용하면 초기화가 거부된다. 다음 명령은 값을 출력하지 않고 여섯 항목이 모두 설정됐는지만 확인한다.
+
+```bash
+: "${EDR_KAFKA_BOOTSTRAP_SERVERS:?missing EDR_KAFKA_BOOTSTRAP_SERVERS}"
+: "${EDR_KAFKA_RAW_TOPIC:?missing EDR_KAFKA_RAW_TOPIC}"
+: "${EDR_KAFKA_VALIDATED_TOPIC:?missing EDR_KAFKA_VALIDATED_TOPIC}"
+: "${EDR_EVENT_STORAGE_CONSUMER_GROUP:?missing EDR_EVENT_STORAGE_CONSUMER_GROUP}"
+: "${EDR_DETECTION_CONSUMER_GROUP:?missing EDR_DETECTION_CONSUMER_GROUP}"
+: "${EDR_S3_BUCKET:?missing EDR_S3_BUCKET}"
+```
+
+DB DSN이나 비밀번호는 확인을 위해 출력하거나 채팅에 붙여 넣지 않는다.
+
+#### 2. 유입을 막고 consumer를 비운다
+
+Portainer에서 다음 순서를 지킨다.
+
+1. HTTP 8080과 mTLS 8443 유입을 함께 막기 위해 Nginx를 가장 먼저 중지한다.
+2. `storage-lifecycle-worker`를 즉시 중지한다.
+3. `event-storage-worker`와 `detection-worker`는 아직 실행한 채 남은 메시지를 처리하게 한다.
+4. Kafka Console에서 두 consumer group의 모든 partition `LAG`가 0인지 확인한다.
+
+```bash
+/opt/kafka/bin/kafka-consumer-groups.sh \
+  --bootstrap-server kafka:29092 \
+  --group edr-event-storage-v1 \
+  --describe
+
+/opt/kafka/bin/kafka-consumer-groups.sh \
+  --bootstrap-server kafka:29092 \
+  --group edr-detection-v1 \
+  --describe
+```
+
+5. lag가 0인 상태에서 Worker log에 새 처리 작업이 들어오지 않는지 확인한다.
+6. `event-storage-worker`, `detection-worker` 순으로 중지한다.
+7. Backend는 외부에서 접근할 수 없는 상태로 두고 Console 실행에만 사용한다.
+
+#### 3. dry-run 후 같은 target을 초기화한다
+
+Backend Console에서 대상 fingerprint와 count를 확인한다. 이 명령은 DB를 변경하지 않는다.
+
+```bash
+python -m tools.seed_presentation_demo \
+  --profile presentation \
+  --seed 20260721 \
+  --anchor "$DEMO_ANCHOR" \
+  --production-demo-reset \
+  --output-manifest /tmp/edr-c-demo/presentation-manifest.json \
+  --dry-run
+```
+
+직전 출력의 `target fingerprint`를 그대로 넣어 실행한다. fingerprint, 두 확인문과 `--confirm-reset` 중 하나라도 다르면 DB 연결 전에 거부된다.
+
+```bash
+read -r -p "Dry-run target fingerprint: " DEMO_TARGET_FINGERPRINT
+
+python -m tools.seed_presentation_demo \
+  --profile presentation \
+  --seed 20260721 \
+  --anchor "$DEMO_ANCHOR" \
+  --production-demo-reset \
+  --output-manifest /tmp/edr-c-demo/presentation-manifest.json \
+  --confirm-reset \
+  --confirm-production-demo-reset FULL_RESET_DEDICATED_MENTOR_DEMO \
+  --confirm-runtime-stopped INGRESS_AND_WORKERS_STOPPED \
+  --target-fingerprint "$DEMO_TARGET_FINGERPRINT"
+```
+
+초기화 또는 검증이 중간에 실패하면 Nginx와 세 Worker를 중지한 상태로 유지한다. 환경 변수, `20260721` seed, `DEMO_ANCHOR`, dry-run에서 확인한 fingerprint를 바꾸지 말고 같은 명령을 다시 실행한다. 이 재주입은 승인된 wipe 이후의 시연 상태를 다시 만드는 절차이며, 삭제 전 live 데이터로 되돌리는 rollback 절차가 아니다.
+
+#### 4. 사용자가 정한 ADMIN을 만든다
+
+Production demo reset은 고정 `frontend-admin`·`frontend-viewer` 계정을 만들지 않는다. 완료 후 사용자가 정한 ADMIN ID로 계정을 별도 생성하고 비밀번호를 두 번 입력한다. 운영 ADMIN 비밀번호는 최소 16자다.
+
+```bash
+read -r -p "Mentor login ID: " MENTOR_LOGIN_ID
+
+python -m tools.create_admin \
+  --login-id "$MENTOR_LOGIN_ID" \
+  --name "Mentor Evaluator"
+```
+
+비밀번호는 Backend Console의 대화형 prompt에 직접 입력한다. 비밀번호를 명령 인자, 환경 변수, manifest, 로그 또는 채팅에 붙여 넣지 않는다. 생성 결과의 `user_id`는 발표 후 제거 절차에 필요하므로 비밀이 아닌 운영 기록에 보관한다.
+
+계정 생성 후 Backend Console에서 API 결과를 검증한다. 이 명령에서도 비밀번호는 prompt에 직접 입력한다.
+
+```bash
+python -m tools.verify_presentation_demo \
+  --manifest /tmp/edr-c-demo/presentation-manifest.json \
+  --api-base-url http://127.0.0.1:8000 \
+  --login-id "$MENTOR_LOGIN_ID" \
+  --prompt-password
+```
+
+#### 5. 멘토 사이트만 다시 연다
+
+검증이 끝나면 실제 Agent가 여전히 중지됐고 다시 연결되지 않을 상태인지 재확인한다. 그다음 `event-storage-worker`, `detection-worker`를 시작하고 Nginx를 마지막에 시작한다.
+
+`storage-lifecycle-worker`는 seed의 고정 Endpoint와 archive key에 영향을 줄 수 있으므로 멘토 시연이 끝날 때까지 계속 중지한다. 공개 `/nginx-health`, `/health/ready`, 사용자 지정 ADMIN 로그인과 주요 시연 화면을 각각 확인한다.
+
+#### 6. 발표 직후 임시 ADMIN을 제거한다
+
+Backend Console에서 생성 시 출력된 정확한 `user_id`와 사용자가 정한 login ID를 넣는다. 먼저 대상을 조회하고, 비활성화한 다음 soft-delete한다. 초기화 후 이 계정이 유일한 ACTIVE ADMIN이므로 비활성화 명령에는 마지막 ADMIN 제거 확인문이 필요하다.
+
+```bash
+read -r -p "Created ADMIN user_id: " MENTOR_USER_ID
+read -r -p "Mentor login ID: " MENTOR_LOGIN_ID
+
+python -m tools.manage_admin inspect \
+  --user-id "$MENTOR_USER_ID"
+
+python -m tools.manage_admin disable \
+  --user-id "$MENTOR_USER_ID" \
+  --confirm-login-id "$MENTOR_LOGIN_ID" \
+  --confirm-environment production \
+  --operator demo-owner \
+  --reason "mentor-demo-ended" \
+  --confirm-last-admin-removal ALLOW_NO_ACTIVE_ADMIN
+
+python -m tools.manage_admin soft-delete \
+  --user-id "$MENTOR_USER_ID" \
+  --confirm-login-id "$MENTOR_LOGIN_ID" \
+  --confirm-environment production \
+  --operator demo-owner \
+  --reason "mentor-demo-ended"
+```
+
+마지막으로 같은 `inspect` 명령을 다시 실행해 `status`가 `DISABLED`, `isDelete`가 `true`인지 확인한다. 이후 Nginx를 중지하고, 일반 운영으로 되돌릴 계획이 확정되기 전에는 `storage-lifecycle-worker`를 임의로 재시작하지 않는다.
+
 ## 2. 시연 클릭 순서
 
 1. manifest의 `urls.overview`를 열고 `LATEST_24H`에서 400 Event, 3 Alert, 1 open Incident를 확인한다.

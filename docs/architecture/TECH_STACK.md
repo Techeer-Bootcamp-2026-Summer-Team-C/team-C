@@ -181,7 +181,7 @@ python -m tools.create_admin --login-id <LOGIN_ID> --name <DISPLAY_NAME>
 
 개발 계정의 기존 비밀번호를 다시 지정할 때는 위 명령에 `--reset-existing`을 추가한다.
 
-CLI는 사용자가 지정한 login ID와 name을 인자로 받고 1~1,024자 password는 대화형 또는 안전한 stdin으로 받아 `ACTIVE` ADMIN을 생성한다. login ID는 trim/lowercase 정규화 후 대소문자 구분 없이 unique다. 초기 계정이나 비밀번호를 migration, seed, repository에 하드코딩하지 않으며 사용자 생성·삭제·상태 변경 REST API는 만들지 않는다.
+CLI는 사용자가 지정한 login ID와 name을 인자로 받고 password는 두 번 확인하는 대화형 입력 또는 안전한 stdin으로 받아 `ACTIVE` ADMIN을 생성한다. 일반 계약은 1~1,024자이고 Production ADMIN 생성 CLI는 최소 16자를 요구한다. login ID는 trim/lowercase 정규화 후 대소문자 구분 없이 unique다. 초기 계정이나 비밀번호를 migration, seed, repository에 하드코딩하지 않으며 사용자 생성·삭제·상태 변경 REST API는 만들지 않는다.
 
 Agent mTLS 인증서는 다음 CLI로 발급한다.
 

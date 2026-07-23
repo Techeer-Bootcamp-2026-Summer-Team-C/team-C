@@ -11,6 +11,8 @@ from backend.contracts.auth import MAX_PASSWORD_LENGTH, normalize_login_id
 from backend.settings import get_settings
 from backend.storage.postgres import UserRepository
 
+PRODUCTION_MIN_PASSWORD_LENGTH = 16
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Create an ACTIVE Dashboard ADMIN or reset its local credentials.")
@@ -25,21 +27,43 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def read_password(*, password_stdin: bool) -> str:
+    if password_stdin:
+        if sys.stdin.isatty():
+            raise ValueError("--password-stdin requires redirected non-interactive input")
+        return sys.stdin.readline().rstrip("\n")
+    password = getpass.getpass("Password: ")
+    confirmation = getpass.getpass("Confirm password: ")
+    if password != confirmation:
+        raise ValueError("password confirmation does not match")
+    return password
+
+
+def validate_password(password: str, *, environment: str) -> None:
+    if not password:
+        raise ValueError("password must not be empty")
+    if len(password) > MAX_PASSWORD_LENGTH:
+        raise ValueError(f"password must be at most {MAX_PASSWORD_LENGTH} characters")
+    if environment.strip().lower() == "production" and len(password) < PRODUCTION_MIN_PASSWORD_LENGTH:
+        raise ValueError(
+            f"production ADMIN password must be at least {PRODUCTION_MIN_PASSWORD_LENGTH} characters"
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    password = sys.stdin.readline().rstrip("\n") if args.password_stdin else getpass.getpass("Password: ")
-    if not password:
-        print("password must not be empty", file=sys.stderr)
-        return 2
-    if len(password) > MAX_PASSWORD_LENGTH:
-        print(f"password must be at most {MAX_PASSWORD_LENGTH} characters", file=sys.stderr)
-        return 2
     try:
         login_id = normalize_login_id(args.login_id)
     except ValueError as error:
         print(str(error), file=sys.stderr)
         return 2
     settings = get_settings()
+    try:
+        password = read_password(password_stdin=args.password_stdin)
+        validate_password(password, environment=settings.env)
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 2
     if args.reset_existing and settings.env != "local":
         print("--reset-existing is allowed only when EDR_ENV=local", file=sys.stderr)
         return 2

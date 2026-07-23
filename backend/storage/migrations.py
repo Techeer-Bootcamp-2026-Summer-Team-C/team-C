@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 from typing import Literal, Protocol
 
@@ -33,3 +34,37 @@ def apply_postgres_migrations(
 def apply_clickhouse_file(client: ClickHouseCommandClient, path: Path) -> None:
     for statement in split_sql_statements(path.read_text(encoding="utf-8")):
         client.command(statement)
+
+
+def record_applied_postgres_migrations(
+    connection: PostgresConnection,
+    directory: Path,
+) -> None:
+    """Record every migration after a verified full-reset apply without running it twice."""
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            migration_name TEXT PRIMARY KEY,
+            checksum_sha256 CHAR(64) NOT NULL,
+            applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    connection.commit()
+    recorded = {
+        str(row[0]): str(row[1])
+        for row in connection.execute(
+            "SELECT migration_name, checksum_sha256 FROM schema_migrations"
+        ).fetchall()
+    }
+    for path in sorted(directory.glob("*.up.sql")):
+        checksum = hashlib.sha256(path.read_bytes()).hexdigest()
+        existing = recorded.get(path.name)
+        if existing is not None and existing != checksum:
+            raise RuntimeError(f"PostgreSQL migration checksum drift: {path.name}")
+        if existing is None:
+            connection.execute(
+                "INSERT INTO schema_migrations (migration_name, checksum_sha256) VALUES (%s, %s)",
+                (path.name, checksum),
+            )
+    connection.commit()
