@@ -223,7 +223,7 @@ export function ErrorState({ error, onRetry, archiveAction = false }: {
   );
 }
 
-function InvalidFilterState({ message }: { message?: string }) {
+export function InvalidFilterState({ message }: { message?: string }) {
   const { t } = useI18n();
   return <div className="state-card invalid" role="alert"><CircleAlert aria-hidden="true" size={22} /><strong>{t("filter.invalidTitle")}</strong><p>{message ?? t("filter.invalidDescription")}</p></div>;
 }

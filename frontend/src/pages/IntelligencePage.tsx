@@ -13,6 +13,7 @@ import {
   ErrorState,
   Field,
   GlobalFilterBar,
+  InvalidFilterState,
   Inspector,
   PageHeader,
   Panel,
@@ -79,7 +80,7 @@ export function IntelligencePage() {
       <TimeFilterFields params={params} setParams={setParams} />
       <Field label={t("filter.endpointIds")}><input onChange={(event) => setParams(updateParams(params, { endpointIds: event.target.value }))} placeholder="1, 2, 7" value={params.get("endpointIds") ?? ""} /></Field>
     </GlobalFilterBar>
-    {!time.valid ? <ErrorState error={new Error(t("filter.invalidRange"))} /> : null}
+    {!time.valid && time.preset !== "CUSTOM" ? <InvalidFilterState /> : null}
     {time.valid && !summary.data && !topology.data && (summary.isPending || topology.isPending) ? <Skeleton rows={10} /> : null}
     {summaryUnavailable && topologyUnavailable ? <ErrorState error={error} onRetry={() => void Promise.all([summary.refetch(), topology.refetch()])} /> : null}
     {(summaryUnavailable !== topologyUnavailable) ? <PartialFailureWarning message={summaryUnavailable ? t("intelligence.summaryUnavailable") : t("intelligence.topologyUnavailable")} /> : null}
