@@ -5,7 +5,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/endpoints";
 import { readTimeFilter, TimeFilterFields } from "../components/filters";
 import { Button } from "../components/primitives";
-import { ErrorState, PageHeader, PartialFailureWarning, StaleWarning } from "../components/ui";
+import { ErrorState, InvalidFilterState, PageHeader, PartialFailureWarning, StaleWarning } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 import { OverviewLayoutProvider } from "../features/overviewLayout/OverviewLayoutContext";
 import { OverviewDashboardWorkspace } from "../features/overviewLayout/OverviewDashboardWorkspace";
@@ -90,8 +90,8 @@ function OverviewPageContent({ mode }: { mode: "overview" | "manage" }) {
         eyebrow={t("dashboard.workbenchEyebrow")}
         title={t("dashboard.workbenchTitle")}
       /> : <h1 className="sr-only">{t("overview.title")}</h1>}
-      {!time.valid ? <ErrorState error={new Error(t("filter.invalidRange"))} /> : null}
-      {time.valid ? <OverviewToolbar
+      {!time.valid && time.preset !== "CUSTOM" ? <InvalidFilterState /> : null}
+      <OverviewToolbar
         dashboardSettingsTo={mode === "overview" ? `/dashboards${params.toString() ? `?${params.toString()}` : ""}` : undefined}
         lastRefreshedAt={lastRefreshedAt}
         onRefresh={refreshManually}
@@ -99,7 +99,8 @@ function OverviewPageContent({ mode }: { mode: "overview" | "manage" }) {
         refreshing={manualRefreshing}
         selectedEndpointId={selectedEndpointId}
         setParams={setParams}
-      /> : null}
+        timeValid={time.valid}
+      />
       {partialFailure ? <PartialFailureWarning message={t("overview.partialFailure")} /> : null}
       {staleError && hasPanelData ? <StaleWarning error={staleError} onRetry={() => void refreshData()} /> : null}
       {initialError ? <ErrorState error={initialError} onRetry={() => void refreshData()} /> : null}
@@ -114,7 +115,7 @@ function OverviewPageContent({ mode }: { mode: "overview" | "manage" }) {
   );
 }
 
-function OverviewToolbar({ dashboardSettingsTo, lastRefreshedAt, onRefresh, params, refreshing, selectedEndpointId, setParams }: {
+function OverviewToolbar({ dashboardSettingsTo, lastRefreshedAt, onRefresh, params, refreshing, selectedEndpointId, setParams, timeValid }: {
   dashboardSettingsTo?: string | undefined;
   lastRefreshedAt: number;
   onRefresh: () => Promise<unknown>;
@@ -122,12 +123,13 @@ function OverviewToolbar({ dashboardSettingsTo, lastRefreshedAt, onRefresh, para
   refreshing: boolean;
   selectedEndpointId: number | undefined;
   setParams: (next: URLSearchParams) => void;
+  timeValid: boolean;
 }) {
   const { t } = useI18n();
   return <section className="overview-toolbar" aria-label={t("overview.toolbarAria")}>
     <div className="overview-toolbar-controls">
       <OverviewScopeControls params={params} selectedEndpointId={selectedEndpointId} setParams={setParams} />
-      <button aria-busy={refreshing} className="button ghost overview-refresh" disabled={refreshing} onClick={() => void onRefresh()} type="button"><RefreshCw aria-hidden="true" className={refreshing ? "spin" : ""} size={15} />{refreshing ? t("overview.refreshing") : t("overview.refresh")}</button>
+      <button aria-busy={refreshing} className="button ghost overview-refresh" disabled={!timeValid || refreshing} onClick={() => void onRefresh()} type="button"><RefreshCw aria-hidden="true" className={refreshing ? "spin" : ""} size={15} />{refreshing ? t("overview.refreshing") : t("overview.refresh")}</button>
       {dashboardSettingsTo ? <Link className="button ghost overview-refresh" to={dashboardSettingsTo}><Settings2 aria-hidden="true" size={15} />{t("dashboard.settings")}</Link> : null}
     </div>
     <span className="overview-refresh-meta">{t("overview.lastRefreshed", { time: lastRefreshedAt ? formatDateTime(new Date(lastRefreshedAt).toISOString()) : t("overview.notYet") })}</span>

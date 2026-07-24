@@ -398,6 +398,24 @@ describe("overview fixed dashboard", () => {
     expect(screen.getByText(/Successful dashboard sections remain available/i)).toBeInTheDocument();
   });
 
+  it("keeps the custom UTC range controls available without showing a request error", () => {
+    setAuthSession();
+    const dashboardSpy = vi.spyOn(api, "dashboard").mockRejectedValue(new Error("must not load an incomplete custom range"));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider><MemoryRouter initialEntries={["/?timePreset=CUSTOM"]}>
+      <OverviewPage />
+    </MemoryRouter></LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
+
+    expect(screen.getByLabelText("Time range")).toHaveValue("CUSTOM");
+    expect(screen.getByLabelText("From")).toHaveAttribute("type", "datetime-local");
+    expect(screen.getByLabelText("To")).toHaveAttribute("type", "datetime-local");
+    expect(screen.getByText("From and to are required, and from must be earlier than to.")).toBeInTheDocument();
+    expect(screen.queryByText("The requested data could not be loaded.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Request ID unavailable")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh" })).toBeDisabled();
+    expect(dashboardSpy).not.toHaveBeenCalled();
+  });
+
   it("reads only positive integer endpointId values from the Overview URL", () => {
     expect(readOverviewEndpointId(new URLSearchParams("endpointId=2"))).toBe(2);
     expect(readOverviewEndpointId(new URLSearchParams("endpointId=0"))).toBeUndefined();

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../src/auth/AuthContext";
+import { api } from "../src/api/endpoints";
 import {
   correlationGraphMinHeight,
   correlationSelectionFromElement,
@@ -41,13 +42,28 @@ import {
 } from "../src/features/intelligenceOperations";
 import { LocaleProvider } from "../src/i18n/LocaleContext";
 import { ArchiveLifecycleBoard, ArchivesPage } from "../src/pages/ArchivesPage";
-import { CorrelationResult, IntelligenceContent } from "../src/pages/IntelligencePage";
+import { CorrelationResult, IntelligenceContent, IntelligencePage } from "../src/pages/IntelligencePage";
 import { PipelineSnapshot } from "../src/pages/OperationsPage";
 import { canMutate } from "../src/query/policy";
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); sessionStorage.clear(); });
 
 describe("WP-08 Intelligence, Operations, and Archives", () => {
+  it("treats an incomplete custom UTC range as a local filter draft", () => {
+    const dashboardSpy = vi.spyOn(api, "dashboard").mockRejectedValue(new Error("must not load an incomplete custom range"));
+    const topologySpy = vi.spyOn(api, "topology").mockRejectedValue(new Error("must not load an incomplete custom range"));
+    renderWithProviders(<IntelligencePage />, ["/intelligence?timePreset=CUSTOM"]);
+
+    expect(screen.getByLabelText("Time range")).toHaveValue("CUSTOM");
+    expect(screen.getByLabelText("From")).toHaveAttribute("type", "datetime-local");
+    expect(screen.getByLabelText("To")).toHaveAttribute("type", "datetime-local");
+    expect(screen.getByText("From and to are required, and from must be earlier than to.")).toBeInTheDocument();
+    expect(screen.queryByText("The requested data could not be loaded.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Request ID unavailable")).not.toBeInTheDocument();
+    expect(dashboardSpy).not.toHaveBeenCalled();
+    expect(topologySpy).not.toHaveBeenCalled();
+  });
+
   it("keeps topology filtering deterministic and the graph feature flag reversible", () => {
     const filtered = filterTopology(topologyFixture, "tcp", 1);
     expect(filtered.edges).toHaveLength(1);
