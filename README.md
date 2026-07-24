@@ -45,7 +45,7 @@ Collector, Kafka, Worker, 저장소 상태를 점검하고 Endpoint와 기간을
 
 ## 시스템 아키텍처
 
-![OWLBY 시스템 아키텍처](assets/diagrams/Pasted%20image%2020260721000834.png)
+![OWLBY 시스템 아키텍처와 Portainer GitOps 배포 흐름](assets/diagrams/owlby-system-architecture-gitops.png)
 
 ![OWLBY 서비스 구성](assets/diagrams/Pasted%20image%2020260721000850.png)
 
@@ -147,6 +147,30 @@ Hosted Metrics 인스턴스별 수집률과 discarded samples, exemplars, metada
 | Deployment | ![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white) ![GHCR](https://img.shields.io/badge/GHCR-181717?style=for-the-badge&logo=github&logoColor=white) ![Portainer](https://img.shields.io/badge/Portainer-13BEF9?style=for-the-badge&logo=portainer&logoColor=white) ![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white) |
 | Monitoring | ![Grafana Alloy](https://img.shields.io/badge/Grafana%20Alloy-F46800?style=for-the-badge&logo=grafana&logoColor=white) ![Grafana Cloud](https://img.shields.io/badge/Grafana%20Cloud-F46800?style=for-the-badge&logo=grafana&logoColor=white) |
 
+## CI/CD 및 GitOps
+
+Pull Request에서는 GitHub Actions가 Backend lint·test·dependency audit, Frontend contract·type·lint·test·build, 운영 Compose 구성을 검증합니다.
+
+```mermaid
+flowchart LR
+    A["main 반영"]
+    B["GitHub Actions<br/>검증·이미지 빌드"]
+    C["GHCR<br/>commit SHA 이미지"]
+    D["production 브랜치<br/>배포 명세"]
+    E["Portainer<br/>GitOps polling"]
+    F["AWS EC2<br/>Docker 스택"]
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+```
+
+`main`에 변경이 반영되면 GitHub Actions가 Backend와 Nginx 이미지를 GHCR에 commit SHA로 저장하고, `production` 브랜치의 배포 명세를 같은 SHA로 갱신합니다. Portainer는 이 브랜치를 5분마다 확인해 AWS EC2의 Docker 스택을 자동으로 다시 배포합니다. GitHub Actions가 Portainer API를 직접 호출하지 않고 Git 저장소의 배포 명세를 원하는 상태로 사용하는 GitOps 구조입니다.
+
+자세한 설정과 운영 절차는 [CI workflow](.github/workflows/ci.yml), [Production image workflow](.github/workflows/build-prod-images.yml), [Portainer 배포 가이드](deploy/portainer/README.md)에서 확인할 수 있습니다.
+
 
 ## 빠른 실행
 
@@ -168,4 +192,4 @@ Dashboard: http://127.0.0.1:8080
 | :---------------------------------------------------------------: | :--------------------------------------------------------------: | :----------------------------------------------------------------: | :-----------------------------------------------------------: |
 | <img src="assets/team/04-hwang-geonha.jpg" width="180" alt="황건하"> | <img src="assets/team/01-park-soyeon.jpg" width="180" alt="박소연"> | <img src="assets/team/03-lee-hyeryeong.jpg" width="180" alt="이혜령"> | <img src="assets/team/02-lee-juho.jpg" width="180" alt="이주호"> |
 |              [@altius03](https://github.com/altius03)              |             [@yoskrap](https://github.com/yoskrap)             |           [@hyernglee](https://github.com/hyernglee)           |            [@coder072](https://github.com/coder072)            |
-|                     Team Leader<br>Full Stack                     |                       Full Stack<br>DevOps                       |                         Frontend<br>Design                         |                            Backend                            |
+|                  Team Leader<br>Full Stack<br>DevOps                  |                       Full Stack<br>DevOps                       |                         Frontend<br>Design                         |                            Backend                            |
