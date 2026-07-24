@@ -31,12 +31,17 @@ from .contracts.collector import (
     TelemetryBatchRequest,
 )
 from .contracts.common import ErrorBody, ErrorDetail, ErrorEnvelope, PagedData, RequestMeta, SuccessEnvelope
-from .contracts.dashboard import DashboardSummaryDto, EndpointSummaryDto, IngestSummaryDto
+from .contracts.dashboard import (
+    DashboardAvailabilityDto,
+    DashboardSummaryDto,
+    EndpointSummaryDto,
+    IngestSummaryDto,
+)
 from .contracts.dashboard_layouts import DashboardLayoutDto, DashboardLayoutPutRequest
 from .contracts.endpoints import EndpointDetailDto, EndpointDto
 from .contracts.enums import DashboardInterval, UserLocale, UserRole, UserStatus
 from .contracts.events import EventDetailDto, EventDto, ProcessTreeDto
-from .contracts.incidents import IncidentDetailDto, IncidentDto
+from .contracts.incidents import IncidentDetailDto, IncidentDto, IncidentStatusUpdateRequest
 from .contracts.intelligence import (
     CorrelationDto,
     DnsLookupDto,
@@ -52,6 +57,7 @@ from .contracts.requests import (
     AlertListQuery,
     ArchiveRestoreListQuery,
     CorrelationQuery,
+    DashboardAvailabilityQuery,
     DashboardSummaryQuery,
     DashboardTimeQuery,
     EndpointListQuery,
@@ -593,6 +599,36 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
             data = IncidentService(IncidentRepository(connection)).detail(incidentId)
         return _success(request, data)
 
+    @app.patch(
+        "/api/v1/incidents/{incidentId}/status",
+        response_model=SuccessEnvelope[IncidentDto],
+        operation_id="incidentsUpdateStatus",
+        summary="Incident 상태 변경",
+        description=(
+            "권한이 있는 사용자가 Incident를 다시 열거나 종료합니다. "
+            "수동 상태는 다음 수동 변경까지 유지하며 감사 로그에 기록합니다."
+        ),
+        tags=["Incidents"],
+        responses=_error_responses(400, 401, 403, 404, 503),
+    )
+    def incident_status(
+        incidentId: Annotated[int, Path(description="상태를 변경할 Incident ID입니다.")],
+        request: Request,
+        body: IncidentStatusUpdateRequest,
+        user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[IncidentDto]:
+        require_write_role(user)
+        runtime = _runtime(request)
+        with runtime.postgres() as connection:
+            data = IncidentService(IncidentRepository(connection)).update_status(
+                incidentId,
+                status=body.status,
+                actor_identifier=str(user.user_id),
+                request_id=request.state.request_id,
+                changed_at=datetime.now(UTC),
+            )
+        return _success(request, data)
+
     @app.get(
         "/api/v1/incidents/{incidentId}/timeline",
         response_model=SuccessEnvelope[AttackTimelineDto],
@@ -656,6 +692,25 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
                 calculated_at=calculated_at,
                 endpoint_id=query.endpoint_id,
             )
+        return _success(request, data)
+
+    @app.get(
+        "/api/v1/dashboard/availability",
+        response_model=SuccessEnvelope[DashboardAvailabilityDto],
+        operation_id="dashboardGetAvailability",
+        summary="조회 가능한 Dashboard 기간 조회",
+        description="HOT 또는 RESTORED 저장소에서 실제 Event를 조회할 수 있는 기간을 반환합니다.",
+        tags=["Dashboard"],
+        responses=_error_responses(400, 401, 503),
+    )
+    def dashboard_availability(
+        request: Request,
+        query: Annotated[DashboardAvailabilityQuery, Query()],
+        _user: Annotated[AuthenticatedUser, Depends(current_user)],
+    ) -> SuccessEnvelope[DashboardAvailabilityDto]:
+        runtime = _runtime(request)
+        with runtime.postgres() as connection:
+            data = _summary_service(runtime, connection).availability(endpoint_ids=query.endpoint_ids)
         return _success(request, data)
 
     @app.get(

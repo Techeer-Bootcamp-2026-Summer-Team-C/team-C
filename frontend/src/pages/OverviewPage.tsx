@@ -2,8 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import { RefreshCw, Settings2 } from "lucide-react";
 import { memo, useCallback, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { isUnavailableTimeRangeError } from "../api/client";
 import { api } from "../api/endpoints";
-import { readTimeFilter, TimeFilterFields } from "../components/filters";
+import {
+  readTimeFilter,
+  TimeFilterFields,
+  UnavailableTimeRangeState,
+  type TimeAvailabilityState,
+} from "../components/filters";
 import { Button } from "../components/primitives";
 import { ErrorState, InvalidFilterState, PageHeader, PartialFailureWarning, StaleWarning } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
@@ -13,6 +19,7 @@ import { EndpointScopePicker } from "../features/overview/EndpointScopePicker";
 import { useI18n } from "../i18n/LocaleContext";
 import { formatDateTime } from "../lib/format";
 import { updateParams } from "../lib/url";
+import type { DashboardAvailabilityQuery, DashboardSummaryDto } from "../contracts";
 
 export function readOverviewEndpointId(params: URLSearchParams): number | undefined {
   const endpointId = Number(params.get("endpointId"));
@@ -40,6 +47,20 @@ function OverviewPageContent({ mode }: { mode: "overview" | "manage" }) {
   const [params, setParams] = useSearchParams();
   const time = readTimeFilter(params);
   const selectedEndpointId = readOverviewEndpointId(params);
+  const availabilityQuery: DashboardAvailabilityQuery = selectedEndpointId
+    ? { endpointIds: [selectedEndpointId] }
+    : {};
+  const availability = useQuery({
+    queryKey: ["dashboard-availability", availabilityQuery],
+    queryFn: ({ signal }) => api.dashboardAvailability(availabilityQuery, signal),
+    enabled: time.preset === "CUSTOM",
+    staleTime: 300_000,
+  });
+  const availabilityState: TimeAvailabilityState = {
+    ranges: availability.data?.data.availableRanges ?? [],
+    pending: availability.isPending,
+    unavailable: availability.isError,
+  };
   const scopedTimeQuery = {
     ...time.query,
     ...(selectedEndpointId ? { endpointId: selectedEndpointId } : {}),
@@ -55,7 +76,10 @@ function OverviewPageContent({ mode }: { mode: "overview" | "manage" }) {
   const allQueries = [dashboard, endpoints, ingest, endpointRanking, incidentQueue];
   const panelQueries = [dashboard, endpoints, endpointRanking, incidentQueue];
   const lastRefreshedAt = Math.max(...allQueries.map((query) => query.dataUpdatedAt));
-  const refreshData = () => Promise.all(allQueries.map((query) => query.refetch()));
+  const refreshData = () => Promise.all([
+    ...allQueries.map((query) => query.refetch()),
+    ...(time.preset === "CUSTOM" ? [availability.refetch()] : []),
+  ]);
   const refreshManually = async () => {
     if (manualRefreshing) return;
     setManualRefreshing(true);
@@ -66,10 +90,20 @@ function OverviewPageContent({ mode }: { mode: "overview" | "manage" }) {
     }
   };
   const hasPanelData = panelQueries.some((query) => Boolean(query.data));
-  const totalFailure = panelQueries.every((query) => Boolean(query.error && !query.data));
+  const unavailableRange = time.preset === "CUSTOM" && time.valid && (
+    allQueries.some((query) => isUnavailableTimeRangeError(query.error))
+    || Boolean(dashboard.data && !dashboardHasEvidenceInRange(dashboard.data.data))
+  );
+  const totalFailure = panelQueries.every((query) => Boolean(
+    query.error && !query.data && !isUnavailableTimeRangeError(query.error)
+  ));
   const initialError = totalFailure ? panelQueries.map((query) => query.error).find(Boolean) ?? null : null;
-  const partialFailure = hasPanelData && allQueries.some((query) => query.error && !query.data);
-  const staleError = [dashboard, endpoints, ingest].find((query) => query.isRefetchError)?.error ?? null;
+  const partialFailure = !unavailableRange && hasPanelData && allQueries.some((query) => (
+    query.error && !query.data && !isUnavailableTimeRangeError(query.error)
+  ));
+  const staleError = [dashboard, endpoints, ingest].find((query) => (
+    query.isRefetchError && !isUnavailableTimeRangeError(query.error)
+  ))?.error ?? null;
   const dashboardData = {
     dashboard: dashboard.data?.data,
     endpoints: endpoints.data?.data,
@@ -92,6 +126,7 @@ function OverviewPageContent({ mode }: { mode: "overview" | "manage" }) {
       /> : <h1 className="sr-only">{t("overview.title")}</h1>}
       {!time.valid && time.preset !== "CUSTOM" ? <InvalidFilterState /> : null}
       <OverviewToolbar
+        availability={availabilityState}
         dashboardSettingsTo={mode === "overview" ? `/dashboards${params.toString() ? `?${params.toString()}` : ""}` : undefined}
         lastRefreshedAt={lastRefreshedAt}
         onRefresh={refreshManually}
@@ -103,8 +138,9 @@ function OverviewPageContent({ mode }: { mode: "overview" | "manage" }) {
       />
       {partialFailure ? <PartialFailureWarning message={t("overview.partialFailure")} /> : null}
       {staleError && hasPanelData ? <StaleWarning error={staleError} onRetry={() => void refreshData()} /> : null}
-      {initialError ? <ErrorState error={initialError} onRetry={() => void refreshData()} /> : null}
-      {time.valid && !totalFailure ? <OverviewDashboardWorkspace data={dashboardData} mode={mode} onSettingsClose={() => setDashboardSettingsOpen(false)} queueState={{
+      {initialError && !unavailableRange ? <ErrorState error={initialError} onRetry={() => void refreshData()} /> : null}
+      {unavailableRange ? <UnavailableTimeRangeState /> : null}
+      {time.valid && !totalFailure && !unavailableRange ? <OverviewDashboardWorkspace data={dashboardData} mode={mode} onSettingsClose={() => setDashboardSettingsOpen(false)} queueState={{
         endpoints: { pending: endpointRanking.isPending, error: endpointRanking.error, stale: endpointRanking.isRefetchError, onRetry: () => void endpointRanking.refetch() },
         incidents: { pending: incidentQueue.isPending, error: incidentQueue.error, stale: incidentQueue.isRefetchError, onRetry: () => void incidentQueue.refetch() },
       }} settingsOpen={dashboardSettingsOpen} summaryState={{
@@ -115,7 +151,8 @@ function OverviewPageContent({ mode }: { mode: "overview" | "manage" }) {
   );
 }
 
-function OverviewToolbar({ dashboardSettingsTo, lastRefreshedAt, onRefresh, params, refreshing, selectedEndpointId, setParams, timeValid }: {
+function OverviewToolbar({ availability, dashboardSettingsTo, lastRefreshedAt, onRefresh, params, refreshing, selectedEndpointId, setParams, timeValid }: {
+  availability: TimeAvailabilityState;
   dashboardSettingsTo?: string | undefined;
   lastRefreshedAt: number;
   onRefresh: () => Promise<unknown>;
@@ -128,7 +165,7 @@ function OverviewToolbar({ dashboardSettingsTo, lastRefreshedAt, onRefresh, para
   const { t } = useI18n();
   return <section className="overview-toolbar" aria-label={t("overview.toolbarAria")}>
     <div className="overview-toolbar-controls">
-      <OverviewScopeControls params={params} selectedEndpointId={selectedEndpointId} setParams={setParams} />
+      <OverviewScopeControls availability={availability} params={params} selectedEndpointId={selectedEndpointId} setParams={setParams} />
       <button aria-busy={refreshing} className="button ghost overview-refresh" disabled={!timeValid || refreshing} onClick={() => void onRefresh()} type="button"><RefreshCw aria-hidden="true" className={refreshing ? "spin" : ""} size={15} />{refreshing ? t("overview.refreshing") : t("overview.refresh")}</button>
       {dashboardSettingsTo ? <Link className="button ghost overview-refresh" to={dashboardSettingsTo}><Settings2 aria-hidden="true" size={15} />{t("dashboard.settings")}</Link> : null}
     </div>
@@ -136,7 +173,8 @@ function OverviewToolbar({ dashboardSettingsTo, lastRefreshedAt, onRefresh, para
   </section>;
 }
 
-const OverviewScopeControls = memo(function OverviewScopeControls({ params, selectedEndpointId, setParams }: {
+const OverviewScopeControls = memo(function OverviewScopeControls({ availability, params, selectedEndpointId, setParams }: {
+  availability: TimeAvailabilityState;
   params: URLSearchParams;
   selectedEndpointId: number | undefined;
   setParams: (next: URLSearchParams) => void;
@@ -147,6 +185,14 @@ const OverviewScopeControls = memo(function OverviewScopeControls({ params, sele
 
   return <>
     <EndpointScopePicker onChange={onEndpointChange} selectedEndpointId={selectedEndpointId} />
-    <div className="overview-time-select"><TimeFilterFields params={params} setParams={setParams} /></div>
+    <div className="overview-time-select"><TimeFilterFields availability={availability} params={params} setParams={setParams} /></div>
   </>;
 });
+
+function dashboardHasEvidenceInRange(dashboard: DashboardSummaryDto): boolean {
+  return dashboard.events.totalCount > 0
+    || dashboard.alerts.totalCount > 0
+    || dashboard.incidents.openCount > 0
+    || dashboard.incidents.closedCount > 0
+    || dashboard.eventFailures.totalCount > 0;
+}

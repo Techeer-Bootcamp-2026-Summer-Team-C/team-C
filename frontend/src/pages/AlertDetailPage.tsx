@@ -85,12 +85,13 @@ function AlertDetail({ alert, canUpdate, mutation, nextAlert, params, queue, que
   const [draftStatus, setDraftStatus] = useState<AlertStatus>(alert.status);
   const activeQueue = queue.filter((item) => item.status !== "RESOLVED");
   const queueCleared = !queuePending && !queueError && alert.status === "RESOLVED" && activeQueue.length === 0;
-  if (queueCleared) return <section aria-live="polite" className="triage-complete-state" role="status">
-    <CheckCircle2 aria-hidden="true" size={28} />
-    <div><strong>{t("alert.queueCleared")}</strong><p>{t("alert.queueClearedDescription")}</p></div>
-    <Link className="button" to={`/alerts${params.size ? `?${params.toString()}` : ""}`}>{t("alerts.queue")}</Link>
-  </section>;
-  return <section className="triage-workspace">
+  return <>
+    {queueCleared ? <section aria-live="polite" className="triage-complete-state" role="status">
+      <CheckCircle2 aria-hidden="true" size={28} />
+      <div><strong>{t("alert.queueCleared")}</strong><p>{t("alert.queueClearedRecoverableDescription")}</p></div>
+      <Link className="button" to={`/alerts${params.size ? `?${params.toString()}` : ""}`}>{t("alerts.queue")}</Link>
+    </section> : null}
+    <section className="triage-workspace">
     <Panel className="triage-queue-panel" title={t("alert.activeQueue")} subtitle={t("alert.requiresAction", { total: queue.filter((item) => item.status !== "RESOLVED").length })}>
       {queuePending ? <Skeleton rows={8} /> : null}
       {queueError ? <ErrorState error={queueError} /> : null}
@@ -140,7 +141,8 @@ function AlertDetail({ alert, canUpdate, mutation, nextAlert, params, queue, que
         </div> : <div className="read-only-note"><StatusPill value={alert.status} /><span>{t("alert.viewerControlsHidden")}</span></div>}</Panel>
       </section>
     </div>
-  </section>;
+    </section>
+  </>;
 }
 
 function AlertEvidenceChain({ alert }: { alert: import("../contracts").AlertDetailDto }) {

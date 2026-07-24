@@ -12,9 +12,9 @@ Agent는 Process, Network, File, DNS, L7 5종 metadata를 전송한다. Npcap/tc
 
 | 구분 | 개수 |
 | --- | ---: |
-| Dashboard Backend REST API | 30 |
+| Dashboard Backend REST API | 32 |
 | Collector REST API | 3 |
-| **제품 REST API 합계** | **33** |
+| **제품 REST API 합계** | **35** |
 
 `/health/live`, `/health/ready`, `/metrics`, Swagger/OpenAPI 경로는 운영 endpoint이므로 제품 API 개수에서 제외한다. Failure 재처리는 공개 REST API가 아니라 관리자용 Python CLI로 수행한다.
 
@@ -117,6 +117,7 @@ VIEWER
 - 조회 API: 세 role 모두 허용
 - 본인 Dashboard layout 조회·저장·삭제: 세 role 모두 허용. JWT `sub` 사용자만 대상으로 하며 body/query user ID는 받지 않는다.
 - Alert 상태 변경: `ADMIN`, `ANALYST`
+- Incident 상태 변경: `ADMIN`, `ANALYST`
 - Archive restore 시작: `ADMIN`, `ANALYST`; `VIEWER`는 `403 FORBIDDEN`
 - 담당자 지정 기능 없음
 - `AGENT`, `SYSTEM`은 user role이 아닌 service principal이다.
@@ -233,6 +234,8 @@ FastAPI/Pydantic response model을 최종 응답 계약으로 사용한다.
 | 28 | GET | `/intelligence/reverse-dns` | IP의 현재 PTR 후보 조회 | `ReverseDnsDto` |
 | 29 | GET | `/intelligence/dns-lookup` | DNS record type별 조회 | `DnsLookupDto` |
 | 30 | GET | `/intelligence/correlate` | Live DNS와 관찰 Event의 IP/Domain 관계 조회 | `CorrelationDto` |
+| 31 | GET | `/dashboard/availability` | 실제 Event가 있는 조회 가능 기간 | `DashboardAvailabilityDto` |
+| 32 | PATCH | `/incidents/{incidentId}/status` | Incident 다시 열기·종료 | `IncidentDto` |
 
 ### 5.2 Collector REST API
 
@@ -842,7 +845,7 @@ PATCH /api/v1/alerts/{alertId}/status
 
 ## 12. Incidents API
 
-Incident는 RuleV1 correlation key/window로 자동 생성하는 read-only projection이다. 활성 Rule condition은 해당 event type에서 정규화되는 payload field만 참조할 수 있고, 공유 correlation key는 모든 참여 Rule에서 동일한 window 크기를 사용해야 readiness를 통과한다. 생성 시 `OPEN`이며 기존 Detection Worker의 60초 periodic task가 `window_end_at`이 지난 OPEN Incident를 `CLOSED`로 바꾸고 `closed_at=window_end_at`을 기록한다. 담당자·사용자 상태 변경 API는 없다.
+Incident는 RuleV1 correlation key/window로 자동 생성하는 Detection projection이다. 활성 Rule condition은 해당 event type에서 정규화되는 payload field만 참조할 수 있고, 공유 correlation key는 모든 참여 Rule에서 동일한 window 크기를 사용해야 readiness를 통과한다. 생성 시 `OPEN`이며 Detection Worker의 60초 periodic task가 `window_end_at`이 지난 자동 관리 OPEN Incident를 `CLOSED`로 바꾸고 `closed_at=window_end_at`을 기록한다. `ADMIN`, `ANALYST`가 상태를 수동 변경하면 `status_overridden=true`로 기록해 다음 수동 변경까지 Worker가 덮어쓰지 않는다.
 
 ### 12.1 목록
 
@@ -892,7 +895,21 @@ GET /api/v1/incidents/{incidentId}
 
 상세 응답 model은 `IncidentDetailDto`다. `IncidentDto` 전체 필드와 `alerts: AlertDto[]`를 반환하며 연결 Alert가 없으면 `[]`다.
 
-### 12.3 Attack Timeline
+### 12.3 상태 변경
+
+```http
+PATCH /api/v1/incidents/{incidentId}/status
+```
+
+```json
+{
+  "status": "OPEN"
+}
+```
+
+허용 상태는 `OPEN`, `CLOSED`다. `CLOSED → OPEN`은 Incident를 다시 열고 `closed_at=null`로 바꾼다. `OPEN → CLOSED`는 `closed_at=window_end_at`을 기록한다. Incident update와 `INCIDENT_STATUS_CHANGED` audit insert는 같은 PostgreSQL transaction에서 처리한다. 같은 상태 요청은 멱등이며 audit log를 추가하지 않는다. Event와 연결 Alert는 상태 변경과 무관하게 보존·조회한다.
+
+### 12.4 Attack Timeline
 
 ```http
 GET /api/v1/incidents/{incidentId}/timeline
@@ -900,7 +917,7 @@ GET /api/v1/incidents/{incidentId}/timeline
 
 기존 `incidents`, `incident_alerts`, `alerts`와 Event detail을 결합해 `AttackTimelineDto`를 반환한다. 항목 타입은 `INCIDENT`, `EVENT`, `ALERT`이며 발생 시각 순으로 정렬한다. 별도 timeline table이나 ERD 변경은 없다.
 
-### 12.4 Incident Investigation
+### 12.5 Incident Investigation
 
 ```http
 GET /api/v1/incidents/{incidentId}/investigation
@@ -1021,6 +1038,14 @@ Dashboard metric item model은 다음 required field를 사용한다.
 모든 하위 object와 list field는 required다. 집계 결과가 없으면 count는 `0`, list는 `[]`다. `topDomains.domain`은 `COALESCE(remote_domain, http_host)`로 계산하고 DNS query는 `topDnsQueries`에서 별도 집계한다. `top*` list는 count 내림차순, 값 오름차순으로 정렬한 상위 10개까지 반환한다.
 
 `interval`은 `1m`, `5m`, `1h`, `1d`, 최대 point 수는 2,000이다.
+
+#### 13.1.1 조회 가능한 데이터 기간
+
+```http
+GET /api/v1/dashboard/availability?endpointIds=1001&endpointIds=1002
+```
+
+선택 query `endpointIds: positive integer[]`를 전달하면 지정한 Endpoint로 범위를 제한한다. 응답 `DashboardAvailabilityDto.availableRanges`는 `eventCount > 0`이면서 ClickHouse `HOT` 또는 S3 `RESTORED` 상태인 Bucket만 대상으로 하며, 서로 겹치거나 이어진 Bucket은 하나의 `TimeRangeDto`로 병합한다. 조회 가능한 기간이 없으면 `availableRanges: []`를 반환한다.
 
 ### 13.2 Endpoint 상태 요약
 
@@ -1408,7 +1433,7 @@ CLI는 S3 원문의 보존 만료, 크기, checksum을 검증한 뒤 `replay_fai
 | 웹 Failure 관리 | 읽기 전용 DLQ Monitor 제공, 웹 replay API는 사용하지 않음 |
 | Archive | RestoreObject 7일 Standard tier, 동일 Glacier key/class, PyArrow 직접 조회 |
 | Endpoint 상태 | Heartbeat ONLINE, 30초 Worker sweep, 2분 미수신 OFFLINE, RETIRED 우선 |
-| Incident 상태 | 생성 OPEN, 60초 Detection Worker sweep, window 만료 CLOSED |
+| Incident 상태 | 생성 OPEN, 자동 관리 상태는 60초 Worker sweep으로 window 만료 시 CLOSED, 수동 변경 상태는 다음 수동 변경까지 유지 |
 | Dashboard 사용자 | ACTIVE/DISABLED, 최초 ADMIN은 `tools.create_admin` CLI |
 | Agent 인증서 | `tools.provision_agent_cert` CLI와 URI SAN, 발급 REST 없음 |
 | MITRE | 모든 활성 RuleV1 code 필수, 고정 mapping 파일에서 name 변환 |

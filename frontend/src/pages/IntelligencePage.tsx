@@ -2,9 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import { Maximize2, Search } from "lucide-react";
 import { lazy, Suspense, useMemo, useRef, useState, type FormEvent, type RefObject } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { isUnavailableTimeRangeError } from "../api/client";
 import { api } from "../api/endpoints";
 import { CountBars } from "../components/charts";
-import { readTimeFilter, TimeFilterFields } from "../components/filters";
+import {
+  readTimeFilter,
+  TimeFilterFields,
+  UnavailableTimeRangeState,
+  type TimeAvailabilityState,
+} from "../components/filters";
 import { Badge, Button, Dialog } from "../components/primitives";
 import {
   DataTable,
@@ -22,7 +28,12 @@ import {
   StaleWarning,
   StatusPill,
 } from "../components/ui";
-import type { CorrelationDto, DashboardSummaryDto, EgressTopologyDto } from "../contracts";
+import type {
+  CorrelationDto,
+  DashboardAvailabilityQuery,
+  DashboardSummaryDto,
+  EgressTopologyDto,
+} from "../contracts";
 import {
   CORRELATION_GRAPH_RELATIONSHIP_LIMIT,
   CORRELATION_INLINE_RELATIONSHIP_LIMIT,
@@ -63,6 +74,18 @@ export function IntelligencePage() {
   const [params, setParams] = useSearchParams();
   const time = readTimeFilter(params);
   const endpointIds = parseEndpointIds(params.get("endpointIds"));
+  const availabilityQuery: DashboardAvailabilityQuery = endpointIds.length ? { endpointIds } : {};
+  const availability = useQuery({
+    queryKey: ["dashboard-availability", availabilityQuery],
+    queryFn: ({ signal }) => api.dashboardAvailability(availabilityQuery, signal),
+    enabled: time.preset === "CUSTOM",
+    staleTime: 300_000,
+  });
+  const availabilityState: TimeAvailabilityState = {
+    ranges: availability.data?.data.availableRanges ?? [],
+    pending: availability.isPending,
+    unavailable: availability.isError,
+  };
   const summaryQuery = { ...time.query, interval: time.interval };
   const topologyQuery = { ...time.query, ...(endpointIds.length ? { endpointIds } : {}) };
   const correlationValue = params.get("value")?.trim() ?? "";
@@ -70,23 +93,29 @@ export function IntelligencePage() {
   const summary = useQuery({ queryKey: ["intelligence-summary", summaryQuery], queryFn: ({ signal }) => api.dashboard(summaryQuery, signal), enabled: time.valid });
   const topology = useQuery({ queryKey: ["egress-topology", topologyQuery], queryFn: ({ signal }) => api.topology(topologyQuery, signal), enabled: time.valid });
   const correlation = useQuery({ queryKey: ["dns-correlation", correlationRequest], queryFn: ({ signal }) => api.correlation(correlationRequest, signal), enabled: time.valid && Boolean(correlationValue) });
-  const summaryUnavailable = Boolean(summary.error && !summary.data);
-  const topologyUnavailable = Boolean(topology.error && !topology.data);
+  const unavailableRange = time.preset === "CUSTOM" && time.valid && (
+    isUnavailableTimeRangeError(summary.error)
+    || isUnavailableTimeRangeError(topology.error)
+    || Boolean(summary.data && !dashboardHasEvidenceInRange(summary.data.data))
+  );
+  const summaryUnavailable = !unavailableRange && Boolean(summary.error && !summary.data);
+  const topologyUnavailable = !unavailableRange && Boolean(topology.error && !topology.data);
   const error = summary.error ?? topology.error;
 
   return <div className="page-stack intelligence-page">
     <PageHeader title={t("intelligence.title")} />
     <GlobalFilterBar hasFilters={params.size > 0} onClear={() => setParams({})}>
-      <TimeFilterFields params={params} setParams={setParams} />
+      <TimeFilterFields availability={availabilityState} params={params} setParams={setParams} />
       <Field label={t("filter.endpointIds")}><input onChange={(event) => setParams(updateParams(params, { endpointIds: event.target.value }))} placeholder="1, 2, 7" value={params.get("endpointIds") ?? ""} /></Field>
     </GlobalFilterBar>
     {!time.valid && time.preset !== "CUSTOM" ? <InvalidFilterState /> : null}
-    {time.valid && !summary.data && !topology.data && (summary.isPending || topology.isPending) ? <Skeleton rows={10} /> : null}
+    {unavailableRange ? <UnavailableTimeRangeState /> : null}
+    {time.valid && !unavailableRange && !summary.data && !topology.data && (summary.isPending || topology.isPending) ? <Skeleton rows={10} /> : null}
     {summaryUnavailable && topologyUnavailable ? <ErrorState error={error} onRetry={() => void Promise.all([summary.refetch(), topology.refetch()])} /> : null}
     {(summaryUnavailable !== topologyUnavailable) ? <PartialFailureWarning message={summaryUnavailable ? t("intelligence.summaryUnavailable") : t("intelligence.topologyUnavailable")} /> : null}
-    {(summary.isRefetchError || topology.isRefetchError) && (summary.data || topology.data) ? <StaleWarning error={error} onRetry={() => void Promise.all([summary.refetch(), topology.refetch()])} /> : null}
-    {(summary.data || topology.data) ? <IntelligenceContent dashboard={summary.data?.data ?? null} topology={topology.data?.data ?? null} /> : null}
-    {time.valid ? <CorrelationWorkspace
+    {!unavailableRange && (summary.isRefetchError || topology.isRefetchError) && (summary.data || topology.data) ? <StaleWarning error={error} onRetry={() => void Promise.all([summary.refetch(), topology.refetch()])} /> : null}
+    {!unavailableRange && (summary.data || topology.data) ? <IntelligenceContent dashboard={summary.data?.data ?? null} topology={topology.data?.data ?? null} /> : null}
+    {time.valid && !unavailableRange ? <CorrelationWorkspace
       correlation={correlation.data?.data ?? null}
       error={correlation.error}
       graphEnabled={topologyGraphEnabled()}
@@ -106,6 +135,14 @@ export function IntelligencePage() {
       key={correlationValue}
     /> : null}
   </div>;
+}
+
+function dashboardHasEvidenceInRange(dashboard: DashboardSummaryDto): boolean {
+  return dashboard.events.totalCount > 0
+    || dashboard.alerts.totalCount > 0
+    || dashboard.incidents.openCount > 0
+    || dashboard.incidents.closedCount > 0
+    || dashboard.eventFailures.totalCount > 0;
 }
 
 export function CorrelationWorkspace({

@@ -438,6 +438,52 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
         assert client.get("/api/v1/incidents/1/investigation", headers=_auth(viewer_token)).status_code == 200
         assert client.get("/api/v1/incidents/999/investigation", headers=_auth(admin_token)).status_code == 404
         assert client.patch("/api/v1/incidents/1", headers=_auth(admin_token), json={}).status_code == 405
+        assert (
+            client.patch(
+                "/api/v1/incidents/1/status",
+                headers=_auth(viewer_token),
+                json={"status": "CLOSED"},
+            ).status_code
+            == 403
+        )
+        incident_closed = client.patch(
+            "/api/v1/incidents/1/status",
+            headers=_auth(admin_token),
+            json={"status": "CLOSED"},
+        )
+        closed_incidents = client.get(
+            "/api/v1/incidents",
+            headers=_auth(admin_token),
+            params={"status": "CLOSED"},
+        )
+        incident_reopened = client.patch(
+            "/api/v1/incidents/1/status",
+            headers=_auth(admin_token),
+            json={"status": "OPEN"},
+        )
+        open_incidents = client.get(
+            "/api/v1/incidents",
+            headers=_auth(admin_token),
+            params={"status": "OPEN"},
+        )
+        assert incident_closed.status_code == incident_reopened.status_code == 200
+        assert closed_incidents.status_code == open_incidents.status_code == 200
+        assert incident_closed.json()["data"]["status"] == "CLOSED"
+        assert [item["incidentId"] for item in closed_incidents.json()["data"]["items"]] == [1]
+        assert incident_reopened.json()["data"]["status"] == "OPEN"
+        assert incident_reopened.json()["data"]["closedAt"] is None
+        assert [item["incidentId"] for item in open_incidents.json()["data"]["items"]] == [1]
+        assert (
+            client.get(
+                f"/api/v1/events/{hot_event_id}",
+                headers=_auth(admin_token),
+                params={
+                    "endpointId": 1,
+                    "occurredAt": hot_record["occurred_at"].isoformat().replace("+00:00", "Z"),
+                },
+            ).status_code
+            == 200
+        )
 
         assert (
             client.patch(
@@ -457,13 +503,42 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
             headers=_auth(admin_token),
             json={"status": "IN_PROGRESS"},
         )
-        assert changed.status_code == same_state.status_code == 200
+        resolved = client.patch(
+            "/api/v1/alerts/1/status",
+            headers=_auth(admin_token),
+            json={"status": "RESOLVED"},
+        )
+        resolved_alerts = client.get(
+            "/api/v1/alerts",
+            headers=_auth(admin_token),
+            params={"status": "RESOLVED"},
+        )
+        reopened = client.patch(
+            "/api/v1/alerts/1/status",
+            headers=_auth(admin_token),
+            json={"status": "OPEN"},
+        )
+        open_alerts = client.get(
+            "/api/v1/alerts",
+            headers=_auth(admin_token),
+            params={"status": "OPEN"},
+        )
+        assert changed.status_code == same_state.status_code == resolved.status_code == reopened.status_code == 200
+        assert resolved_alerts.status_code == open_alerts.status_code == 200
+        assert [item["alertId"] for item in resolved_alerts.json()["data"]["items"]] == [1]
+        assert [item["alertId"] for item in open_alerts.json()["data"]["items"]] == [1]
         with psycopg.connect(postgres_dsn) as connection:
             assert (
                 connection.execute("SELECT count(*) FROM audit_logs WHERE action = 'ALERT_STATUS_CHANGED'").fetchone()[
                     0
                 ]
-                == 1
+                == 3
+            )
+            assert (
+                connection.execute(
+                    "SELECT count(*) FROM audit_logs WHERE action = 'INCIDENT_STATUS_CHANGED'"
+                ).fetchone()[0]
+                == 2
             )
 
         dashboard_paths = (

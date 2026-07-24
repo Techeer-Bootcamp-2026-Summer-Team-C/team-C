@@ -7,6 +7,7 @@ from .contracts.alerts import ResponseGuidanceStepDto
 from .contracts.dashboard import (
     AlertStatusCountDto,
     DashboardAlertsDto,
+    DashboardAvailabilityDto,
     DashboardEndpointsDto,
     DashboardEventFailuresDto,
     DashboardEventsDto,
@@ -81,6 +82,23 @@ class SummaryService:
         self.failures = failures
         self.event_service = event_service
         self.rules = {(item.rule.rule_code, item.rule.version): item for item in (rules or [])}
+
+    def availability(self, *, endpoint_ids: list[int] | None = None) -> DashboardAvailabilityDto:
+        rows = self.metadata.queryable_ranges(endpoint_ids=endpoint_ids)
+        merged: list[tuple[datetime, datetime]] = []
+        for row in rows:
+            start = _aware(row["bucket_start_at"])
+            end = _aware(row["bucket_end_at"])
+            if start is None or end is None:
+                continue
+            if merged and start <= merged[-1][1]:
+                previous_start, previous_end = merged[-1]
+                merged[-1] = (previous_start, max(previous_end, end))
+            else:
+                merged.append((start, end))
+        return DashboardAvailabilityDto(
+            available_ranges=[TimeRangeDto(from_=start, to=end) for start, end in merged]
+        )
 
     def dashboard(
         self,

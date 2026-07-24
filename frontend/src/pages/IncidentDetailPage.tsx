@@ -1,13 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { useMutation, useQuery, useQueryClient, type QueryClient, type UseMutationResult } from "@tanstack/react-query";
+import { ArrowLeft, CheckCircle2, Save } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/endpoints";
+import { useAuth } from "../auth/AuthContext";
 import { IncidentInvestigation } from "../components/IncidentInvestigation";
 import { ProcessTree } from "../components/ProcessTree";
 import { Badge } from "../components/primitives";
-import { DataTable, DetailLedger, DetailLedgerSection, EmptyState, ErrorState, PageHeader, Panel, PartialFailureWarning, Skeleton, StatusPill } from "../components/ui";
-import type { AttackTimelineDto, IncidentDetailDto, IncidentDto, IncidentInvestigationDto } from "../contracts";
+import { DataTable, DetailLedger, DetailLedgerSection, EmptyState, ErrorState, Field, PageHeader, Panel, PartialFailureWarning, Skeleton, StatusPill } from "../components/ui";
+import type { AttackTimelineDto, IncidentDetailDto, IncidentDto, IncidentInvestigationDto, IncidentStatus, SuccessEnvelope } from "../contracts";
 import {
   incidentDetailUrl,
   incidentQueueQuery,
@@ -19,11 +20,14 @@ import {
 import { useI18n } from "../i18n/LocaleContext";
 import { detectionSummary, detectionTitle } from "../i18n/detectionCopy";
 import { formatDateTime } from "../lib/format";
+import { canMutate } from "../query/policy";
 
 export function IncidentDetailPage() {
   const { t } = useI18n();
   const incidentId = Number(useParams().incidentId);
   const [params] = useSearchParams();
+  const auth = useAuth();
+  const queryClient = useQueryClient();
   const [selectionState, setSelectionState] = useState<{ incidentId: number; value: InvestigationSelection } | null>(null);
   const selection = selectionState?.incidentId === incidentId ? selectionState.value : null;
   const setSelection = (value: InvestigationSelection) => setSelectionState({ incidentId, value });
@@ -33,6 +37,12 @@ export function IncidentDetailPage() {
   const investigation = useQuery({ queryKey: ["incident-investigation", incidentId], queryFn: ({ signal }) => api.incidentInvestigation(incidentId, signal), enabled: valid });
   const queueQuery = incidentQueueQuery(params);
   const queue = useQuery({ queryKey: ["incident-workbench-queue", queueQuery], queryFn: ({ signal }) => api.incidents(queueQuery, signal), enabled: valid });
+  const mutation = useMutation({
+    mutationFn: (status: IncidentStatus) => api.updateIncident(incidentId, { status }),
+    onSuccess: async () => {
+      await invalidateIncidentData(queryClient, incidentId);
+    },
+  });
   const investigationData = investigation.data?.data ?? null;
   const processPid = selectedProcessPid(selection, investigationData);
   const processTree = useQuery({
@@ -56,7 +66,12 @@ export function IncidentDetailPage() {
       {!queue.isPending && !queue.error && !queueItems.length ? <div className="incident-queue-cleared" role="status"><span><strong>{t("incident.noActiveQueue")}</strong>{t("incident.noActiveQueueDescription")}</span><Link to={`/incidents${params.size ? `?${params}` : ""}`}>{t("incident.queue")}</Link></div> : null}
       <section aria-label={t("incident.workbench")} className={showQueue ? "incident-workbench" : "incident-workbench queue-empty"}>
         {showQueue ? <IncidentQueue currentIncidentId={incidentId} error={queue.error} incidents={queueItems} loading={queue.isPending} params={params} /> : null}
-        <main className="incident-detail"><IncidentDetail incident={result.data.data} /></main>
+        <main className="incident-detail"><IncidentDetail
+          canUpdate={auth.user ? canMutate(auth.user.role) : false}
+          incident={result.data.data}
+          key={`${result.data.data.incidentId}-${result.data.data.updatedAt}`}
+          mutation={mutation}
+        /></main>
       </section>
       <section aria-label={t("incident.investigation")} className="incident-evidence-workspace">
         {investigation.isPending ? <Skeleton rows={10} /> : null}
@@ -81,6 +96,16 @@ export function IncidentDetailPage() {
   </div>;
 }
 
+export async function invalidateIncidentData(queryClient: Pick<QueryClient, "invalidateQueries">, incidentId: number) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["incident", incidentId] }),
+    queryClient.invalidateQueries({ queryKey: ["incidents"] }),
+    queryClient.invalidateQueries({ queryKey: ["incident-workbench-queue"] }),
+    queryClient.invalidateQueries({ queryKey: ["endpoints"] }),
+    queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+  ]);
+}
+
 function IncidentQueue({ currentIncidentId, error, incidents, loading, params }: { currentIncidentId: number; error: unknown; incidents: IncidentDto[]; loading: boolean; params: URLSearchParams }) {
   const { t } = useI18n();
   return <Panel className="incident-queue-panel" title={t("incident.activeQueue")} subtitle={t("incident.activeQueueDescription")} meta={<Badge tone="info">{incidents.length}</Badge>}>
@@ -95,10 +120,17 @@ function IncidentQueue({ currentIncidentId, error, incidents, loading, params }:
   </Panel>;
 }
 
-function IncidentDetail({ incident }: { incident: IncidentDetailDto }) {
+function IncidentDetail({ canUpdate, incident, mutation }: {
+  canUpdate: boolean;
+  incident: IncidentDetailDto;
+  mutation: UseMutationResult<SuccessEnvelope<IncidentDto>, Error, IncidentStatus>;
+}) {
   const { t } = useI18n();
+  const [draftStatus, setDraftStatus] = useState<IncidentStatus>(incident.status);
   return <>
     <PageHeader eyebrow={`INCIDENT ${incident.incidentId}`} title={detectionTitle(t, incident.title)} description={detectionSummary(t, incident.description, t("incident.noDescription"))} actions={<><StatusPill value={incident.severity} /><StatusPill value={incident.status} /></>} />
+    {mutation.error ? <ErrorState error={mutation.error} /> : null}
+    {mutation.isSuccess ? <div className="mutation-success"><CheckCircle2 aria-hidden="true" size={16} />{t("incident.statusSaved")}</div> : null}
     <DetailLedger className="incident-summary-ledger">
       <DetailLedgerSection title={t("incident.context")} subtitle={t("incident.contextSubtitle")} items={[
         { label: t("incident.correlationKey"), value: <code>{incident.correlationKey}</code> },
@@ -110,7 +142,12 @@ function IncidentDetail({ incident }: { incident: IncidentDetailDto }) {
         { label: t("incident.lastDetected"), value: formatDateTime(incident.lastDetectedAt) },
         { label: t("incident.closed"), value: formatDateTime(incident.closedAt) },
       ]} />
-      <DetailLedgerSection title={t("incident.lifecycle")} subtitle={t("incident.noManualControls")}><div className="read-only-note"><StatusPill value={incident.status} /><span>{t("incident.backendLifecycle")}</span></div></DetailLedgerSection>
+      <DetailLedgerSection title={t("incident.lifecycle")} subtitle={canUpdate ? t("incident.statusControlDescription") : t("incident.viewerReadOnly")}>{canUpdate ? <div className="workflow-controls">
+        <Field label={t("filter.status")}><select disabled={mutation.isPending} onChange={(event) => setDraftStatus(event.target.value as IncidentStatus)} value={draftStatus}><option>OPEN</option><option>CLOSED</option></select></Field>
+        <div className="workflow-actions">
+          <button className="button ghost" disabled={mutation.isPending || draftStatus === incident.status} onClick={() => mutation.mutate(draftStatus)} type="button"><Save aria-hidden="true" size={15} />{t("incident.saveStatus")}</button>
+        </div>
+      </div> : <div className="read-only-note"><StatusPill value={incident.status} /><span>{t("incident.viewerReadOnlyDescription")}</span></div>}</DetailLedgerSection>
       <DetailLedgerSection title={t("incident.connectedAlerts")} subtitle={t("incident.connectedSubtitle")}>{incident.alerts.length ? <DataTable label={t("incident.connectedAlerts")}><thead><tr><th scope="col">Alert</th><th scope="col">{t("filter.severity")}</th><th scope="col">{t("filter.status")}</th><th scope="col">{t("alerts.detected")}</th></tr></thead><tbody>{incident.alerts.map((alert) => <tr key={alert.alertId}><td><Link className="table-primary" to={`/alerts/${alert.alertId}`}><strong>{detectionTitle(t, alert.title, alert.ruleCode)}</strong><code>{alert.ruleCode} · v{alert.ruleVersion}</code></Link></td><td><StatusPill value={alert.severity} /></td><td><StatusPill value={alert.status} /></td><td>{formatDateTime(alert.detectedAt)}</td></tr>)}</tbody></DataTable> : <EmptyState title={t("incident.noConnectedAlerts")} message={t("incident.noConnectedAlertsDescription")} />}</DetailLedgerSection>
     </DetailLedger>
   </>;

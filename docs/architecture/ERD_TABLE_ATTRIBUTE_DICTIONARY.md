@@ -169,7 +169,7 @@ HOT `storage_path`는 Endpoint별 ClickHouse 논리 조회 locator이고 S3 `sto
 
 ### 3.7 `incidents`
 
-목적: RuleV1 correlation key/window로 관련 Alert를 자동 묶는 read-only projection이다. 속성 수는 15개다. 최초 생성 Alert RuleV1의 `alert_title`, `alert_summary`를 `title`, `description`에 그대로 snapshot하며 후속 Alert UPSERT는 이를 덮어쓰지 않는다. 생성 시 `OPEN`이며 Detection Worker의 60초 periodic task가 `window_end_at`이 지난 row를 `CLOSED`로 바꾸고 `closed_at=window_end_at`을 기록한다. 담당자·상태 변경 API를 두지 않는다.
+목적: RuleV1 correlation key/window로 관련 Alert를 자동 묶는 projection이다. 속성 수는 16개다. 최초 생성 Alert RuleV1의 `alert_title`, `alert_summary`를 `title`, `description`에 그대로 snapshot하며 후속 Alert UPSERT는 이를 덮어쓰지 않는다. 생성 시 `OPEN`이며 Detection Worker의 60초 periodic task가 `window_end_at`이 지난 자동 관리 row를 `CLOSED`로 바꾸고 `closed_at=window_end_at`을 기록한다. `ADMIN`, `ANALYST`가 상태를 수동 변경하면 `status_overridden=true`가 되어 다음 수동 변경까지 Worker가 덮어쓰지 않으며, 변경은 감사 로그에 남는다.
 
 | 컬럼 | 실제 PostgreSQL 타입 | 설명 |
 | --- | --- | --- |
@@ -181,10 +181,11 @@ HOT `storage_path`는 Endpoint별 ClickHouse 논리 조회 locator이고 S3 `sto
 | `title` | `VARCHAR(200)` | 최초 Alert rule의 제목 snapshot |
 | `description` | `TEXT NULL` | 최초 Alert rule의 요약 snapshot |
 | `severity` | `VARCHAR(20)` | 연결 Alert 중 최고 심각도 |
-| `status` | `VARCHAR(30)` | `OPEN` 또는 자동 종료된 `CLOSED` |
+| `status` | `VARCHAR(30)` | `OPEN` 또는 `CLOSED` |
+| `status_overridden` | `BOOLEAN` | 수동 상태 변경 여부. `true`이면 자동 종료 대상에서 제외 |
 | `first_detected_at` | `TIMESTAMPTZ` | 첫 Alert 탐지 시각 |
 | `last_detected_at` | `TIMESTAMPTZ` | 같은 window에서 가장 최근 Alert 탐지 시각 |
-| `closed_at` | `TIMESTAMPTZ NULL` | 자동 종료 시 `window_end_at`과 같은 값 |
+| `closed_at` | `TIMESTAMPTZ NULL` | `CLOSED`이면 `window_end_at`, `OPEN`이면 `NULL` |
 | `created_at` | `TIMESTAMPTZ` | Incident 최초 생성 시각 |
 | `updated_at` | `TIMESTAMPTZ` | severity/window/status 마지막 갱신 시각 |
 | `is_delete` | `BOOLEAN` | 소프트 삭제 표시 |

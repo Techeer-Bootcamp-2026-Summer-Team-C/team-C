@@ -1235,6 +1235,23 @@
         "title": "DashboardAlertsDto",
         "type": "object"
       },
+      "DashboardAvailabilityDto": {
+        "additionalProperties": false,
+        "properties": {
+          "availableRanges": {
+            "items": {
+              "$ref": "#/components/schemas/TimeRangeDto"
+            },
+            "title": "Availableranges",
+            "type": "array"
+          }
+        },
+        "required": [
+          "availableRanges"
+        ],
+        "title": "DashboardAvailabilityDto",
+        "type": "object"
+      },
       "DashboardEndpointsDto": {
         "additionalProperties": false,
         "properties": {
@@ -4302,6 +4319,23 @@
         "title": "IncidentStatus",
         "type": "string"
       },
+      "IncidentStatusUpdateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/IncidentStatus",
+            "description": "변경할 Incident 상태입니다. 수동으로 변경한 상태는 다음 수동 변경까지 유지됩니다.",
+            "examples": [
+              "OPEN"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "IncidentStatusUpdateRequest",
+        "type": "object"
+      },
       "IncidentTimeSeriesPointDto": {
         "additionalProperties": false,
         "properties": {
@@ -6396,6 +6430,25 @@
         "title": "SuccessEnvelope[CorrelationDto]",
         "type": "object"
       },
+      "SuccessEnvelope_DashboardAvailabilityDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DashboardAvailabilityDto",
+            "description": "API별 성공 응답 데이터입니다."
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[DashboardAvailabilityDto]",
+        "type": "object"
+      },
       "SuccessEnvelope_DashboardLayoutDto_": {
         "additionalProperties": false,
         "properties": {
@@ -6565,6 +6618,25 @@
           "meta"
         ],
         "title": "SuccessEnvelope[IncidentDetailDto]",
+        "type": "object"
+      },
+      "SuccessEnvelope_IncidentDto_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/IncidentDto",
+            "description": "API별 성공 응답 데이터입니다."
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta",
+            "description": "요청 추적 메타데이터입니다."
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "SuccessEnvelope[IncidentDto]",
         "type": "object"
       },
       "SuccessEnvelope_IncidentInvestigationDto_": {
@@ -8314,6 +8386,89 @@
         "summary": "텔레메트리 배치 수집",
         "tags": [
           "Collector"
+        ]
+      }
+    },
+    "/api/v1/dashboard/availability": {
+      "get": {
+        "description": "HOT 또는 RESTORED 저장소에서 실제 Event를 조회할 수 있는 기간을 반환합니다.",
+        "operationId": "dashboardGetAvailability",
+        "parameters": [
+          {
+            "description": "조회 가능한 데이터 기간을 확인할 Endpoint ID 목록입니다.",
+            "in": "query",
+            "name": "endpointIds",
+            "required": false,
+            "schema": {
+              "description": "조회 가능한 데이터 기간을 확인할 Endpoint ID 목록입니다.",
+              "examples": [
+                [
+                  1,
+                  2
+                ]
+              ],
+              "items": {
+                "description": "1 이상의 리소스 식별자입니다.",
+                "minimum": 1,
+                "type": "integer"
+              },
+              "maxItems": 100,
+              "minItems": 1,
+              "title": "Endpointids",
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_DashboardAvailabilityDto_"
+                }
+              }
+            },
+            "description": "요청을 성공적으로 처리했습니다."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "조회 가능한 Dashboard 기간 조회",
+        "tags": [
+          "Dashboard"
         ]
       }
     },
@@ -10292,6 +10447,106 @@
           }
         ],
         "summary": "Incident 조사 그래프 조회",
+        "tags": [
+          "Incidents"
+        ]
+      }
+    },
+    "/api/v1/incidents/{incidentId}/status": {
+      "patch": {
+        "description": "권한이 있는 사용자가 Incident를 다시 열거나 종료합니다. 수동 상태는 다음 수동 변경까지 유지하며 감사 로그에 기록합니다.",
+        "operationId": "incidentsUpdateStatus",
+        "parameters": [
+          {
+            "description": "상태를 변경할 Incident ID입니다.",
+            "in": "path",
+            "name": "incidentId",
+            "required": true,
+            "schema": {
+              "description": "상태를 변경할 Incident ID입니다.",
+              "title": "Incidentid",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentStatusUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_IncidentDto_"
+                }
+              }
+            },
+            "description": "요청을 성공적으로 처리했습니다."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "요청 형식 또는 입력값 검증에 실패했습니다."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "인증된 주체에게 이 작업을 수행할 권한이 없습니다."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "요청한 리소스를 찾을 수 없습니다."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "필수 의존 서비스를 일시적으로 사용할 수 없습니다."
+          }
+        },
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "summary": "Incident 상태 변경",
         "tags": [
           "Incidents"
         ]

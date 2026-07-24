@@ -8,7 +8,15 @@ import clickhouse_connect
 import psycopg
 import pytest
 
-from backend.contracts.enums import AlertStatus, OsType, Severity, StorageBackend, StorageClass, StorageStatus
+from backend.contracts.enums import (
+    AlertStatus,
+    IncidentStatus,
+    OsType,
+    Severity,
+    StorageBackend,
+    StorageClass,
+    StorageStatus,
+)
 from backend.storage.clickhouse import EventRepository, FailureRepository
 from backend.storage.migrations import apply_clickhouse_file, apply_postgres_file, apply_postgres_migrations
 from backend.storage.models import AlertInsert, EndpointInsert, IncidentInsert, IngestBucket
@@ -44,6 +52,8 @@ def test_postgresql_migration_repository_idempotency_and_rollback() -> None:
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0004_user_dashboard_layouts.up.sql")
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0005_query_search_sort_indexes.up.sql")
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0005_query_search_sort_indexes.up.sql")
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0006_backend_hardening.up.sql")
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0007_incident_status_override.up.sql")
         column = connection.execute(
             """
             SELECT data_type, character_maximum_length
@@ -219,6 +229,32 @@ def test_postgresql_migration_repository_idempotency_and_rollback() -> None:
             )
             assert alerts.active_for_endpoint(endpoint_id) == []
             assert incidents.close_expired(now + timedelta(hours=1)) == 1
+            reopened = incidents.update_status_with_audit(
+                incident_id=incident.incident_id,
+                status=IncidentStatus.OPEN,
+                actor_identifier="integration-test",
+                request_id="req_incident_reopen",
+                changed_at=now + timedelta(hours=1, minutes=1),
+            )
+            assert reopened["status"] == "OPEN"
+            assert reopened["closed_at"] is None
+            assert len(incidents.open_for_endpoint(endpoint_id)) == 1
+            assert incidents.close_expired(now + timedelta(hours=2)) == 0
+            closed = incidents.update_status_with_audit(
+                incident_id=incident.incident_id,
+                status=IncidentStatus.CLOSED,
+                actor_identifier="integration-test",
+                request_id="req_incident_close",
+                changed_at=now + timedelta(hours=2, minutes=1),
+            )
+            assert closed["status"] == "CLOSED"
+            assert closed["closed_at"] == now + timedelta(minutes=30)
+            assert (
+                connection.execute(
+                    "SELECT count(*) FROM audit_logs WHERE action = 'INCIDENT_STATUS_CHANGED'"
+                ).fetchone()[0]
+                == 2
+            )
         finally:
             apply_postgres_migrations(connection, ROOT / "migrations/postgresql", direction="down")
 

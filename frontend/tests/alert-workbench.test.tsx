@@ -61,7 +61,7 @@ describe("WP-05 alert workbench", () => {
     expect(badges?.querySelectorAll(".status-pill")).toHaveLength(2);
   });
 
-  it("replaces the last resolved Alert with the queue-complete state", async () => {
+  it("keeps the last resolved Alert available and allows reopening it", async () => {
     const update = arrangeSingleQueueApi();
     renderDetail("ADMIN");
     await screen.findByRole("heading", { name: "Alert 1" });
@@ -72,9 +72,14 @@ describe("WP-05 alert workbench", () => {
     fireEvent.click(submit);
 
     await waitFor(() => expect(update).toHaveBeenCalledWith(1, { status: "RESOLVED" }));
-    expect(await screen.findByText("Queue cleared")).toBeInTheDocument();
-    expect(screen.getByText(/No unresolved Alerts match the current time/)).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Alert 1" })).not.toBeInTheDocument();
+    expect(await screen.findByText(/resolved Alert remains available below/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Alert 1" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Alert status" }), { target: { value: "OPEN" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save status" }));
+
+    await waitFor(() => expect(update).toHaveBeenLastCalledWith(1, { status: "OPEN" }));
+    expect(screen.getByRole("heading", { name: "Alert 1" })).toBeInTheDocument();
   });
 });
 

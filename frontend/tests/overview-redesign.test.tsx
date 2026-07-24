@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { DetectionActivityTable } from "../src/components/charts";
 import { EdrStateSummary } from "../src/components/ui";
 import { AuthProvider } from "../src/auth/AuthContext";
+import { ApiError } from "../src/api/client";
 import { api } from "../src/api/endpoints";
 import { OverviewDashboard, OVERVIEW_BLOCK_IDS, type OverviewDashboardData } from "../src/features/overview/OverviewDashboard";
 import { AlertSeverityDonut } from "../src/features/overview/AlertSeverityDonut";
@@ -398,8 +399,11 @@ describe("overview fixed dashboard", () => {
     expect(screen.getByText(/Successful dashboard sections remain available/i)).toBeInTheDocument();
   });
 
-  it("keeps the custom UTC range controls available without showing a request error", () => {
+  it("keeps the custom UTC range controls available without showing a request error", async () => {
     setAuthSession();
+    vi.spyOn(api, "dashboardAvailability").mockResolvedValue(success({
+      availableRanges: [{ from: "2026-07-15T00:00:00Z", to: "2026-07-18T00:00:00Z" }],
+    }));
     const dashboardSpy = vi.spyOn(api, "dashboard").mockRejectedValue(new Error("must not load an incomplete custom range"));
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider><MemoryRouter initialEntries={["/?timePreset=CUSTOM"]}>
@@ -409,11 +413,70 @@ describe("overview fixed dashboard", () => {
     expect(screen.getByLabelText("Time range")).toHaveValue("CUSTOM");
     expect(screen.getByLabelText("From")).toHaveAttribute("type", "datetime-local");
     expect(screen.getByLabelText("To")).toHaveAttribute("type", "datetime-local");
-    expect(screen.getByText("From and to are required, and from must be earlier than to.")).toBeInTheDocument();
+    expect(screen.queryByText("From and to are required, and from must be earlier than to.")).not.toBeInTheDocument();
+    expect(await screen.findByText("Queryable data periods")).toBeInTheDocument();
+    await waitFor(() => expect(document.querySelector('time[datetime="2026-07-15T00:00:00Z"]')).not.toBeNull());
     expect(screen.queryByText("The requested data could not be loaded.")).not.toBeInTheDocument();
     expect(screen.queryByText("Request ID unavailable")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Refresh" })).toBeDisabled();
     expect(dashboardSpy).not.toHaveBeenCalled();
+  });
+
+  it("replaces an unavailable custom range error with queryable periods", async () => {
+    setAuthSession();
+    const archiveError = new ApiError({
+      status: 409,
+      code: "ARCHIVE_NOT_READY",
+      message: "Archive is not ready",
+      retryable: false,
+      details: [],
+      requestId: "req_archive_range",
+    });
+    vi.spyOn(api, "dashboardAvailability").mockResolvedValue(success({
+      availableRanges: [{ from: "2026-07-15T00:00:00Z", to: "2026-07-18T00:00:00Z" }],
+    }));
+    vi.spyOn(api, "dashboard").mockRejectedValue(archiveError);
+    vi.spyOn(api, "endpointSummary").mockResolvedValue(success(overviewData().endpoints!));
+    vi.spyOn(api, "ingestSummary").mockResolvedValue(success(ingestSummary()));
+    vi.spyOn(api, "endpoints").mockResolvedValue(success({ items: [], page: 1, size: 5, total: 0 }));
+    vi.spyOn(api, "incidents").mockResolvedValue(success({ items: [], page: 1, size: 5, total: 0 }));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider><MemoryRouter initialEntries={["/?timePreset=CUSTOM&from=2026-06-01T00%3A00%3A00Z&to=2026-06-02T00%3A00%3A00Z"]}>
+      <OverviewPage />
+    </MemoryRouter></LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
+
+    expect(await screen.findByText("No data is available for the selected period")).toBeInTheDocument();
+    expect(screen.getAllByText("Queryable data periods").length).toBeGreaterThan(0);
+    expect(screen.queryByText("The requested data could not be loaded.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Request req_archive_range")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Fixed Overview dashboard" })).not.toBeInTheDocument();
+  });
+
+  it("shows queryable periods when a custom range succeeds without evidence", async () => {
+    setAuthSession();
+    const emptyDashboard = {
+      ...overviewData().dashboard!,
+      alerts: { ...overviewData().dashboard!.alerts, totalCount: 0 },
+      events: { ...overviewData().dashboard!.events, totalCount: 0 },
+      incidents: { ...overviewData().dashboard!.incidents, openCount: 0, closedCount: 0 },
+      eventFailures: { totalCount: 0, byStage: [], byCode: [], byStatus: [] },
+    };
+    vi.spyOn(api, "dashboardAvailability").mockResolvedValue(success({
+      availableRanges: [{ from: "2026-07-15T00:00:00Z", to: "2026-07-18T00:00:00Z" }],
+    }));
+    vi.spyOn(api, "dashboard").mockResolvedValue(success(emptyDashboard));
+    vi.spyOn(api, "endpointSummary").mockResolvedValue(success(overviewData().endpoints!));
+    vi.spyOn(api, "ingestSummary").mockResolvedValue(success(ingestSummary()));
+    vi.spyOn(api, "endpoints").mockResolvedValue(success({ items: [], page: 1, size: 5, total: 0 }));
+    vi.spyOn(api, "incidents").mockResolvedValue(success({ items: [], page: 1, size: 5, total: 0 }));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider><MemoryRouter initialEntries={["/?timePreset=CUSTOM&from=2026-06-01T00%3A00%3A00Z&to=2026-06-02T00%3A00%3A00Z"]}>
+      <OverviewPage />
+    </MemoryRouter></LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
+
+    expect(await screen.findByText("No data is available for the selected period")).toBeInTheDocument();
+    expect(screen.queryByText("The requested data could not be loaded.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Fixed Overview dashboard" })).not.toBeInTheDocument();
   });
 
   it("reads only positive integer endpointId values from the Overview URL", () => {

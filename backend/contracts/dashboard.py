@@ -26,6 +26,10 @@ class TimeRangeDto(ContractModel):
     to: UtcDateTime
 
 
+class DashboardAvailabilityDto(ContractModel):
+    available_ranges: list[TimeRangeDto]
+
+
 class SeverityCountDto(ContractModel):
     severity: Severity
     count: NonNegativeInt

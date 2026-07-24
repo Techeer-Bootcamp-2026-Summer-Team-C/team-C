@@ -9,6 +9,8 @@ import type {
   AttackTimelineDto,
   DashboardSummaryDto,
   DashboardSummaryQuery,
+  DashboardAvailabilityDto,
+  DashboardAvailabilityQuery,
   DashboardTimeQuery,
   CorrelationDto,
   CorrelationQuery,
@@ -27,6 +29,7 @@ import type {
   IncidentDto,
   IncidentInvestigationDto,
   IncidentListQuery,
+  IncidentStatusUpdateRequest,
   IngestSummaryDto,
   LoginData,
   LoginRequest,
@@ -94,6 +97,13 @@ export const api = {
   incident(incidentId: number, signal?: AbortSignal): Promise<SuccessEnvelope<IncidentDetailDto>> {
     return apiRequest(`/incidents/${incidentId}`, {}, signal);
   },
+  updateIncident(
+    incidentId: number,
+    body: IncidentStatusUpdateRequest,
+    signal?: AbortSignal,
+  ): Promise<SuccessEnvelope<IncidentDto>> {
+    return apiRequest(`/incidents/${incidentId}/status`, { method: "PATCH", body: JSON.stringify(body) }, signal);
+  },
   incidentTimeline(incidentId: number, signal?: AbortSignal): Promise<SuccessEnvelope<AttackTimelineDto>> {
     return apiRequest(`/incidents/${incidentId}/timeline`, {}, signal);
   },
@@ -105,6 +115,12 @@ export const api = {
   },
   dashboard(query: DashboardSummaryQuery, signal?: AbortSignal): Promise<SuccessEnvelope<DashboardSummaryDto>> {
     return apiRequest(`/dashboard/summary${buildQuery(queryRecord(query))}`, {}, signal);
+  },
+  dashboardAvailability(
+    query: DashboardAvailabilityQuery,
+    signal?: AbortSignal,
+  ): Promise<SuccessEnvelope<DashboardAvailabilityDto>> {
+    return apiRequest(`/dashboard/availability${buildQuery(queryRecord(query))}`, {}, signal);
   },
   endpointSummary(query: DashboardTimeQuery, signal?: AbortSignal): Promise<SuccessEnvelope<EndpointSummaryDto>> {
     return apiRequest(`/dashboard/endpoints/summary${buildQuery(queryRecord(query))}`, {}, signal);

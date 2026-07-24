@@ -27,6 +27,13 @@ PRODUCT_API_CONTRACTS: tuple[ApiContract, ...] = (
     ApiContract("PATCH", "/alerts/{alertId}/status", "AlertStatusUpdateRequest", "AlertDto", "JWT_WRITE"),
     ApiContract("GET", "/incidents", "IncidentListQuery", "PagedData<IncidentDto>", "JWT_READ"),
     ApiContract("GET", "/incidents/{incidentId}", "path", "IncidentDetailDto", "JWT_READ"),
+    ApiContract(
+        "PATCH",
+        "/incidents/{incidentId}/status",
+        "IncidentStatusUpdateRequest",
+        "IncidentDto",
+        "JWT_WRITE",
+    ),
     ApiContract("GET", "/incidents/{incidentId}/timeline", "path", "AttackTimelineDto", "JWT_READ"),
     ApiContract(
         "GET",
@@ -36,6 +43,13 @@ PRODUCT_API_CONTRACTS: tuple[ApiContract, ...] = (
         "JWT_READ",
     ),
     ApiContract("GET", "/dashboard/summary", "DashboardSummaryQuery", "DashboardSummaryDto", "JWT_READ"),
+    ApiContract(
+        "GET",
+        "/dashboard/availability",
+        "DashboardAvailabilityQuery",
+        "DashboardAvailabilityDto",
+        "JWT_READ",
+    ),
     ApiContract("GET", "/dashboard/layouts/{dashboardKey}", "path", "DashboardLayoutDto", "JWT_READ"),
     ApiContract(
         "PUT",

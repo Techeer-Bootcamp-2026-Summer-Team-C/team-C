@@ -152,6 +152,13 @@ class DashboardTimeQuery(TimeRangeQuery):
     )
 
 
+class DashboardAvailabilityQuery(ContractModel):
+    endpoint_ids: EndpointIdList | SkipJsonSchema[None] = Field(
+        default=None,
+        description="조회 가능한 데이터 기간을 확인할 Endpoint ID 목록입니다.",
+    )
+
+
 class CorrelationQuery(TimeRangeQuery):
     value: str = Field(description="상관분석할 IP 주소 또는 Domain입니다.", examples=["example.com"])
     endpoint_ids: EndpointIdList | SkipJsonSchema[None] = Field(

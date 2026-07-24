@@ -1,7 +1,8 @@
-import type { DashboardTimeQuery, TimePreset } from "../contracts";
+import type { DashboardTimeQuery, TimePreset, TimeRangeDto } from "../contracts";
 import { useI18n } from "../i18n/LocaleContext";
+import { formatDateTime } from "../lib/format";
 import { intervalFor, localDateTimeValue, timePreset, updateParams, utcFromLocal } from "../lib/url";
-import { Field } from "./ui";
+import { EmptyState, Field } from "./ui";
 
 export interface TimeFilterState {
   preset: TimePreset;
@@ -29,7 +30,14 @@ export function readTimeFilter(params: URLSearchParams): TimeFilterState {
 
 const TIME_PRESETS: readonly TimePreset[] = ["LATEST_15M", "LATEST_1H", "LATEST_24H", "LATEST_7D", "CUSTOM"];
 
-export function TimeFilterFields({ params, setParams, variant = "select" }: {
+export interface TimeAvailabilityState {
+  ranges: readonly TimeRangeDto[];
+  pending: boolean;
+  unavailable: boolean;
+}
+
+export function TimeFilterFields({ availability, params, setParams, variant = "select" }: {
+  availability?: TimeAvailabilityState;
   params: URLSearchParams;
   setParams: (next: URLSearchParams) => void;
   variant?: "select" | "presets";
@@ -77,9 +85,35 @@ export function TimeFilterFields({ params, setParams, variant = "select" }: {
               value={state.to ? localDateTimeValue(state.to) : ""}
             />
           </Field>
-          {!state.valid ? <span className="field-error">{t("filter.invalidRange")}</span> : null}
+          {availability ? <AvailableTimeRanges {...availability} /> : null}
         </>
       ) : null}
     </>
   );
+}
+
+export function AvailableTimeRanges({ pending, ranges, unavailable }: TimeAvailabilityState) {
+  const { t } = useI18n();
+  return <div aria-live="polite" className="time-availability" role="status">
+    <strong>{t("filter.availableRanges")}</strong>
+    {pending ? <span>{t("filter.availabilityLoading")}</span> : unavailable ? (
+      <span>{t("filter.availabilityUnavailable")}</span>
+    ) : ranges.length ? <ul>
+      {ranges.map((range) => <li key={`${range.from}-${range.to}`}>
+        <time dateTime={range.from}>{formatDateTime(range.from)}</time>
+        <span aria-hidden="true">–</span>
+        <time dateTime={range.to}>{formatDateTime(range.to)}</time>
+      </li>)}
+    </ul> : <span>{t("filter.noAvailableRanges")}</span>}
+  </div>;
+}
+
+export function UnavailableTimeRangeState() {
+  const { t } = useI18n();
+  return <div className="time-range-unavailable">
+    <EmptyState
+      message={t("filter.unavailableRangeDescription")}
+      title={t("filter.unavailableRangeTitle")}
+    />
+  </div>;
 }

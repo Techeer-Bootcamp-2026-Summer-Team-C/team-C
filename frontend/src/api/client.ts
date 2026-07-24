@@ -33,6 +33,10 @@ export class ApiError extends Error {
   }
 }
 
+export function isUnavailableTimeRangeError(error: unknown): boolean {
+  return error instanceof ApiError && error.code === "ARCHIVE_NOT_READY";
+}
+
 export function configureApiAuth(token: string | null, onUnauthorized: (() => void) | null): void {
   accessToken = token;
   unauthorizedHandler = onUnauthorized;

@@ -11,7 +11,7 @@ from .contracts.alerts import (
 )
 from .contracts.common import PagedData
 from .contracts.endpoints import CertificateDto, EndpointDetailDto, EndpointDto, EndpointRiskDto, SensorHealthDto
-from .contracts.enums import Severity
+from .contracts.enums import IncidentStatus, Severity
 from .contracts.incidents import IncidentDetailDto, IncidentDto
 from .contracts.requests import AlertListQuery, EndpointListQuery, IncidentListQuery
 from .errors import ApplicationError
@@ -192,6 +192,27 @@ class IncidentService:
             **incident_dto(row).model_dump(),
             alerts=[alert_dto(item) for item in self.repository.alerts_for_incident(incident_id)],
         )
+
+    def update_status(
+        self,
+        incident_id: int,
+        *,
+        status: IncidentStatus,
+        actor_identifier: str,
+        request_id: str,
+        changed_at: datetime,
+    ) -> IncidentDto:
+        try:
+            row = self.repository.update_status_with_audit(
+                incident_id=incident_id,
+                status=status,
+                actor_identifier=actor_identifier,
+                request_id=request_id,
+                changed_at=changed_at,
+            )
+        except KeyError as error:
+            raise ApplicationError(404, "NOT_FOUND", "Incident was not found.") from error
+        return incident_dto(row)
 
 
 def endpoint_dto(row: dict[str, Any], *, calculated_at: datetime) -> EndpointDto:

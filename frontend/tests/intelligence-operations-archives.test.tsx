@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../src/auth/AuthContext";
+import { ApiError } from "../src/api/client";
 import { api } from "../src/api/endpoints";
 import {
   correlationGraphMinHeight,
@@ -49,7 +50,11 @@ import { canMutate } from "../src/query/policy";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); sessionStorage.clear(); });
 
 describe("WP-08 Intelligence, Operations, and Archives", () => {
-  it("treats an incomplete custom UTC range as a local filter draft", () => {
+  it("treats an incomplete custom UTC range as a local filter draft", async () => {
+    vi.spyOn(api, "dashboardAvailability").mockResolvedValue({
+      data: { availableRanges: [{ from: "2026-07-15T00:00:00Z", to: "2026-07-18T00:00:00Z" }] },
+      meta: { requestId: "req_availability" },
+    });
     const dashboardSpy = vi.spyOn(api, "dashboard").mockRejectedValue(new Error("must not load an incomplete custom range"));
     const topologySpy = vi.spyOn(api, "topology").mockRejectedValue(new Error("must not load an incomplete custom range"));
     renderWithProviders(<IntelligencePage />, ["/intelligence?timePreset=CUSTOM"]);
@@ -57,11 +62,35 @@ describe("WP-08 Intelligence, Operations, and Archives", () => {
     expect(screen.getByLabelText("Time range")).toHaveValue("CUSTOM");
     expect(screen.getByLabelText("From")).toHaveAttribute("type", "datetime-local");
     expect(screen.getByLabelText("To")).toHaveAttribute("type", "datetime-local");
-    expect(screen.getByText("From and to are required, and from must be earlier than to.")).toBeInTheDocument();
+    expect(screen.queryByText("From and to are required, and from must be earlier than to.")).not.toBeInTheDocument();
+    expect(await screen.findByText("Queryable data periods")).toBeInTheDocument();
     expect(screen.queryByText("The requested data could not be loaded.")).not.toBeInTheDocument();
     expect(screen.queryByText("Request ID unavailable")).not.toBeInTheDocument();
     expect(dashboardSpy).not.toHaveBeenCalled();
     expect(topologySpy).not.toHaveBeenCalled();
+  });
+
+  it("replaces an unavailable Intelligence range error with queryable periods", async () => {
+    const archiveError = new ApiError({
+      status: 409,
+      code: "ARCHIVE_NOT_READY",
+      message: "Archive is not ready",
+      retryable: false,
+      details: [],
+      requestId: "req_archive_range",
+    });
+    vi.spyOn(api, "dashboardAvailability").mockResolvedValue({
+      data: { availableRanges: [{ from: "2026-07-15T00:00:00Z", to: "2026-07-18T00:00:00Z" }] },
+      meta: { requestId: "req_availability" },
+    });
+    vi.spyOn(api, "dashboard").mockRejectedValue(archiveError);
+    vi.spyOn(api, "topology").mockRejectedValue(archiveError);
+    renderWithProviders(<IntelligencePage />, ["/intelligence?timePreset=CUSTOM&from=2026-06-01T00%3A00%3A00Z&to=2026-06-02T00%3A00%3A00Z"]);
+
+    expect(await screen.findByText("No data is available for the selected period")).toBeInTheDocument();
+    expect(screen.getAllByText("Queryable data periods").length).toBeGreaterThan(0);
+    expect(screen.queryByText("The requested data could not be loaded.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Request req_archive_range")).not.toBeInTheDocument();
   });
 
   it("keeps topology filtering deterministic and the graph feature flag reversible", () => {

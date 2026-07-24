@@ -248,17 +248,18 @@ CREATE TABLE `incidents` (
   `title` VARCHAR(200) NOT NULL COMMENT 'Incident 제목',
   `description` TEXT NULL COMMENT 'Incident 설명',
   `severity` VARCHAR(20) NOT NULL COMMENT '심각도',
-  `status` VARCHAR(30) NOT NULL COMMENT '생성 시 OPEN, Window 만료 시 자동 CLOSED',
+  `status` VARCHAR(30) NOT NULL COMMENT 'OPEN 또는 CLOSED',
+  `status_overridden` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '수동 상태 변경 여부. 1이면 자동 종료 제외',
   `first_detected_at` DATETIME NOT NULL COMMENT '최초 Alert 탐지 시각',
   `last_detected_at` DATETIME NOT NULL COMMENT '최근 Alert 탐지 시각',
-  `closed_at` DATETIME NULL COMMENT '자동 종료 시 window_end_at과 같은 시각',
+  `closed_at` DATETIME NULL COMMENT 'CLOSED이면 window_end_at, OPEN이면 NULL',
   `created_at` DATETIME NOT NULL COMMENT '생성 시각',
   `updated_at` DATETIME NOT NULL COMMENT '수정 시각',
   `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '소프트 삭제 여부',
   PRIMARY KEY (`incident_id`),
   UNIQUE KEY `uq_incidents_correlation` (`endpoint_id`, `correlation_key`, `window_start_at`),
   CONSTRAINT `fk_incidents_endpoint` FOREIGN KEY (`endpoint_id`) REFERENCES `endpoints` (`endpoint_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='[PostgreSQL] Rule Window 만료 시 자동 종료되는 읽기 전용 Incident Projection';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='[PostgreSQL] 자동 상관분석 및 수동 상태 복구를 지원하는 Incident Projection';
 
 CREATE TABLE `incident_alerts` (
   `incident_alert_id` BIGINT NOT NULL COMMENT 'Incident와 Alert 연결 식별자',

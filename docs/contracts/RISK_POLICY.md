@@ -32,6 +32,8 @@ Endpoint별로 다음 값을 사용한다.
 
 `activeAlertCount`는 중복 제거 전 활성 Alert 전체 개수다. `openIncidentCount`는 OPEN Incident 전체 개수다. `highestAlertRiskScore`는 중복 제거 전 활성 Alert 전체의 최고 `riskScore`이며 활성 Alert가 없으면 `null`이다.
 
+사용자가 수동으로 다시 연 `status=OPEN`, `status_overridden=true` Incident도 다른 OPEN Incident와 동일하게 Endpoint Risk와 전역 EDR 상태에 반영한다. 수동 변경 여부 자체는 별도 가중치를 만들지 않는다.
+
 ### 3.2 동일 Rule Alert 중복 처리
 
 점수 계산에서는 동일 `(ruleCode, ruleVersion)` Alert를 한 그룹으로 묶고 대표 Alert 하나만 사용한다.

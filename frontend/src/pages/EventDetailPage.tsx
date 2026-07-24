@@ -51,7 +51,7 @@ export function EventDetailPage() {
 function EventDetail({ event, processTree }: { event: EventDetailDto; processTree: ReactNode }) {
   const { locale, t } = useI18n();
   return <>
-    <PageHeader eyebrow={`EVENT · SCHEMA V${event.schemaVersion}`} title={event.processName ?? event.remoteDomain ?? event.filePath ?? event.eventType} description={event.eventId} actions={<StatusPill value={event.eventType} />} />
+    <PageHeader eyebrow={`EVENT · SCHEMA V${event.schemaVersion}`} title={event.processName ?? event.remoteDomain ?? event.filePath ?? event.eventType} description={event.eventId} actions={<><StatusPill value={event.eventType} /><StatusPill value="READ ONLY" /></>} />
     <section aria-label={t("event.groupIdentity")} className="event-anchor-strip">
       <div><span>Event ID</span><code>{event.eventId}</code></div>
       <div><span>Endpoint</span><Link to={`/endpoints/${event.endpointId}`}>{event.hostname} · {event.endpointId}</Link></div>

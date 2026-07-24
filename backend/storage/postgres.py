@@ -1196,11 +1196,67 @@ class IncidentRepository:
                 """
                 UPDATE incidents
                 SET status = 'CLOSED', closed_at = window_end_at, updated_at = %s
-                WHERE is_delete = FALSE AND status = 'OPEN' AND window_end_at <= %s
+                WHERE is_delete = FALSE AND status = 'OPEN'
+                  AND status_overridden = FALSE AND window_end_at <= %s
                 """,
                 (now, now),
             )
             return int(cursor.rowcount)
+
+    def update_status_with_audit(
+        self,
+        *,
+        incident_id: int,
+        status: IncidentStatus,
+        actor_identifier: str,
+        request_id: str,
+        changed_at: datetime,
+    ) -> dict[str, Any]:
+        with self.connection.transaction():
+            with self.connection.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    "SELECT * FROM incidents WHERE incident_id = %s AND is_delete = FALSE FOR UPDATE",
+                    (incident_id,),
+                )
+                before = cursor.fetchone()
+            if before is None:
+                raise KeyError(incident_id)
+            if before["status"] != status.value:
+                self.connection.execute(
+                    """
+                    UPDATE incidents
+                    SET status = %s,
+                        closed_at = CASE WHEN %s = 'CLOSED' THEN window_end_at ELSE NULL END,
+                        status_overridden = TRUE,
+                        updated_at = %s
+                    WHERE incident_id = %s
+                    """,
+                    (status.value, status.value, changed_at, incident_id),
+                )
+                self.connection.execute(
+                    """
+                    INSERT INTO audit_logs (
+                        actor_type, actor_identifier, action, resource_type, resource_id,
+                        before_json, after_json, request_id, created_at
+                    ) VALUES (
+                        'USER', %s, 'INCIDENT_STATUS_CHANGED', 'INCIDENT', %s,
+                        jsonb_build_object('status', %s::text),
+                        jsonb_build_object('status', %s::text), %s, %s
+                    )
+                    """,
+                    (
+                        actor_identifier,
+                        str(incident_id),
+                        before["status"],
+                        status.value,
+                        request_id,
+                        changed_at,
+                    ),
+                )
+            row = self.detail(incident_id)
+            if row is None:
+                raise RuntimeError("Incident status update lookup failed.")
+            return row
 
     def open_for_endpoint(self, endpoint_id: int) -> list[dict[str, Any]]:
         with self.connection.cursor(row_factory=dict_row) as cursor:
@@ -1501,6 +1557,28 @@ class IngestMetadataRepository:
                 (
                     to,
                     from_,
+                    list(endpoint_ids) if endpoint_ids is not None else None,
+                    list(endpoint_ids) if endpoint_ids is not None else None,
+                ),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def queryable_ranges(self, *, endpoint_ids: Sequence[int] | None = None) -> list[dict[str, Any]]:
+        with self.connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """
+                SELECT bucket_start_at, bucket_end_at
+                FROM ingest_metadata
+                WHERE is_delete = FALSE
+                  AND event_count > 0
+                  AND (
+                    (storage_backend = 'CLICKHOUSE' AND storage_status = 'HOT')
+                    OR (storage_backend = 'S3' AND storage_status = 'RESTORED')
+                  )
+                  AND (%s::bigint[] IS NULL OR endpoint_id = ANY(%s::bigint[]))
+                ORDER BY bucket_start_at ASC, bucket_end_at ASC
+                """,
+                (
                     list(endpoint_ids) if endpoint_ids is not None else None,
                     list(endpoint_ids) if endpoint_ids is not None else None,
                 ),

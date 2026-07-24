@@ -168,6 +168,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboard/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 조회 가능한 Dashboard 기간 조회
+         * @description HOT 또는 RESTORED 저장소에서 실제 Event를 조회할 수 있는 기간을 반환합니다.
+         */
+        get: operations["dashboardGetAvailability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dashboard/endpoints/summary": {
         parameters: {
             query?: never;
@@ -454,6 +474,26 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/incidents/{incidentId}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Incident 상태 변경
+         * @description 권한이 있는 사용자가 Incident를 다시 열거나 종료합니다. 수동 상태는 다음 수동 변경까지 유지하며 감사 로그에 기록합니다.
+         */
+        patch: operations["incidentsUpdateStatus"];
         trace?: never;
     };
     "/api/v1/incidents/{incidentId}/timeline": {
@@ -1158,6 +1198,11 @@ export interface components {
              * @description 0 이상의 정수입니다.
              */
             totalCount: number;
+        };
+        /** DashboardAvailabilityDto */
+        DashboardAvailabilityDto: {
+            /** Availableranges */
+            availableRanges: components["schemas"]["TimeRangeDto"][];
         };
         /** DashboardEndpointsDto */
         DashboardEndpointsDto: {
@@ -2303,6 +2348,14 @@ export interface components {
          * @enum {string}
          */
         IncidentStatus: "OPEN" | "CLOSED";
+        /** IncidentStatusUpdateRequest */
+        IncidentStatusUpdateRequest: {
+            /**
+             * @description 변경할 Incident 상태입니다. 수동으로 변경한 상태는 다음 수동 변경까지 유지됩니다.
+             * @example OPEN
+             */
+            status: components["schemas"]["IncidentStatus"];
+        };
         /** IncidentTimeSeriesPointDto */
         IncidentTimeSeriesPointDto: {
             /**
@@ -3238,6 +3291,13 @@ export interface components {
             /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
+        /** SuccessEnvelope[DashboardAvailabilityDto] */
+        SuccessEnvelope_DashboardAvailabilityDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
+            data: components["schemas"]["DashboardAvailabilityDto"];
+            /** @description 요청 추적 메타데이터입니다. */
+            meta: components["schemas"]["RequestMeta"];
+        };
         /** SuccessEnvelope[DashboardLayoutDto] */
         SuccessEnvelope_DashboardLayoutDto_: {
             /** @description API별 성공 응답 데이터입니다. */
@@ -3298,6 +3358,13 @@ export interface components {
         SuccessEnvelope_IncidentDetailDto_: {
             /** @description API별 성공 응답 데이터입니다. */
             data: components["schemas"]["IncidentDetailDto"];
+            /** @description 요청 추적 메타데이터입니다. */
+            meta: components["schemas"]["RequestMeta"];
+        };
+        /** SuccessEnvelope[IncidentDto] */
+        SuccessEnvelope_IncidentDto_: {
+            /** @description API별 성공 응답 데이터입니다. */
+            data: components["schemas"]["IncidentDto"];
             /** @description 요청 추적 메타데이터입니다. */
             meta: components["schemas"]["RequestMeta"];
         };
@@ -4240,6 +4307,56 @@ export interface operations {
             };
             /** @description 요청 본문 크기 또는 이벤트 수가 허용 한도를 초과했습니다. */
             413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardGetAvailability: {
+        parameters: {
+            query?: {
+                /** @description 조회 가능한 데이터 기간을 확인할 Endpoint ID 목록입니다. */
+                endpointIds?: number[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 요청을 성공적으로 처리했습니다. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_DashboardAvailabilityDto_"];
+                };
+            };
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5221,6 +5338,78 @@ export interface operations {
             };
             /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description 요청한 리소스를 찾을 수 없습니다. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description 필수 의존 서비스를 일시적으로 사용할 수 없습니다. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    incidentsUpdateStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 상태를 변경할 Incident ID입니다. */
+                incidentId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncidentStatusUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description 요청을 성공적으로 처리했습니다. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_IncidentDto_"];
+                };
+            };
+            /** @description 요청 형식 또는 입력값 검증에 실패했습니다. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description 인증된 주체에게 이 작업을 수행할 권한이 없습니다. */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

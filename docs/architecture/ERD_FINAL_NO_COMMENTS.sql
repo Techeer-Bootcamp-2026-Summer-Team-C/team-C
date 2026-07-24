@@ -249,6 +249,7 @@ CREATE TABLE `incidents` (
   `description` TEXT NULL,
   `severity` VARCHAR(20) NOT NULL,
   `status` VARCHAR(30) NOT NULL,
+  `status_overridden` TINYINT(1) NOT NULL DEFAULT 0,
   `first_detected_at` DATETIME NOT NULL,
   `last_detected_at` DATETIME NOT NULL,
   `closed_at` DATETIME NULL,
