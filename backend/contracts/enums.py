@@ -72,6 +72,7 @@ class InvestigationWarningCode(StrEnum):
 
 class EventFailureStatus(StrEnum):
     FAILED = "FAILED"
+    REPLAY_PUBLISHED = "REPLAY_PUBLISHED"
     REPROCESSED = "REPROCESSED"
     REPROCESS_FAILED = "REPROCESS_FAILED"
 
@@ -175,6 +176,11 @@ class DashboardInterval(StrEnum):
     FIVE_MINUTES = "5m"
     ONE_HOUR = "1h"
     ONE_DAY = "1d"
+
+
+class DashboardEventSource(StrEnum):
+    ROLLUP = "ROLLUP"
+    LIVE = "LIVE"
 
 
 class DnsRecordType(StrEnum):

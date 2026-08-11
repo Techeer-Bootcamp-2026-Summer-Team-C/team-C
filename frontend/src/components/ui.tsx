@@ -333,6 +333,7 @@ const API_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
   NOT_FOUND: "error.notFound",
   SERVICE_UNAVAILABLE: "error.serviceUnavailable",
   ARCHIVE_NOT_READY: "error.archiveNotReady",
+  ROLLUP_NOT_READY: "error.rollupNotReady",
   NETWORK_ERROR: "error.network",
   INVALID_ENVELOPE: "error.invalidEnvelope",
   DASHBOARD_LAYOUT_REVISION_CONFLICT: "error.dashboardRevisionConflict",

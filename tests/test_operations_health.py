@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 from backend.contracts.enums import SensorHealth, WorkerStatus
@@ -13,20 +13,37 @@ class Connection:
     def __init__(self) -> None:
         self.statement = ""
 
-    def execute(self, statement: str):
+    def execute(self, statement: str, _parameters=None):
         self.statement = statement
         return self
 
     def fetchone(self):
         if "pg_partition_tree" in self.statement:
             return (0, 0)
+        if "dashboard_rollup_coverage" in self.statement:
+            return (1440,)
+        if "max(source_max_ingested_at)" in self.statement:
+            return (NOW - timedelta(seconds=30),)
         return (1,)
+
+    def fetchall(self):
+        return []
 
 
 class HealthyRuntime:
-    settings = SimpleNamespace(kafka_bootstrap_servers="kafka:9092", s3_bucket="edr-failures")
+    settings = SimpleNamespace(
+        kafka_bootstrap_servers="kafka:9092",
+        s3_bucket="edr-failures",
+        event_storage_consumer_group="edr-event-storage-v1",
+        detection_consumer_group="edr-detection-v1",
+        dashboard_rollup_consumer_group="edr-dashboard-rollup-v1",
+        dashboard_rollup_freshness_grace_seconds=300,
+    )
     producer = SimpleNamespace(check=lambda: None)
-    clickhouse = SimpleNamespace(command=lambda _statement: 1)
+    clickhouse = SimpleNamespace(
+        command=lambda _statement: 1,
+        query=lambda *_args, **_kwargs: SimpleNamespace(result_rows=[(NOW,)]),
+    )
     s3 = SimpleNamespace(head_bucket=lambda **_kwargs: {})
 
     @contextmanager
@@ -45,13 +62,15 @@ def test_operations_health_reports_live_services_and_worker_lag() -> None:
         "Backend API",
         "PostgreSQL",
         "Event ingest registry capacity",
+        "Dashboard rollup coverage",
         "ClickHouse",
         "Kafka",
         "S3",
     ]
     assert all(service.status is SensorHealth.HEALTHY for service in result.services)
     assert all(worker.status is WorkerStatus.RUNNING for worker in result.workers)
-    assert [worker.lag for worker in result.workers] == [0, 0]
+    assert [worker.worker for worker in result.workers] == ["Event storage", "Detection", "Dashboard rollup"]
+    assert [worker.lag for worker in result.workers] == [0, 0, 0]
 
 
 def test_operations_health_keeps_partial_results_when_probes_fail() -> None:
@@ -69,6 +88,45 @@ def test_operations_health_keeps_partial_results_when_probes_fail() -> None:
     assert all(worker.status is WorkerStatus.UNKNOWN for worker in result.workers)
 
 
+def test_operations_health_degrades_when_recent_rollup_coverage_has_a_gap() -> None:
+    class UncoveredConnection(Connection):
+        def fetchone(self):
+            return (1439,) if "dashboard_rollup_coverage" in self.statement else (1,)
+
+    class Runtime(HealthyRuntime):
+        @contextmanager
+        def postgres(self):
+            yield UncoveredConnection()
+
+    result = OperationsHealthService(Runtime(), worker_probe=running_worker).snapshot(checked_at=NOW)
+
+    assert result.status is SensorHealth.DEGRADED
+    coverage = next(service for service in result.services if service.service == "Dashboard rollup coverage")
+    assert coverage.status is SensorHealth.UNAVAILABLE
+    assert "RuntimeError" in coverage.detail
+
+
+def test_operations_health_degrades_when_rollup_watermark_is_stale() -> None:
+    class StaleConnection(Connection):
+        def fetchone(self):
+            if "dashboard_rollup_coverage" in self.statement:
+                return (1440,)
+            if "max(source_max_ingested_at)" in self.statement:
+                return (NOW - timedelta(minutes=10),)
+            return (1,)
+
+    class Runtime(HealthyRuntime):
+        @contextmanager
+        def postgres(self):
+            yield StaleConnection()
+
+    result = OperationsHealthService(Runtime(), worker_probe=running_worker).snapshot(checked_at=NOW)
+
+    assert result.status is SensorHealth.DEGRADED
+    coverage = next(service for service in result.services if service.service == "Dashboard rollup coverage")
+    assert coverage.status is SensorHealth.UNAVAILABLE
+
+
 def test_operations_health_degrades_before_registry_capacity_is_exhausted() -> None:
     class FullRegistryConnection(Connection):
         def fetchone(self):
@@ -76,15 +134,12 @@ def test_operations_health_degrades_before_registry_capacity_is_exhausted() -> N
                 return (100_000_001, 1024)
             return super().fetchone()
 
-    class FullRegistryRuntime(HealthyRuntime):
+    class Runtime(HealthyRuntime):
         @contextmanager
         def postgres(self):
             yield FullRegistryConnection()
 
-    result = OperationsHealthService(
-        FullRegistryRuntime(),
-        worker_probe=running_worker,
-    ).snapshot(checked_at=NOW)
+    result = OperationsHealthService(Runtime(), worker_probe=running_worker).snapshot(checked_at=NOW)
 
     assert result.status is SensorHealth.DEGRADED
     capacity = next(service for service in result.services if service.service == "Event ingest registry capacity")

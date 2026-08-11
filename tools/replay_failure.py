@@ -1,5 +1,7 @@
 import argparse
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -14,7 +16,16 @@ class FailureNotFoundError(Exception):
     pass
 
 
+class FailureReplayInProgressError(Exception):
+    pass
+
+
 def replay_failure(failure_id: UUID, runtime: RuntimeServices, *, now: datetime) -> None:
+    with _failure_replay_guard(runtime, failure_id):
+        _replay_failure_unlocked(failure_id, runtime, now=now)
+
+
+def _replay_failure_unlocked(failure_id: UUID, runtime: RuntimeServices, *, now: datetime) -> None:
     repository = FailureRepository(runtime.clickhouse)
     failure = repository.latest(failure_id)
     if failure is None:
@@ -50,10 +61,28 @@ def replay_failure(failure_id: UUID, runtime: RuntimeServices, *, now: datetime)
         raise
     repository.append_replay_result(
         failure,
-        status="REPROCESSED",
+        status="REPLAY_PUBLISHED",
         outcome="telemetry.raw broker acknowledged",
         replayed_at=now,
     )
+
+
+@contextmanager
+def _failure_replay_guard(runtime: RuntimeServices, failure_id: UUID) -> Iterator[None]:
+    with runtime.postgres() as connection:
+        acquired = connection.execute(
+            "SELECT pg_try_advisory_lock(hashtext(%s), hashtext(%s))",
+            ("failure-replay-v1", str(failure_id)),
+        ).fetchone()
+        if acquired is None or not bool(acquired[0]):
+            raise FailureReplayInProgressError(str(failure_id))
+        try:
+            yield
+        finally:
+            connection.execute(
+                "SELECT pg_advisory_unlock(hashtext(%s), hashtext(%s))",
+                ("failure-replay-v1", str(failure_id)),
+            ).fetchone()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -65,7 +94,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        runtime = RuntimeServices(get_settings())
+        runtime = RuntimeServices(get_settings(), clickhouse_role="worker")
         replay_failure(args.failure_id, runtime, now=datetime.now(UTC))
     except FailureNotFoundError:
         print(f"failure not found: {args.failure_id}", file=sys.stderr)
@@ -73,7 +102,7 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as error:
         print(f"replay failed: {error}", file=sys.stderr)
         return 1
-    print(f"replayed failure: {args.failure_id}")
+    print(f"replay published: {args.failure_id}")
     return 0
 
 

@@ -32,7 +32,7 @@ EXPECTED_RESPONSES = {
     "incidentsUpdateStatus": {"200", "400", "401", "403", "404", "503"},
     "incidentsGetTimeline": {"200", "400", "401", "404", "503"},
     "incidentsGetInvestigation": {"200", "400", "401", "404", "503"},
-    "dashboardGetSummary": {"200", "400", "401", "503"},
+    "dashboardGetSummary": {"200", "400", "401", "429", "503"},
     "dashboardGetAvailability": {"200", "400", "401", "503"},
     "dashboardLayoutsGet": {"200", "401", "404", "503"},
     "dashboardLayoutsPut": {"200", "400", "401", "404", "409", "503"},

@@ -1246,6 +1246,11 @@ export interface components {
              */
             totalCount: number;
         };
+        /**
+         * DashboardEventSource
+         * @enum {string}
+         */
+        DashboardEventSource: "ROLLUP" | "LIVE";
         /** DashboardEventsDto */
         DashboardEventsDto: {
             /** Byeventtype */
@@ -2056,7 +2061,7 @@ export interface components {
          * EventFailureStatus
          * @enum {string}
          */
-        EventFailureStatus: "FAILED" | "REPROCESSED" | "REPROCESS_FAILED";
+        EventFailureStatus: "FAILED" | "REPLAY_PUBLISHED" | "REPROCESSED" | "REPROCESS_FAILED";
         /**
          * EventType
          * @enum {string}
@@ -4672,6 +4677,8 @@ export interface operations {
                 endpointId?: number;
                 /** @description 시계열 집계 간격입니다. */
                 interval: "1m" | "5m" | "1h" | "1d";
+                /** @description ROLLUP은 PostgreSQL 사전 집계를, LIVE는 ClickHouse 원본을 조회합니다. */
+                eventSource?: components["schemas"]["DashboardEventSource"];
             };
             header?: never;
             path?: never;
@@ -4699,6 +4706,15 @@ export interface operations {
             };
             /** @description 인증에 실패했거나 유효한 인증 정보가 없습니다. */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description 설정된 요청 속도 제한을 초과했습니다. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -854,7 +854,7 @@ class AlertRepository:
                     %s, %s, %s, %s, 'OPEN', %s, %s, %s
                 )
                 ON CONFLICT (event_id, rule_code, rule_version) DO NOTHING
-                RETURNING alert_id, status
+                RETURNING alert_id, status, detected_at
                 """,
                 (
                     alert.endpoint_id,
@@ -879,17 +879,22 @@ class AlertRepository:
                 ),
             ).fetchone()
             if row is not None:
-                return StoredAlert(int(row[0]), True, AlertStatus(row[1]))
+                return StoredAlert(int(row[0]), True, AlertStatus(row[1]), row[2].astimezone(UTC))
             existing = self.connection.execute(
                 """
-                SELECT alert_id, status FROM alerts
+                SELECT alert_id, status, detected_at FROM alerts
                 WHERE event_id = %s AND rule_code = %s AND rule_version = %s AND is_delete = FALSE
                 """,
                 (alert.event_id, alert.rule_code, alert.rule_version),
             ).fetchone()
             if existing is None:
                 raise RuntimeError("alert idempotency lookup failed")
-            return StoredAlert(int(existing[0]), False, AlertStatus(existing[1]))
+            return StoredAlert(
+                int(existing[0]),
+                False,
+                AlertStatus(existing[1]),
+                existing[2].astimezone(UTC),
+            )
 
     def update_status_with_audit(
         self,
@@ -1165,7 +1170,7 @@ class IncidentRepository:
                         WHEN array_position(ARRAY['LOW','MEDIUM','HIGH','CRITICAL'], EXCLUDED.severity)
                            > array_position(ARRAY['LOW','MEDIUM','HIGH','CRITICAL'], incidents.severity)
                         THEN EXCLUDED.severity ELSE incidents.severity END,
-                    updated_at = EXCLUDED.updated_at
+                    updated_at = GREATEST(incidents.updated_at, EXCLUDED.updated_at)
                 RETURNING incident_id, status, (xmax = 0) AS created
                 """,
                 (
@@ -1638,6 +1643,21 @@ class IngestMetadataRepository:
         lock_name = f"edr_events:{bucket_start.date().isoformat()}"
         with self.connection.transaction():
             self.connection.execute("SELECT pg_advisory_xact_lock_shared(hashtext(%s))", (lock_name,))
+            frozen = self.connection.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM ingest_metadata
+                    WHERE bucket_start_at = %s
+                      AND storage_backend = 'CLICKHOUSE'
+                      AND storage_class = 'HOT'
+                      AND (is_delete = TRUE OR partition_deleted_at IS NOT NULL)
+                )
+                """,
+                (bucket_start,),
+            ).fetchone()[0]
+            if frozen:
+                raise ArchivedDayImmutableError("Archived ClickHouse day cannot be recreated")
             existing = self.connection.execute(
                 """
                 SELECT is_delete FROM ingest_metadata

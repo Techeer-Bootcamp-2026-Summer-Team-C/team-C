@@ -6,6 +6,7 @@ WORKER_NAMES = frozenset(
     {
         "event-storage-worker",
         "detection-worker",
+        "dashboard-rollup-worker",
         "storage-lifecycle-worker",
     }
 )

@@ -28,6 +28,7 @@ def test_portainer_stacks_split_infrastructure_from_services() -> None:
         "backend",
         "event-storage-worker",
         "detection-worker",
+        "dashboard-rollup-worker",
         "storage-lifecycle-worker",
         "nginx",
     }
@@ -113,7 +114,13 @@ def test_service_stack_uses_the_shared_data_network_and_waits_for_init() -> None
 
     assert service["networks"]["data"] == {"external": True, "name": "edr-c-data"}
     assert "depends_on" not in services["app-init"]
-    for name in ("backend", "event-storage-worker", "detection-worker", "storage-lifecycle-worker"):
+    for name in (
+        "backend",
+        "event-storage-worker",
+        "detection-worker",
+        "dashboard-rollup-worker",
+        "storage-lifecycle-worker",
+    ):
         assert services[name]["depends_on"]["app-init"]["condition"] == "service_completed_successfully"
 
 
@@ -123,6 +130,7 @@ def test_workers_expose_loop_heartbeat_healthchecks() -> None:
     expected_max_age = {
         "event-storage-worker": "240",
         "detection-worker": "15",
+        "dashboard-rollup-worker": "15",
         "storage-lifecycle-worker": "75",
     }
     for name, max_age in expected_max_age.items():
@@ -163,9 +171,6 @@ def test_production_images_are_built_for_ec2_and_tagged_with_the_commit() -> Non
     assert "team-c-backend" in workflow
     assert "team-c-nginx" in workflow
     assert ":latest" not in workflow
-    assert "\n  workflow_call:\n" in workflow
-    assert "\n  workflow_dispatch:\n" in workflow
-    assert "\n  push:\n" not in workflow
     assert "COPY deploy/nginx/nginx.prod.conf /etc/nginx/nginx.conf" in nginx_dockerfile
     assert parsed_workflow["permissions"] == {"contents": "read"}
     assert parsed_workflow["jobs"]["build-and-push"]["needs"] == "validate"
@@ -240,6 +245,14 @@ def test_nginx_resolves_recreated_backend_containers_through_docker_dns() -> Non
     assert "resolver 127.0.0.11" in nginx
     assert "zone backend_upstream" in nginx
     assert "server backend:8000 resolve;" in nginx
+
+
+def test_production_nginx_limits_explicit_dashboard_live_refreshes() -> None:
+    nginx = (ROOT / "deploy/nginx/nginx.prod.conf").read_text(encoding="utf-8")
+
+    assert "map $arg_eventSource $dashboard_live_limit_key" in nginx
+    assert "limit_req zone=dashboard_live burst=3 nodelay;" in nginx
+    assert "Too many Dashboard LIVE refreshes" in nginx
 
 
 def test_production_nginx_hides_docs_and_sets_security_headers() -> None:

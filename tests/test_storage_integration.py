@@ -1,7 +1,11 @@
 import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from threading import Barrier
+from threading import Event as ThreadEvent
+from time import monotonic
 from uuid import UUID
 
 import clickhouse_connect
@@ -17,10 +21,19 @@ from backend.contracts.enums import (
     StorageClass,
     StorageStatus,
 )
+from backend.errors import ArchivedDayImmutableError, EventIngestLockTimeoutError
+from backend.rollup import DashboardRollupSynchronizer
 from backend.storage.clickhouse import EventRepository, FailureRepository
 from backend.storage.migrations import apply_clickhouse_file, apply_postgres_file, apply_postgres_migrations
 from backend.storage.models import AlertInsert, EndpointInsert, IncidentInsert, IngestBucket
-from backend.storage.postgres import AlertRepository, EndpointRepository, IncidentRepository, IngestMetadataRepository
+from backend.storage.postgres import (
+    AlertRepository,
+    EndpointRepository,
+    EventIngestRegistryRepository,
+    IncidentRepository,
+    IngestMetadataRepository,
+)
+from backend.storage.rollup import DashboardEventRollupRepository
 
 ROOT = Path(__file__).parents[1]
 RUN_INTEGRATION = os.getenv("EDR_RUN_STORAGE_INTEGRATION") == "1"
@@ -54,6 +67,12 @@ def test_postgresql_migration_repository_idempotency_and_rollback() -> None:
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0005_query_search_sort_indexes.up.sql")
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0006_backend_hardening.up.sql")
         apply_postgres_file(connection, ROOT / "migrations/postgresql/0007_incident_status_override.up.sql")
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0008_dashboard_event_rollups.up.sql")
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0009_dashboard_rollup_coverage.up.sql")
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0010_event_ingest_registry.up.sql")
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0011_event_ingest_registry_append_only.up.sql")
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0012_dashboard_dimension_resolution.up.sql")
+        apply_postgres_file(connection, ROOT / "migrations/postgresql/0013_event_ingest_registry_hash_partition.up.sql")
         column = connection.execute(
             """
             SELECT data_type, character_maximum_length
@@ -89,6 +108,133 @@ def test_postgresql_migration_repository_idempotency_and_rollback() -> None:
             endpoint_id = EndpointRepository(connection).insert(
                 EndpointInsert("agent-test-001", "TEST-ENDPOINT", OsType.MACOS, now)
             )
+            registry = EventIngestRegistryRepository(connection)
+            registry.assert_ready()
+            registry_event_id = UUID("018ff8f4-86de-7b25-9b8a-2d22f6a3d001")
+            with registry.claim(
+                event_id=registry_event_id,
+                endpoint_id=endpoint_id,
+                agent_id="agent-test-001",
+                payload_sha256="0" * 64,
+                registered_at=now,
+            ) as first_claim:
+                assert first_claim.created is True
+            with registry.claim(
+                event_id=registry_event_id,
+                endpoint_id=endpoint_id,
+                agent_id="agent-test-001",
+                payload_sha256="1" * 64,
+                registered_at=now,
+            ) as duplicate_claim:
+                assert duplicate_claim.created is False
+                assert duplicate_claim.identity.payload_sha256 == "0" * 64
+            assert (
+                connection.execute(
+                    "SELECT count(*) FROM event_ingest_registry WHERE event_id = %s",
+                    (registry_event_id,),
+                ).fetchone()[0]
+                == 1
+            )
+
+            for statement in (
+                "UPDATE event_ingest_registry SET registered_at = now() WHERE event_id = %s",
+                "DELETE FROM event_ingest_registry WHERE event_id = %s",
+                "TRUNCATE event_ingest_registry",
+                "TRUNCATE event_ingest_registry_p00",
+            ):
+                with pytest.raises(psycopg.errors.ObjectNotInPrerequisiteState, match="append-only"):
+                    with connection.transaction():
+                        parameters = () if statement.startswith("TRUNCATE") else (registry_event_id,)
+                        connection.execute(statement, parameters)
+            assert connection.execute(
+                "SELECT count(*) FROM event_ingest_registry WHERE event_id = %s",
+                (registry_event_id,),
+            ).fetchone()[0] == 1
+
+            rolled_back_event_id = UUID("018ff8f4-86de-7b25-9b8a-2d22f6a3d002")
+            with pytest.raises(RuntimeError, match="rollback claim"):
+                with registry.claim(
+                    event_id=rolled_back_event_id,
+                    endpoint_id=endpoint_id,
+                    agent_id="agent-test-001",
+                    payload_sha256="2" * 64,
+                    registered_at=now,
+                ):
+                    raise RuntimeError("rollback claim")
+            assert (
+                connection.execute(
+                    "SELECT count(*) FROM event_ingest_registry WHERE event_id = %s",
+                    (rolled_back_event_id,),
+                ).fetchone()[0]
+                == 0
+            )
+
+            concurrent_event_id = UUID("018ff8f4-86de-7b25-9b8a-2d22f6a3d003")
+            connection.commit()
+            claim_together = Barrier(2)
+
+            def claim_event_concurrently() -> bool:
+                with psycopg.connect(dsn) as concurrent_connection:
+                    claim_together.wait(timeout=10)
+                    with EventIngestRegistryRepository(concurrent_connection).claim(
+                        event_id=concurrent_event_id,
+                        endpoint_id=endpoint_id,
+                        agent_id="agent-test-001",
+                        payload_sha256="3" * 64,
+                        registered_at=now,
+                    ) as claim:
+                        return claim.created
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                claim_results = list(executor.map(lambda _index: claim_event_concurrently(), range(2)))
+            assert sorted(claim_results) == [False, True]
+            assert (
+                connection.execute(
+                    "SELECT count(*) FROM event_ingest_registry WHERE event_id = %s",
+                    (concurrent_event_id,),
+                ).fetchone()[0]
+                == 1
+            )
+
+            lock_timeout_event_id = UUID("018ff8f4-86de-7b25-9b8a-2d22f6a3d004")
+            claim_acquired = ThreadEvent()
+            release_claim = ThreadEvent()
+
+            def hold_event_claim() -> None:
+                with psycopg.connect(dsn) as holder_connection:
+                    with EventIngestRegistryRepository(holder_connection).claim(
+                        event_id=lock_timeout_event_id,
+                        endpoint_id=endpoint_id,
+                        agent_id="agent-test-001",
+                        payload_sha256="4" * 64,
+                        registered_at=now,
+                    ):
+                        claim_acquired.set()
+                        assert release_claim.wait(timeout=10)
+
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                holder = executor.submit(hold_event_claim)
+                assert claim_acquired.wait(timeout=10)
+                try:
+                    with psycopg.connect(dsn) as waiting_connection:
+                        started_at = monotonic()
+                        with pytest.raises(EventIngestLockTimeoutError, match="100ms"):
+                            with EventIngestRegistryRepository(
+                                waiting_connection,
+                                lock_timeout_ms=100,
+                            ).claim(
+                                event_id=lock_timeout_event_id,
+                                endpoint_id=endpoint_id,
+                                agent_id="agent-test-001",
+                                payload_sha256="4" * 64,
+                                registered_at=now,
+                            ):
+                                pass
+                        assert monotonic() - started_at < 3
+                finally:
+                    release_claim.set()
+                holder.result(timeout=10)
+
             endpoint_rows = EndpointRepository(connection)
             assert [row["endpoint_id"] for row in endpoint_rows.risk_snapshot(q="test")] == [endpoint_id]
             assert [row["endpoint_id"] for row in endpoint_rows.risk_snapshot(q=str(endpoint_id))] == [endpoint_id]
@@ -96,6 +242,100 @@ def test_postgresql_migration_repository_idempotency_and_rollback() -> None:
             risk_page, risk_total = endpoint_rows.risk_page(q="test", limit=1, offset=0)
             assert risk_total == 1
             assert [row["endpoint_id"] for row in risk_page] == [endpoint_id]
+
+            rollups = DashboardEventRollupRepository(connection)
+            bucket_key = (endpoint_id, now)
+            activity_row = {
+                "bucket_start_at": now,
+                "endpoint_id": endpoint_id,
+                "event_type": "DNS_QUERY",
+                "event_count": 2,
+                "source_max_ingested_at": now,
+            }
+            dimension_row = {
+                "bucket_start_at": now,
+                "endpoint_id": endpoint_id,
+                "dimension_name": "top_dns_queries",
+                "dimension_value": "example.com",
+                "event_count": 2,
+            }
+            rollups.replace_buckets(
+                bucket_keys=[bucket_key],
+                dimension_bucket_keys=[(endpoint_id, now.replace(minute=0))],
+                activity_rows=[activity_row],
+                dimension_rows=[dimension_row],
+                refreshed_at=now,
+            )
+            activity_row["event_count"] = 3
+            dimension_row["event_count"] = 3
+            rollups.replace_buckets(
+                bucket_keys=[bucket_key],
+                dimension_bucket_keys=[(endpoint_id, now.replace(minute=0))],
+                activity_rows=[activity_row],
+                dimension_rows=[dimension_row],
+                refreshed_at=now + timedelta(seconds=1),
+            )
+            assert rollups.covers_range(from_=now, to=now + timedelta(minutes=1)) is False
+            rollups.replace_range(
+                from_=now,
+                to=now + timedelta(minutes=1),
+                activity_rows=[activity_row],
+                dimension_rows=[dimension_row],
+                refreshed_at=now + timedelta(seconds=2),
+            )
+            assert rollups.covers_range(from_=now, to=now + timedelta(minutes=1)) is True
+            assert rollups.missing_ranges(from_=now, to=now + timedelta(minutes=2)) == [
+                (now + timedelta(minutes=1), now + timedelta(minutes=2))
+            ]
+            rollup_summary = rollups.dashboard_summary(
+                from_=now,
+                to=now + timedelta(minutes=5),
+                interval_seconds=300,
+                endpoint_id=endpoint_id,
+            )
+            assert rollup_summary.total_count == 3
+            assert rollup_summary.by_event_type == {"DNS_QUERY": 3}
+            assert rollup_summary.top_dns_queries == {"example.com": 3}
+            assert rollups.state()["covered_from"] == now
+
+            concurrent_bucket = now + timedelta(minutes=10)
+            connection.commit()
+            start_together = Barrier(2)
+
+            def replace_concurrently(event_count: int) -> None:
+                with psycopg.connect(dsn) as concurrent_connection:
+                    start_together.wait(timeout=10)
+                    DashboardEventRollupRepository(concurrent_connection).replace_buckets(
+                        bucket_keys=[(endpoint_id, concurrent_bucket)],
+                        dimension_bucket_keys=[],
+                        activity_rows=[
+                            {
+                                "bucket_start_at": concurrent_bucket,
+                                "endpoint_id": endpoint_id,
+                                "event_type": "DNS_QUERY",
+                                "event_count": event_count,
+                                "source_max_ingested_at": concurrent_bucket,
+                            }
+                        ],
+                        dimension_rows=[],
+                        refreshed_at=concurrent_bucket + timedelta(seconds=event_count),
+                    )
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                futures = [executor.submit(replace_concurrently, count) for count in (4, 5)]
+                for future in futures:
+                    future.result(timeout=20)
+            concurrent_rows = connection.execute(
+                """
+                SELECT count(*), max(event_count)
+                FROM dashboard_event_rollups
+                WHERE endpoint_id = %s AND bucket_start_at = %s AND event_type = 'DNS_QUERY'
+                """,
+                (endpoint_id, concurrent_bucket),
+            ).fetchone()
+            assert concurrent_rows[0] == 1
+            assert concurrent_rows[1] in {4, 5}
+
             alert_insert = AlertInsert(
                 endpoint_id=endpoint_id,
                 event_id=UUID("018ff8f4-86de-7b25-9b8a-2d22f6a3e001"),
@@ -154,6 +394,54 @@ def test_postgresql_migration_repository_idempotency_and_rollback() -> None:
                 now,
             )
             assert len(metadata.overlapping([endpoint_id], now + timedelta(hours=1), now + timedelta(hours=2))) == 1
+
+            frozen_day = now - timedelta(days=10)
+            metadata.upsert(
+                IngestBucket(
+                    endpoint_id,
+                    frozen_day,
+                    frozen_day + timedelta(days=1),
+                    StorageBackend.CLICKHOUSE,
+                    StorageClass.HOT,
+                    StorageStatus.HOT,
+                    f"clickhouse://edr_events/date={frozen_day.date().isoformat()}/endpoint_id={endpoint_id}",
+                ),
+                now,
+            )
+            connection.execute(
+                """
+                UPDATE ingest_metadata
+                SET is_delete = TRUE, partition_deleted_at = %s
+                WHERE endpoint_id = %s AND bucket_start_at = %s
+                  AND storage_backend = 'CLICKHOUSE' AND storage_class = 'HOT'
+                """,
+                (now, endpoint_id, frozen_day),
+            )
+            late_endpoint_id = EndpointRepository(connection).insert(
+                EndpointInsert("agent-test-late-001", "TEST-LATE-ENDPOINT", OsType.MACOS, now)
+            )
+            with pytest.raises(ArchivedDayImmutableError):
+                with metadata.hot_ingest_guard(
+                    endpoint_id=late_endpoint_id,
+                    occurred_at=frozen_day + timedelta(hours=1),
+                    now=now,
+                ):
+                    pass
+            assert (
+                connection.execute(
+                    """
+                    SELECT count(*)
+                    FROM ingest_metadata
+                    WHERE endpoint_id = %s AND bucket_start_at = %s
+                      AND storage_backend = 'CLICKHOUSE' AND storage_class = 'HOT'
+                    """,
+                    (late_endpoint_id, frozen_day),
+                ).fetchone()[0]
+                == 0
+            )
+            assert DashboardEventRollupRepository(connection).frozen_bucket_dates(
+                bucket_dates=[frozen_day.date()]
+            ) == {frozen_day.date()}
 
             archive_start = now + timedelta(days=1)
             metadata.upsert(
@@ -340,6 +628,24 @@ def test_clickhouse_migration_event_repository_and_rollback() -> None:
             )
             == 1
         )
+        activity_rows, dimension_rows = repository.dashboard_rollup_rows(
+            from_=now,
+            to=now + timedelta(minutes=1),
+            endpoint_ids=[1001],
+        )
+        assert activity_rows == [
+            {
+                "endpoint_id": 1001,
+                "bucket_start_at": now,
+                "event_type": "DNS_QUERY",
+                "event_count": 1,
+                "source_max_ingested_at": now,
+            }
+        ]
+        assert {
+            (row["dimension_name"], row["dimension_value"], row["event_count"])
+            for row in dimension_rows
+        } == {("top_dns_queries", "example.com", 1)}
 
         failure_id = UUID("018ff8f4-86de-7b25-9b8a-2d22f6a3e099")
         failure = {
@@ -374,6 +680,145 @@ def test_clickhouse_migration_event_repository_and_rollback() -> None:
     finally:
         apply_clickhouse_file(client, down)
         client.close()
+
+
+def test_clickhouse_to_postgres_dashboard_rollup_end_to_end() -> None:
+    dsn = os.environ["TEST_POSTGRES_DSN"]
+    client = clickhouse_connect.get_client(
+        host=os.getenv("TEST_CLICKHOUSE_HOST", "127.0.0.1"),
+        port=int(os.getenv("TEST_CLICKHOUSE_PORT", "58123")),
+        username=os.getenv("TEST_CLICKHOUSE_USER", "edr"),
+        password=os.environ["TEST_CLICKHOUSE_PASSWORD"],
+        database=os.getenv("TEST_CLICKHOUSE_DATABASE", "edr"),
+    )
+    clickhouse_down = ROOT / "migrations/clickhouse/0001_initial.down.sql"
+    clickhouse_up = ROOT / "migrations/clickhouse/0001_initial.up.sql"
+    with psycopg.connect(dsn) as connection:
+        apply_postgres_migrations(connection, ROOT / "migrations/postgresql", direction="down")
+        apply_postgres_migrations(connection, ROOT / "migrations/postgresql")
+        apply_clickhouse_file(client, clickhouse_down)
+        apply_clickhouse_file(client, clickhouse_up)
+        try:
+            bucket_start = datetime(2026, 7, 12, 12, 0, tzinfo=UTC)
+            endpoint_id = EndpointRepository(connection).insert(
+                EndpointInsert("agent-rollup-001", "ROLLUP-ENDPOINT", OsType.MACOS, bucket_start)
+            )
+            connection.autocommit = True
+            events = EventRepository.for_maintenance(client)
+            first = _dns_event(
+                101,
+                bucket_start + timedelta(seconds=5),
+                remote_domain="first.example",
+                dns_answers="[]",
+                endpoint_id=endpoint_id,
+            )
+            events.insert([first, first])
+            rollups = DashboardEventRollupRepository(connection)
+            synchronizer = DashboardRollupSynchronizer(events=events, store=rollups)
+
+            synchronizer.refresh_range(from_=bucket_start, to=bucket_start + timedelta(minutes=1))
+            first_summary = rollups.dashboard_summary(
+                from_=bucket_start,
+                to=bucket_start + timedelta(minutes=1),
+                interval_seconds=60,
+                endpoint_id=endpoint_id,
+            )
+            assert first_summary.total_count == 1
+            assert first_summary.top_domains == {"first.example": 1}
+            assert rollups.covers_range(
+                from_=bucket_start + timedelta(seconds=5),
+                to=bucket_start + timedelta(seconds=10),
+            )
+            with psycopg.connect(dsn) as observer_connection:
+                observer_rollups = DashboardEventRollupRepository(observer_connection)
+                assert observer_rollups.covers_range(from_=bucket_start, to=bucket_start + timedelta(minutes=1))
+                assert observer_rollups.dashboard_summary(
+                    from_=bucket_start,
+                    to=bucket_start + timedelta(minutes=1),
+                    interval_seconds=60,
+                    endpoint_id=endpoint_id,
+                ).total_count == 1
+
+            second = _dns_event(
+                102,
+                bucket_start + timedelta(seconds=15),
+                remote_domain="second.example",
+                dns_answers="[]",
+                endpoint_id=endpoint_id,
+            )
+            events.insert([second])
+            synchronizer.refresh_range(from_=bucket_start, to=bucket_start + timedelta(minutes=1))
+            second_summary = rollups.dashboard_summary(
+                from_=bucket_start,
+                to=bucket_start + timedelta(minutes=1),
+                interval_seconds=60,
+                endpoint_id=endpoint_id,
+            )
+            assert second_summary.total_count == 2
+            assert second_summary.top_domains == {"first.example": 1, "second.example": 1}
+
+            # The advisory guard must include both the ClickHouse read and the
+            # PostgreSQL replacement. Otherwise a slow older read can overwrite
+            # a newer result after the write-only lock is released.
+            concurrent_bucket = bucket_start + timedelta(minutes=5)
+            shared_count = {"value": 1}
+            first_query_started = ThreadEvent()
+            second_refresh_started = ThreadEvent()
+            release_first_query = ThreadEvent()
+
+            class SequencedEvents:
+                def __init__(self, *, block_first: bool) -> None:
+                    self.block_first = block_first
+
+                def dashboard_rollup_rows(self, **_kwargs):
+                    event_count = shared_count["value"]
+                    if self.block_first:
+                        first_query_started.set()
+                        assert release_first_query.wait(timeout=10)
+                    return ([{
+                        "bucket_start_at": concurrent_bucket,
+                        "endpoint_id": endpoint_id,
+                        "event_type": "DNS_QUERY",
+                        "event_count": event_count,
+                        "source_max_ingested_at": concurrent_bucket,
+                    }], [])
+
+            def refresh_concurrently(*, block_first: bool) -> None:
+                with psycopg.connect(dsn) as concurrent_connection:
+                    if not block_first:
+                        second_refresh_started.set()
+                    DashboardRollupSynchronizer(
+                        events=SequencedEvents(block_first=block_first),
+                        store=DashboardEventRollupRepository(concurrent_connection),
+                    ).refresh_range(
+                        from_=concurrent_bucket,
+                        to=concurrent_bucket + timedelta(minutes=1),
+                        endpoint_ids=[endpoint_id],
+                    )
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                first_future = executor.submit(refresh_concurrently, block_first=True)
+                assert first_query_started.wait(timeout=10)
+                second_future = executor.submit(refresh_concurrently, block_first=False)
+                assert second_refresh_started.wait(timeout=10)
+                shared_count["value"] = 2
+                release_first_query.set()
+                first_future.result(timeout=20)
+                second_future.result(timeout=20)
+
+            serialized_count = connection.execute(
+                """
+                SELECT event_count
+                FROM dashboard_event_rollups
+                WHERE endpoint_id = %s AND bucket_start_at = %s AND event_type = 'DNS_QUERY'
+                """,
+                (endpoint_id, concurrent_bucket),
+            ).fetchone()
+            assert serialized_count == (2,)
+        finally:
+            apply_clickhouse_file(client, clickhouse_down)
+            apply_postgres_migrations(connection, ROOT / "migrations/postgresql", direction="down")
+            client.close()
 
 
 def _dns_event(

@@ -37,15 +37,20 @@ Windows C++ Agent / macOS Swift Agent
    -> RuleV1 YAML
    -> MITRE ATT&CK mapping
    -> PostgreSQL alerts / incidents
+-> Dashboard Rollup Worker
+   -> ClickHouse 활동 1분·차원 1시간 bucket 재집계
+   -> PostgreSQL dashboard_event_*_rollups
 
 Dashboard
 -> Nginx
 -> Uvicorn / FastAPI
--> PostgreSQL / ClickHouse / restored archive 조회
+-> 기본 Event metric: PostgreSQL rollup
+-> 사용자 Refresh: ClickHouse live 집계
+-> Event 상세: ClickHouse / restored archive 조회
 -> React Dashboard
 ```
 
-위험 여부와 관계없이 유효한 raw metadata event는 ClickHouse에 저장한다. Detection Worker가 생성한 Alert와 자동 correlation Incident만 PostgreSQL에 저장한다.
+위험 여부와 관계없이 유효한 raw metadata event는 ClickHouse에 저장한다. Detection Worker가 생성한 Alert와 자동 correlation Incident는 PostgreSQL에 저장하고, Dashboard 첫 조회용 Event 집계 projection도 PostgreSQL에 저장한다. Event 원본은 PostgreSQL로 복제하지 않는다.
 
 ### 3.2 패킷 처리 원칙
 
@@ -127,12 +132,13 @@ Endpoint Security, Network Extension, KEXT/System Extension은 사용하지 않�
 | Nginx | Reverse proxy/TLS | HTTPS/mTLS 종료, body 제한, Dashboard 로그인 IP별 rate limit, 검증된 client certificate 전달 |
 | Collector | Python, FastAPI, Uvicorn | Agent 등록, heartbeat, telemetry validation, Kafka publish |
 | Kafka | `telemetry.raw`, `telemetry.validated` | 수집과 탐지 경계, at-least-once 전달 |
-| Event Storage Worker | Python, ClickHouse native client | raw consume, identity/payload 검증, ClickHouse batch insert, validated publish |
+| Event Storage Worker | Python, PostgreSQL, ClickHouse native client | PostgreSQL `event_id` 선점, identity/payload 검증, ClickHouse insert, validated publish |
 | Detection Worker | Python | RuleV1/MITRE 평가, Alert/Incident 저장, Endpoint 30초·Incident 60초 상태 sweep |
+| Dashboard Rollup Worker | Python, Kafka, ClickHouse, PostgreSQL | validated Event를 dirty bucket 알림으로 사용, ClickHouse 활동 1분·차원 1시간 집계를 PostgreSQL projection으로 멱등 교체 |
 | Failure Sink module | Python, S3, ClickHouse | 결정적 failure ID/S3 key로 원문과 failure index 기록 |
 | Admin CLI | Python CLI | Dashboard ADMIN 생성, Agent 인증서 provision, failure 수동 재발행 |
 | Storage Lifecycle Worker | Python, AWS SDK, PyArrow | timestamp bucket archive/checksum, RestoreObject, restore metadata 관리 |
-| Dashboard API | Python, FastAPI, Uvicorn, PyArrow | login 포함 30개 Dashboard Backend REST API, Endpoint Risk/전역 EDR 상태 계산, 사용자별 layout, restored Parquet 직접 조회, Swagger |
+| Dashboard API | Python, FastAPI, Uvicorn, PyArrow | Dashboard Backend REST API, Rollup/LIVE Event 집계 선택, Endpoint Risk/전역 EDR 상태 계산, 사용자별 layout, restored Parquet 직접 조회, Swagger |
 
 Backend/API/Worker 패키지 관리는 `uv`를 사용한다. REST/FastAPI를 우선 구현하고 gRPC는 추후 확장으로 남긴다.
 
@@ -152,7 +158,7 @@ Local Compose는 Event Storage Worker와 Detection Worker를 각각 1개만 실�
 | `cert-init` | 개발용 Agent CA, demo Agent, Nginx 인증서 생성 |
 | `app-init` | migration, Kafka topic, S3 bucket, 최초 ADMIN 초기화 |
 | `backend` | FastAPI Collector와 Dashboard API |
-| `event-storage-worker`, `detection-worker` | 두 비동기 consumer process |
+| `event-storage-worker`, `detection-worker`, `dashboard-rollup-worker` | 저장·탐지·Dashboard rollup 비동기 consumer process |
 | `storage-lifecycle-worker` | archive export/checksum, RestoreObject 상태, HOT partition 정리 process |
 | `frontend` | Vercel 배포 전용 React 앱의 로컬 Vite 실행기 |
 | `nginx` | Dashboard/API 단일 HTTP 진입점과 Collector mTLS 진입점 |
@@ -163,7 +169,7 @@ Local Compose는 Event Storage Worker와 Detection Worker를 각각 1개만 실�
 | --- | --- |
 | Edge/API | Nginx + FastAPI |
 | Event Broker | Kafka |
-| Worker | Event Storage Worker + Detection Worker |
+| Worker | Event Storage Worker + Detection Worker + Dashboard Rollup Worker + Storage Lifecycle Worker |
 | Relational DB | PostgreSQL |
 | Event DB | ClickHouse |
 | Frontend | Vercel |
@@ -217,7 +223,10 @@ S3 object key는 `failures/{failureId}/payload.json.gz`다. Failure envelope를 
 
 ```text
 python -m tools.replay_failure --failure-id <UUID>
+python -m tools.audit_event_duplicates --limit 100 --fail-on-findings
 ```
+
+`audit_event_duplicates`는 ClickHouse의 물리 중복 Event ID 수, 초과 row 수와 서로 다른 `(endpoint_id, agent_id, payload_sha256)` identity 충돌 수를 JSON으로 출력한다. 기본 실행은 읽기 전용이며 `--fail-on-findings`를 사용하면 중복 발견 시 exit code 2를 반환한다.
 
 CLI는 다음 순서로 실행한다.
 
@@ -226,11 +235,11 @@ CLI는 다음 순서로 실행한다.
 3. S3 원문을 읽고 크기와 SHA-256 검증
 4. canonical `TelemetryEventV1`로 변환
 5. `replay_failure_id` header와 함께 `telemetry.raw` publish
-6. broker ACK 확인 후 `REPROCESSED`, 실패하면 `REPROCESS_FAILED` 기록
+6. broker ACK 확인 후 후속 처리와 구분되는 `REPLAY_PUBLISHED`, 실패하면 `REPROCESS_FAILED` 기록
 
-재발행 이후 처리는 비동기다. Event Storage Worker는 동일 raw event를 논리 중복으로 만들지 않으면서 `telemetry.validated`까지 다시 전달하고, Alert unique key가 중복 Alert 생성을 막는다.
+재발행 이후 처리는 비동기다. Event Storage Worker는 PostgreSQL `event_ingest_registry.event_id` PK를 선점해 동일 raw event의 ClickHouse 저장을 직렬화하면서 `telemetry.validated`까지 다시 전달하고, Alert unique key가 중복 Alert 생성을 막는다.
 
-상태는 `FAILED`, `REPROCESSED`, `REPROCESS_FAILED`만 사용한다. 동일 failure 최신 결과는 `updated_at`으로 선택한다. 복잡한 occurrence ID, tie-break priority/fingerprint, 자동 attempt state machine, CAS 경쟁 처리는 구현하지 않는다.
+상태는 `FAILED`, `REPLAY_PUBLISHED`, `REPROCESSED`, `REPROCESS_FAILED`를 사용한다. `REPLAY_PUBLISHED`는 Kafka ACK까지만 뜻하고 Detection·Rollup 완료를 주장하지 않는다. 동일 failure의 CLI 동시 실행은 PostgreSQL advisory lock으로 차단한다.
 
 Failure payload는 최초 실패부터 7일까지 S3 Standard, 이후 Glacier Instant Retrieval로 전환하고 최초 실패 시각부터 90일에 삭제한다. `retention_expires_at`은 이 90일 payload 만료 시각이며 ClickHouse `event_failures` 실행 DDL의 TTL은 `failed_at + 97일`로 고정한다. 이 lifecycle은 `ingest_metadata`가 아니라 S3 lifecycle과 `event_failures` pointer로 관리한다.
 
@@ -366,11 +375,11 @@ PCAP object용 S3 prefix/bucket과 PCAP retention 정책은 없다.
 | hot | `storage_backend=CLICKHOUSE`, `storage_class=HOT` |
 | archive | `storage_backend=S3`, `storage_class=GLACIER_FLEXIBLE_RETRIEVAL`, Parquet + ZSTD + SHA-256 |
 
-실행 ClickHouse DDL은 `PARTITION BY toDate(occurred_at)`, `ORDER BY (endpoint_id, occurred_at, event_type, event_id)`를 사용한다. Lifecycle Worker는 export 직전에 `is_delete=false` ClickHouse row의 Endpoint/UTC DAY별 `uniqExact(event_id)`를 계산해 HOT `event_count`를 갱신한다. Endpoint별 하루치 object를 export한 뒤 Parquet row count가 HOT `event_count`와 같은지 확인하고 S3 `event_count`, checksum, `archive_verified_at`을 기록한다.
+실행 ClickHouse DDL은 `PARTITION BY toDate(occurred_at)`, `ORDER BY (endpoint_id, occurred_at, event_type, event_id)`를 사용한다. Lifecycle Worker는 날짜 잠금 밖에서 Endpoint/UTC DAY별 `uniqExact(event_id)`와 Parquet row count를 맞춰 object를 export한다. 이후 짧은 날짜 배타 lock 안에서 ClickHouse count를 다시 조회해 export count와 같을 때만 S3 `event_count`, checksum, `archive_verified_at`을 기록한다. export 도중 늦은 Event가 들어오면 검증을 보류하고 다음 sweep에서 다시 export한다.
 
 날짜 partition 삭제 조건은 해당 날짜의 `is_delete=false` HOT row마다 대응하는 `is_delete=false` S3 row가 존재하고, 모든 S3 row의 `archive_verified_at`과 `checksum_sha256`이 존재하며, HOT/S3 `event_count`가 일치하고, 현재 시각이 `MAX(archive_verified_at) + 7일` 이상인 경우다. 이벤트가 없어서 HOT row가 없는 Endpoint는 검사 대상이 아니다. Lifecycle Worker는 PostgreSQL 날짜 advisory lock을 배타 모드로 획득하고 조건을 다시 확인한 뒤 모든 HOT row를 먼저 `is_delete=true`로 닫고 해당 날짜 partition 전체를 삭제한다. ClickHouse 삭제가 실패하면 HOT row는 닫힌 상태로 유지하고 검증된 S3 object를 보존한 채 다음 sweep에서 삭제를 재시도한다. `ingest_metadata`의 backend/class literal은 `CLICKHOUSE`, `S3`와 `HOT`, `GLACIER_FLEXIBLE_RETRIEVAL`만 허용하며 failure payload의 Standard/Instant lifecycle은 이 catalog에 넣지 않는다.
 
-Event Storage Worker는 ClickHouse batch insert와 metadata 갱신 동안 같은 PostgreSQL 날짜 advisory lock을 공유 모드로 사용하고 HOT row를 확인한다. 같은 날짜의 HOT row가 이미 `is_delete=true`이면 partition을 재생성하지 않고 `ARCHIVED_DAY_IMMUTABLE` failure로 기록한다. partition 삭제 전 늦은 event가 들어와 검증된 Archive object가 오래된 상태가 되면 대응 S3 row의 `archive_verified_at`과 `checksum_sha256`을 `null`로 되돌린 뒤 해당 Endpoint/UTC DAY object를 다시 export·검증하고 7일 safety window를 새 검증 시각부터 다시 계산한다.
+Event Storage Worker는 새 `event_ingest_registry.event_id` PK claim transaction을 ClickHouse insert 완료까지 유지한다. Registry는 16개 hash partition과 전역 PK 계약을 사용하며, 동일 ID lock 대기는 기본 15초로 제한한다. API, Worker, Lifecycle은 선택적으로 별도 ClickHouse DSN을 사용해 SELECT, INSERT, ALTER 권한을 분리한다. 또한 ClickHouse insert와 metadata 갱신 동안 같은 PostgreSQL 날짜 advisory lock을 공유 모드로 사용하고 HOT row를 확인한다. 같은 날짜의 HOT row가 이미 `is_delete=true`이면 partition을 재생성하지 않고 `ARCHIVED_DAY_IMMUTABLE` failure로 기록한다. partition 삭제 전 늦은 event가 들어와 검증된 Archive object가 오래된 상태가 되면 대응 S3 row의 `archive_verified_at`과 `checksum_sha256`을 `null`로 되돌린 뒤 해당 Endpoint/UTC DAY object를 다시 export·검증하고 7일 safety window를 새 검증 시각부터 다시 계산한다.
 
 Archive 복원은 기존 Storage Lifecycle Worker가 AWS `RestoreObject(Days=7, Tier=Standard)`로 수행한다. 원 S3 object key와 `GLACIER_FLEXIBLE_RETRIEVAL` class는 바꾸지 않고 영구 Standard copy를 만들지 않는다. 상태는 `ARCHIVED -> RESTORE_REQUESTED -> RESTORED -> EXPIRED`이며 실패하면 `RESTORE_FAILED`다. `restore_expires_at`은 완료 시각이 아니라 AWS가 반환한 임시 copy 만료 시각을 기록한다.
 
@@ -382,7 +391,7 @@ HOT `storage_path`는 물리 partition명이 아니라 `clickhouse://edr_events/
 
 ## 11. API와 Dashboard
 
-- 제품 REST API는 Dashboard Backend 30개 + Collector 3개 = 33개다.
+- 제품 REST API는 Dashboard Backend 32개 + Collector 3개 = 35개다.
 - Collector API는 Agent 등록, heartbeat, telemetry batch만 제공한다.
 - PCAP artifact upload/download API와 Agent command API는 없다.
 - Endpoint Risk는 기존 Endpoint 목록·상세·summary DTO를 확장하며 새 REST API를 만들지 않는다.
@@ -408,7 +417,7 @@ HOT `storage_path`는 물리 partition명이 아니라 `clickhouse://edr_events/
 - Archive restore 시작은 `ADMIN`, `ANALYST`만 허용하고 `VIEWER`는 `403 FORBIDDEN`이다.
 - 수집·저장 요약은 영구 Standard copy를 세지 않고 복원 완료 bucket을 `restoredBucketCount`로 반환한다.
 
-Latest preset은 `LATEST_15M`, `LATEST_1H`, `LATEST_24H`, `LATEST_7D`, `CUSTOM`이며 기본은 `LATEST_24H`다. Rollup은 현재 구현하지 않고 ClickHouse raw table을 조회한다.
+Latest preset은 `LATEST_15M`, `LATEST_1H`, `LATEST_24H`, `LATEST_7D`, `CUSTOM`이며 기본은 `LATEST_24H`다. Overview 최초 Event 지표는 PostgreSQL Rollup에서 읽는다. 요청 범위 coverage가 없으면 `503 ROLLUP_NOT_READY`를 반환하고, 사용자가 Refresh를 누른 경우에만 `eventSource=LIVE`로 ClickHouse 원본을 집계한다.
 
 ## 12. 운영과 관측성
 
@@ -418,6 +427,7 @@ Latest preset은 `LATEST_15M`, `LATEST_1H`, `LATEST_24H`, `LATEST_7D`, `CUSTOM`�
 - Agent SQLite buffer depth와 retry count
 - Kafka consumer lag와 oldest pending age
 - ClickHouse insert latency/error
+- Event ingest registry row/index size, duplicate skip, legacy recovery, lock timeout과 identity conflict count
 - failure count by stage/code와 수동 replay 결과
 - Npcap/tcpdump readiness와 packet drop count
 - packet parse error와 metadata event 생성률
@@ -425,6 +435,7 @@ Latest preset은 `LATEST_15M`, `LATEST_1H`, `LATEST_24H`, `LATEST_7D`, `CUSTOM`�
 - Endpoint Risk 계산 latency와 level 분포
 - EDR state status/score와 reason code 분포
 - Dashboard 수동 refresh success/error와 마지막 성공 응답 age
+- Dashboard rollup minute coverage hole, source freshness와 `edr-dashboard-rollup-v1` lag
 
 민감정보를 log label로 사용하지 않고 `agent_id`, `endpoint_id`, request ID 중심으로 추적한다.
 
@@ -454,12 +465,14 @@ mappings/
   mitre_attack.yaml
 
 tools/
+  audit_event_duplicates.py
   create_admin.py
   provision_agent_cert.py
   replay_failure.py
+  run_dashboard_rollup_worker.py
 ```
 
-`ERD_FINAL.sql`은 ERDCloud 업로드용 논리 모델이며 실행 migration이 아니다. 파일 안의 `[SQLite]`, `[PostgreSQL]`, `[ClickHouse]` 한글 테이블 설명으로 실제 저장소를 구분한다. 논리 ERD의 `edr_events.event_id` unique는 전역 Event identity 계약을 표현하며, 실제 ClickHouse에서는 Event Storage Worker의 identity/payload 검증과 latest-row 조회 규칙으로 멱등성을 보장한다. PostgreSQL FK/unique/index, ClickHouse engine/partition/order/TTL, SQLite pragma/index는 저장소별 migration에서 구현한다.
+`ERD_FINAL.sql`은 ERDCloud 업로드용 논리 모델이며 실행 migration이 아니다. 파일 안의 `[SQLite]`, `[PostgreSQL]`, `[ClickHouse]` 한글 테이블 설명으로 실제 저장소를 구분한다. 논리 ERD의 `edr_events.event_id` unique는 전역 Event identity 계약을 표현하며, 실제 저장 경계에서는 PostgreSQL `event_ingest_registry.event_id` PK와 Event Storage Worker의 identity/payload 검증으로 강제한다. PostgreSQL FK/unique/index, ClickHouse engine/partition/order/TTL, SQLite pragma/index는 저장소별 migration에서 구현한다.
 
 ## 14. 제외 및 추후 확장
 
@@ -479,8 +492,8 @@ tools/
 | Response Playbook 실행·완료 상태 저장 | 제외 |
 | 프론트 Endpoint Risk/EDR 상태 계산 | 제외 |
 | 자동 failure replay state machine | 제외 |
-| Orphan reconciliation/CAS 경쟁 | 추후 확장 |
-| Rollup table/materialized view | 추후 확장 |
+| Orphan reconciliation | 추후 확장 |
+| ClickHouse outbound CDC/materialized view | 추후 확장. 현재는 Kafka change signal + Python micro-batch, PostgreSQL 1분 activity/1시간 dimension projection 사용 |
 | gRPC | 추후 확장 |
 | 담당자 지정 | 제거 |
 
@@ -491,6 +504,7 @@ tools/
 - 실제 Windows Endpoint 1대
 - 실제 macOS Endpoint 1대
 - Kafka consumer 중단 후 lag 회복 확인
+- Rollup Worker 중단·재시작 후 lag와 coverage 회복 확인
 
 원본 PCAP binary 부하 시나리오는 없다. Network/DNS/L7 metadata는 일반 telemetry 부하에 포함한다.
 
@@ -511,6 +525,7 @@ tools/
 - Agent SQLite ACK row 물리 삭제 확인
 - failure 1건을 S3에 저장하고 관리자 CLI로 수동 재처리
 - archive checksum과 `ingest_metadata` 상태 확인
+- 사용자 Refresh에서만 ClickHouse LIVE 집계를 실행하는지 확인
 
 ### 15.3 macOS 개발 흐름
 

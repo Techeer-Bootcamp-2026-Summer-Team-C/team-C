@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     access_token_ttl_seconds: int = Field(default=43_200, ge=300, le=604_800)
     postgres_dsn: SecretStr
     clickhouse_dsn: SecretStr
+    clickhouse_read_dsn: SecretStr | None = None
+    clickhouse_worker_dsn: SecretStr | None = None
+    clickhouse_lifecycle_dsn: SecretStr | None = None
     kafka_bootstrap_servers: str
     kafka_raw_topic: str = "telemetry.raw"
     kafka_validated_topic: str = "telemetry.validated"
@@ -34,6 +37,16 @@ class Settings(BaseSettings):
     event_ingest_registry_max_rows: int = Field(default=100_000_000, ge=1_000_000)
     event_ingest_registry_max_bytes: int = Field(default=53_687_091_200, ge=1_073_741_824)
     detection_consumer_group: str = "edr-detection-v1"
+    dashboard_rollup_consumer_group: str = "edr-dashboard-rollup-v1"
+    dashboard_rollup_backfill_hours: int = Field(default=744, ge=1, le=744)
+    dashboard_rollup_backfill_chunk_hours: int = Field(default=1, ge=1, le=24)
+    dashboard_rollup_overlap_minutes: int = Field(default=2, ge=1, le=60)
+    dashboard_rollup_flush_seconds: float = Field(default=5.0, ge=0.1, le=60)
+    dashboard_rollup_max_dirty_buckets: int = Field(default=500, ge=1, le=10_000)
+    dashboard_rollup_reconcile_hours: int = Field(default=24, ge=1, le=744)
+    dashboard_rollup_reconcile_interval_seconds: int = Field(default=21_600, ge=300, le=86_400)
+    dashboard_rollup_freshness_grace_seconds: int = Field(default=300, ge=30, le=3_600)
+    dashboard_live_max_concurrency: int = Field(default=2, ge=1, le=32)
     aws_region: str | None = None
     s3_endpoint_url: str | None = None
     s3_access_key_id: SecretStr | None = None
@@ -46,6 +59,9 @@ class Settings(BaseSettings):
         "s3_access_key_id",
         "s3_secret_access_key",
         "s3_bucket",
+        "clickhouse_read_dsn",
+        "clickhouse_worker_dsn",
+        "clickhouse_lifecycle_dsn",
         mode="before",
     )
     @classmethod

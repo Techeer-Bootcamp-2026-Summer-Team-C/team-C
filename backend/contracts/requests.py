@@ -8,6 +8,7 @@ from .common import ContractModel, EndpointIdList, NonNegativeInt, PositiveId, U
 from .enums import (
     AlertSortBy,
     AlertStatus,
+    DashboardEventSource,
     EventFailureStatus,
     EventType,
     IncidentStatus,
@@ -144,6 +145,10 @@ class DashboardSummaryQuery(TimeRangeQuery):
         default=None, description="특정 엔드포인트 지표만 집계합니다."
     )
     interval: Literal["1m", "5m", "1h", "1d"] = Field(description="시계열 집계 간격입니다.")
+    event_source: DashboardEventSource = Field(
+        default=DashboardEventSource.ROLLUP,
+        description="ROLLUP은 PostgreSQL 사전 집계를, LIVE는 ClickHouse 원본을 조회합니다.",
+    )
 
 
 class DashboardTimeQuery(TimeRangeQuery):

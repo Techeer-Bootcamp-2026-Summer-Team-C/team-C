@@ -2,7 +2,7 @@
 
 ## 1. 문서 목적
 
-이 문서는 ERDCloud 업로드 파일 `ERD_FINAL.sql`과 `ERD_FINAL_NO_COMMENTS.sql`의 12개 테이블·202개 속성을 설명하는 데이터 사전이다. ERDCloud DDL은 importer 호환을 위해 MySQL 계열 타입으로 표현하지만, 아래 속성 표의 타입은 실제 실행 저장소인 SQLite, PostgreSQL, ClickHouse 타입을 기준으로 한다.
+이 문서는 ERDCloud 업로드 파일 `ERD_FINAL.sql`과 `ERD_FINAL_NO_COMMENTS.sql`의 12개 core 테이블·202개 속성을 설명하는 데이터 사전이다. ERDCloud DDL은 importer 호환을 위해 MySQL 계열 타입으로 표현하지만, 아래 속성 표의 타입은 실제 실행 저장소인 SQLite, PostgreSQL, ClickHouse 타입을 기준으로 한다. 재생성 가능한 Dashboard rollup 4종과 저장 동시성 제어용 `event_ingest_registry`는 core 논리 ERD에서 제외하며 실행 migration과 `DASHBOARD_ROLLUP.md`, `EDR_DATA_MODEL.md` 8.13~8.14에서 정의한다.
 
 ## 2. 전체 테이블 구성
 
@@ -328,7 +328,7 @@ Event 조회, latest-row 선택과 `uniqExact(event_id)` 집계는 `is_delete=fa
 | 테이블 | 속성 | 허용 값 |
 | --- | --- | --- |
 | `local_event_buffer` | `status` | `PENDING`, `FAILED` |
-| `event_failures` | `status` | `FAILED`, `REPROCESSED`, `REPROCESS_FAILED` |
+| `event_failures` | `status` | `FAILED`, `REPLAY_PUBLISHED`, `REPROCESSED`, `REPROCESS_FAILED` |
 | `endpoints` | `status` | `ONLINE`, `OFFLINE`, `RETIRED` |
 | `users` | `status` | `ACTIVE`, `DISABLED` |
 | `users` | `locale` | `EN`, `KO` |

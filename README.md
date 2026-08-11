@@ -102,22 +102,31 @@ flowchart LR
     D["Detection Worker"]
     E["Rule 탐지<br/>MITRE ATT&CK 매핑"]
     F["Alert 및 Incident 생성"]
+    G["ClickHouse"]
+    H["Dashboard Rollup Worker"]
+    I["PostgreSQL<br/>Event Rollup"]
 
     A --> B
-    B -->|"정규화 및 검증"| C
+    B -->|"정규화 및 검증 후 저장"| G
+    B -->|"저장 완료 후 발행"| C
     C --> D
+    C --> H
     D --> E
     E --> F
+    H -->|"dirty bucket 재집계"| G
+    H -->|"멱등 교체"| I
 ```
 
 Event Storage Worker가 Event를 정규화·검증하고, Detection Worker가 Rule과 MITRE ATT&CK 정보를 적용해 Alert과 Incident를 생성합니다.
+
+Dashboard Rollup Worker는 `telemetry.validated`를 변경 알림으로 사용해 ClickHouse 원본의 활동 추이를 1분, 차원별 분포를 1시간 bucket으로 재집계하고 PostgreSQL에 멱등 교체합니다. Dashboard 기본 조회는 Rollup을 사용하고, 사용자가 새로 고침을 요청한 경우에만 ClickHouse LIVE 집계를 실행합니다. 세부 동기화와 coverage 계약은 [Dashboard Event Rollup 전략](docs/architecture/DASHBOARD_ROLLUP.md)을 따릅니다.
 
 ### 데이터 저장 구조
 
 | 저장소 | 저장 데이터 | 용도 |
 | --- | --- | --- |
 | ClickHouse | Process·Network·File·DNS·L7 Event | 대량 Event 검색 및 집계 |
-| PostgreSQL | Endpoint·사용자·Alert·Incident | 상태와 데이터 관계 관리 |
+| PostgreSQL | Endpoint·사용자·Alert·Incident·Event Rollup | 상태·관계 및 Dashboard 기본 집계 관리 |
 | Amazon S3 | 장기 보관 데이터·실패 Payload | Archive 및 실패 Event 재처리 |
 
 ## API

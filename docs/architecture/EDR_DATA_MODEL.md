@@ -25,6 +25,9 @@ Windows C++ / macOS Swift Agent
 -> Detection Worker
    -> RuleV1 + MITRE ATT&CK
    -> PostgreSQL alerts / incidents / incident_alerts
+-> Dashboard Rollup Worker
+   -> ClickHouse의 endpoint + 1분 bucket 전체 재집계
+   -> PostgreSQL dashboard_event_rollups / dashboard_event_dimension_rollups
 
 처리 실패
 -> 원문 S3 Standard
@@ -46,7 +49,7 @@ Windows C++ / macOS Swift Agent
 | --- | --- | --- |
 | Agent SQLite | `local_event_buffer` | Collector ACK 전 metadata event 임시 저장 |
 | ClickHouse | `edr_events`, `event_failures` | 정상 telemetry와 대량 failure 검색 index |
-| PostgreSQL | `endpoints`, `agent_auth_keys`, `audit_logs`, `ingest_metadata`, `users`, `user_dashboard_layouts`, `alerts`, `incidents`, `incident_alerts` | 운영 상태, 인증, 감사, 저장 카탈로그, 사용자 Dashboard 설정, 탐지 결과 |
+| PostgreSQL | 기존 운영 테이블 + `event_ingest_registry`, Dashboard rollup 4종 | 운영 상태, 인증, 감사, Event ID 유일성, 저장 카탈로그, 탐지 결과와 Dashboard Event projection |
 | S3 Standard | 최초 실패부터 7일까지 failure 원문 | Failure 단기 object |
 | S3 Glacier Instant Retrieval | 7일 이후 failure 원문 | 최초 실패 기준 총 90일 보존 |
 | S3 Glacier Flexible Retrieval | raw event archive | Parquet/ZSTD 장기 보관과 7일 임시 RestoreObject |
@@ -55,7 +58,7 @@ PostgreSQL에는 event failure row와 원문을 저장하지 않는다. ClickHou
 
 ## 5. 테이블 구성
 
-최종 논리 ERD는 12개 테이블이다.
+최종 core 논리 ERD는 12개 테이블이다. Dashboard rollup 4종과 `event_ingest_registry`는 각각 재생성 가능한 운영 projection과 저장 동시성 제어용 운영 테이블이므로 기존 ERDCloud 12개 core table·202개 속성에는 포함하지 않고 PostgreSQL migration과 이 문서 8.13~8.14에서 별도로 정의한다.
 
 | 저장소 | 테이블 | 속성 수 | 역할 |
 | --- | --- | ---: | --- |
@@ -73,13 +76,25 @@ PostgreSQL에는 event failure row와 원문을 저장하지 않는다. ClickHou
 | PostgreSQL | `alerts` | 22 | Rule/MITRE 탐지 결과 |
 | **합계** | **12개** | **202** |  |
 
+| 운영 테이블 | 속성 수 | 역할 |
+| --- | ---: | --- |
+| `event_ingest_registry` | 5 | `event_id` 전역 유일성 및 동시 ClickHouse 저장 직렬화 |
+| `dashboard_event_rollups` | 6 | endpoint·1분·Event type count |
+| `dashboard_event_dimension_rollups` | 7 | endpoint·1시간·dimension 상위 후보 count와 bucket 해상도 |
+| `dashboard_rollup_state` | 5 | 관측한 전체 범위와 source freshness |
+| `dashboard_rollup_coverage` | 3 | 전 범위 재집계가 끝난 1분 bucket readiness |
+
 ## 6. 관계 요약
 
 ```text
 endpoints -> agent_auth_keys
 endpoints -> ingest_metadata
+endpoints -> event_ingest_registry
 endpoints -> alerts
 endpoints -> incidents
+endpoints -> dashboard_event_rollups
+endpoints -> dashboard_event_dimension_rollups
+dashboard_rollup_state -> dashboard_rollup_coverage
 incidents -> incident_alerts <- alerts
 users -> user_dashboard_layouts
 ```
@@ -104,7 +119,8 @@ users -> user_dashboard_layouts
 - `local_event_buffer`는 `acceptedEventIds` ACK를 받으면 transaction에서 물리 삭제한다.
 - `is_delete` 컬럼이 있는 PostgreSQL·ClickHouse row는 조회, 인증, 집계와 상태 변경에서 `is_delete=false`만 사용한다.
 - `audit_logs`는 append-only이며 application role에 UPDATE/DELETE 권한을 주지 않는다.
-- Event 중복은 논리 ERD의 `event_id` unique와 실제 Event Storage Worker의 identity/payload 검증으로 차단하고, Alert 중복은 `(event_id, rule_code, rule_version)`으로 차단한다.
+- Event 중복은 PostgreSQL `event_ingest_registry.event_id` PK 선점과 Event Storage Worker의 identity/payload 검증으로 차단한다. PK transaction은 ClickHouse insert 완료까지 유지하며 commit 전 장애 시 rollback되고, 재시도는 기존 ClickHouse identity를 확인해 registry를 복구한다. Alert 중복은 `(event_id, rule_code, rule_version)`으로 차단한다.
+- Dashboard rollup은 Event별 증가 연산을 하지 않는다. ClickHouse `FINAL + uniqExact(event_id)`로 dirty 1분 bucket 전체를 다시 계산하고 PostgreSQL transaction에서 교체하므로 Kafka 재전달과 동시 실행에도 멱등이다.
 - 복잡한 CAS 경쟁, orphan reconciliation, 다단계 상태 versioning은 추후 확장이다.
 
 ### 7.3 패킷 수집
@@ -119,7 +135,7 @@ users -> user_dashboard_layouts
 ### 7.4 Failure와 수동 재처리
 
 - Worker의 짧은 in-process retry 후에도 실패한 원문은 S3에 저장한다.
-- `event_failures`는 `FAILED`, `REPROCESSED`, `REPROCESS_FAILED`만 사용한다.
+- `event_failures`는 `FAILED`, `REPLAY_PUBLISHED`, `REPROCESSED`, `REPROCESS_FAILED`를 사용한다. `REPLAY_PUBLISHED`는 Kafka broker ACK이며 후속 처리 완료를 뜻하지 않는다.
 - 자동 scheduler와 replay state machine을 사용하지 않는다.
 - 관리자는 내부 CLI로 failure ID를 지정해 checksum 검증 후 `telemetry.raw`에 재발행한다.
 - 동일 failure의 최신 결과는 `updated_at` 기준으로 조회한다.
@@ -142,13 +158,13 @@ users -> user_dashboard_layouts
 - 상태는 `ARCHIVED -> RESTORE_REQUESTED -> RESTORED -> EXPIRED`이며 실패하면 `RESTORE_FAILED`다. 복원 완료 후 PyArrow가 같은 S3 Parquet object를 직접 조회하고 ClickHouse에는 재적재하지 않는다.
 - archive 검증 후 ClickHouse 삭제 전 7일 safety window처럼 동일 논리 bucket에 HOT과 S3 row가 함께 있으면 HOT을 우선한다. 이 경우 S3 row 상태는 조회를 차단하거나 RestoreObject를 시작하지 않으며, HOT 또는 RESTORED로 충족되지 않은 논리 bucket만 archive 미준비 상태로 판단한다.
 - 별도 restore job/request table을 만들지 않는다.
-- Rollup은 구현하지 않고 추후 확장으로 둔다.
+- ClickHouse 날짜 partition 삭제 직전에 해당 UTC 하루의 Dashboard rollup을 다시 계산한다. 이 작업이 실패하면 partition을 유지한다.
 
 ### 7.6 Latest 조회
 
 - `LATEST_15M`, `LATEST_1H`, `LATEST_24H`, `LATEST_7D`, `CUSTOM`을 지원한다.
 - 기본값은 `LATEST_24H`다.
-- Endpoint/Alert/Incident는 PostgreSQL, event와 failure는 ClickHouse, archive 위치는 `ingest_metadata`에서 조회한다.
+- Endpoint/Alert/Incident는 PostgreSQL, Event 목록·상세와 failure는 ClickHouse, archive 위치는 `ingest_metadata`에서 조회한다. Dashboard Event metric의 기본 조회는 PostgreSQL rollup이며 사용자가 Refresh를 요청한 경우에만 ClickHouse live 집계를 사용한다.
 
 ## 8. 테이블 상세 정의
 
@@ -449,12 +465,73 @@ Event 조회, latest-row 선택과 `uniqExact(event_id)` 집계는 `is_delete=fa
 | `updated_at` | `TIMESTAMPTZ` | 상태 등 마지막 변경 시각 |
 | `is_delete` | `BOOLEAN` | 소프트 삭제 표시 |
 
+### 8.13 Dashboard Event rollup projection
+
+목적: Dashboard 첫 조회에서 ClickHouse 원본을 매번 집계하지 않도록 1분 단위의 재생성 가능한 Event projection을 저장한다. 상세 동기화·멱등성·archive 경계는 `DASHBOARD_ROLLUP.md`를 따른다.
+
+`dashboard_event_rollups`:
+
+| 컬럼 | 실제 PostgreSQL 타입 | 설명 |
+| --- | --- | --- |
+| `bucket_start_at` | `TIMESTAMPTZ` | 1분 bucket 시작. PK 일부 |
+| `endpoint_id` | `BIGINT` | Endpoint FK, 삭제 시 cascade. PK 일부 |
+| `event_type` | `VARCHAR(30)` | 5종 Event type. PK 일부 |
+| `event_count` | `BIGINT` | `uniqExact(event_id)` count |
+| `source_max_ingested_at` | `TIMESTAMPTZ NULL` | source freshness |
+| `refreshed_at` | `TIMESTAMPTZ` | projection 교체 시각 |
+
+`dashboard_event_dimension_rollups`:
+
+| 컬럼 | 실제 PostgreSQL 타입 | 설명 |
+| --- | --- | --- |
+| `bucket_start_at` | `TIMESTAMPTZ` | 1시간 bucket 시작. PK 일부 |
+| `endpoint_id` | `BIGINT` | Endpoint FK, 삭제 시 cascade. PK 일부 |
+| `dimension_name` | `VARCHAR(30)` | process/IP/domain/hash/DNS/L7 dimension. PK 일부 |
+| `dimension_value` | `TEXT` | 비어 있지 않은 dimension 값. PK 일부 |
+| `bucket_width_seconds` | `INTEGER` | 현재 projection은 3600초. PK 일부 |
+| `event_count` | `BIGINT` | 해당 값의 중복 제거 Event count |
+| `refreshed_at` | `TIMESTAMPTZ` | projection 교체 시각 |
+
+`dashboard_rollup_state`:
+
+| 컬럼 | 실제 PostgreSQL 타입 | 설명 |
+| --- | --- | --- |
+| `rollup_name` | `VARCHAR(100)` | projection version PK |
+| `covered_from` | `TIMESTAMPTZ NULL` | 지금까지 관측한 가장 이른 전체 범위 갱신 시작 |
+| `covered_through` | `TIMESTAMPTZ NULL` | 지금까지 관측한 가장 늦은 전체 범위 갱신 끝, exclusive |
+| `source_max_ingested_at` | `TIMESTAMPTZ NULL` | 반영된 원본의 최신 ingest 시각 |
+| `refreshed_at` | `TIMESTAMPTZ` | 마지막 갱신 시각 |
+
+`dashboard_rollup_state`의 시작·끝은 중간 구간의 연속성을 보장하지 않는 운영 요약값이다. API readiness는 아래 minute coverage를 사용한다.
+
+`dashboard_rollup_coverage`:
+
+| 컬럼 | 실제 PostgreSQL 타입 | 설명 |
+| --- | --- | --- |
+| `rollup_name` | `VARCHAR(100)` | `dashboard_rollup_state` FK. PK 일부 |
+| `bucket_start_at` | `TIMESTAMPTZ` | 모든 Endpoint를 스캔한 1분 bucket. PK 일부 |
+| `refreshed_at` | `TIMESTAMPTZ` | 해당 minute 전체 재집계 완료 시각 |
+
+Endpoint별 dirty-bucket 갱신은 전역 범위 완료를 증명하지 않으므로 coverage를 기록하지 않는다. API는 요청 범위에 필요한 모든 minute row가 있을 때만 PostgreSQL rollup을 반환하며 hole이 있으면 `503 ROLLUP_NOT_READY`를 반환한다.
+
+### 8.14 `event_ingest_registry`
+
+목적: ClickHouse가 강제 unique constraint를 제공하지 않는 저장 구조에서 전역 `event_id` 유일성을 PostgreSQL PK로 강제하고, 동시 Event Storage Worker의 check-then-insert 경쟁을 직렬화한다. Registry는 `event_id` 기준 16개 hash partition으로 나누되 동일 ID가 항상 같은 partition으로 가므로 PK 유일성은 유지한다. 새 Registry row를 만드는 PostgreSQL transaction은 ClickHouse insert가 끝날 때까지 유지하고 lock 대기는 `EDR_EVENT_INGEST_LOCK_TIMEOUT_MS`로 설정한다(기본 15,000ms). 이미 commit된 append-only row는 쓰기 잠금 없이 조회한다. `0011` trigger는 `UPDATE`, `DELETE`, `TRUNCATE`를 거부하고 `0013`은 부모와 16개 leaf partition에 이 계약을 유지한다. 배포 `app-init`과 Worker 시작 검사는 table, PK, hash partition 수와 모든 partition trigger를 확인한다. Registry row를 삭제하면 같은 ID의 재적재가 다시 가능해지므로 Event archive 이후에도 보존하며 TTL을 두지 않는다. `/operations/health`는 기본 1억 행 또는 50GiB 임계값 전에 용량 상태를 노출한다. Registry가 없는 legacy Event를 복구할 때는 ClickHouse의 모든 물리 row를 identity별로 묶어 정확히 하나일 때만 등록하고, 서로 다른 identity가 둘 이상이면 `EVENT_IDENTITY_CONFLICT`로 처리한다. 기존 ClickHouse 중복은 `python -m tools.audit_event_duplicates --fail-on-findings`로 읽기 전용 점검한다.
+
+| 컬럼 | 실제 PostgreSQL 타입 | 설명 |
+| --- | --- | --- |
+| `event_id` | `UUID` | 전역 Event ID PK |
+| `endpoint_id` | `BIGINT` | Endpoint FK 및 identity 검증 값 |
+| `agent_id` | `VARCHAR(64)` | Agent identity 검증 값 |
+| `payload_sha256` | `VARCHAR(64)` | 정규화 payload 충돌 검사용 소문자 SHA-256 |
+| `registered_at` | `TIMESTAMPTZ` | 유일성 registry에 최초 등록된 시각 |
+
 ## 9. 주요 상태값
 
 | 테이블 | 컬럼 | 값 |
 | --- | --- | --- |
 | `local_event_buffer` | `status` | `PENDING`, `FAILED` |
-| `event_failures` | `status` | `FAILED`, `REPROCESSED`, `REPROCESS_FAILED` |
+| `event_failures` | `status` | `FAILED`, `REPLAY_PUBLISHED`, `REPROCESSED`, `REPROCESS_FAILED` |
 | `endpoints` | `status` | `ONLINE`, `OFFLINE`, `RETIRED` |
 | `users` | `status` | `ACTIVE`, `DISABLED` |
 | `users` | `locale` | `EN`, `KO` |
@@ -471,5 +548,5 @@ Event 조회, latest-row 선택과 `uniqExact(event_id)` 집계는 `is_delete=fa
 - Npcap/tcpdump는 live capture input이며 PCAP file storage가 아니다.
 - Agent command, PCAP artifact, PCAP segment, automatic replay scheduler/topic, occurrence/attempt table은 없다.
 - Archive restore job/request table과 영구 restored Standard object는 없다.
-- Rollup, orphan reconciliation, CAS 경쟁 처리, 다단계 failure versioning은 규모 검증 후 확장한다.
+- Rollup의 다중 해상도 materialization, S3-only 과거 구간 자동 backfill, orphan reconciliation, CAS 경쟁 처리, 다단계 failure versioning은 규모 검증 후 확장한다.
 - Windows Minifilter/WFP와 macOS Endpoint Security/System Extension은 포트폴리오 범위에서 제외한다.

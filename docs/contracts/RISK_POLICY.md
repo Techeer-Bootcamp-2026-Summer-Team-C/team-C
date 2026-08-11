@@ -252,7 +252,7 @@ failedContribution = min(FAILED count * 5, 20)
 reprocessFailedContribution = min(REPROCESS_FAILED count * 10, 20)
 ```
 
-`REPROCESSED`는 collection penalty에 포함하지 않는다.
+`REPLAY_PUBLISHED`는 후속 처리 완료 상태가 아니지만 broker ACK 자체에는 collection penalty를 추가하지 않는다. 기존 데이터의 `REPROCESSED`도 collection penalty에 포함하지 않는다.
 
 ### 6.5 Storage contribution
 

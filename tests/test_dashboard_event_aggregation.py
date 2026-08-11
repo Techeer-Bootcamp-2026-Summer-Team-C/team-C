@@ -6,7 +6,13 @@ import pytest
 
 import backend.event_service as event_service_module
 from backend.event_service import EventService
-from backend.storage.clickhouse import DASHBOARD_TOP_LIMIT, DashboardEventAggregate, EventRepository
+from backend.storage.clickhouse import (
+    DASHBOARD_LIVE_MAX_EXECUTION_SECONDS,
+    DASHBOARD_LIVE_MAX_ROWS_TO_READ,
+    DASHBOARD_TOP_LIMIT,
+    DashboardEventAggregate,
+    EventRepository,
+)
 
 NOW = datetime(2026, 7, 17, 12, tzinfo=UTC)
 
@@ -57,6 +63,11 @@ def test_dashboard_summary_aggregates_in_clickhouse_without_raw_event_projection
     assert all("raw_payload" not in query for query, _parameters in client.queries)
     assert all(parameters["endpoint_id"] == 7 for _query, parameters in client.queries)
     assert f"LIMIT {DASHBOARD_TOP_LIMIT} BY target" in client.queries[1][0]
+    assert all(
+        f"max_execution_time = {DASHBOARD_LIVE_MAX_EXECUTION_SECONDS}" in query
+        and f"max_rows_to_read = {DASHBOARD_LIVE_MAX_ROWS_TO_READ}" in query
+        for query, _parameters in client.queries
+    )
 
 
 def test_dashboard_summary_rejects_an_unknown_interval_before_querying() -> None:

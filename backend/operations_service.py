@@ -1,16 +1,19 @@
 from collections.abc import Callable
 from contextlib import AbstractContextManager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from time import perf_counter
 from typing import Any, Protocol
 
 from .contracts.enums import SensorHealth, WorkerStatus
 from .contracts.operations import OperationsHealthDto, PipelineWorkerDto, ServiceHealthDto
 from .kafka import RAW_TOPIC, VALIDATED_TOPIC, ConsumerGroupSnapshot, consumer_group_snapshot
+from .storage.clickhouse import EventRepository
+from .storage.rollup import DashboardEventRollupRepository
 
 WORKERS = (
-    ("Event storage", "edr-event-storage-v1", RAW_TOPIC),
-    ("Detection", "edr-detection-v1", VALIDATED_TOPIC),
+    ("Event storage", "event_storage_consumer_group", RAW_TOPIC),
+    ("Detection", "detection_consumer_group", VALIDATED_TOPIC),
+    ("Dashboard rollup", "dashboard_rollup_consumer_group", VALIDATED_TOPIC),
 )
 
 
@@ -47,11 +50,15 @@ class OperationsHealthService:
             ),
             self._probe("PostgreSQL", self._check_postgres),
             self._probe("Event ingest registry capacity", self._check_registry_capacity),
+            self._probe("Dashboard rollup coverage", lambda: self._check_rollup_coverage(checked_at)),
             self._probe("ClickHouse", lambda: self.runtime.clickhouse.command("SELECT 1")),
             self._probe("Kafka", self.runtime.producer.check),
             self._probe("S3", lambda: self.runtime.s3.head_bucket(Bucket=self.runtime.settings.s3_bucket)),
         ]
-        workers = [self._worker(worker, group_id, topic) for worker, group_id, topic in WORKERS]
+        workers = [
+            self._worker(worker, getattr(self.runtime.settings, group_setting), topic)
+            for worker, group_setting, topic in WORKERS
+        ]
         degraded = any(item.status is not SensorHealth.HEALTHY for item in services) or any(
             item.status is not WorkerStatus.RUNNING for item in workers
         )
@@ -87,6 +94,25 @@ class OperationsHealthService:
                 "Event ingest registry capacity threshold exceeded "
                 f"(estimated_rows={estimated_rows}, bytes={total_bytes})"
             )
+
+    def _check_rollup_coverage(self, checked_at: datetime) -> None:
+        with self.runtime.postgres() as connection:
+            rollups = DashboardEventRollupRepository(connection)
+            covered = rollups.covers_range(
+                from_=checked_at - timedelta(hours=24),
+                to=checked_at,
+            )
+            if not covered:
+                raise RuntimeError("Dashboard Event rollup does not cover the latest 24 hours")
+            projected_latest = rollups.latest_ingested_at()
+        source_latest = EventRepository(self.runtime.clickhouse).latest_ingested_at()
+        freshness_grace = timedelta(
+            seconds=getattr(self.runtime.settings, "dashboard_rollup_freshness_grace_seconds", 300)
+        )
+        if source_latest is not None and (
+            projected_latest is None or source_latest - projected_latest > freshness_grace
+        ):
+            raise RuntimeError("Dashboard Event rollup source watermark is stale")
 
     @staticmethod
     def _status(snapshot: ConsumerGroupSnapshot) -> WorkerStatus:

@@ -14,6 +14,7 @@ from backend.detection import DetectionEngine
 from backend.failure import FailureSink
 from backend.kafka import RAW_TOPIC, TOPICS, KafkaConsumer, ensure_topics
 from backend.main import create_app
+from backend.rollup import DashboardRollupSynchronizer, DashboardRollupWorker
 from backend.runtime import RuntimeServices
 from backend.settings import Settings
 from backend.storage.clickhouse import EventRepository, FailureRepository
@@ -25,6 +26,7 @@ from backend.storage.postgres import (
     IncidentRepository,
     IngestMetadataRepository,
 )
+from backend.storage.rollup import DashboardEventRollupRepository
 from backend.workers import DetectionWorker, EventStorageWorker, LifecycleTasks
 from tools.replay_failure import FailureNotFoundError, replay_failure
 
@@ -167,6 +169,11 @@ def test_actual_http_kafka_storage_detection_failure_and_replay_flow() -> None:
         group_id=f"ingest-detection-{uuid4()}",
         topic="telemetry.validated",
     )
+    rollup_consumer = KafkaConsumer(
+        bootstrap,
+        group_id=f"ingest-rollup-{uuid4()}",
+        topic="telemetry.validated",
+    )
     client = TestClient(create_app(runtime))
     fingerprint_a = "a" * 64
     fingerprint_b = "b" * 64
@@ -284,6 +291,33 @@ def test_actual_http_kafka_storage_detection_failure_and_replay_flow() -> None:
             "Encoded PowerShell command detected",
             "PowerShell was executed with an encoded command argument.",
         )
+        rollup_bucket = now.replace(second=0, microsecond=0)
+        with runtime.postgres() as connection:
+            connection.autocommit = True
+            rollup_store = DashboardEventRollupRepository(connection)
+            rollup_sync = DashboardRollupSynchronizer(
+                events=EventRepository(runtime.clickhouse),
+                store=rollup_store,
+            )
+            rollup_sync.refresh_range(
+                from_=rollup_bucket,
+                to=rollup_bucket + timedelta(minutes=1),
+            )
+            rollup_worker = DashboardRollupWorker(
+                consumer=rollup_consumer,
+                synchronizer=rollup_sync,
+                flush_interval_seconds=60,
+            )
+            consume_until(rollup_worker)
+            rollup_worker.flush()
+            rollup_summary = rollup_store.dashboard_summary(
+                from_=rollup_bucket,
+                to=rollup_bucket + timedelta(minutes=1),
+                interval_seconds=60,
+                endpoint_id=endpoint_id,
+            )
+            assert rollup_summary.total_count == 1
+            assert rollup_store.covers_range(from_=rollup_bucket, to=rollup_bucket + timedelta(minutes=1))
 
         duplicate = telemetry(
             event_id,
@@ -321,6 +355,24 @@ def test_actual_http_kafka_storage_detection_failure_and_replay_flow() -> None:
             consume_until(duplicate_detection)
             assert connection.execute("SELECT count(*) FROM alerts").fetchone()[0] == 1
             assert connection.execute("SELECT count(*) FROM incidents").fetchone()[0] == 1
+            connection.commit()
+            connection.autocommit = True
+            duplicate_rollup = DashboardRollupWorker(
+                consumer=rollup_consumer,
+                synchronizer=DashboardRollupSynchronizer(
+                    events=EventRepository(runtime.clickhouse),
+                    store=DashboardEventRollupRepository(connection),
+                ),
+                flush_interval_seconds=60,
+            )
+            consume_until(duplicate_rollup)
+            duplicate_rollup.flush()
+            assert DashboardEventRollupRepository(connection).dashboard_summary(
+                from_=rollup_bucket,
+                to=rollup_bucket + timedelta(minutes=1),
+                interval_seconds=60,
+                endpoint_id=endpoint_id,
+            ).total_count == 1
 
         retry_event_id = UUID("018ff8f4-86de-7b25-9b8a-2d22f6a3e010")
         retry_payload = telemetry(retry_event_id, uuid4(), command_line="notepad.exe", occurred_at=now)
@@ -352,7 +404,7 @@ def test_actual_http_kafka_storage_detection_failure_and_replay_flow() -> None:
         assert failure is not None
         assert s3.head_object(Bucket=s3_bucket, Key=str(failure["payload_object_key"]))["ContentLength"] > 0
         replay_failure(failure_id, runtime, now=datetime.now(UTC))
-        assert failure_repository.latest_status(failure_id) == "REPROCESSED"
+        assert failure_repository.latest_status(failure_id) == "REPLAY_PUBLISHED"
         with runtime.postgres() as connection:
             replay_worker = EventStorageWorker(
                 consumer=raw_consumer,
@@ -420,6 +472,7 @@ def test_actual_http_kafka_storage_detection_failure_and_replay_flow() -> None:
     finally:
         raw_consumer.close()
         detection_consumer.close()
+        rollup_consumer.close()
         with psycopg.connect(postgres_dsn) as connection:
             apply_postgres_migrations(connection, postgres_migrations, direction="down")
         apply_clickhouse_file(clickhouse, clickhouse_down)
