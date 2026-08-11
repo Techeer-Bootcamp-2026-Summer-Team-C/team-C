@@ -15,6 +15,9 @@ x-app-environment: &app-environment
   EDR_KAFKA_PARTITIONS_PER_TOPIC: ${EDR_KAFKA_PARTITIONS_PER_TOPIC:-2}
   EDR_KAFKA_REPLICATION_FACTOR: ${EDR_KAFKA_REPLICATION_FACTOR:-1}
   EDR_EVENT_STORAGE_CONSUMER_GROUP: ${EDR_EVENT_STORAGE_CONSUMER_GROUP:-edr-event-storage-v1}
+  EDR_EVENT_INGEST_LOCK_TIMEOUT_MS: ${EDR_EVENT_INGEST_LOCK_TIMEOUT_MS:-15000}
+  EDR_EVENT_INGEST_REGISTRY_MAX_ROWS: ${EDR_EVENT_INGEST_REGISTRY_MAX_ROWS:-100000000}
+  EDR_EVENT_INGEST_REGISTRY_MAX_BYTES: ${EDR_EVENT_INGEST_REGISTRY_MAX_BYTES:-53687091200}
   EDR_DETECTION_CONSUMER_GROUP: ${EDR_DETECTION_CONSUMER_GROUP:-edr-detection-v1}
   EDR_AWS_REGION: ${EDR_AWS_REGION:?EDR_AWS_REGION is required}
   EDR_S3_BUCKET: ${EDR_S3_BUCKET:?EDR_S3_BUCKET is required}
@@ -58,7 +61,7 @@ services:
       app-init:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "python", "-m", "tools.check_worker_health", "event-storage-worker", "--max-age", "15"]
+      test: ["CMD", "python", "-m", "tools.check_worker_health", "event-storage-worker", "--max-age", "240"]
       interval: 10s
       timeout: 3s
       retries: 3

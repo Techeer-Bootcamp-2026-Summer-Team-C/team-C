@@ -10,10 +10,16 @@ NOW = datetime(2026, 7, 13, 3, 0, tzinfo=UTC)
 
 
 class Connection:
-    def execute(self, _statement: str):
+    def __init__(self) -> None:
+        self.statement = ""
+
+    def execute(self, statement: str):
+        self.statement = statement
         return self
 
     def fetchone(self):
+        if "pg_partition_tree" in self.statement:
+            return (0, 0)
         return (1,)
 
 
@@ -38,6 +44,7 @@ def test_operations_health_reports_live_services_and_worker_lag() -> None:
     assert [service.service for service in result.services] == [
         "Backend API",
         "PostgreSQL",
+        "Event ingest registry capacity",
         "ClickHouse",
         "Kafka",
         "S3",
@@ -60,3 +67,25 @@ def test_operations_health_keeps_partial_results_when_probes_fail() -> None:
     assert clickhouse.status is SensorHealth.UNAVAILABLE
     assert "RuntimeError" in clickhouse.detail
     assert all(worker.status is WorkerStatus.UNKNOWN for worker in result.workers)
+
+
+def test_operations_health_degrades_before_registry_capacity_is_exhausted() -> None:
+    class FullRegistryConnection(Connection):
+        def fetchone(self):
+            if "pg_partition_tree" in self.statement:
+                return (100_000_001, 1024)
+            return super().fetchone()
+
+    class FullRegistryRuntime(HealthyRuntime):
+        @contextmanager
+        def postgres(self):
+            yield FullRegistryConnection()
+
+    result = OperationsHealthService(
+        FullRegistryRuntime(),
+        worker_probe=running_worker,
+    ).snapshot(checked_at=NOW)
+
+    assert result.status is SensorHealth.DEGRADED
+    capacity = next(service for service in result.services if service.service == "Event ingest registry capacity")
+    assert capacity.status is SensorHealth.UNAVAILABLE

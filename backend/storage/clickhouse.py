@@ -4,6 +4,8 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal, Protocol
 from uuid import UUID
 
+from backend.errors import EventIdentityConflictError
+
 from .models import EventIdentity, JsonObject
 
 
@@ -202,31 +204,60 @@ def _event_search_filters(
 
 
 class EventRepository:
-    def __init__(self, client: ClickHouseClient) -> None:
+    def __init__(
+        self,
+        client: ClickHouseClient,
+        *,
+        _write_mode: Literal["read_only", "ingest", "maintenance"] = "read_only",
+    ) -> None:
         self.client = client
+        self._write_mode = _write_mode
+
+    @classmethod
+    def for_ingest(cls, client: ClickHouseClient) -> "EventRepository":
+        """Create a writer reserved for the registry-guarded Event Storage Worker."""
+        return cls(client, _write_mode="ingest")
+
+    @classmethod
+    def for_maintenance(cls, client: ClickHouseClient) -> "EventRepository":
+        """Create an explicit writer for controlled seed, migration, or repair jobs."""
+        return cls(client, _write_mode="maintenance")
+
+    def assert_ingest_writer(self) -> None:
+        if self._write_mode != "ingest":
+            raise RuntimeError("Event Storage Worker requires EventRepository.for_ingest()")
 
     def insert(self, events: list[JsonObject]) -> None:
         if not events:
             return
+        if self._write_mode == "read_only":
+            raise PermissionError(
+                "EventRepository is read-only; use for_ingest() behind a registry claim "
+                "or for_maintenance() in a controlled job"
+            )
         rows = [[event.get(column) for column in EVENT_COLUMNS] for event in events]
         self.client.insert("edr_events", rows, column_names=EVENT_COLUMNS)
 
     def identity(self, event_id: UUID) -> EventIdentity | None:
         result = self.client.query(
             """
-            SELECT event_id, endpoint_id, agent_id, payload_sha256
-            FROM edr_events FINAL
-            WHERE event_id = {event_id:UUID} AND is_delete = 0
-            ORDER BY updated_at DESC
-            LIMIT 1
+            SELECT endpoint_id, agent_id, payload_sha256
+            FROM edr_events
+            WHERE event_id = {event_id:UUID}
+            GROUP BY endpoint_id, agent_id, payload_sha256
+            ORDER BY endpoint_id, agent_id, payload_sha256
+            LIMIT 2
+            SETTINGS max_execution_time = 5, max_threads = 1
             """,
             parameters={"event_id": str(event_id)},
         )
         if not result.result_rows:
             return None
+        if len(result.result_rows) > 1:
+            raise EventIdentityConflictError("eventId has multiple physical identities in ClickHouse")
         row = result.result_rows[0]
-        payload_sha256 = row[3].decode("ascii") if isinstance(row[3], bytes) else str(row[3])
-        return EventIdentity(UUID(str(row[0])), int(row[1]), str(row[2]), payload_sha256)
+        payload_sha256 = row[2].decode("ascii") if isinstance(row[2], bytes) else str(row[2])
+        return EventIdentity(event_id, int(row[0]), str(row[1]), payload_sha256)
 
     def archive_count(self, *, endpoint_id: int, bucket_start_at: datetime) -> int:
         bucket_start_at = bucket_start_at.astimezone(UTC)

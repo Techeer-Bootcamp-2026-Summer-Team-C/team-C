@@ -10,19 +10,21 @@ from typing import Any
 from uuid import UUID
 
 from .detection import DetectionEngine
-from .errors import ArchivedDayImmutableError
+from .errors import ArchivedDayImmutableError, EventIdentityConflictError, EventIngestLockTimeoutError
 from .failure import FailureSink
 from .kafka import VALIDATED_TOPIC, ConsumedMessage, ConsumerPort, ProducerPort
 from .storage.clickhouse import EventRepository
 from .storage.models import IncidentInsert
-from .storage.postgres import AlertRepository, EndpointRepository, IncidentRepository, IngestMetadataRepository
+from .storage.postgres import (
+    AlertRepository,
+    EndpointRepository,
+    EventIngestRegistryRepository,
+    IncidentRepository,
+    IngestMetadataRepository,
+)
 
 RETRY_DELAYS_SECONDS = (1, 5, 30)
 LOGGER = logging.getLogger(__name__)
-
-
-class EventIdentityConflictError(Exception):
-    pass
 
 
 class PermanentMessageError(Exception):
@@ -70,6 +72,7 @@ def _run_worker_once(
     timeout: float,
     sleep: Callable[[float], None],
     now: Callable[[], datetime],
+    retryable_errors: tuple[tuple[type[Exception], str], ...] = (),
 ) -> tuple[bool, bool]:
     message = consumer.consume_one(timeout)
     if message is None:
@@ -87,6 +90,10 @@ def _run_worker_once(
         error = retry_failure.error
         retry_count = retry_failure.retry_count
         reset_requested = True
+        failure_code = next(
+            (code for error_type, code in retryable_errors if isinstance(error, error_type)),
+            None,
+        )
     except Exception as caught:
         failure_code = next(
             (code for error_type, code in permanent_errors if isinstance(caught, error_type)),
@@ -141,15 +148,19 @@ class EventStorageWorker:
         consumer: ConsumerPort,
         producer: ProducerPort,
         events: EventRepository,
+        registry: EventIngestRegistryRepository,
         metadata: IngestMetadataRepository,
         failure_sink: FailureSink,
         validated_topic: str = VALIDATED_TOPIC,
         sleep: Callable[[float], None] = time.sleep,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
+        if isinstance(events, EventRepository):
+            events.assert_ingest_writer()
         self.consumer = consumer
         self.producer = producer
         self.events = events
+        self.registry = registry
         self.metadata = metadata
         self.failure_sink = failure_sink
         self.validated_topic = validated_topic
@@ -172,6 +183,7 @@ class EventStorageWorker:
             timeout=timeout,
             sleep=self.sleep,
             now=self.now,
+            retryable_errors=((EventIngestLockTimeoutError, "EVENT_INGEST_LOCK_TIMEOUT"),),
         )
         return completed
 
@@ -184,21 +196,25 @@ class EventStorageWorker:
         except (UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
             raise PermanentMessageError("Kafka message payload is invalid") from error
         event_id = record["event_id"]
-        existing = self.events.identity(event_id)
-        if existing is not None:
-            if (
-                existing.endpoint_id != record["endpoint_id"]
-                or existing.agent_id != record["agent_id"]
-                or existing.payload_sha256 != record["payload_sha256"]
-            ):
-                raise EventIdentityConflictError("eventId exists with a different identity or payload")
-        else:
-            with self.metadata.hot_ingest_guard(
-                endpoint_id=record["endpoint_id"],
-                occurred_at=record["occurred_at"],
-                now=self.now(),
-            ):
-                self.events.insert([record])
+        with self.registry.claim(
+            event_id=event_id,
+            endpoint_id=record["endpoint_id"],
+            agent_id=record["agent_id"],
+            payload_sha256=record["payload_sha256"],
+            registered_at=self.now(),
+        ) as claim:
+            self._assert_same_identity(claim.identity, record)
+            if claim.created:
+                existing = self.events.identity(event_id)
+                if existing is not None:
+                    self._assert_same_identity(existing, record)
+                else:
+                    with self.metadata.hot_ingest_guard(
+                        endpoint_id=record["endpoint_id"],
+                        occurred_at=record["occurred_at"],
+                        now=self.now(),
+                    ):
+                        self.events.insert([record])
         validated = {
             "event": json_ready(record),
             "raw": raw,
@@ -209,6 +225,15 @@ class EventStorageWorker:
             value=canonical_json(validated),
         ):
             raise RuntimeError("telemetry.validated broker acknowledgement failed")
+
+    @staticmethod
+    def _assert_same_identity(existing: Any, record: dict[str, Any]) -> None:
+        if (
+            existing.endpoint_id != record["endpoint_id"]
+            or existing.agent_id != record["agent_id"]
+            or existing.payload_sha256 != record["payload_sha256"]
+        ):
+            raise EventIdentityConflictError("eventId exists with a different identity or payload")
 
 
 class DetectionWorker:

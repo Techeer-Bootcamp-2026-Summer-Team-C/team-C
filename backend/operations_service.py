@@ -46,6 +46,7 @@ class OperationsHealthService:
                 detail="The authenticated operations endpoint is responding.",
             ),
             self._probe("PostgreSQL", self._check_postgres),
+            self._probe("Event ingest registry capacity", self._check_registry_capacity),
             self._probe("ClickHouse", lambda: self.runtime.clickhouse.command("SELECT 1")),
             self._probe("Kafka", self.runtime.producer.check),
             self._probe("S3", lambda: self.runtime.s3.head_bucket(Bucket=self.runtime.settings.s3_bucket)),
@@ -64,6 +65,28 @@ class OperationsHealthService:
     def _check_postgres(self) -> None:
         with self.runtime.postgres() as connection:
             connection.execute("SELECT 1").fetchone()
+
+    def _check_registry_capacity(self) -> None:
+        with self.runtime.postgres() as connection:
+            row = connection.execute(
+                """
+                SELECT
+                    COALESCE(SUM(GREATEST(relation.reltuples, 0)), 0)::bigint,
+                    COALESCE(SUM(pg_total_relation_size(relation.oid)), 0)::bigint
+                FROM pg_partition_tree('event_ingest_registry'::regclass) AS partition
+                JOIN pg_class AS relation ON relation.oid = partition.relid
+                WHERE partition.isleaf
+                """
+            ).fetchone()
+        estimated_rows = int(row[0]) if row is not None else 0
+        total_bytes = int(row[1]) if row is not None else 0
+        max_rows = getattr(self.runtime.settings, "event_ingest_registry_max_rows", 100_000_000)
+        max_bytes = getattr(self.runtime.settings, "event_ingest_registry_max_bytes", 53_687_091_200)
+        if estimated_rows > max_rows or total_bytes > max_bytes:
+            raise RuntimeError(
+                "Event ingest registry capacity threshold exceeded "
+                f"(estimated_rows={estimated_rows}, bytes={total_bytes})"
+            )
 
     @staticmethod
     def _status(snapshot: ConsumerGroupSnapshot) -> WorkerStatus:

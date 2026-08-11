@@ -42,6 +42,7 @@ def test_app_containers_use_compose_internal_service_addresses() -> None:
     assert "@postgres:5432/" in environment["EDR_POSTGRES_DSN"]
     assert "@clickhouse:8123/" in environment["EDR_CLICKHOUSE_DSN"]
     assert environment["EDR_KAFKA_BOOTSTRAP_SERVERS"] == "kafka:29092"
+    assert environment["EDR_EVENT_INGEST_LOCK_TIMEOUT_MS"] == "${EDR_EVENT_INGEST_LOCK_TIMEOUT_MS:-15000}"
     assert environment["EDR_S3_ENDPOINT_URL"] == "http://minio:9000"
     assert environment["EDR_AWS_REGION"] == "${EDR_AWS_REGION:-us-east-1}"
     assert environment["EDR_KAFKA_PARTITIONS_PER_TOPIC"] == "${EDR_KAFKA_PARTITIONS_PER_TOPIC:-2}"
@@ -97,6 +98,7 @@ def test_production_apps_use_internal_data_services_and_iam_role_s3() -> None:
     assert "@postgres:5432/" in environment["EDR_POSTGRES_DSN"]
     assert "@clickhouse:8123/" in environment["EDR_CLICKHOUSE_DSN"]
     assert environment["EDR_KAFKA_BOOTSTRAP_SERVERS"] == "kafka:29092"
+    assert environment["EDR_EVENT_INGEST_LOCK_TIMEOUT_MS"] == "${EDR_EVENT_INGEST_LOCK_TIMEOUT_MS:-15000}"
     assert environment["EDR_AWS_REGION"] == "${EDR_AWS_REGION:?EDR_AWS_REGION is required}"
     assert environment["EDR_S3_BUCKET"] == "${EDR_S3_BUCKET:?EDR_S3_BUCKET is required}"
     assert "EDR_S3_ENDPOINT_URL" not in environment

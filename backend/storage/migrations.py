@@ -10,8 +10,96 @@ class ClickHouseCommandClient(Protocol):
 
 
 def split_sql_statements(sql: str) -> list[str]:
-    lines = [line for line in sql.splitlines() if not line.lstrip().startswith("--")]
-    return [statement.strip() for statement in "\n".join(lines).split(";") if statement.strip()]
+    statements: list[str] = []
+    buffer: list[str] = []
+    index = 0
+    quote: str | None = None
+    dollar_tag: str | None = None
+    block_comment_depth = 0
+    line_comment = False
+
+    while index < len(sql):
+        char = sql[index]
+        following = sql[index + 1] if index + 1 < len(sql) else ""
+
+        if line_comment:
+            if char == "\n":
+                line_comment = False
+                buffer.append(char)
+            index += 1
+            continue
+        if block_comment_depth:
+            if char == "/" and following == "*":
+                block_comment_depth += 1
+                index += 2
+            elif char == "*" and following == "/":
+                block_comment_depth -= 1
+                index += 2
+            else:
+                index += 1
+            continue
+        if dollar_tag is not None:
+            if sql.startswith(dollar_tag, index):
+                buffer.append(dollar_tag)
+                index += len(dollar_tag)
+                dollar_tag = None
+            else:
+                buffer.append(char)
+                index += 1
+            continue
+        if quote is not None:
+            buffer.append(char)
+            if char == quote:
+                if following == quote:
+                    buffer.append(following)
+                    index += 2
+                    continue
+                quote = None
+            index += 1
+            continue
+
+        if char == "-" and following == "-":
+            if buffer and not buffer[-1].isspace():
+                buffer.append(" ")
+            line_comment = True
+            index += 2
+            continue
+        if char == "/" and following == "*":
+            if buffer and not buffer[-1].isspace():
+                buffer.append(" ")
+            block_comment_depth = 1
+            index += 2
+            continue
+        if char in {"'", '"'}:
+            quote = char
+            buffer.append(char)
+            index += 1
+            continue
+        if char == "$":
+            closing = sql.find("$", index + 1)
+            if closing != -1:
+                candidate = sql[index : closing + 1]
+                tag = candidate[1:-1]
+                if not tag or (tag.replace("_", "a").isalnum() and not tag[0].isdigit()):
+                    dollar_tag = candidate
+                    buffer.append(candidate)
+                    index = closing + 1
+                    continue
+        if char == ";":
+            statement = "".join(buffer).strip()
+            if statement:
+                statements.append(statement)
+            buffer.clear()
+        else:
+            buffer.append(char)
+        index += 1
+
+    if quote is not None or dollar_tag is not None or block_comment_depth:
+        raise ValueError("unterminated quoted string or comment in SQL migration")
+    statement = "".join(buffer).strip()
+    if statement:
+        statements.append(statement)
+    return statements
 
 
 def apply_postgres_file(connection: PostgresConnection, path: Path) -> None:

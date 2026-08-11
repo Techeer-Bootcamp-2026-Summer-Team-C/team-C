@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     kafka_partitions_per_topic: int = Field(default=2, ge=1)
     kafka_replication_factor: int = Field(default=1, ge=1)
     event_storage_consumer_group: str = "edr-event-storage-v1"
+    event_ingest_lock_timeout_ms: int = Field(default=15_000, ge=100, le=30_000)
+    event_ingest_registry_max_rows: int = Field(default=100_000_000, ge=1_000_000)
+    event_ingest_registry_max_bytes: int = Field(default=53_687_091_200, ge=1_073_741_824)
     detection_consumer_group: str = "edr-detection-v1"
     aws_region: str | None = None
     s3_endpoint_url: str | None = None
