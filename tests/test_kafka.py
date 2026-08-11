@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import backend.kafka as kafka_module
 from backend.kafka import (
+    DASHBOARD_ROLLUP_CONSUMER_GROUP,
     DETECTION_CONSUMER_GROUP,
     EVENT_STORAGE_CONSUMER_GROUP,
     PARTITIONS_PER_TOPIC,
@@ -57,6 +58,7 @@ def test_default_topic_partition_replication_and_consumer_group_contract() -> No
     assert REPLICATION_FACTOR == 1
     assert EVENT_STORAGE_CONSUMER_GROUP == "edr-event-storage-v1"
     assert DETECTION_CONSUMER_GROUP == "edr-detection-v1"
+    assert DASHBOARD_ROLLUP_CONSUMER_GROUP == "edr-dashboard-rollup-v1"
 
 
 def test_ensure_topics_creates_new_topics_with_two_partitions(monkeypatch) -> None:

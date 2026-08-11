@@ -1,7 +1,8 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from threading import BoundedSemaphore
+from typing import Any, Literal
 
 import boto3
 import clickhouse_connect
@@ -9,21 +10,30 @@ import psycopg
 from botocore.config import Config
 
 from .archive_service import BotoRestoreObjectClient
+from .errors import ServiceUnavailableError
 from .event_service import RestoredEventReader
 from .kafka import KafkaProducer
 from .rule_loader import LoadedRule, RuleLoader
 from .settings import Settings
 
+DASHBOARD_LIVE_LOCK_NAMESPACE = "dashboard-live-v1"
+
 
 class RuntimeServices:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        clickhouse_role: Literal["read", "worker", "lifecycle"] = "read",
+    ) -> None:
         self.settings = settings
         bootstrap_servers = settings.kafka_bootstrap_servers
         self.raw_topic = settings.kafka_raw_topic
         self.validated_topic = settings.kafka_validated_topic
+        self._dashboard_live_slots = BoundedSemaphore(settings.dashboard_live_max_concurrency)
         self.producer = KafkaProducer(bootstrap_servers, allowed_topics=settings.kafka_topics)
         self.clickhouse = clickhouse_connect.get_client(
-            dsn=settings.clickhouse_dsn.get_secret_value(),
+            dsn=clickhouse_dsn_for_role(settings, clickhouse_role),
             autogenerate_session_id=False,
             connect_timeout=5,
             send_receive_timeout=10,
@@ -47,6 +57,36 @@ class RuntimeServices:
         ) as connection:
             yield connection
 
+    @contextmanager
+    def dashboard_live_query_guard(self, connection: Any | None = None) -> Iterator[None]:
+        if not self._dashboard_live_slots.acquire(blocking=False):
+            raise ServiceUnavailableError("Dashboard LIVE query capacity is exhausted. Retry later.")
+        acquired_slot: int | None = None
+        try:
+            if connection is not None:
+                for slot in range(self.settings.dashboard_live_max_concurrency):
+                    acquired = connection.execute(
+                        "SELECT pg_try_advisory_lock(hashtext(%s), %s)",
+                        (DASHBOARD_LIVE_LOCK_NAMESPACE, slot),
+                    ).fetchone()
+                    if acquired is not None and bool(acquired[0]):
+                        acquired_slot = slot
+                        break
+                if acquired_slot is None:
+                    raise ServiceUnavailableError(
+                        "Dashboard LIVE query capacity is exhausted. Retry later."
+                    )
+            yield
+        finally:
+            try:
+                if connection is not None and acquired_slot is not None:
+                    connection.execute(
+                        "SELECT pg_advisory_unlock(hashtext(%s), %s)",
+                        (DASHBOARD_LIVE_LOCK_NAMESPACE, acquired_slot),
+                    ).fetchone()
+            finally:
+                self._dashboard_live_slots.release()
+
     def check_ready(self) -> None:
         self.producer.check()
         with self.postgres() as connection:
@@ -63,6 +103,18 @@ class RuntimeServices:
             mapping_path=root / "mappings" / "mitre_attack.yaml",
         )
         return loader.load_directory(root / "rules")
+
+
+def clickhouse_dsn_for_role(
+    settings: Settings,
+    role: Literal["read", "worker", "lifecycle"],
+) -> str:
+    role_dsn = {
+        "read": settings.clickhouse_read_dsn,
+        "worker": settings.clickhouse_worker_dsn,
+        "lifecycle": settings.clickhouse_lifecycle_dsn,
+    }[role]
+    return (role_dsn or settings.clickhouse_dsn).get_secret_value()
 
 
 def create_s3_client(settings: Settings) -> Any:

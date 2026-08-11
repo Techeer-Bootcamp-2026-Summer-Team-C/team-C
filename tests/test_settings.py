@@ -150,6 +150,16 @@ def test_kafka_defaults_match_the_two_worker_pipeline() -> None:
     assert settings.event_ingest_registry_max_rows == 100_000_000
     assert settings.event_ingest_registry_max_bytes == 53_687_091_200
     assert settings.detection_consumer_group == "edr-detection-v1"
+    assert settings.dashboard_rollup_consumer_group == "edr-dashboard-rollup-v1"
+    assert settings.dashboard_rollup_backfill_hours == 744
+    assert settings.dashboard_rollup_backfill_chunk_hours == 1
+    assert settings.dashboard_rollup_overlap_minutes == 2
+    assert settings.dashboard_rollup_flush_seconds == 5
+    assert settings.dashboard_rollup_max_dirty_buckets == 500
+    assert settings.dashboard_rollup_reconcile_hours == 24
+    assert settings.dashboard_rollup_reconcile_interval_seconds == 21_600
+    assert settings.dashboard_rollup_freshness_grace_seconds == 300
+    assert settings.dashboard_live_max_concurrency == 2
 
 
 @pytest.mark.parametrize(

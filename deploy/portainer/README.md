@@ -110,11 +110,16 @@ EDR_IMAGE_TAG=<3단계의 전체 40자리 커밋 SHA>
 EDR_JWT_SECRET=<32자 이상의 임의 문자열>
 EDR_POSTGRES_DSN=postgresql://<사용자>:<URL-인코딩한-비밀번호>@postgres:5432/<DB명>
 EDR_CLICKHOUSE_DSN=http://<사용자>:<URL-인코딩한-비밀번호>@clickhouse:8123/<DB명>
+EDR_CLICKHOUSE_READ_DSN=http://<조회전용-사용자>:<URL-인코딩한-비밀번호>@clickhouse:8123/<DB명>
+EDR_CLICKHOUSE_WORKER_DSN=http://<워커-사용자>:<URL-인코딩한-비밀번호>@clickhouse:8123/<DB명>
+EDR_CLICKHOUSE_LIFECYCLE_DSN=http://<수명주기-사용자>:<URL-인코딩한-비밀번호>@clickhouse:8123/<DB명>
 EDR_AWS_REGION=ap-northeast-2
 EDR_S3_BUCKET=<실제 S3 버킷 이름>
 ```
 
 비밀번호에 `@`, `:`, `/`, `?`, `#`, `[`, `]` 같은 문자가 있으면 DSN 안의 비밀번호를 URL 인코딩해야 한다. EC2 인스턴스 역할로 S3에 접근하므로 AWS Access Key와 Secret Key는 입력하지 않는다.
+
+역할별 DSN은 선택 사항이며 비어 있으면 `EDR_CLICKHOUSE_DSN`을 사용한다. 운영에서는 ClickHouse 사용자를 별도로 만들고 조회 전용 사용자는 `edr` DB의 `SELECT`, 워커 사용자는 `edr_events`·`event_failures`의 `SELECT`/`INSERT`, 수명주기 사용자는 `edr_events`의 `SELECT`/`ALTER`만 부여한다. 스키마 마이그레이션과 관리 CLI는 기본 DSN을 사용한다. 계정 비밀번호와 `CREATE USER`/`GRANT` 문은 저장소에 커밋하지 않는다.
 
 > 운영 `edr-c-service`는 현재 `refs/heads/production` 브랜치 + polling으로 자동 배포된다(7절 참조). production 브랜치의 compose는 이미지 SHA가 고정돼 있어 `EDR_IMAGE_TAG`는 CI가 자동으로 채운다. 이 스택을 재구성할 때는 repository reference를 `refs/heads/production`으로 두고 `EDR_IMAGE_TAG` 없이 나머지 비밀 변수만 입력한다.
 

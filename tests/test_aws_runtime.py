@@ -1,7 +1,13 @@
+from threading import BoundedSemaphore
+from types import SimpleNamespace
+
+import pytest
+
 import backend.event_service as event_service_module
 import backend.runtime as runtime_module
+from backend.errors import ServiceUnavailableError
 from backend.event_service import RestoredEventReader
-from backend.runtime import create_s3_client
+from backend.runtime import RuntimeServices, clickhouse_dsn_for_role, create_s3_client
 from backend.settings import Settings
 
 
@@ -118,3 +124,65 @@ def test_pyarrow_minio_mode_passes_endpoint_and_explicit_credentials(monkeypatch
         "connect_timeout": 5,
         "request_timeout": 10,
     }
+
+
+def test_dashboard_live_query_guard_rejects_excess_concurrency_and_releases_slot() -> None:
+    runtime = object.__new__(RuntimeServices)
+    runtime._dashboard_live_slots = BoundedSemaphore(1)
+
+    with runtime.dashboard_live_query_guard():
+        with pytest.raises(ServiceUnavailableError, match="capacity is exhausted"):
+            with runtime.dashboard_live_query_guard():
+                pass
+
+    with runtime.dashboard_live_query_guard():
+        pass
+
+
+def test_dashboard_live_query_guard_uses_postgres_slots_across_processes() -> None:
+    class Result:
+        def __init__(self, value: bool) -> None:
+            self.value = value
+
+        def fetchone(self):
+            return (self.value,)
+
+    class Connection:
+        def __init__(self, available: list[bool]) -> None:
+            self.available = iter(available)
+            self.calls: list[tuple[str, tuple]] = []
+
+        def execute(self, statement, parameters):
+            self.calls.append((statement, parameters))
+            if "pg_try_advisory_lock" in statement:
+                return Result(next(self.available))
+            return Result(True)
+
+    runtime = object.__new__(RuntimeServices)
+    runtime.settings = SimpleNamespace(dashboard_live_max_concurrency=2)
+    runtime._dashboard_live_slots = BoundedSemaphore(2)
+    connection = Connection([False, True])
+
+    with runtime.dashboard_live_query_guard(connection):
+        pass
+
+    assert connection.calls[0][1][1] == 0
+    assert connection.calls[1][1][1] == 1
+    assert "pg_advisory_unlock" in connection.calls[-1][0]
+
+    with pytest.raises(ServiceUnavailableError, match="capacity is exhausted"):
+        with runtime.dashboard_live_query_guard(Connection([False, False])):
+            pass
+
+
+def test_clickhouse_runtime_roles_use_separate_credentials_with_safe_fallback() -> None:
+    configured = settings(
+        clickhouse_read_dsn="http://read@clickhouse/edr",
+        clickhouse_worker_dsn="http://worker@clickhouse/edr",
+        clickhouse_lifecycle_dsn="http://lifecycle@clickhouse/edr",
+    )
+
+    assert clickhouse_dsn_for_role(configured, "read") == "http://read@clickhouse/edr"
+    assert clickhouse_dsn_for_role(configured, "worker") == "http://worker@clickhouse/edr"
+    assert clickhouse_dsn_for_role(configured, "lifecycle") == "http://lifecycle@clickhouse/edr"
+    assert clickhouse_dsn_for_role(settings(), "read") == "http://user:password@localhost:8123/edr"

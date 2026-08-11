@@ -4,7 +4,7 @@ import tempfile
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Protocol
 from uuid import UUID
 
 import pyarrow as pa
@@ -18,6 +18,10 @@ LOGGER = logging.getLogger(__name__)
 ARCHIVE_SAFETY_WINDOW = timedelta(days=7)
 RESTORE_REDISPATCH_GRACE = timedelta(minutes=15)
 RESTORE_TIMEOUT = timedelta(days=2)
+
+
+class DashboardRollupPort(Protocol):
+    def refresh_range(self, *, from_: datetime, to: datetime) -> Any: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,12 +156,14 @@ class StorageLifecycleWorker:
         events: EventRepository,
         archive_store: BotoParquetArchiveStore,
         restore_client: RestoreStatusPort,
+        dashboard_rollups: DashboardRollupPort | None = None,
         candidate_limit: int = 10,
     ) -> None:
         self.metadata = metadata
         self.events = events
         self.archive_store = archive_store
         self.restore_client = restore_client
+        self.dashboard_rollups = dashboard_rollups
         self.candidate_limit = candidate_limit
 
     def run_once(self, *, now: datetime) -> LifecycleResult:
@@ -179,34 +185,51 @@ class StorageLifecycleWorker:
             endpoint_id = int(candidate["endpoint_id"])
             bucket_start_at = _utc(candidate["bucket_start_at"])
             try:
+                # Export without holding the date-wide PostgreSQL advisory lock.
+                # Event rows are append-only, so a final count under the lock is
+                # sufficient to detect a late Event and reject the stale object.
+                event_count = self.events.archive_count(
+                    endpoint_id=endpoint_id,
+                    bucket_start_at=bucket_start_at,
+                )
+                if event_count <= 0:
+                    LOGGER.warning(
+                        "archive candidate has no active events endpoint_id=%s bucket=%s",
+                        endpoint_id,
+                        bucket_start_at.isoformat(),
+                    )
+                    continue
+                storage_path = str(
+                    candidate.get("archive_storage_path") or _archive_key(endpoint_id, bucket_start_at)
+                )
+                archived_object = self.archive_store.write(
+                    storage_path,
+                    self.events.archive_row_batches(
+                        endpoint_id=endpoint_id,
+                        bucket_start_at=bucket_start_at,
+                    ),
+                    expected_count=event_count,
+                )
                 with self.metadata.archive_guard(
                     endpoint_id=endpoint_id,
                     bucket_start_at=bucket_start_at,
                 ) as hot:
                     if hot is None:
                         continue
-                    event_count = self.events.archive_count(
+                    current_event_count = self.events.archive_count(
                         endpoint_id=endpoint_id,
                         bucket_start_at=bucket_start_at,
                     )
-                    if event_count <= 0:
+                    if current_event_count != archived_object.event_count:
                         LOGGER.warning(
-                            "archive candidate has no active events endpoint_id=%s bucket=%s",
+                            "archive source changed during export endpoint_id=%s bucket=%s "
+                            "exported=%s current=%s",
                             endpoint_id,
                             bucket_start_at.isoformat(),
+                            archived_object.event_count,
+                            current_event_count,
                         )
                         continue
-                    storage_path = str(
-                        candidate.get("archive_storage_path") or _archive_key(endpoint_id, bucket_start_at)
-                    )
-                    archived_object = self.archive_store.write(
-                        storage_path,
-                        self.events.archive_row_batches(
-                            endpoint_id=endpoint_id,
-                            bucket_start_at=bucket_start_at,
-                        ),
-                        expected_count=event_count,
-                    )
                     self.metadata.record_verified_archive(
                         endpoint_id=endpoint_id,
                         bucket_start_at=bucket_start_at,
@@ -280,6 +303,18 @@ class StorageLifecycleWorker:
             limit=self.candidate_limit,
         ):
             bucket_start_at = _utc(bucket_start_at)
+            if self.dashboard_rollups is not None:
+                try:
+                    self.dashboard_rollups.refresh_range(
+                        from_=bucket_start_at,
+                        to=bucket_start_at + timedelta(days=1),
+                    )
+                except Exception:
+                    LOGGER.exception(
+                        "dashboard rollup barrier failed; ClickHouse partition retained bucket=%s",
+                        bucket_start_at.isoformat(),
+                    )
+                    continue
             if not self.metadata.claim_partition_deletion(
                 bucket_start_at=bucket_start_at,
                 verified_before=verified_before,

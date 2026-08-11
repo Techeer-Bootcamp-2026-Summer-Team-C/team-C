@@ -115,6 +115,7 @@ class StoredAlert:
     alert_id: int
     created: bool
     status: AlertStatus
+    detected_at: datetime
 
 
 @dataclass(frozen=True, slots=True)

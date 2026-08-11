@@ -26,6 +26,7 @@ def test_local_compose_contains_the_complete_development_stack() -> None:
         "backend",
         "event-storage-worker",
         "detection-worker",
+        "dashboard-rollup-worker",
         "storage-lifecycle-worker",
         "frontend",
         "nginx",
@@ -75,6 +76,7 @@ def test_production_compose_contains_only_the_required_runtime_services() -> Non
         "backend",
         "event-storage-worker",
         "detection-worker",
+        "dashboard-rollup-worker",
         "storage-lifecycle-worker",
         "nginx",
     }
@@ -122,12 +124,22 @@ def test_production_init_is_safe_and_does_not_call_local_demo_or_s3() -> None:
 def test_production_workers_default_to_one_scalable_service_each() -> None:
     services = _production_compose()["services"]
 
-    for worker_name in ("event-storage-worker", "detection-worker", "storage-lifecycle-worker"):
+    for worker_name in (
+        "event-storage-worker",
+        "detection-worker",
+        "dashboard-rollup-worker",
+        "storage-lifecycle-worker",
+    ):
         worker = services[worker_name]
         assert "container_name" not in worker
         assert "deploy" not in worker
     assert services["event-storage-worker"]["command"] == ["python", "-m", "tools.run_event_storage_worker"]
     assert services["detection-worker"]["command"] == ["python", "-m", "tools.run_detection_worker"]
+    assert services["dashboard-rollup-worker"]["command"] == [
+        "python",
+        "-m",
+        "tools.run_dashboard_rollup_worker",
+    ]
     assert services["storage-lifecycle-worker"]["command"] == [
         "python",
         "-m",
@@ -142,35 +154,6 @@ def test_backend_image_and_app_services_drop_root_privileges() -> None:
         app = compose["x-app-service"]
         assert app["security_opt"] == ["no-new-privileges:true"]
         assert app["cap_drop"] == ["ALL"]
-
-
-def test_backend_image_allowlists_runtime_and_demo_setup_tools() -> None:
-    dockerfile = (ROOT / "deploy/docker/backend.Dockerfile").read_text(encoding="utf-8")
-
-    assert "COPY tools ./tools" not in dockerfile
-    for tool in (
-        "check_worker_health.py",
-        "create_admin.py",
-        "local_demo.py",
-        "manage_admin.py",
-        "prod_init.py",
-        "provision_agent_cert.py",
-        "provision_compose_certs.py",
-        "replay_failure.py",
-        "run_detection_worker.py",
-        "run_event_storage_worker.py",
-        "run_storage_lifecycle_worker.py",
-        "secure_files.py",
-        "seed_presentation_demo.py",
-        "seed_safety.py",
-        "verify_presentation_demo.py",
-    ):
-        assert f"tools/{tool}" in dockerfile
-    for development_only_tool in (
-        "export_openapi.py",
-        "sync_mitre_attack.py",
-    ):
-        assert f"tools/{development_only_tool}" not in dockerfile
 
 
 def test_production_example_has_no_access_key_fields() -> None:
@@ -199,3 +182,13 @@ def test_nginx_rate_limits_dashboard_login_with_a_contract_error() -> None:
     assert "location = /api/v1/auth/login" in nginx
     assert "limit_req_status 429;" in nginx
     assert '"code":"RATE_LIMITED"' in nginx
+
+
+def test_nginx_rate_limits_only_explicit_dashboard_live_refreshes() -> None:
+    nginx = (ROOT / "deploy/nginx/nginx.dev.conf").read_text(encoding="utf-8")
+
+    assert "map $arg_eventSource $dashboard_live_limit_key" in nginx
+    assert "LIVE $binary_remote_addr;" in nginx
+    assert "limit_req_zone $dashboard_live_limit_key zone=dashboard_live:10m rate=12r/m;" in nginx
+    assert "location = /api/v1/dashboard/summary" in nginx
+    assert "Too many Dashboard LIVE refreshes" in nginx

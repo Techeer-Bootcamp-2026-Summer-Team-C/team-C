@@ -207,6 +207,7 @@ def test_lifecycle_marks_completed_restore_and_expires_old_copies() -> None:
 
 def test_lifecycle_exports_under_archive_guard_and_records_verified_object() -> None:
     bucket_start = NOW.replace(hour=0) - timedelta(days=1)
+    calls: list[str] = []
 
     class Metadata:
         def archive_candidates(self, **_kwargs):
@@ -214,9 +215,14 @@ def test_lifecycle_exports_under_archive_guard_and_records_verified_object() -> 
 
         @contextmanager
         def archive_guard(self, **_kwargs):
-            yield {"bucket_end_at": bucket_start + timedelta(days=1)}
+            calls.append("guard-enter")
+            try:
+                yield {"bucket_end_at": bucket_start + timedelta(days=1)}
+            finally:
+                calls.append("guard-exit")
 
         def record_verified_archive(self, **kwargs):
+            calls.append("record")
             self.archive = kwargs
 
         def requested_restores(self, **_kwargs):
@@ -230,18 +236,163 @@ def test_lifecycle_exports_under_archive_guard_and_records_verified_object() -> 
 
     class Events:
         def archive_count(self, **_kwargs):
+            calls.append("count")
             return 1
 
         def archive_row_batches(self, **_kwargs):
+            calls.append("stream")
             return [[_event_row()]]
+
+    class ArchiveStore:
+        def __init__(self) -> None:
+            self.delegate = BotoParquetArchiveStore(
+                MemoryS3(),
+                bucket="archive",
+                use_glacier_storage_class=False,
+            )
+
+        def write(self, *args, **kwargs):
+            calls.append("upload")
+            return self.delegate.write(*args, **kwargs)
 
     metadata = Metadata()
     result = StorageLifecycleWorker(
         metadata=metadata,
         events=Events(),
-        archive_store=BotoParquetArchiveStore(MemoryS3(), bucket="archive", use_glacier_storage_class=False),
+        archive_store=ArchiveStore(),
         restore_client=object(),
     ).run_once(now=NOW)
     assert result.archived_bucket_count == 1
     assert metadata.archive["event_count"] == 1
     assert metadata.archive["storage_path"].endswith("endpoint_id=7/events.parquet")
+    assert calls == ["count", "stream", "upload", "guard-enter", "count", "record", "guard-exit"]
+
+
+def test_lifecycle_rejects_archive_when_late_event_arrives_during_export() -> None:
+    bucket_start = NOW.replace(hour=0) - timedelta(days=1)
+
+    class Metadata:
+        def archive_candidates(self, **_kwargs):
+            return [{"endpoint_id": 7, "bucket_start_at": bucket_start, "archive_storage_path": None}]
+
+        @contextmanager
+        def archive_guard(self, **_kwargs):
+            yield {"bucket_end_at": bucket_start + timedelta(days=1)}
+
+        def record_verified_archive(self, **_kwargs):
+            pytest.fail("a stale archive must not be marked verified")
+
+        def requested_restores(self, **_kwargs):
+            return []
+
+        def expire_restores(self, _now):
+            return 0
+
+        def partition_deletion_candidates(self, **_kwargs):
+            return []
+
+    class Events:
+        def __init__(self) -> None:
+            self.counts = iter((1, 2))
+
+        def archive_count(self, **_kwargs):
+            return next(self.counts)
+
+        def archive_row_batches(self, **_kwargs):
+            return [[_event_row()]]
+
+    result = StorageLifecycleWorker(
+        metadata=Metadata(),
+        events=Events(),
+        archive_store=BotoParquetArchiveStore(
+            MemoryS3(),
+            bucket="archive",
+            use_glacier_storage_class=False,
+        ),
+        restore_client=object(),
+    ).run_once(now=NOW)
+
+    assert result.archived_bucket_count == 0
+
+
+def test_partition_deletion_waits_for_successful_dashboard_rollup() -> None:
+    bucket_start = NOW.replace(hour=0) - timedelta(days=8)
+    calls: list[str] = []
+
+    class Metadata:
+        def archive_candidates(self, **_kwargs):
+            return []
+
+        def requested_restores(self, **_kwargs):
+            return []
+
+        def expire_restores(self, _now):
+            return 0
+
+        def partition_deletion_candidates(self, **_kwargs):
+            return [bucket_start]
+
+        def claim_partition_deletion(self, **_kwargs):
+            calls.append("claim")
+            return True
+
+        def mark_partition_deleted(self, **_kwargs):
+            calls.append("mark")
+
+    class Events:
+        def drop_partition(self, _date):
+            calls.append("drop")
+
+    class Rollups:
+        def refresh_range(self, **kwargs):
+            calls.append("rollup")
+            assert kwargs == {"from_": bucket_start, "to": bucket_start + timedelta(days=1)}
+
+    result = StorageLifecycleWorker(
+        metadata=Metadata(),
+        events=Events(),
+        archive_store=object(),
+        restore_client=object(),
+        dashboard_rollups=Rollups(),
+    ).run_once(now=NOW)
+
+    assert result.deleted_partition_count == 1
+    assert calls == ["rollup", "claim", "drop", "mark"]
+
+
+def test_partition_is_retained_when_dashboard_rollup_barrier_fails() -> None:
+    bucket_start = NOW.replace(hour=0) - timedelta(days=8)
+    calls: list[str] = []
+
+    class Metadata:
+        def archive_candidates(self, **_kwargs):
+            return []
+
+        def requested_restores(self, **_kwargs):
+            return []
+
+        def expire_restores(self, _now):
+            return 0
+
+        def partition_deletion_candidates(self, **_kwargs):
+            return [bucket_start]
+
+        def claim_partition_deletion(self, **_kwargs):
+            calls.append("claim")
+            return True
+
+    class Rollups:
+        def refresh_range(self, **_kwargs):
+            calls.append("rollup")
+            raise RuntimeError("PostgreSQL unavailable")
+
+    result = StorageLifecycleWorker(
+        metadata=Metadata(),
+        events=object(),
+        archive_store=object(),
+        restore_client=object(),
+        dashboard_rollups=Rollups(),
+    ).run_once(now=NOW)
+
+    assert result.deleted_partition_count == 0
+    assert calls == ["rollup"]

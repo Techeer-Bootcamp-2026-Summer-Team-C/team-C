@@ -1336,6 +1336,14 @@
         "title": "DashboardEventFailuresDto",
         "type": "object"
       },
+      "DashboardEventSource": {
+        "enum": [
+          "ROLLUP",
+          "LIVE"
+        ],
+        "title": "DashboardEventSource",
+        "type": "string"
+      },
       "DashboardEventsDto": {
         "additionalProperties": false,
         "properties": {
@@ -3721,6 +3729,7 @@
       "EventFailureStatus": {
         "enum": [
           "FAILED",
+          "REPLAY_PUBLISHED",
           "REPROCESSED",
           "REPROCESS_FAILED"
         ],
@@ -9006,6 +9015,17 @@
               "title": "Interval",
               "type": "string"
             }
+          },
+          {
+            "description": "ROLLUP은 PostgreSQL 사전 집계를, LIVE는 ClickHouse 원본을 조회합니다.",
+            "in": "query",
+            "name": "eventSource",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/DashboardEventSource",
+              "default": "ROLLUP",
+              "description": "ROLLUP은 PostgreSQL 사전 집계를, LIVE는 ClickHouse 원본을 조회합니다."
+            }
           }
         ],
         "responses": {
@@ -9038,6 +9058,16 @@
               }
             },
             "description": "인증에 실패했거나 유효한 인증 정보가 없습니다."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "설정된 요청 속도 제한을 초과했습니다."
           },
           "503": {
             "content": {

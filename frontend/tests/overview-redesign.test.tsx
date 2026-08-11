@@ -360,7 +360,7 @@ describe("overview fixed dashboard", () => {
     </MemoryRouter></LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
 
     await waitFor(() => expect(dashboardSpy).toHaveBeenCalled());
-    await waitFor(() => expect(queryClient.getQueryData(["dashboard", { timePreset: "LATEST_24H", interval: "1h" }])).toEqual(success(data.dashboard!)));
+    await waitFor(() => expect(queryClient.getQueryData(["dashboard", { timePreset: "LATEST_24H", interval: "1h", eventSource: "ROLLUP" }])).toEqual(success(data.dashboard!)));
     expect(await screen.findByRole("region", { name: "Fixed Overview dashboard" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Dashboard settings" })).toHaveAttribute("href", "/dashboards");
     expect(screen.queryByText("ACTIVE LAYOUT")).not.toBeInTheDocument();
@@ -397,6 +397,81 @@ describe("overview fixed dashboard", () => {
     expect(screen.getByRole("heading", { name: "Fleet distribution" })).toBeInTheDocument();
     expect(container.querySelectorAll("[data-overview-block]")).toHaveLength(10);
     expect(screen.getByText(/Successful dashboard sections remain available/i)).toBeInTheDocument();
+  });
+
+  it("loads Event metrics from the rollup and queries ClickHouse only after manual refresh", async () => {
+    setAuthSession();
+    const rollupData = overviewData();
+    const liveData = {
+      ...rollupData.dashboard!,
+      alerts: { ...rollupData.dashboard!.alerts, totalCount: 9 },
+    };
+    const dashboardSpy = vi.spyOn(api, "dashboard").mockImplementation(async (query) => (
+      success(query.eventSource === "LIVE" ? liveData : rollupData.dashboard!)
+    ));
+    const ingestSpy = vi.spyOn(api, "ingestSummary").mockResolvedValue(success(ingestSummary()));
+    vi.spyOn(api, "endpointSummary").mockResolvedValue(success(rollupData.endpoints!));
+    vi.spyOn(api, "endpoints").mockResolvedValue(success({ items: [], page: 1, size: 5, total: 0 }));
+    vi.spyOn(api, "incidents").mockResolvedValue(success({ items: [], page: 1, size: 5, total: 0 }));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider><MemoryRouter>
+      <OverviewPage />
+    </MemoryRouter></LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
+
+    await waitFor(() => expect(dashboardSpy).toHaveBeenCalledWith(
+      { timePreset: "LATEST_24H", interval: "1h", eventSource: "ROLLUP" },
+      expect.any(AbortSignal),
+    ));
+    expect(ingestSpy).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+
+    await waitFor(() => expect(dashboardSpy).toHaveBeenCalledWith(
+      { timePreset: "LATEST_24H", interval: "1h", eventSource: "LIVE" },
+    ));
+    expect(await screen.findByRole("link", { name: /Total alerts9/i })).toBeInTheDocument();
+    expect(ingestSpy).not.toHaveBeenCalled();
+  });
+
+  it("offers a user-triggered LIVE recovery when the requested rollup range is not ready", async () => {
+    setAuthSession();
+    const data = overviewData();
+    const liveData = {
+      ...data.dashboard!,
+      alerts: { ...data.dashboard!.alerts, totalCount: 9 },
+    };
+    const dashboardSpy = vi.spyOn(api, "dashboard").mockImplementation(async (query) => {
+      if (query.eventSource === "ROLLUP") {
+        throw new ApiError({
+          status: 503,
+          code: "ROLLUP_NOT_READY",
+          message: "Dashboard rollup coverage is not ready for the requested range.",
+          retryable: true,
+          details: [],
+          requestId: "req_rollup_not_ready",
+        });
+      }
+      return success(liveData);
+    });
+    vi.spyOn(api, "endpointSummary").mockResolvedValue(success(data.endpoints!));
+    vi.spyOn(api, "endpoints").mockResolvedValue(success({ items: [], page: 1, size: 5, total: 0 }));
+    vi.spyOn(api, "incidents").mockResolvedValue(success({ items: [], page: 1, size: 5, total: 0 }));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><LocaleProvider><MemoryRouter>
+      <OverviewPage />
+    </MemoryRouter></LocaleProvider></AuthProvider></ThemeProvider></QueryClientProvider>);
+
+    const rollupNotice = await screen.findByText("Dashboard rollup coverage is not ready for the requested range.");
+    const recoveryNotice = rollupNotice.closest<HTMLElement>('[role="alert"]');
+    expect(recoveryNotice).not.toBeNull();
+    expect(screen.queryByText(/Successful dashboard sections remain available/i)).not.toBeInTheDocument();
+
+    fireEvent.click(within(recoveryNotice as HTMLElement).getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(dashboardSpy).toHaveBeenCalledWith(
+      { timePreset: "LATEST_24H", interval: "1h", eventSource: "LIVE" },
+    ));
+    expect(await screen.findByRole("link", { name: /Total alerts9/i })).toBeInTheDocument();
   });
 
   it("keeps the custom UTC range controls available without showing a request error", async () => {

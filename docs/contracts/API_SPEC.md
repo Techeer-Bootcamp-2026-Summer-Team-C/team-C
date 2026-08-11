@@ -32,7 +32,7 @@ Agent는 Process, Network, File, DNS, L7 5종 metadata를 전송한다. Npcap/tc
 | 저장소 | 데이터 |
 | --- | --- |
 | Agent SQLite | ACK 전 `local_event_buffer` |
-| PostgreSQL | `users`, `endpoints`, `agent_auth_keys`, `alerts`, `incidents`, `incident_alerts`, `audit_logs`, `ingest_metadata` |
+| PostgreSQL | `users`, `endpoints`, `agent_auth_keys`, `alerts`, `incidents`, `incident_alerts`, `audit_logs`, `ingest_metadata`, Dashboard Event rollup 4종 |
 | ClickHouse | `edr_events`, `event_failures` |
 | S3 Standard | 최초 실패부터 7일까지 failure 원문 |
 | Glacier Instant Retrieval | 7일 이후 failure 원문, 총 90일 |
@@ -59,7 +59,7 @@ PostgreSQL에는 event failure row나 원문을 저장하지 않는다. Failure 
 | SQLite ACK | `acceptedEventIds` row 즉시 물리 삭제 |
 | raw archive | Endpoint별 object checksum 검증 + 7일 safety window 후 동일 UTC 날짜의 ClickHouse partition 전체 삭제 |
 | failure payload | S3 Standard 7일 → Glacier Instant Retrieval, 최초 실패부터 90일 |
-| Rollup | 현재 제외, 추후 확장 |
+| Dashboard Event rollup | ClickHouse 원본을 endpoint·1분 단위로 PostgreSQL에 projection, 기본 조회에 사용 |
 
 `batchId`는 전송 추적용이며 서버에 ingest batch table을 만들지 않는다.
 
@@ -675,7 +675,7 @@ GET /api/v1/events/{eventId}?endpointId=1001&occurredAt=2026-07-11T00:00:04.123Z
 
 `endpointId`, `occurredAt`은 ClickHouse partition pruning과 archive routing을 위해 요구한다. 원본 PCAP download URL은 제공하지 않는다.
 
-API는 `is_delete=false` row에서 `event_id`별 최신 row를 조회하고 정확한 count는 `uniqExact(event_id)`로 계산한다. Rollup은 사용하지 않는다.
+API는 `is_delete=false` row에서 `event_id`별 최신 row를 조회하고 정확한 count는 `uniqExact(event_id)`로 계산한다. Event 목록·상세에는 Dashboard rollup을 사용하지 않는다.
 
 Event 목록·상세는 bucket 상태에 따라 다음과 같이 조회한다.
 
@@ -953,10 +953,18 @@ GET /api/v1/incidents/{incidentId}/investigation
 ### 13.1 전체 요약
 
 ```http
-GET /api/v1/dashboard/summary?timePreset=LATEST_24H&interval=5m
+GET /api/v1/dashboard/summary?timePreset=LATEST_24H&interval=5m&eventSource=ROLLUP
 ```
 
-선택 query `endpointId: positive integer`를 전달하면 Endpoint snapshot, Alert, Incident, Event, failure, storage, EDR state를 모두 해당 Endpoint 범위로 제한한다. 생략하면 전체 Endpoint 집계를 반환한다.
+선택 query `endpointId: positive integer`를 전달하면 Endpoint snapshot, Alert, Incident, Event, failure, storage, EDR state를 모두 해당 Endpoint 범위로 제한한다. 생략하면 전체 Endpoint 집계를 반환한다. `eventSource`는 `ROLLUP / LIVE`이며 기본값은 `ROLLUP`이다.
+
+- `ROLLUP`: PostgreSQL의 endpoint·1분 activity projection과 endpoint·1시간 top-dimension projection에서 집계를 읽는다. 요청 범위의 분 단위 `dashboard_rollup_coverage`가 하나라도 없으면 0건 응답 대신 retryable `503 ROLLUP_NOT_READY`를 반환한다.
+- `LIVE`: 같은 Event metric을 ClickHouse 원본에서 즉시 다시 계산한다. Overview에서 사용자가 `Refresh`를 명시적으로 실행한 경우에만 요청한다.
+- 두 모드는 응답 DTO가 동일하다. Alert·Incident·Endpoint·storage는 기존 PostgreSQL 경로를, Event failure는 기존 ClickHouse failure 경로를 사용한다.
+- `ROLLUP_NOT_READY`를 받은 Frontend의 Retry는 동일한 Rollup 요청을 반복하지 않고 사용자가 요청한 LIVE 조회를 실행한다.
+- LIVE 실패 시 Frontend는 마지막 ROLLUP 결과를 유지하고 stale/error 경고를 표시한다. 자동 LIVE polling은 사용하지 않는다.
+
+Activity Rollup은 1분, top dimension은 1시간 해상도다. `from` 또는 `to`가 경계와 맞지 않으면 activity는 최대 두 경계 minute, top dimension은 최대 두 경계 hour를 포함할 수 있다. Event 목록·상세의 정확한 `[from, to)` 조회 계약에는 영향을 주지 않는다. top dimension은 ClickHouse에서 endpoint·hour·dimension별 상위 50개 후보를 저장한 뒤 기간 전체 상위 10개를 계산하므로 bounded-candidate 근사치다.
 
 응답 model은 `DashboardSummaryDto`다. `TimeRangeDto`는 `from: timestamp`, `to: timestamp` required field를 가진다.
 
@@ -1176,7 +1184,7 @@ DELETE는 본인 row를 물리 삭제하고 기본 layout 응답을 반환한다
 GET /api/v1/operations/health
 ```
 
-이 API는 요청 시점에 Backend API, PostgreSQL, ClickHouse, Kafka, S3를 직접 probe하고 `edr-event-storage-v1`, `edr-detection-v1` Consumer Group의 member 수와 committed-offset lag를 조회한다. 결과를 저장하지 않으므로 ERD 변경과 과거 이력은 없다. 일부 probe가 실패해도 HTTP 200으로 성공한 결과와 실패한 결과를 함께 반환하며, 인증 실패만 401이다.
+이 API는 요청 시점에 Backend API, PostgreSQL, ClickHouse, Kafka, S3와 최근 24시간의 Dashboard rollup minute coverage를 직접 probe하고 `edr-event-storage-v1`, `edr-detection-v1`, `edr-dashboard-rollup-v1` Consumer Group의 member 수와 committed-offset lag를 조회한다. 결과를 저장하지 않으므로 과거 운영 이력은 저장하지 않는다. coverage hole이나 일부 probe 실패가 있어도 HTTP 200으로 성공한 결과와 실패한 결과를 함께 반환하며 전체 상태는 degraded가 된다. 인증 실패만 401이다.
 
 `OperationsHealthDto`:
 
@@ -1206,7 +1214,8 @@ Worker `status`는 `RUNNING / IDLE / OFFLINE / UNKNOWN`이다. Group member 조�
 | `risk`, Endpoint Risk count/distribution | PostgreSQL active Alert/OPEN Incident aggregate 파생값 |
 | `edrState` | Endpoint Risk와 PostgreSQL/ClickHouse 수집·저장 상태 집계 파생값 |
 | `DashboardLayoutDto.widgets` | `user_dashboard_layouts.layout_json`, row가 없거나 손상되면 registry 기본 layout |
-| Dashboard count/top/timeSeries | PostgreSQL/ClickHouse/PyArrow 집계 파생값 |
+| Dashboard Event count/top/timeSeries | `eventSource=ROLLUP`이면 PostgreSQL `dashboard_event_*_rollups`, `LIVE`이면 ClickHouse 집계 |
+| Dashboard Alert/Incident/Endpoint/storage 집계 | 기존 PostgreSQL 원본 테이블 집계 파생값 |
 | `restoredBucketCount` | `ingest_metadata`의 `S3/GLACIER_FLEXIBLE_RETRIEVAL/RESTORED` count |
 
 ### 13.8 IP와 Domain Intelligence
@@ -1288,6 +1297,7 @@ CLOSED
 ```text
 FAILED
 REPROCESSED
+REPLAY_PUBLISHED
 REPROCESS_FAILED
 ```
 
@@ -1393,6 +1403,13 @@ LATEST_7D
 CUSTOM
 ```
 
+### 14.19 Dashboard Event Source
+
+```text
+ROLLUP
+LIVE
+```
+
 ## 15. 관리자 Failure 재처리 계약
 
 공개 REST API를 만들지 않는다.
@@ -1410,9 +1427,9 @@ Failure 저장 identity와 object 계약:
 python -m tools.replay_failure --failure-id <UUID>
 ```
 
-CLI는 S3 원문의 보존 만료, 크기, checksum을 검증한 뒤 `replay_failure_id` header와 함께 `telemetry.raw`에 publish한다. broker ACK까지 성공하면 `REPROCESSED`, 실패하면 `REPROCESS_FAILED`를 기록한다. 이후 Event Storage Worker는 동일 `eventId`의 raw event를 논리 중복으로 만들지 않으면서 `telemetry.validated`까지 다시 전달하고, Alert unique key가 중복 Alert 생성을 막는다.
+CLI는 S3 원문의 보존 만료, 크기, checksum을 검증한 뒤 `replay_failure_id` header와 함께 `telemetry.raw`에 publish한다. broker ACK까지 성공하면 후속 처리 완료와 구분되는 `REPLAY_PUBLISHED`, 실패하면 `REPROCESS_FAILED`를 기록한다. 같은 failure의 동시 CLI 실행은 PostgreSQL advisory lock으로 차단한다. 이후 Event Storage Worker는 동일 `eventId`의 raw event를 논리 중복으로 만들지 않으면서 `telemetry.validated`까지 다시 전달하고, Alert unique key가 중복 Alert 생성을 막는다.
 
-자동 scheduler, `telemetry.replay` topic, replay pointer, `REPLAY_REQUESTED`/`REPLAY_PUBLISHED`, occurrence ID와 다단계 versioning은 사용하지 않는다.
+자동 replay scheduler, `telemetry.replay` topic, replay pointer, `REPLAY_REQUESTED`, occurrence ID와 다단계 완료 추적은 사용하지 않는다. `REPLAY_PUBLISHED`는 Kafka ACK까지만 뜻하며 Detection·Rollup 완료 상태가 아니다.
 
 ## 16. 확정된 설계 결정
 
@@ -1439,7 +1456,7 @@ CLI는 S3 원문의 보존 만료, 크기, checksum을 검증한 뒤 `replay_fai
 | MITRE | 모든 활성 RuleV1 code 필수, 고정 mapping 파일에서 name 변환 |
 | Audit | append-only `audit_logs`, 조회 API 없음 |
 | 담당자 | 완전 제거 |
-| Rollup | 추후 확장 |
+| Dashboard Event rollup | Kafka dirty-bucket 알림 + Python batch, ClickHouse 전체 bucket 재집계, PostgreSQL 1분 projection |
 | gRPC | 추후 확장 |
 
 ## 17. 개발·검증 전제
@@ -1464,9 +1481,14 @@ CLI는 S3 원문의 보존 만료, 크기, checksum을 검증한 뒤 `replay_fai
 - 실제 Windows/macOS에서 5종 telemetry end-to-end 검증
 - Kafka consumer 중단 후 lag 회복 확인
 - ClickHouse insert와 Detection 처리 확인
+- Rollup Worker를 중단·재시작해 Kafka lag 회복과 동일 bucket 재처리 시 중복 count가 생기지 않는지 확인
+- 중간 minute coverage hole을 0건으로 표시하지 않고 `ROLLUP_NOT_READY`로 차단한 뒤 시작 backfill이 hole을 복구하는지 확인
+- 서로 다른 PostgreSQL connection이 같은 bucket을 동시에 교체해도 advisory lock으로 직렬화되고 두 count가 합산되지 않는지 확인
+- Overview 최초 요청이 `eventSource=ROLLUP`, 사용자 Refresh만 `eventSource=LIVE`를 사용하는지 확인
+- Archive partition 삭제 전 해당 UTC 날짜 rollup 실패 시 ClickHouse partition이 유지되는지 확인
 - packet이 로컬 파일이나 S3에 남지 않는지 확인
 - failure 1건을 관리자 CLI로 수동 재처리
 - Endpoint Risk가 active Alert/OPEN Incident 입력과 등급 구간을 일관되게 반영하는지 확인
 - 전역 EDR 상태가 Threat Level과 Collection Health reason code를 Backend 계산 결과로 반환하는지 확인
 - Alert 상세의 versioned `responseGuidance`가 읽기 전용으로 표시되고 Agent command를 만들지 않는지 확인
-- Rollup과 PCAP artifact 시나리오는 검증 범위에 없음
+- PCAP artifact 시나리오는 검증 범위에 없음

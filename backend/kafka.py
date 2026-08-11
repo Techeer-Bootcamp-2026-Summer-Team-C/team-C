@@ -11,6 +11,7 @@ PARTITIONS_PER_TOPIC = 2
 REPLICATION_FACTOR = 1
 EVENT_STORAGE_CONSUMER_GROUP = "edr-event-storage-v1"
 DETECTION_CONSUMER_GROUP = "edr-detection-v1"
+DASHBOARD_ROLLUP_CONSUMER_GROUP = "edr-dashboard-rollup-v1"
 
 
 @dataclass(frozen=True, slots=True)

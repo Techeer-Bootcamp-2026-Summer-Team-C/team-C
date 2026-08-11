@@ -49,7 +49,14 @@ from .contracts.dashboard import (
     TopRemoteIpDto,
     TopRuleDto,
 )
-from .contracts.enums import AlertStatus, DashboardInterval, EventFailureStatus, EventType, Severity
+from .contracts.enums import (
+    AlertStatus,
+    DashboardEventSource,
+    DashboardInterval,
+    EventFailureStatus,
+    EventType,
+    Severity,
+)
 from .errors import ApplicationError
 from .event_service import EventService
 from .policy.edr_state import CollectionHealthInput, ThreatLevelInput, calculate_edr_state
@@ -57,6 +64,7 @@ from .policy.risk import summarize_endpoint_risks
 from .rule_loader import LoadedRule
 from .storage.clickhouse import DASHBOARD_TOP_LIMIT, EventRepository, FailureRepository
 from .storage.postgres import AlertRepository, EndpointRepository, IncidentRepository, IngestMetadataRepository
+from .storage.rollup import DashboardEventRollupRepository
 
 MAX_SUMMARY_ENDPOINTS = 10_000
 
@@ -72,6 +80,7 @@ class SummaryService:
         events: EventRepository,
         failures: FailureRepository,
         event_service: EventService,
+        event_rollups: DashboardEventRollupRepository | None = None,
         rules: list[LoadedRule] | None = None,
     ) -> None:
         self.endpoints = endpoints
@@ -81,6 +90,7 @@ class SummaryService:
         self.events = events
         self.failures = failures
         self.event_service = event_service
+        self.event_rollups = event_rollups
         self.rules = {(item.rule.rule_code, item.rule.version): item for item in (rules or [])}
 
     def availability(self, *, endpoint_ids: list[int] | None = None) -> DashboardAvailabilityDto:
@@ -108,6 +118,7 @@ class SummaryService:
         interval: DashboardInterval,
         calculated_at: datetime,
         endpoint_id: int | None = None,
+        event_source: DashboardEventSource = DashboardEventSource.LIVE,
     ) -> DashboardSummaryDto:
         seconds = {
             DashboardInterval.ONE_MINUTE: 60,
@@ -117,6 +128,16 @@ class SummaryService:
         }[interval]
         if ceil((to - from_).total_seconds() / seconds) > 2000:
             raise ApplicationError(400, "VALIDATION_ERROR", "Dashboard interval exceeds 2,000 points.")
+        if event_source is DashboardEventSource.ROLLUP:
+            if self.event_rollups is None:
+                raise RuntimeError("dashboard Event rollup repository is required")
+            if not self.event_rollups.covers_range(from_=from_, to=to):
+                raise ApplicationError(
+                    503,
+                    "ROLLUP_NOT_READY",
+                    "Dashboard Event rollup does not cover the requested time range yet.",
+                    True,
+                )
         endpoint_items = self._endpoint_items(calculated_at, endpoint_id=endpoint_id)
         alert_summary = self._alert_summary(
             from_=from_, to=to, endpoint_id=endpoint_id, interval_seconds=seconds
@@ -124,12 +145,20 @@ class SummaryService:
         incident_summary = self._incident_summary(
             from_=from_, to=to, endpoint_id=endpoint_id, interval_seconds=seconds
         )
-        event_summary = self.event_service.dashboard_summary(
-            from_=from_,
-            to=to,
-            interval_seconds=seconds,
-            endpoint_id=endpoint_id,
-        )
+        if event_source is DashboardEventSource.ROLLUP:
+            event_summary = self.event_rollups.dashboard_summary(
+                from_=from_,
+                to=to,
+                interval_seconds=seconds,
+                endpoint_id=endpoint_id,
+            )
+        else:
+            event_summary = self.event_service.dashboard_summary(
+                from_=from_,
+                to=to,
+                interval_seconds=seconds,
+                endpoint_id=endpoint_id,
+            )
         failure_summary = self._failure_summary(from_=from_, to=to, endpoint_id=endpoint_id)
         storage_summary = self._storage_summary(endpoint_id=endpoint_id)
         edr_state = self._edr_state(
@@ -137,6 +166,7 @@ class SummaryService:
             storage_summary=storage_summary,
             calculated_at=calculated_at,
             endpoint_id=endpoint_id,
+            event_source=event_source,
         )
         incident_time: dict[datetime, Counter[str]] = {}
         for row in incident_summary["time_series"]:
@@ -347,7 +377,10 @@ class SummaryService:
             event_failures=IngestEventFailuresDto(
                 failed_count=failures["by_status"].get("FAILED", 0),
                 rate_per_minute=failures["total"] / duration_minutes,
-                reprocessed_count=failures["by_status"].get("REPROCESSED", 0),
+                reprocessed_count=(
+                    failures["by_status"].get("REPLAY_PUBLISHED", 0)
+                    + failures["by_status"].get("REPROCESSED", 0)
+                ),
                 reprocess_failed_count=failures["by_status"].get("REPROCESS_FAILED", 0),
                 oldest_failed_at=_aware(failures["oldest_failed_at"]),
             ),
@@ -553,6 +586,7 @@ class SummaryService:
         storage_summary: dict,
         calculated_at: datetime,
         endpoint_id: int | None = None,
+        event_source: DashboardEventSource = DashboardEventSource.LIVE,
     ) -> EdrStateDto:
         risks = [item.risk for item in endpoints]
         risk_summary = summarize_endpoint_risks(risks, calculated_at=calculated_at)
@@ -567,7 +601,10 @@ class SummaryService:
                     endpoint_ids=[endpoint_id] if endpoint_id is not None else None
                 )
             )
-        latest_ingest = self.events.latest_ingested_at(endpoint_id=endpoint_id)
+        if event_source is DashboardEventSource.ROLLUP and self.event_rollups is not None:
+            latest_ingest = self.event_rollups.latest_ingested_at(endpoint_id=endpoint_id)
+        else:
+            latest_ingest = self.events.latest_ingested_at(endpoint_id=endpoint_id)
         recent_failures = self._failure_summary(
             from_=calculated_at.replace(microsecond=0) - timedelta(minutes=15),
             to=calculated_at,

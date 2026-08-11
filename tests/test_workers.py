@@ -1,7 +1,7 @@
 import gzip
 import json
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID
@@ -357,15 +357,18 @@ class MemoryAlerts:
         key = (alert.event_id, alert.rule_code, alert.rule_version)
         created = key not in self.rows
         self.rows.setdefault(key, alert)
-        return StoredAlert(1, created, AlertStatus.OPEN)
+        stored = self.rows[key]
+        return StoredAlert(1, created, AlertStatus.OPEN, stored.detected_at)
 
 
 class MemoryIncidents:
     def __init__(self) -> None:
         self.rows = {}
         self.links = set()
+        self.upserts = []
 
     def upsert(self, incident):
+        self.upserts.append(incident)
         key = (incident.endpoint_id, incident.correlation_key, incident.window_start_at)
         created = key not in self.rows
         self.rows.setdefault(key, incident)
@@ -398,6 +401,7 @@ def test_detection_worker_creates_idempotent_alert_and_incident_with_first_snaps
     )
     alerts = MemoryAlerts()
     incidents = MemoryIncidents()
+    detection_times = iter((NOW, NOW + timedelta(hours=6)))
     worker = DetectionWorker(
         consumer=consumer,
         engine=DetectionEngine(loader.load_directory(ROOT / "rules")),
@@ -405,7 +409,7 @@ def test_detection_worker_creates_idempotent_alert_and_incident_with_first_snaps
         incidents=incidents,
         failure_sink=Sink(),
         sleep=lambda _delay: None,
-        now=lambda: NOW,
+        now=lambda: next(detection_times),
     )
     worker.run_once()
     worker.run_once()
@@ -415,6 +419,7 @@ def test_detection_worker_creates_idempotent_alert_and_incident_with_first_snaps
     assert incident.title == "Encoded PowerShell command detected"
     assert incident.description == "PowerShell was executed with an encoded command argument."
     assert len(incidents.links) == 1
+    assert [item.detected_at for item in incidents.upserts] == [NOW, NOW]
 
 
 def test_detection_worker_quarantines_invalid_message_without_retrying() -> None:

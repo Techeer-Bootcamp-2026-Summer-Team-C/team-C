@@ -302,13 +302,16 @@ class DetectionWorker:
                     title=match.alert.title,
                     description=match.alert.summary,
                     severity=match.alert.severity,
-                    detected_at=detected_at,
+                    # A replayed validated message must converge on the Alert's
+                    # original detection time. Using the current processing time
+                    # would move an old Incident into the newest dashboard window.
+                    detected_at=stored_alert.detected_at,
                 )
             )
             self.incidents.link_alert(
                 incident_id=stored_incident.incident_id,
                 alert_id=stored_alert.alert_id,
-                linked_at=detected_at,
+                linked_at=stored_alert.detected_at,
             )
 
 

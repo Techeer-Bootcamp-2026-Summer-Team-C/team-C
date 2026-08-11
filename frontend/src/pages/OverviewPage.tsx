@@ -1,8 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, Settings2 } from "lucide-react";
 import { memo, useCallback, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { isUnavailableTimeRangeError } from "../api/client";
+import { isRollupNotReadyError, isUnavailableTimeRangeError } from "../api/client";
 import { api } from "../api/endpoints";
 import {
   readTimeFilter,
@@ -19,7 +19,7 @@ import { EndpointScopePicker } from "../features/overview/EndpointScopePicker";
 import { useI18n } from "../i18n/LocaleContext";
 import { formatDateTime } from "../lib/format";
 import { updateParams } from "../lib/url";
-import type { DashboardAvailabilityQuery, DashboardSummaryDto } from "../contracts";
+import type { DashboardAvailabilityQuery, DashboardSummaryDto, DashboardSummaryQuery } from "../contracts";
 
 export function readOverviewEndpointId(params: URLSearchParams): number | undefined {
   const endpointId = Number(params.get("endpointId"));
@@ -42,6 +42,7 @@ function AuthenticatedOverviewRoute({ mode }: { mode: "overview" | "manage" }) {
 
 function OverviewPageContent({ mode }: { mode: "overview" | "manage" }) {
   const { t } = useI18n();
+  const queryClient = useQueryClient();
   const [dashboardSettingsOpen, setDashboardSettingsOpen] = useState(false);
   const [manualRefreshing, setManualRefreshing] = useState(false);
   const [params, setParams] = useSearchParams();
@@ -65,15 +66,18 @@ function OverviewPageContent({ mode }: { mode: "overview" | "manage" }) {
     ...time.query,
     ...(selectedEndpointId ? { endpointId: selectedEndpointId } : {}),
   };
-  const summaryQuery = { ...scopedTimeQuery, interval: time.interval };
+  const summaryQuery: DashboardSummaryQuery = { ...scopedTimeQuery, interval: time.interval, eventSource: "ROLLUP" };
   const dashboard = useQuery({ queryKey: ["dashboard", summaryQuery], queryFn: ({ signal }) => api.dashboard(summaryQuery, signal), enabled: time.valid, staleTime: 30_000 });
+  const liveDashboard = useMutation({
+    mutationFn: () => api.dashboard({ ...summaryQuery, eventSource: "LIVE" }),
+    onSuccess: (response) => queryClient.setQueryData(["dashboard", summaryQuery], response),
+  });
   const endpoints = useQuery({ queryKey: ["endpoint-summary", scopedTimeQuery], queryFn: ({ signal }) => api.endpointSummary(scopedTimeQuery, signal), enabled: time.valid, staleTime: 30_000 });
-  const ingest = useQuery({ queryKey: ["ingest-summary", scopedTimeQuery], queryFn: ({ signal }) => api.ingestSummary(scopedTimeQuery, signal), enabled: time.valid, staleTime: 30_000 });
   const endpointRankingQuery = { page: 1, size: 5, ...(selectedEndpointId ? { endpointIds: [selectedEndpointId] } : {}), sortBy: "riskScore" as const, sortOrder: "desc" as const };
   const endpointRanking = useQuery({ queryKey: ["overview-risk-endpoints", endpointRankingQuery], queryFn: ({ signal }) => api.endpoints(endpointRankingQuery, signal), enabled: time.valid, staleTime: 30_000 });
   const incidentQuery = { ...scopedTimeQuery, status: "OPEN" as const, page: 1, size: 5, sortOrder: "desc" as const };
   const incidentQueue = useQuery({ queryKey: ["overview-incidents", incidentQuery], queryFn: ({ signal }) => api.incidents(incidentQuery, signal), enabled: time.valid, staleTime: 30_000 });
-  const allQueries = [dashboard, endpoints, ingest, endpointRanking, incidentQueue];
+  const allQueries = [dashboard, endpoints, endpointRanking, incidentQueue];
   const panelQueries = [dashboard, endpoints, endpointRanking, incidentQueue];
   const lastRefreshedAt = Math.max(...allQueries.map((query) => query.dataUpdatedAt));
   const refreshData = () => Promise.all([
@@ -82,14 +86,22 @@ function OverviewPageContent({ mode }: { mode: "overview" | "manage" }) {
   ]);
   const refreshManually = async () => {
     if (manualRefreshing) return;
+    liveDashboard.reset();
     setManualRefreshing(true);
     try {
-      await refreshData();
+      await Promise.allSettled([
+        liveDashboard.mutateAsync(),
+        endpoints.refetch(),
+        endpointRanking.refetch(),
+        incidentQueue.refetch(),
+        ...(time.preset === "CUSTOM" ? [availability.refetch()] : []),
+      ]);
     } finally {
       setManualRefreshing(false);
     }
   };
   const hasPanelData = panelQueries.some((query) => Boolean(query.data));
+  const rollupNotReady = isRollupNotReadyError(dashboard.error);
   const unavailableRange = time.preset === "CUSTOM" && time.valid && (
     allQueries.some((query) => isUnavailableTimeRangeError(query.error))
     || Boolean(dashboard.data && !dashboardHasEvidenceInRange(dashboard.data.data))
@@ -99,11 +111,12 @@ function OverviewPageContent({ mode }: { mode: "overview" | "manage" }) {
   ));
   const initialError = totalFailure ? panelQueries.map((query) => query.error).find(Boolean) ?? null : null;
   const partialFailure = !unavailableRange && hasPanelData && allQueries.some((query) => (
-    query.error && !query.data && !isUnavailableTimeRangeError(query.error)
+    query.error && !query.data && !isUnavailableTimeRangeError(query.error) && !isRollupNotReadyError(query.error)
   ));
-  const staleError = [dashboard, endpoints, ingest].find((query) => (
+  const staleQueryError = [dashboard, endpoints].find((query) => (
     query.isRefetchError && !isUnavailableTimeRangeError(query.error)
   ))?.error ?? null;
+  const staleError = liveDashboard.error ?? staleQueryError;
   const dashboardData = {
     dashboard: dashboard.data?.data,
     endpoints: endpoints.data?.data,
@@ -137,14 +150,19 @@ function OverviewPageContent({ mode }: { mode: "overview" | "manage" }) {
         timeValid={time.valid}
       />
       {partialFailure ? <PartialFailureWarning message={t("overview.partialFailure")} /> : null}
-      {staleError && hasPanelData ? <StaleWarning error={staleError} onRetry={() => void refreshData()} /> : null}
-      {initialError && !unavailableRange ? <ErrorState error={initialError} onRetry={() => void refreshData()} /> : null}
+      {staleError && hasPanelData ? <StaleWarning error={staleError} onRetry={() => void (liveDashboard.error || rollupNotReady ? refreshManually() : refreshData())} /> : null}
+      {rollupNotReady && !dashboard.data ? <ErrorState error={dashboard.error} onRetry={() => void refreshManually()} /> : initialError && !unavailableRange ? <ErrorState error={initialError} onRetry={() => void refreshData()} /> : null}
       {unavailableRange ? <UnavailableTimeRangeState /> : null}
       {time.valid && !totalFailure && !unavailableRange ? <OverviewDashboardWorkspace data={dashboardData} mode={mode} onSettingsClose={() => setDashboardSettingsOpen(false)} queueState={{
         endpoints: { pending: endpointRanking.isPending, error: endpointRanking.error, stale: endpointRanking.isRefetchError, onRetry: () => void endpointRanking.refetch() },
         incidents: { pending: incidentQueue.isPending, error: incidentQueue.error, stale: incidentQueue.isRefetchError, onRetry: () => void incidentQueue.refetch() },
       }} settingsOpen={dashboardSettingsOpen} summaryState={{
-        dashboard: { pending: dashboard.isPending, error: dashboard.error, stale: dashboard.isRefetchError, onRetry: () => void dashboard.refetch() },
+        dashboard: {
+          pending: dashboard.isPending || (rollupNotReady && !dashboard.data),
+          error: rollupNotReady && !dashboard.data ? null : dashboard.error,
+          stale: dashboard.isRefetchError,
+          onRetry: () => void (rollupNotReady ? refreshManually() : dashboard.refetch()),
+        },
         endpoints: { pending: endpoints.isPending, error: endpoints.error, stale: endpoints.isRefetchError, onRetry: () => void endpoints.refetch() },
       }} /> : null}
     </div>

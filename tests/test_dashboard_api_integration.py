@@ -16,10 +16,12 @@ from backend.auth import hash_password, issue_access_token
 from backend.contracts.enums import UserRole
 from backend.dashboard_layouts import default_overview_widgets
 from backend.main import create_app
+from backend.rollup import DashboardRollupSynchronizer
 from backend.runtime import RuntimeServices
 from backend.settings import Settings
 from backend.storage.clickhouse import EventRepository
 from backend.storage.migrations import apply_clickhouse_file, apply_postgres_migrations
+from backend.storage.rollup import DashboardEventRollupRepository
 from backend.workers import normalize_event
 
 ROOT = Path(__file__).parents[1]
@@ -541,6 +543,20 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
                 == 2
             )
 
+        rollup_not_ready = client.get(
+            "/api/v1/dashboard/summary?timePreset=LATEST_24H&interval=5m",
+            headers=_auth(admin_token),
+        )
+        assert rollup_not_ready.status_code == 503
+        assert rollup_not_ready.json()["error"]["code"] == "ROLLUP_NOT_READY"
+        rollup_from = (now - timedelta(hours=25)).replace(second=0, microsecond=0)
+        rollup_to = (now + timedelta(minutes=2)).replace(second=0, microsecond=0)
+        with psycopg.connect(postgres_dsn) as connection:
+            DashboardRollupSynchronizer(
+                events=EventRepository(clickhouse),
+                store=DashboardEventRollupRepository(connection),
+            ).refresh_range(from_=rollup_from, to=rollup_to)
+
         dashboard_paths = (
             "/api/v1/dashboard/summary?timePreset=LATEST_24H&interval=5m",
             "/api/v1/dashboard/endpoints/summary?timePreset=LATEST_24H",
@@ -551,6 +567,12 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
                 executor.map(lambda path: client.get(path, headers=_auth(admin_token)), dashboard_paths)
             )
         assert [response.status_code for response in parallel_responses] == [200, 200, 200]
+        live_dashboard = client.get(
+            "/api/v1/dashboard/summary?timePreset=LATEST_24H&interval=5m&eventSource=LIVE",
+            headers=_auth(admin_token),
+        )
+        assert live_dashboard.status_code == 200
+        assert live_dashboard.json()["data"]["events"]["totalCount"] == 2
 
         for path in dashboard_paths:
             response = client.get(path, headers=_auth(admin_token))

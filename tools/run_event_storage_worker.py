@@ -18,7 +18,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    runtime = RuntimeServices(get_settings())
+    runtime = RuntimeServices(get_settings(), clickhouse_role="worker")
     consumer = KafkaConsumer(
         runtime.settings.kafka_bootstrap_servers,
         group_id=runtime.settings.event_storage_consumer_group,

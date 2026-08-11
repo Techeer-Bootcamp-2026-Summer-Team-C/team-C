@@ -1,4 +1,5 @@
 import logging
+from contextlib import nullcontext
 from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID, uuid4
@@ -39,7 +40,7 @@ from .contracts.dashboard import (
 )
 from .contracts.dashboard_layouts import DashboardLayoutDto, DashboardLayoutPutRequest
 from .contracts.endpoints import EndpointDetailDto, EndpointDto
-from .contracts.enums import DashboardInterval, UserLocale, UserRole, UserStatus
+from .contracts.enums import DashboardEventSource, DashboardInterval, UserLocale, UserRole, UserStatus
 from .contracts.events import EventDetailDto, EventDto, ProcessTreeDto
 from .contracts.incidents import IncidentDetailDto, IncidentDto, IncidentStatusUpdateRequest
 from .contracts.intelligence import (
@@ -86,6 +87,7 @@ from .storage.postgres import (
     IngestMetadataRepository,
     UserRepository,
 )
+from .storage.rollup import DashboardEventRollupRepository
 from .summary_service import SummaryService
 from .time_range import resolve_time_range
 
@@ -674,7 +676,7 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         summary="통합 대시보드 요약 조회",
         description="선택한 시간 범위의 이벤트, Alert, Incident, 엔드포인트와 저장소 지표를 집계해 반환합니다.",
         tags=["Dashboard"],
-        responses=_error_responses(400, 401, 503),
+        responses=_error_responses(400, 401, 429, 503),
     )
     def dashboard_summary(
         request: Request,
@@ -685,13 +687,20 @@ def create_app(runtime: RuntimeServices | None = None) -> FastAPI:
         calculated_at = datetime.now(UTC)
         from_, to = resolve_time_range(query, now=calculated_at)
         with runtime.postgres() as connection:
-            data = _summary_service(runtime, connection).dashboard(
-                from_=from_,
-                to=to,
-                interval=DashboardInterval(query.interval),
-                calculated_at=calculated_at,
-                endpoint_id=query.endpoint_id,
+            live_guard = (
+                runtime.dashboard_live_query_guard(connection)
+                if query.event_source is DashboardEventSource.LIVE
+                else nullcontext()
             )
+            with live_guard:
+                data = _summary_service(runtime, connection).dashboard(
+                    from_=from_,
+                    to=to,
+                    interval=DashboardInterval(query.interval),
+                    calculated_at=calculated_at,
+                    endpoint_id=query.endpoint_id,
+                    event_source=query.event_source,
+                )
         return _success(request, data)
 
     @app.get(
@@ -1115,6 +1124,7 @@ def _summary_service(runtime: RuntimeServices, connection) -> SummaryService:
         events=EventRepository(runtime.clickhouse),
         failures=FailureRepository(runtime.clickhouse),
         event_service=_event_service(runtime, connection),
+        event_rollups=DashboardEventRollupRepository(connection),
         rules=runtime.rules,
     )
 

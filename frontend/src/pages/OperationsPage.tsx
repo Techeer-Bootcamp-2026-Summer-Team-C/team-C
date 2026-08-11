@@ -17,7 +17,7 @@ export function OperationsPage() {
   const time = readTimeFilter(params);
   const ingest = useQuery({ queryKey: ["ingest-summary", time.query], queryFn: ({ signal }) => api.ingestSummary(time.query, signal), enabled: time.valid, staleTime: 15_000 });
   const health = useQuery({ queryKey: ["operations-health"], queryFn: ({ signal }) => api.operationsHealth(signal), staleTime: 15_000 });
-  const failureStatus = allowedValue(params.get("failureStatus"), ["FAILED", "REPROCESSED", "REPROCESS_FAILED"] as const);
+  const failureStatus = allowedValue(params.get("failureStatus"), ["FAILED", "REPLAY_PUBLISHED", "REPROCESSED", "REPROCESS_FAILED"] as const);
   const retryable = allowedValue(params.get("retryable"), ["true", "false"] as const);
   const failureQuery: FailureListQuery = { ...time.query, page: numberParam(params, "page", 1), size: 50, sortOrder: "desc" };
   if (failureStatus) failureQuery.status = failureStatus;
@@ -33,7 +33,7 @@ export function OperationsPage() {
       <Link className="button" to="/operations/archives"><Archive aria-hidden="true" size={16} />{t("operations.archiveAction")}</Link>
     </>} />
     <GlobalFilterBar hasFilters={params.size > 0} onClear={() => setParams({})}><TimeFilterFields params={params} setParams={setParams} />
-      <Field label={t("operations.failureStatus")}><select onChange={(event) => setParams(updateParams(params, { failureStatus: event.target.value, page: null }))} value={failureStatus ?? ""}><option value="">{t("filter.allStatuses")}</option><option>FAILED</option><option>REPROCESSED</option><option>REPROCESS_FAILED</option></select></Field>
+      <Field label={t("operations.failureStatus")}><select onChange={(event) => setParams(updateParams(params, { failureStatus: event.target.value, page: null }))} value={failureStatus ?? ""}><option value="">{t("filter.allStatuses")}</option><option>FAILED</option><option>REPLAY_PUBLISHED</option><option>REPROCESSED</option><option>REPROCESS_FAILED</option></select></Field>
       <Field label={t("operations.stage")}><input onChange={(event) => setParams(updateParams(params, { failureStage: event.target.value, page: null }))} placeholder="detection" value={params.get("failureStage") ?? ""} /></Field>
       <Field label={t("operations.retryable")}><select onChange={(event) => setParams(updateParams(params, { retryable: event.target.value, page: null }))} value={retryable ?? ""}><option value="">{t("operations.all")}</option><option value="true">{t("operations.retryable")}</option><option value="false">{t("operations.notRetryable")}</option></select></Field>
     </GlobalFilterBar>

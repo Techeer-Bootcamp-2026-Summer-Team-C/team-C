@@ -92,6 +92,11 @@ FAILURE_COLUMNS = [
 ]
 
 DASHBOARD_TOP_LIMIT = 10
+DASHBOARD_ROLLUP_DIMENSION_CANDIDATE_LIMIT = 50
+DASHBOARD_ROLLUP_DIMENSION_BUCKET_SECONDS = 3600
+DASHBOARD_LIVE_MAX_EXECUTION_SECONDS = 8
+DASHBOARD_LIVE_MAX_THREADS = 2
+DASHBOARD_LIVE_MAX_ROWS_TO_READ = 50_000_000
 
 
 def _failure_filters(
@@ -533,6 +538,10 @@ class EventRepository:
             WHERE {where}
             GROUP BY event_type, bucket_start_at
             ORDER BY bucket_start_at, event_type
+            SETTINGS
+                max_execution_time = {DASHBOARD_LIVE_MAX_EXECUTION_SECONDS},
+                max_threads = {DASHBOARD_LIVE_MAX_THREADS},
+                max_rows_to_read = {DASHBOARD_LIVE_MAX_ROWS_TO_READ}
             """,
             parameters=parameters,
         )
@@ -562,6 +571,10 @@ class EventRepository:
             GROUP BY target, value
             ORDER BY target ASC, event_count DESC, value ASC
             LIMIT {DASHBOARD_TOP_LIMIT} BY target
+            SETTINGS
+                max_execution_time = {DASHBOARD_LIVE_MAX_EXECUTION_SECONDS},
+                max_threads = {DASHBOARD_LIVE_MAX_THREADS},
+                max_rows_to_read = {DASHBOARD_LIVE_MAX_ROWS_TO_READ}
             """,
             parameters=parameters,
         )
@@ -569,6 +582,143 @@ class EventRepository:
             getattr(aggregate, str(target)).update({str(value): int(count)})
 
         return aggregate
+
+    def dashboard_rollup_rows(
+        self,
+        *,
+        from_: datetime,
+        to: datetime,
+        endpoint_ids: list[int] | None = None,
+    ) -> tuple[list[JsonObject], list[JsonObject]]:
+        if from_ >= to:
+            raise ValueError("rollup range must not be empty")
+        conditions = [
+            "occurred_at >= {from:DateTime64(3)}",
+            "occurred_at < {to:DateTime64(3)}",
+            "is_delete = 0",
+        ]
+        parameters: dict[str, Any] = {"from": from_, "to": to}
+        if endpoint_ids is not None:
+            if not endpoint_ids:
+                return [], []
+            conditions.append("endpoint_id IN {endpoint_ids:Array(UInt64)}")
+            parameters["endpoint_ids"] = endpoint_ids
+        where = " AND ".join(conditions)
+
+        activity_result = self.client.query(
+            f"""
+            SELECT
+                endpoint_id,
+                toStartOfInterval(occurred_at, INTERVAL 60 SECOND, 'UTC') AS bucket_start_at,
+                event_type,
+                uniqExact(event_id) AS event_count,
+                max(ingested_at) AS source_max_ingested_at
+            FROM edr_events FINAL
+            WHERE {where}
+            GROUP BY endpoint_id, bucket_start_at, event_type
+            ORDER BY endpoint_id, bucket_start_at, event_type
+            """,
+            parameters=parameters,
+        )
+        activity_columns = (
+            "endpoint_id",
+            "bucket_start_at",
+            "event_type",
+            "event_count",
+            "source_max_ingested_at",
+        )
+        activity_rows = [
+            dict(zip(activity_columns, row, strict=True))
+            for row in activity_result.result_rows
+        ]
+        for row in activity_rows:
+            row["bucket_start_at"] = _utc_datetime(row["bucket_start_at"])
+            row["source_max_ingested_at"] = _utc_datetime(row["source_max_ingested_at"])
+
+        dimension_from, dimension_to = _expanded_bucket_bounds(
+            from_,
+            to,
+            bucket_seconds=DASHBOARD_ROLLUP_DIMENSION_BUCKET_SECONDS,
+        )
+        dimension_conditions = [
+            "occurred_at >= {dimension_from:DateTime64(3)}",
+            "occurred_at < {dimension_to:DateTime64(3)}",
+            "is_delete = 0",
+        ]
+        dimension_parameters: dict[str, Any] = {
+            "dimension_from": dimension_from,
+            "dimension_to": dimension_to,
+        }
+        if endpoint_ids is not None:
+            dimension_conditions.append("endpoint_id IN {endpoint_ids:Array(UInt64)}")
+            dimension_parameters["endpoint_ids"] = endpoint_ids
+        dimension_where = " AND ".join(dimension_conditions)
+
+        dimension_result = self.client.query(
+            f"""
+            SELECT
+                endpoint_id,
+                toStartOfInterval(
+                    occurred_at,
+                    INTERVAL {DASHBOARD_ROLLUP_DIMENSION_BUCKET_SECONDS} SECOND,
+                    'UTC'
+                ) AS bucket_start_at,
+                dimension.1 AS dimension_name,
+                dimension.2 AS dimension_value,
+                uniqExact(event_id) AS event_count
+            FROM edr_events FINAL
+            ARRAY JOIN [
+                tuple('top_processes', coalesce(process_name, '')),
+                tuple('top_remote_ips', coalesce(remote_ip, '')),
+                tuple(
+                    'top_domains',
+                    coalesce(nullIf(remote_domain, ''), nullIf(http_host, ''), '')
+                ),
+                tuple('top_file_hashes', coalesce(file_hash_sha256, '')),
+                tuple('top_dns_queries', coalesce(dns_query, '')),
+                tuple('top_l7_protocols', coalesce(l7_protocol, ''))
+            ] AS dimension
+            WHERE {dimension_where} AND dimension_value != ''
+            GROUP BY endpoint_id, bucket_start_at, dimension_name, dimension_value
+            ORDER BY endpoint_id, bucket_start_at, dimension_name, event_count DESC, dimension_value
+            LIMIT {DASHBOARD_ROLLUP_DIMENSION_CANDIDATE_LIMIT}
+                BY endpoint_id, bucket_start_at, dimension_name
+            """,
+            parameters=dimension_parameters,
+        )
+        dimension_columns = (
+            "endpoint_id",
+            "bucket_start_at",
+            "dimension_name",
+            "dimension_value",
+            "event_count",
+        )
+        dimension_rows = [
+            dict(zip(dimension_columns, row, strict=True))
+            for row in dimension_result.result_rows
+        ]
+        for row in dimension_rows:
+            row["bucket_start_at"] = _utc_datetime(row["bucket_start_at"])
+        return activity_rows, dimension_rows
+
+
+def _expanded_bucket_bounds(
+    from_: datetime,
+    to: datetime,
+    *,
+    bucket_seconds: int,
+) -> tuple[datetime, datetime]:
+    from_ = from_.astimezone(UTC)
+    to = to.astimezone(UTC)
+    start_epoch = int(from_.timestamp())
+    end_epoch = int(to.timestamp())
+    expanded_start = start_epoch - (start_epoch % bucket_seconds)
+    expanded_end = (
+        end_epoch
+        if end_epoch % bucket_seconds == 0
+        else end_epoch + bucket_seconds - (end_epoch % bucket_seconds)
+    )
+    return datetime.fromtimestamp(expanded_start, UTC), datetime.fromtimestamp(expanded_end, UTC)
 
 
 def _utc_datetime(value: datetime) -> datetime:
@@ -624,6 +774,8 @@ class FailureRepository:
         replayed_at: datetime,
     ) -> None:
         updated = dict(failure)
+        previous_updated_at = _utc_datetime(failure["updated_at"])
+        replayed_at = max(replayed_at.astimezone(UTC), previous_updated_at + timedelta(milliseconds=1))
         updated["status"] = status
         updated["replay_count"] = int(failure["replay_count"]) + 1
         updated["last_replayed_at"] = replayed_at
