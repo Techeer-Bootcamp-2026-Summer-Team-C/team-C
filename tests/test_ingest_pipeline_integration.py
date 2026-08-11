@@ -18,7 +18,13 @@ from backend.runtime import RuntimeServices
 from backend.settings import Settings
 from backend.storage.clickhouse import EventRepository, FailureRepository
 from backend.storage.migrations import apply_clickhouse_file, apply_postgres_migrations
-from backend.storage.postgres import AlertRepository, EndpointRepository, IncidentRepository, IngestMetadataRepository
+from backend.storage.postgres import (
+    AlertRepository,
+    EndpointRepository,
+    EventIngestRegistryRepository,
+    IncidentRepository,
+    IngestMetadataRepository,
+)
 from backend.workers import DetectionWorker, EventStorageWorker, LifecycleTasks
 from tools.replay_failure import FailureNotFoundError, replay_failure
 
@@ -250,7 +256,8 @@ def test_actual_http_kafka_storage_detection_failure_and_replay_flow() -> None:
             storage_worker = EventStorageWorker(
                 consumer=raw_consumer,
                 producer=runtime.producer,
-                events=EventRepository(runtime.clickhouse),
+                events=EventRepository.for_ingest(runtime.clickhouse),
+                registry=EventIngestRegistryRepository(connection),
                 metadata=IngestMetadataRepository(connection),
                 failure_sink=failure_sink,
                 sleep=lambda _delay: None,
@@ -296,7 +303,8 @@ def test_actual_http_kafka_storage_detection_failure_and_replay_flow() -> None:
             duplicate_storage = EventStorageWorker(
                 consumer=raw_consumer,
                 producer=runtime.producer,
-                events=EventRepository(runtime.clickhouse),
+                events=EventRepository.for_ingest(runtime.clickhouse),
+                registry=EventIngestRegistryRepository(connection),
                 metadata=IngestMetadataRepository(connection),
                 failure_sink=failure_sink,
                 sleep=lambda _delay: None,
@@ -326,6 +334,7 @@ def test_actual_http_kafka_storage_detection_failure_and_replay_flow() -> None:
                 consumer=raw_consumer,
                 producer=runtime.producer,
                 events=AlwaysFailEvents(),
+                registry=EventIngestRegistryRepository(connection),
                 metadata=IngestMetadataRepository(connection),
                 failure_sink=failure_sink,
                 sleep=lambda _delay: None,
@@ -348,7 +357,8 @@ def test_actual_http_kafka_storage_detection_failure_and_replay_flow() -> None:
             replay_worker = EventStorageWorker(
                 consumer=raw_consumer,
                 producer=runtime.producer,
-                events=EventRepository(runtime.clickhouse),
+                events=EventRepository.for_ingest(runtime.clickhouse),
+                registry=EventIngestRegistryRepository(connection),
                 metadata=IngestMetadataRepository(connection),
                 failure_sink=failure_sink,
                 sleep=lambda _delay: None,

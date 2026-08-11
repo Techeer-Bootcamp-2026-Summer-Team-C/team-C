@@ -124,12 +124,17 @@ def test_initialize_postgres_applies_only_missing_migrations(
         lambda _connection, path: applied.append(path.name),
     )
     monkeypatch.setattr(prod_init, "_apply_versioned_postgres_migrations", lambda _connection: None)
+    registry = SimpleNamespace(assert_ready=MagicMock())
+    registry_factory = MagicMock(return_value=registry)
+    monkeypatch.setattr(prod_init, "EventIngestRegistryRepository", registry_factory)
 
     prod_init.initialize_postgres(settings)
 
     assert applied == expected_migrations
     executed_queries = [call.args[0] for call in connection.execute.call_args_list]
     assert "SELECT to_regclass('public.user_dashboard_layouts')" in executed_queries
+    registry_factory.assert_called_once_with(connection)
+    registry.assert_ready.assert_called_once_with()
 
 
 def test_main_checks_dependencies_before_running_initializers(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -146,6 +146,9 @@ def test_kafka_defaults_match_the_two_worker_pipeline() -> None:
     assert settings.kafka_partitions_per_topic == 2
     assert settings.kafka_replication_factor == 1
     assert settings.event_storage_consumer_group == "edr-event-storage-v1"
+    assert settings.event_ingest_lock_timeout_ms == 15_000
+    assert settings.event_ingest_registry_max_rows == 100_000_000
+    assert settings.event_ingest_registry_max_bytes == 53_687_091_200
     assert settings.detection_consumer_group == "edr-detection-v1"
 
 
@@ -156,6 +159,12 @@ def test_kafka_defaults_match_the_two_worker_pipeline() -> None:
 def test_kafka_counts_must_be_positive(field: str, value: int) -> None:
     with pytest.raises(ValidationError):
         Settings(**base_settings(**{field: value}))
+
+
+@pytest.mark.parametrize("timeout_ms", [99, 30_001])
+def test_event_ingest_lock_timeout_is_bounded(timeout_ms: int) -> None:
+    with pytest.raises(ValidationError):
+        Settings(**base_settings(event_ingest_lock_timeout_ms=timeout_ms))
 
 
 @pytest.mark.parametrize("ttl", [299, 604_801])

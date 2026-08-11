@@ -32,7 +32,12 @@ from backend.runtime import RuntimeServices
 from backend.settings import Settings
 from backend.storage.clickhouse import EventRepository, FailureRepository
 from backend.storage.migrations import apply_clickhouse_file, apply_postgres_migrations
-from backend.storage.postgres import AlertRepository, IncidentRepository, IngestMetadataRepository
+from backend.storage.postgres import (
+    AlertRepository,
+    EventIngestRegistryRepository,
+    IncidentRepository,
+    IngestMetadataRepository,
+)
 from backend.workers import DetectionWorker, EventStorageWorker
 from tools.provision_agent_cert import provision
 
@@ -589,7 +594,8 @@ def main() -> int:
                 EventStorageWorker(
                     consumer=raw_consumer,
                     producer=runtime.producer,
-                    events=EventRepository(runtime.clickhouse),
+                    events=EventRepository.for_ingest(runtime.clickhouse),
+                    registry=EventIngestRegistryRepository(connection),
                     metadata=IngestMetadataRepository(connection),
                     failure_sink=failure_sink,
                     sleep=lambda _: None,

@@ -13,6 +13,7 @@ from confluent_kafka.admin import AdminClient
 from backend.kafka import ensure_topics
 from backend.settings import Settings, get_settings
 from backend.storage.migrations import apply_clickhouse_file, apply_postgres_file
+from backend.storage.postgres import EventIngestRegistryRepository
 
 ROOT = Path(__file__).parents[1]
 POSTGRES_BASELINE_MIGRATIONS = {
@@ -126,6 +127,7 @@ def initialize_postgres(settings: Settings) -> None:
         if login_id_length != 64:
             connection.execute("ALTER TABLE users ALTER COLUMN login_id TYPE VARCHAR(64)")
         _apply_versioned_postgres_migrations(connection)
+        EventIngestRegistryRepository(connection).assert_ready()
 
 
 def _apply_versioned_postgres_migrations(connection) -> None:

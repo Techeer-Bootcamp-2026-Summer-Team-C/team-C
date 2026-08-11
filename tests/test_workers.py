@@ -6,12 +6,16 @@ from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID
 
+import pytest
+
 from backend.contracts.enums import AlertStatus, IncidentStatus
 from backend.detection import DetectionEngine
+from backend.errors import EventIngestLockTimeoutError
 from backend.failure import FailureSink, deterministic_failure_payload, failure_id_for
 from backend.kafka import RAW_TOPIC, VALIDATED_TOPIC, ConsumedMessage
 from backend.rule_loader import RuleLoader
-from backend.storage.models import EventIdentity, StoredAlert, StoredIncident
+from backend.storage.clickhouse import EventRepository
+from backend.storage.models import EventIdentity, EventIngestClaim, StoredAlert, StoredIncident
 from backend.workers import DetectionWorker, EventStorageWorker, LifecycleTasks
 
 NOW = datetime(2026, 7, 12, 1, 0, tzinfo=UTC)
@@ -72,6 +76,16 @@ class CapturingProducer:
         return None
 
 
+class SequencedProducer(CapturingProducer):
+    def __init__(self, acknowledgements: list[bool]) -> None:
+        super().__init__()
+        self.acknowledgements = acknowledgements
+
+    def publish(self, topic, *, key, value, headers=None):
+        super().publish(topic, key=key, value=value, headers=headers)
+        return self.acknowledgements.pop(0)
+
+
 class MemoryEvents:
     def __init__(self) -> None:
         self.rows = {}
@@ -87,6 +101,25 @@ class MemoryEvents:
         self.insert_count += len(rows)
         for row in rows:
             self.rows[row["event_id"]] = row
+
+
+class MemoryRegistry:
+    def __init__(self) -> None:
+        self.rows: dict[UUID, EventIdentity] = {}
+
+    @contextmanager
+    def claim(self, *, event_id, endpoint_id, agent_id, payload_sha256, **_kwargs):
+        identity = self.rows.get(event_id)
+        created = identity is None
+        if identity is None:
+            identity = EventIdentity(event_id, endpoint_id, agent_id, payload_sha256)
+            self.rows[event_id] = identity
+        try:
+            yield EventIngestClaim(identity=identity, created=created)
+        except Exception:
+            if created:
+                self.rows.pop(event_id, None)
+            raise
 
 
 class Metadata:
@@ -110,10 +143,12 @@ def test_storage_worker_saves_publishes_and_deduplicates() -> None:
     consumer = QueueConsumer([message(raw_message()), message(raw_message(), offset=2)])
     producer = CapturingProducer()
     events = MemoryEvents()
+    registry = MemoryRegistry()
     worker = EventStorageWorker(
         consumer=consumer,
         producer=producer,
         events=events,
+        registry=registry,
         metadata=Metadata(),
         failure_sink=Sink(),
         sleep=lambda _delay: None,
@@ -127,13 +162,83 @@ def test_storage_worker_saves_publishes_and_deduplicates() -> None:
     assert consumer.committed == [1, 2]
 
 
+def test_storage_worker_rejects_non_ingest_clickhouse_repository() -> None:
+    with pytest.raises(RuntimeError, match=r"requires EventRepository\.for_ingest\(\)"):
+        EventStorageWorker(
+            consumer=QueueConsumer([]),
+            producer=CapturingProducer(),
+            events=EventRepository.for_maintenance(SimpleNamespace()),
+            registry=MemoryRegistry(),
+            metadata=Metadata(),
+            failure_sink=Sink(),
+        )
+
+
+def test_storage_worker_retries_validated_publish_without_reinserting_event() -> None:
+    consumer = QueueConsumer([message(raw_message())])
+    producer = SequencedProducer([False, True])
+    events = MemoryEvents()
+    registry = MemoryRegistry()
+    sleeps: list[float] = []
+    worker = EventStorageWorker(
+        consumer=consumer,
+        producer=producer,
+        events=events,
+        registry=registry,
+        metadata=Metadata(),
+        failure_sink=Sink(),
+        sleep=sleeps.append,
+        now=lambda: NOW,
+    )
+
+    assert worker.run_once() is True
+    assert events.insert_count == 1
+    assert len(producer.messages) == 2
+    assert sleeps == [1]
+    assert consumer.committed == [1]
+    assert worker.reset_requested is False
+
+
+def test_storage_worker_registers_preexisting_clickhouse_event_without_reinserting() -> None:
+    events = MemoryEvents()
+    EventStorageWorker(
+        consumer=QueueConsumer([message(raw_message())]),
+        producer=CapturingProducer(),
+        events=events,
+        registry=MemoryRegistry(),
+        metadata=Metadata(),
+        failure_sink=Sink(),
+        sleep=lambda _delay: None,
+        now=lambda: NOW,
+    ).run_once()
+    registry = MemoryRegistry()
+    duplicate_consumer = QueueConsumer([message(raw_message(), offset=2)])
+
+    EventStorageWorker(
+        consumer=duplicate_consumer,
+        producer=CapturingProducer(),
+        events=events,
+        registry=registry,
+        metadata=Metadata(),
+        failure_sink=Sink(),
+        sleep=lambda _delay: None,
+        now=lambda: NOW,
+    ).run_once()
+
+    assert events.insert_count == 1
+    assert EVENT_ID in registry.rows
+    assert duplicate_consumer.committed == [2]
+
+
 def test_identity_conflict_is_durable_failure_and_sink_failure_does_not_commit() -> None:
     events = MemoryEvents()
+    registry = MemoryRegistry()
     first_consumer = QueueConsumer([message(raw_message())])
     EventStorageWorker(
         consumer=first_consumer,
         producer=CapturingProducer(),
         events=events,
+        registry=registry,
         metadata=Metadata(),
         failure_sink=Sink(),
         sleep=lambda _delay: None,
@@ -147,6 +252,7 @@ def test_identity_conflict_is_durable_failure_and_sink_failure_does_not_commit()
         consumer=durable_consumer,
         producer=CapturingProducer(),
         events=events,
+        registry=registry,
         metadata=Metadata(),
         failure_sink=durable_sink,
         sleep=lambda _delay: None,
@@ -160,6 +266,7 @@ def test_identity_conflict_is_durable_failure_and_sink_failure_does_not_commit()
         consumer=failed_consumer,
         producer=CapturingProducer(),
         events=events,
+        registry=registry,
         metadata=Metadata(),
         failure_sink=Sink(fail=True),
         sleep=lambda _delay: None,
@@ -177,6 +284,7 @@ def test_storage_worker_quarantines_invalid_message_without_retrying() -> None:
         consumer=consumer,
         producer=CapturingProducer(),
         events=MemoryEvents(),
+        registry=MemoryRegistry(),
         metadata=Metadata(),
         failure_sink=sink,
         sleep=sleeps.append,
@@ -196,10 +304,12 @@ def test_storage_worker_requests_connection_reset_after_retry_exhaustion() -> No
         def identity(self, _event_id):
             raise RuntimeError("database connection lost")
 
+    registry = MemoryRegistry()
     worker = EventStorageWorker(
         consumer=QueueConsumer([message(raw_message(), offset=7)]),
         producer=CapturingProducer(),
         events=BrokenEvents(),
+        registry=registry,
         metadata=Metadata(),
         failure_sink=Sink(),
         sleep=lambda _delay: None,
@@ -207,6 +317,36 @@ def test_storage_worker_requests_connection_reset_after_retry_exhaustion() -> No
     )
     assert worker.run_once() is True
     assert worker.reset_requested is True
+    assert registry.rows == {}
+
+
+def test_storage_worker_classifies_registry_lock_timeout_as_retryable_failure() -> None:
+    class LockedRegistry:
+        @contextmanager
+        def claim(self, **_kwargs):
+            raise EventIngestLockTimeoutError(100)
+            yield
+
+    consumer = QueueConsumer([message(raw_message(), offset=8)])
+    sink = Sink()
+    sleeps: list[float] = []
+    worker = EventStorageWorker(
+        consumer=consumer,
+        producer=CapturingProducer(),
+        events=MemoryEvents(),
+        registry=LockedRegistry(),
+        metadata=Metadata(),
+        failure_sink=sink,
+        sleep=sleeps.append,
+        now=lambda: NOW,
+    )
+
+    assert worker.run_once() is True
+    assert worker.reset_requested is True
+    assert consumer.committed == [8]
+    assert sleeps == [1, 5, 30]
+    assert sink.records[0][1]["failure_code"] == "EVENT_INGEST_LOCK_TIMEOUT"
+    assert sink.records[0][1]["retryable"] is True
 
 
 class MemoryAlerts:
@@ -242,6 +382,7 @@ def test_detection_worker_creates_idempotent_alert_and_incident_with_first_snaps
         consumer=storage_consumer,
         producer=producer,
         events=MemoryEvents(),
+        registry=MemoryRegistry(),
         metadata=Metadata(),
         failure_sink=Sink(),
         sleep=lambda _delay: None,

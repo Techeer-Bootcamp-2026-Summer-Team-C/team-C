@@ -1091,7 +1091,7 @@ def _direct_seed(
     events = _normalized_events(plan, endpoint_ids)
     clickhouse = clickhouse_connect.get_client(dsn=target.clickhouse_dsn, autogenerate_session_id=False)
     try:
-        EventRepository(clickhouse).insert(events)
+        EventRepository.for_maintenance(clickhouse).insert(events)
     finally:
         clickhouse.close()
     ids: dict[str, object] = {

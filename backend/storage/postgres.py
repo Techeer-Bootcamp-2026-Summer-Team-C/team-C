@@ -2,8 +2,10 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import UUID
 
 from psycopg import Connection
+from psycopg import errors as psycopg_errors
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
@@ -24,6 +26,7 @@ from backend.errors import (
     AgentIdentityConflictError,
     ArchivedDayImmutableError,
     EndpointRetiredError,
+    EventIngestLockTimeoutError,
     InvalidAgentCertificateError,
 )
 
@@ -33,11 +36,15 @@ from .models import (
     AlertInsert,
     EndpointAuthContext,
     EndpointInsert,
+    EventIdentity,
+    EventIngestClaim,
     IncidentInsert,
     IngestBucket,
     StoredAlert,
     StoredIncident,
 )
+
+EVENT_INGEST_LOCK_TIMEOUT_MS = 15_000
 
 
 def _escape_like_prefix(value: str) -> str:
@@ -1435,6 +1442,153 @@ class IncidentRepository:
             (from_, to, list(event_ids)),
         ).fetchall()
         return {str(event_id): int(count) for event_id, count in rows}
+
+
+class EventIngestRegistryRepository:
+    def __init__(
+        self,
+        connection: Connection[Any],
+        *,
+        lock_timeout_ms: int = EVENT_INGEST_LOCK_TIMEOUT_MS,
+    ) -> None:
+        if lock_timeout_ms < 1:
+            raise ValueError("event ingest lock timeout must be positive")
+        self.connection = connection
+        self.lock_timeout_ms = lock_timeout_ms
+
+    def assert_ready(self) -> None:
+        """Fail before consuming when the uniqueness registry contract is incomplete."""
+        with self.connection.transaction():
+            row = self.connection.execute(
+                """
+                WITH registry AS (
+                    SELECT to_regclass('public.event_ingest_registry') AS oid
+                ),
+                leaf_partitions AS (
+                    SELECT partition.relid
+                    FROM registry
+                    CROSS JOIN LATERAL pg_partition_tree(registry.oid) AS partition
+                    WHERE partition.isleaf
+                )
+                SELECT
+                    registry.oid IS NOT NULL,
+                    EXISTS (
+                        SELECT 1 FROM pg_constraint
+                        WHERE conrelid = registry.oid AND contype = 'p'
+                    ),
+                    EXISTS (
+                        SELECT 1 FROM pg_partitioned_table
+                        WHERE partrelid = registry.oid AND partstrat = 'h'
+                    ),
+                    (SELECT count(*) FROM leaf_partitions) = 16,
+                    EXISTS (
+                        SELECT 1 FROM pg_trigger
+                        WHERE tgrelid = registry.oid
+                          AND tgname = 'tr_event_ingest_registry_append_only'
+                          AND tgenabled <> 'D'
+                          AND NOT tgisinternal
+                    ),
+                    EXISTS (
+                        SELECT 1 FROM pg_trigger
+                        WHERE tgrelid = registry.oid
+                          AND tgname = 'tr_event_ingest_registry_no_truncate'
+                          AND tgenabled <> 'D'
+                          AND NOT tgisinternal
+                    ),
+                    NOT EXISTS (
+                        SELECT 1
+                        FROM leaf_partitions AS leaf
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM pg_trigger
+                            WHERE tgrelid = leaf.relid
+                              AND tgname = 'tr_event_ingest_registry_append_only'
+                              AND tgenabled <> 'D'
+                        )
+                    ),
+                    NOT EXISTS (
+                        SELECT 1
+                        FROM leaf_partitions AS leaf
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM pg_trigger
+                            WHERE tgrelid = leaf.relid
+                              AND tgname = 'tr_event_ingest_registry_no_truncate'
+                              AND tgenabled <> 'D'
+                        )
+                    )
+                FROM registry
+                """
+            ).fetchone()
+        check_names = (
+            "table",
+            "primary key",
+            "hash partitioning",
+            "16 leaf partitions",
+            "parent mutation trigger",
+            "parent truncate trigger",
+            "partition mutation triggers",
+            "partition truncate triggers",
+        )
+        check_values = row if row is not None else (False,) * len(check_names)
+        checks = dict(zip(check_names, check_values, strict=True))
+        missing = [name for name, present in checks.items() if not present]
+        if missing:
+            raise RuntimeError(
+                "event ingest registry schema is not ready; apply PostgreSQL migrations through 0013 "
+                f"(missing: {', '.join(missing)})"
+            )
+
+    @contextmanager
+    def claim(
+        self,
+        *,
+        event_id: UUID,
+        endpoint_id: int,
+        agent_id: str,
+        payload_sha256: str,
+        registered_at: datetime,
+    ) -> Iterator[EventIngestClaim]:
+        """Serialize storage for one event ID until the ClickHouse write completes."""
+        try:
+            with self.connection.transaction():
+                self.connection.execute(
+                    "SELECT set_config('lock_timeout', %s, true)",
+                    (f"{self.lock_timeout_ms}ms",),
+                ).fetchone()
+                row = self.connection.execute(
+                    """
+                    INSERT INTO event_ingest_registry (
+                        event_id, endpoint_id, agent_id, payload_sha256, registered_at
+                    ) VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (event_id) DO NOTHING
+                    RETURNING event_id, endpoint_id, agent_id, payload_sha256
+                    """,
+                    (event_id, endpoint_id, agent_id, payload_sha256, registered_at),
+                ).fetchone()
+                created = row is not None
+                if row is None:
+                    # ON CONFLICT already waits for an uncommitted creator. Once it
+                    # returns, this append-only row is committed and needs no write lock.
+                    row = self.connection.execute(
+                        """
+                        SELECT event_id, endpoint_id, agent_id, payload_sha256
+                        FROM event_ingest_registry
+                        WHERE event_id = %s
+                        """,
+                        (event_id,),
+                    ).fetchone()
+                if row is None:
+                    raise RuntimeError("event ingest registry claim disappeared")
+                yield EventIngestClaim(
+                    identity=EventIdentity(
+                        event_id=UUID(str(row[0])),
+                        endpoint_id=int(row[1]),
+                        agent_id=str(row[2]),
+                        payload_sha256=str(row[3]),
+                    ),
+                    created=created,
+                )
+        except psycopg_errors.LockNotAvailable as error:
+            raise EventIngestLockTimeoutError(self.lock_timeout_ms) from error
 
 
 class IngestMetadataRepository:

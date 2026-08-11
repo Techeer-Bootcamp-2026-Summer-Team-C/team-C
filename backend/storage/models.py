@@ -105,6 +105,12 @@ class EventIdentity:
 
 
 @dataclass(frozen=True, slots=True)
+class EventIngestClaim:
+    identity: EventIdentity
+    created: bool
+
+
+@dataclass(frozen=True, slots=True)
 class StoredAlert:
     alert_id: int
     created: bool

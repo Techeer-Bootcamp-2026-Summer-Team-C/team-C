@@ -126,7 +126,7 @@ def test_dashboard_api_auth_hot_restored_archive_and_empty_contracts() -> None:
         _raw_event(str(restored_event_id), 2, "agent-restored", now - timedelta(minutes=1), "notepad.exe"),
         ingested_at=now,
     )
-    EventRepository(clickhouse).insert([hot_record])
+    EventRepository.for_maintenance(clickhouse).insert([hot_record])
 
     with psycopg.connect(postgres_dsn) as connection:
         admin_hash = hash_password("admin-password")

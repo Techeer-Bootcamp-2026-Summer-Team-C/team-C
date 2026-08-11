@@ -320,7 +320,7 @@ def test_clickhouse_migration_event_repository_and_rollback() -> None:
             "updated_at": now,
             "is_delete": 0,
         }
-        repository = EventRepository(client)
+        repository = EventRepository.for_maintenance(client)
         repository.insert([event])
         repository.insert([event])
         identity = repository.identity(event_id)
@@ -443,7 +443,7 @@ def test_event_search_domain_boundary_and_dns_answer_membership() -> None:
     try:
         now = datetime(2026, 7, 12, tzinfo=UTC)
         window = (now, now + timedelta(seconds=1))
-        repository = EventRepository(client)
+        repository = EventRepository.for_maintenance(client)
         repository.insert(
             [
                 _dns_event(1, now, remote_domain="yahoo.com", dns_answers='["1.2.3.4"]'),
@@ -488,7 +488,7 @@ def test_event_search_endpoint_ids_pushdown() -> None:
     try:
         now = datetime(2026, 7, 12, tzinfo=UTC)
         window = (now, now + timedelta(seconds=1))
-        repository = EventRepository(client)
+        repository = EventRepository.for_maintenance(client)
         repository.insert(
             [
                 _dns_event(10, now, remote_domain="ep1.example.com", dns_answers="[]", endpoint_id=1),

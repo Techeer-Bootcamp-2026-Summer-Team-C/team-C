@@ -5,7 +5,7 @@ from backend.kafka import KafkaConsumer
 from backend.runtime import RuntimeServices
 from backend.settings import get_settings
 from backend.storage.clickhouse import EventRepository, FailureRepository
-from backend.storage.postgres import IngestMetadataRepository
+from backend.storage.postgres import EventIngestRegistryRepository, IngestMetadataRepository
 from backend.worker_health import mark_worker_heartbeat
 from backend.workers import EventStorageWorker
 
@@ -34,6 +34,7 @@ def main(argv: list[str] | None = None) -> int:
             with runtime.postgres() as connection:
                 worker = _worker(runtime, consumer, connection)
                 while not worker.reset_requested:
+                    mark_worker_heartbeat("event-storage-worker")
                     worker.run_once(1)
                     mark_worker_heartbeat("event-storage-worker")
     except KeyboardInterrupt:
@@ -43,10 +44,16 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _worker(runtime, consumer, connection) -> EventStorageWorker:
+    registry = EventIngestRegistryRepository(
+        connection,
+        lock_timeout_ms=runtime.settings.event_ingest_lock_timeout_ms,
+    )
+    registry.assert_ready()
     return EventStorageWorker(
         consumer=consumer,
         producer=runtime.producer,
-        events=EventRepository(runtime.clickhouse),
+        events=EventRepository.for_ingest(runtime.clickhouse),
+        registry=registry,
         metadata=IngestMetadataRepository(connection),
         failure_sink=FailureSink(
             s3_client=runtime.s3,

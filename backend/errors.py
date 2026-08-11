@@ -47,3 +47,13 @@ class RequestValidationError(ApplicationError):
 
 class ArchivedDayImmutableError(Exception):
     pass
+
+
+class EventIngestLockTimeoutError(Exception):
+    def __init__(self, lock_timeout_ms: int) -> None:
+        super().__init__(f"event ingest claim lock timed out after {lock_timeout_ms}ms")
+        self.lock_timeout_ms = lock_timeout_ms
+
+
+class EventIdentityConflictError(Exception):
+    pass

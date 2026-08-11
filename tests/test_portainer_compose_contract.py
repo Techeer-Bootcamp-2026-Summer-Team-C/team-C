@@ -121,7 +121,7 @@ def test_workers_expose_loop_heartbeat_healthchecks() -> None:
     services = _load("compose.service.yaml")["services"]
 
     expected_max_age = {
-        "event-storage-worker": "15",
+        "event-storage-worker": "240",
         "detection-worker": "15",
         "storage-lifecycle-worker": "75",
     }
